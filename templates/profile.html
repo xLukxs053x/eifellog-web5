@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="default-src 'self'; connect-src 'self' http://localhost:* https://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: file:; frame-src 'none';"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EifelLog Tracker | Login</title>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    />
+
+    <style>
+        :root {
+            --bg-1: #020502;
+            --bg-2: #040a06;
+            --bg-3: #08140c;
+
+            --panel: rgba(7, 15, 10, 0.68);
+            --panel-soft: rgba(10, 20, 15, 0.42);
+            --panel-dark: rgba(0, 0, 0, 0.42);
+
+            --line: rgba(255, 255, 255, 0.075);
+            --line-strong: rgba(137, 190, 50, 0.22);
+
+            --text: #edf3ff;
+            --muted: #93a4c8;
+            --muted-2: #687798;
+
+            --brand-yellow: #dce226;
+            --brand-yellow-rgb: 220, 226, 38;
+
+            --brand-green: #89be32;
+            --brand-green-rgb: 137, 190, 50;
+
+            --danger: #ff9f9f;
+            --danger-rgb: 255, 159, 159;
+
+            --success: #9fffc0;
+            --success-rgb: 159, 255, 192;
+
+            --discord: #5865f2;
+            --discord-rgb: 88, 101, 242;
+
+            --radius-xl: 32px;
+            --radius-lg: 26px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+
+            --shadow: 0 36px 100px rgba(0, 0, 0, 0.68);
+            --shadow-soft: 0 24px 70px rgba(0, 0, 0, 0.52);
+
+            --transition: 360ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+
+        ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-1);
+            color: var(--text);
+            font-family: "Inter", sans-serif;
+        }
+
+        body {
+            animation: pageIn 420ms ease-out forwards;
+        }
+
+        button,
+        a,
+        input,
+        label,
+        .no-drag,
+        .glass-card,
+        .quick-links {
+            -webkit-app-region: no-drag;
+        }
+
+        .drag-region {
+            -webkit-app-region: drag;
+        }
+
+        @keyframes pageIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.99);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes fadeZoom {
+            0% {
+                opacity: 0;
+                transform: scale(1);
+            }
+
+            10% {
+                opacity: 0.72;
+            }
+
+            33% {
+                opacity: 0.72;
+            }
+
+            45% {
+                opacity: 0;
+                transform: scale(1.055);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(1.055);
+            }
+        }
+
+        @keyframes dotPulse {
+            from {
+                opacity: 0.52;
+                transform: scale(0.82);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1.18);
+            }
+        }
+
+        @keyframes beam {
+            from {
+                transform: translateX(-28%);
+            }
+
+            to {
+                transform: translateX(28%);
+            }
+        }
+
+        .hero-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -10;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 20% 10%, rgba(var(--brand-green-rgb), 0.11), transparent 34%),
+                radial-gradient(circle at 82% 18%, rgba(var(--brand-yellow-rgb), 0.075), transparent 30%),
+                linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 48%, #010201 100%);
+        }
+
+        .hero-bg .bg-slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            filter: saturate(1.04) brightness(0.24) contrast(1.08);
+            opacity: 0;
+            animation: fadeZoom 24s infinite;
+        }
+
+        .hero-bg .slide-1 {
+            animation-delay: 0s;
+        }
+
+        .hero-bg .slide-2 {
+            animation-delay: 8s;
+        }
+
+        .hero-bg .slide-3 {
+            animation-delay: 16s;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 46% 34%, rgba(10, 20, 15, 0.18) 0%, rgba(4, 10, 6, 0.88) 58%, rgba(2, 5, 2, 0.98) 100%),
+                linear-gradient(180deg, rgba(2, 5, 2, 0.2) 0%, rgba(2, 5, 2, 0.96) 100%);
+        }
+
+        .hero-grid {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: radial-gradient(circle at center, black, transparent 76%);
+            opacity: 0.7;
+        }
+
+        .glass-nav {
+            background: rgba(7, 15, 10, 0.72);
+            backdrop-filter: blur(26px);
+            -webkit-backdrop-filter: blur(26px);
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            border-top: 1px solid rgba(var(--brand-green-rgb), 0.24);
+            border-left: 1px solid rgba(var(--brand-green-rgb), 0.12);
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.48);
+        }
+
+        .glass-card {
+            position: relative;
+            background:
+                linear-gradient(145deg, rgba(16, 28, 18, 0.46) 0%, rgba(3, 8, 4, 0.86) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.065);
+            border-top: 1px solid rgba(var(--brand-green-rgb), 0.22);
+            border-left: 1px solid rgba(var(--brand-green-rgb), 0.16);
+            border-radius: var(--radius-xl);
+            backdrop-filter: blur(34px);
+            -webkit-backdrop-filter: blur(34px);
+            box-shadow: var(--shadow);
+        }
+
+        .glass-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 16%;
+            right: 16%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(var(--brand-green-rgb), 0.75), rgba(var(--brand-yellow-rgb), 0.5), transparent);
+            opacity: 0.75;
+            pointer-events: none;
+        }
+
+        .glass-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background:
+                radial-gradient(circle at 18% 10%, rgba(var(--brand-green-rgb), 0.10), transparent 28%),
+                radial-gradient(circle at 84% 8%, rgba(var(--brand-yellow-rgb), 0.055), transparent 30%);
+            pointer-events: none;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            width: 100%;
+            min-height: 52px;
+            border-radius: var(--radius-sm);
+            padding: 12px 22px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 260ms ease;
+            text-decoration: none;
+            font-family: "Orbitron", sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .btn-primary {
+            background:
+                linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.2), rgba(var(--brand-green-rgb), 0.08));
+            color: var(--brand-green);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.5);
+            box-shadow:
+                0 0 18px rgba(var(--brand-green-rgb), 0.12),
+                inset 0 0 18px rgba(var(--brand-green-rgb), 0.03);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: rgba(var(--brand-green-rgb), 0.3);
+            color: #fff;
+            box-shadow:
+                0 0 28px rgba(var(--brand-green-rgb), 0.28),
+                inset 0 0 20px rgba(var(--brand-green-rgb), 0.08);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled,
+        .btn-secondary:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            filter: grayscale(0.7);
+            transform: none;
+        }
+
+        .btn-secondary {
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.105);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.085);
+            border-color: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+        }
+
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 50;
+            padding: 22px 28px;
+            pointer-events: none;
+        }
+
+        .header-shell {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            pointer-events: auto;
+        }
+
+        .header-nav {
+            padding: 12px 18px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+
+        .brand-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.72);
+            box-shadow:
+                0 0 16px rgba(var(--brand-green-rgb), 0.28),
+                inset 0 0 18px rgba(var(--brand-green-rgb), 0.08);
+            background: rgba(0, 0, 0, 0.55);
+            display: grid;
+            place-items: center;
+            color: var(--brand-green);
+            font-family: "Orbitron", sans-serif;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+
+        .brand-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .brand-copy {
+            display: flex;
+            flex-direction: column;
+            line-height: 1;
+        }
+
+        .brand-copy strong {
+            font-family: "Orbitron", sans-serif;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            color: var(--text);
+            text-transform: uppercase;
+        }
+
+        .brand-copy span {
+            margin-top: 6px;
+            font-family: "Orbitron", sans-serif;
+            font-size: 8px;
+            color: var(--brand-yellow);
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            font-weight: 800;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .system-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 9px 14px;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.28);
+            background: rgba(var(--brand-green-rgb), 0.075);
+            color: var(--brand-green);
+            font-family: "Orbitron", sans-serif;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .system-pill i {
+            display: block;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--brand-green);
+            box-shadow: 0 0 12px rgba(var(--brand-green-rgb), 0.9);
+            animation: dotPulse 1.8s infinite alternate;
+        }
+
+        .window-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .window-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.095);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: all 0.25s ease;
+        }
+
+        .window-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.095);
+            transform: translateY(-1px);
+        }
+
+        .window-btn.danger:hover {
+            color: var(--danger);
+            border-color: rgba(var(--danger-rgb), 0.35);
+            background: rgba(var(--danger-rgb), 0.08);
+        }
+
+        .shell {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            min-height: 100vh;
+            padding: 118px 30px 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .layout {
+            width: min(1180px, 100%);
+            display: grid;
+            grid-template-columns: minmax(380px, 460px) minmax(420px, 1fr);
+            gap: 40px;
+            align-items: center;
+        }
+
+        .scene {
+            width: 100%;
+            min-height: 680px;
+            perspective: 1800px;
+        }
+
+        .parallax-wrapper {
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.08s ease-out;
+        }
+
+        .flip-card {
+            position: relative;
+            width: 100%;
+            height: 680px;
+            transform-style: preserve-3d;
+            transition: transform 680ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .flip-card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .face {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            backface-visibility: hidden;
+        }
+
+        .face-back {
+            transform: rotateY(180deg);
+        }
+
+        .face-inner {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            padding: 36px 36px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .chip-center {
+            width: fit-content;
+            margin: 0 auto 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            border-radius: 999px;
+            padding: 7px 16px;
+            font-size: 10px;
+            font-family: "Orbitron", sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--brand-green);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.24);
+            background: rgba(var(--brand-green-rgb), 0.075);
+            box-shadow: inset 0 0 14px rgba(var(--brand-green-rgb), 0.035);
+            font-weight: 800;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--brand-green);
+            box-shadow: 0 0 10px rgba(var(--brand-green-rgb), 0.95);
+            animation: dotPulse 1.9s infinite alternate;
+        }
+
+        .eyebrow {
+            display: block;
+            color: var(--brand-yellow);
+            font-family: "Orbitron", sans-serif;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            margin-bottom: 10px;
+            font-weight: 900;
+        }
+
+        h1 {
+            margin: 0 0 18px;
+            font-family: "Orbitron", sans-serif;
+            font-size: 34px;
+            line-height: 1.12;
+            font-weight: 900;
+            letter-spacing: 0.005em;
+            color: #fff;
+        }
+
+        h1 .accent {
+            color: var(--brand-green);
+            text-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.32);
+        }
+
+        .lead {
+            margin: 0 0 24px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.66;
+            font-weight: 500;
+        }
+
+        .login-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .discord-icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 4px 0 20px;
+            color: var(--muted);
+            font-size: 10px;
+            font-family: "Orbitron", sans-serif;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            height: 1px;
+            flex: 1;
+            background: rgba(255, 255, 255, 0.085);
+        }
+
+        .form-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 13px;
+            margin-bottom: 18px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field label {
+            font-family: "Orbitron", sans-serif;
+            font-size: 9px;
+            letter-spacing: 0.17em;
+            text-transform: uppercase;
+            color: var(--brand-yellow);
+            font-weight: 900;
+        }
+
+        .field input {
+            width: 100%;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(255, 255, 255, 0.085);
+            background: rgba(0, 0, 0, 0.36);
+            color: var(--text);
+            outline: none;
+            padding: 15px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 220ms ease;
+        }
+
+        .field input::placeholder {
+            color: rgba(147, 164, 200, 0.46);
+        }
+
+        .field input:focus {
+            border-color: rgba(var(--brand-green-rgb), 0.58);
+            box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.075);
+            background: rgba(0, 0, 0, 0.48);
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .check-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .check-wrap input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--brand-green);
+        }
+
+        .mini-link {
+            border: 0;
+            background: transparent;
+            color: var(--brand-yellow);
+            font-family: "Orbitron", sans-serif;
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            font-weight: 900;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .mini-link:hover {
+            color: #fff;
+        }
+
+        .card-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 20px 0 12px;
+        }
+
+        .inner-card {
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            border-radius: var(--radius-md);
+            padding: 16px 17px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: 260ms ease;
+        }
+
+        .inner-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(var(--brand-green-rgb), 0.24);
+            transform: translateY(-1px);
+        }
+
+        .inner-card.full-width {
+            margin-bottom: 12px;
+        }
+
+        .card-eyebrow {
+            font-family: "Orbitron", sans-serif;
+            font-size: 9px;
+            color: var(--brand-yellow);
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            font-weight: 900;
+        }
+
+        .inner-card strong {
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .inner-card span.desc {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.48;
+        }
+
+        .status-box {
+            margin-top: auto;
+            padding: 14px 17px;
+            border-radius: var(--radius-md);
+            background: rgba(0, 0, 0, 0.42);
+            border: 1px solid rgba(255, 255, 255, 0.065);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .status-box svg {
+            flex: 0 0 auto;
+            margin-top: 1px;
+        }
+
+        .status-box p {
+            margin: 0;
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.45;
+        }
+
+        .status-box.info {
+            border-color: rgba(var(--brand-green-rgb), 0.28);
+            background: rgba(var(--brand-green-rgb), 0.055);
+        }
+
+        .status-box.error {
+            border-color: rgba(var(--danger-rgb), 0.3);
+            background: rgba(var(--danger-rgb), 0.065);
+        }
+
+        .status-box.success {
+            border-color: rgba(var(--success-rgb), 0.28);
+            background: rgba(var(--success-rgb), 0.055);
+        }
+
+        .status-box.warning {
+            border-color: rgba(var(--brand-yellow-rgb), 0.28);
+            background: rgba(var(--brand-yellow-rgb), 0.055);
+        }
+
+        .flip-cta-wrap {
+            display: flex;
+            justify-content: center;
+            margin-top: 18px;
+        }
+
+        .flip-cta,
+        .back-button {
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--muted);
+            font-size: 10px;
+            font-family: "Orbitron", sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 900;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 15px;
+            border-radius: 999px;
+            transition: 260ms ease;
+        }
+
+        .flip-cta:hover,
+        .back-button:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.055);
+        }
+
+        .flip-cta svg,
+        .back-button svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .back-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .back-button {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--text);
+        }
+
+        .patch-card {
+            background:
+                linear-gradient(145deg, rgba(16, 28, 18, 0.42), rgba(2, 6, 2, 0.72));
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-left: 2px solid var(--brand-green);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 14px;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+        }
+
+        .patch-card.yellow {
+            border-left-color: var(--brand-yellow);
+        }
+
+        .markdown {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.62;
+        }
+
+        .markdown p {
+            margin: 0 0 12px;
+        }
+
+        .markdown ul {
+            margin: 8px 0 0 18px;
+            padding: 0;
+        }
+
+        .markdown li {
+            list-style: none;
+            position: relative;
+            margin-bottom: 9px;
+        }
+
+        .markdown li::before {
+            content: ">";
+            position: absolute;
+            left: -17px;
+            top: 1px;
+            color: var(--brand-yellow);
+            font-family: "Orbitron", sans-serif;
+            font-size: 11px;
+        }
+
+        .markdown strong {
+            color: var(--text);
+        }
+
+        .release-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            font-family: "Orbitron", sans-serif;
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.13em;
+        }
+
+        .release-meta strong {
+            color: var(--brand-green);
+        }
+
+        .hero-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preview-card {
+            padding: 34px;
+            position: relative;
+            overflow: hidden;
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .preview-card::after {
+            content: "";
+            position: absolute;
+            right: -80px;
+            top: -80px;
+            width: 230px;
+            height: 230px;
+            border-radius: 999px;
+            background: rgba(var(--brand-green-rgb), 0.12);
+            filter: blur(20px);
+        }
+
+        .preview-card .eyebrow {
+            position: relative;
+            z-index: 2;
+        }
+
+        .preview-card h2 {
+            position: relative;
+            z-index: 2;
+            margin: 0;
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(34px, 5vw, 62px);
+            line-height: 0.98;
+            letter-spacing: -0.045em;
+            color: #fff;
+        }
+
+        .preview-card h2 span {
+            color: var(--brand-green);
+            text-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.26);
+        }
+
+        .preview-card p {
+            position: relative;
+            z-index: 2;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.72;
+            margin: 22px 0 0;
+            max-width: 560px;
+        }
+
+        .mini-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .mini-stat {
+            padding: 18px;
+            border-radius: 22px;
+            background: rgba(0, 0, 0, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .mini-stat small {
+            display: block;
+            color: var(--muted);
+            font-family: "Orbitron", sans-serif;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            margin-bottom: 8px;
+        }
+
+        .mini-stat strong {
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .quick-links {
+            display: flex;
+            justify-content: center;
+            gap: 34px;
+            padding-top: 2px;
+        }
+
+        .q-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--muted);
+            text-decoration: none;
+            font-family: "Orbitron", sans-serif;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            transition: 260ms ease;
+        }
+
+        .q-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.72;
+            transition: 260ms ease;
+        }
+
+        .q-link:hover {
+            color: var(--text);
+            transform: translateY(-2px);
+        }
+
+        .q-link:hover svg {
+            opacity: 1;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
+        }
+
+        .q-link.green {
+            color: var(--brand-green);
+        }
+
+        .q-link.yellow {
+            color: var(--brand-yellow);
+        }
+
+        @media (max-width: 1180px) {
+            html,
+            body {
+                overflow: auto;
+                min-height: 100vh;
+            }
+
+            .shell {
+                min-height: 100vh;
+                height: auto;
+                align-items: flex-start;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+                max-width: 760px;
+            }
+
+            .hero-panel {
+                display: none;
+            }
+
+            .scene {
+                min-height: 0;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .app-header {
+                padding: 18px;
+            }
+
+            .header-nav {
+                border-radius: 28px;
+            }
+
+            .system-pill,
+            .window-actions {
+                display: none;
+            }
+
+            .brand-copy strong {
+                font-size: 12px;
+            }
+
+            .shell {
+                padding: 96px 18px 60px;
+            }
+
+            .flip-card {
+                height: auto;
+                min-height: 0;
+            }
+
+            .face {
+                position: relative;
+                min-height: 0;
+            }
+
+            .face-back {
+                transform: none;
+                display: none;
+                margin-top: 16px;
+            }
+
+            .flip-card.is-flipped {
+                transform: none;
+            }
+
+            .flip-card.is-flipped .face-front {
+                display: none;
+            }
+
+            .flip-card.is-flipped .face-back {
+                display: block;
+            }
+
+            .face-inner {
+                height: auto;
+                min-height: 0;
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 29px;
+            }
+
+            .card-grid-2,
+            .mini-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-links {
+                gap: 18px;
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="hero-bg" aria-hidden="true">
+        <img class="bg-slide slide-1" src="./assets/eifellog-bg-1.jpg" alt="EifelLog Truck 1" onerror="this.style.display='none'" />
+        <img class="bg-slide slide-2" src="./assets/eifellog-bg-2.jpg" alt="EifelLog Truck 2" onerror="this.style.display='none'" />
+        <img class="bg-slide slide-3" src="./assets/eifellog-bg-3.jpg" alt="EifelLog Truck 3" onerror="this.style.display='none'" />
+        <div class="hero-overlay"></div>
+        <div class="hero-grid"></div>
+    </div>
+
+    <header class="app-header drag-region">
+        <div class="header-shell">
+            <nav class="glass-nav header-nav">
+                <div class="brand">
+                    <div class="brand-logo">
+                        <img src="./assets/eifellog-logo.png" alt="EifelLog Logo" onerror="this.remove()" />
+                        <span>EL</span>
+                    </div>
+
+                    <div class="brand-copy">
+                        <strong>Eifel LOG</strong>
+                        <span>Tracker Node</span>
+                    </div>
+                </div>
+
+                <div class="header-right no-drag">
+                    <div class="system-pill">
+                        <i></i>
+                        Secure Driver Node
+                    </div>
+
+                    <div class="window-actions">
+                        <button class="window-btn" type="button" onclick="EifelLogBridge.minimize()" aria-label="Minimieren">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14"></path>
+                            </svg>
+                        </button>
+
+                        <button class="window-btn danger" type="button" onclick="EifelLogBridge.close()" aria-label="Schließen">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="shell">
+        <div class="layout">
+            <section class="scene" aria-label="EifelLog Tracker Login">
+                <div class="parallax-wrapper" id="parallaxWrapper">
+                    <div class="flip-card" id="flipCard">
+                        <section class="face face-front glass-card" aria-label="Login">
+                            <div class="face-inner">
+                                <div class="chip-center">
+                                    <span class="status-dot"></span>
+                                    Driver Authentication
+                                </div>
+
+                                <span class="eyebrow">EifelLog Tracker</span>
+
+                                <h1>
+                                    Willkommen im<br />
+                                    <span class="accent">Driver Hub</span>
+                                </h1>
+
+                                <p class="lead">
+                                    Melde dich an, um den lokalen Tracker mit deinem EifelLog-Profil zu verbinden.
+                                    Danach werden Tourdaten, Telemetrie und Status synchronisiert.
+                                </p>
+
+                                <div class="login-actions">
+                                    <button type="button" class="btn-secondary" id="discordLoginButton">
+                                        <svg class="discord-icon" viewBox="0 0 24 24">
+                                            <path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515a13.715 13.715 0 0 0-.618 1.264a18.27 18.27 0 0 0-5.629 0a12.64 12.64 0 0 0-.631-1.264A19.736 19.736 0 0 0 3.67 4.369C.533 9.046-.319 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03a14.87 14.87 0 0 0 1.283-2.106a12.955 12.955 0 0 1-2.011-.964c.169-.124.334-.255.495-.389c3.88 1.823 8.082 1.823 11.916 0c.165.135.33.266.495.389c-.641.375-1.315.698-2.015.964c.365.757.795 1.46 1.287 2.106a19.857 19.857 0 0 0 6.001-3.03c.49-5.194-.838-9.687-3.226-13.688Z"></path>
+                                        </svg>
+                                        Discord Login
+                                    </button>
+                                </div>
+
+                                <div class="divider">
+                                    oder
+                                </div>
+
+                                <form id="loginForm" autocomplete="off">
+                                    <div class="form-grid">
+                                        <div class="field">
+                                            <label for="driverName">Fahrername</label>
+                                            <input
+                                                id="driverName"
+                                                name="driverName"
+                                                type="text"
+                                                placeholder="z. B. Lukxs"
+                                                minlength="3"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div class="field">
+                                            <label for="accessCode">Tracker Code</label>
+                                            <input
+                                                id="accessCode"
+                                                name="accessCode"
+                                                type="password"
+                                                placeholder="Dein persönlicher Tracker-Code"
+                                                minlength="4"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div class="remember-row">
+                                        <label class="check-wrap">
+                                            <input id="rememberLogin" type="checkbox" checked />
+                                            Eingeloggt bleiben
+                                        </label>
+
+                                        <button class="mini-link" type="button" id="helpButton">
+                                            Code erhalten?
+                                        </button>
+                                    </div>
+
+                                    <button type="submit" class="btn-primary" id="loginButton">
+                                        Tracker verbinden
+                                    </button>
+                                </form>
+
+                                <div class="card-grid-2">
+                                    <div class="inner-card">
+                                        <span class="card-eyebrow">Status</span>
+                                        <strong>Geschützt</strong>
+                                        <span class="desc">Der Tracker startet erst nach erfolgreichem Login.</span>
+                                    </div>
+
+                                    <div class="inner-card">
+                                        <span class="card-eyebrow">Sync</span>
+                                        <strong>Live</strong>
+                                        <span class="desc">Telemetrie wird später direkt an EifelLog gesendet.</span>
+                                    </div>
+                                </div>
+
+                                <div class="status-box info" id="statusCard">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-green)" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 8v5"></path>
+                                        <path d="M12 17h.01"></path>
+                                    </svg>
+
+                                    <p id="loginStatus">
+                                        Bitte melde dich an, um den EifelLog Tracker freizuschalten.
+                                    </p>
+                                </div>
+
+                                <div class="flip-cta-wrap">
+                                    <button type="button" class="flip-cta" id="showDetailsButton">
+                                        System Info
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M5 12h14"></path>
+                                            <path d="m12 5 7 7-7 7"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="face face-back glass-card" aria-label="System Info">
+                            <div class="face-inner">
+                                <div class="back-header">
+                                    <span class="eyebrow" style="margin: 0;">System Briefing</span>
+
+                                    <button type="button" class="back-button" id="showLoginButton">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m15 18-6-6 6-6"></path>
+                                        </svg>
+                                        Zurück
+                                    </button>
+                                </div>
+
+                                <div class="patch-card">
+                                    <span class="card-eyebrow">Tracker Login</span>
+
+                                    <div class="markdown">
+                                        <p>
+                                            Der <strong>EifelLog Tracker</strong> benötigt eine aktive Anmeldung,
+                                            damit Fahrten eindeutig deinem Fahrerprofil zugeordnet werden können.
+                                        </p>
+
+                                        <ul>
+                                            <li>Discord Login für normale Fahrer-Anmeldung.</li>
+                                            <li>Tracker Code als Fallback für lokale Tests.</li>
+                                            <li>Nach dem Login wird die Tracker-Oberfläche freigegeben.</li>
+                                            <li>Telemetrie startet erst nach erfolgreicher Authentifizierung.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="patch-card yellow">
+                                    <span class="card-eyebrow">Security Node</span>
+
+                                    <div class="markdown">
+                                        <p>
+                                            Der Client sendet keine Tourdaten, solange keine gültige Sitzung aktiv ist.
+                                            Die finale Prüfung sollte immer serverseitig über deine Flask-API erfolgen.
+                                        </p>
+
+                                        <ul>
+                                            <li>Session Token lokal speichern.</li>
+                                            <li>API-Anfragen mit Bearer Token absichern.</li>
+                                            <li>Ungültige Sessions automatisch zurück zum Login schicken.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="release-meta">
+                                        <span>CLIENT: <strong>WPF WebView2</strong></span>
+                                        <span>STATUS: <strong>LOGIN REQUIRED</strong></span>
+                                    </div>
+                                </div>
+
+                                <div class="inner-card full-width">
+                                    <span class="card-eyebrow">Hinweis</span>
+                                    <strong>WebView2 Bridge aktiv</strong>
+                                    <span class="desc">
+                                        Diese Seite sendet Login-Events an C# über <code>window.chrome.webview.postMessage</code>.
+                                    </span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="hero-panel" aria-hidden="true">
+                <div class="glass-card preview-card">
+                    <span class="eyebrow">EifelLog Network</span>
+
+                    <h2>
+                        Dein lokaler<br />
+                        <span>Telemetry Hub</span>
+                    </h2>
+
+                    <p>
+                        Verbinde deinen Account, starte ETS2 oder ATS und synchronisiere deine Fahrten
+                        direkt mit dem EifelLog Dashboard.
+                    </p>
+                </div>
+
+                <div class="mini-stats">
+                    <div class="mini-stat">
+                        <small>Auth</small>
+                        <strong>Secure</strong>
+                    </div>
+
+                    <div class="mini-stat">
+                        <small>Mode</small>
+                        <strong>Live</strong>
+                    </div>
+
+                    <div class="mini-stat">
+                        <small>Game</small>
+                        <strong>ETS2</strong>
+                    </div>
+                </div>
+
+                <nav class="quick-links" aria-label="Quick Links">
+                    <a href="#" class="q-link green" id="openDashboardLink">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12l2-2 7-7 7 7 2 2"></path>
+                            <path d="M5 10v10h14V10"></path>
+                            <path d="M10 20v-6h4v6"></path>
+                        </svg>
+                        Dashboard
+                    </a>
+
+                    <a href="#" class="q-link yellow" id="openDiscordLink">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515a13.715 13.715 0 0 0-.618 1.264a18.27 18.27 0 0 0-5.629 0a12.64 12.64 0 0 0-.631-1.264A19.736 19.736 0 0 0 3.67 4.369C.533 9.046-.319 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03a14.87 14.87 0 0 0 1.283-2.106a12.955 12.955 0 0 1-2.011-.964c.169-.124.334-.255.495-.389c3.88 1.823 8.082 1.823 11.916 0c.165.135.33.266.495.389c-.641.375-1.315.698-2.015.964c.365.757.795 1.46 1.287 2.106a19.857 19.857 0 0 0 6.001-3.03c.49-5.194-.838-9.687-3.226-13.688Z"></path>
+                        </svg>
+                        Discord
+                    </a>
+
+                    <a href="#" class="q-link" id="openSupportLink">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        Support
+                    </a>
+                </nav>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        const scene = document.querySelector(".scene");
+        const parallaxWrapper = document.getElementById("parallaxWrapper");
+        const flipCard = document.getElementById("flipCard");
+
+        const loginForm = document.getElementById("loginForm");
+        const loginButton = document.getElementById("loginButton");
+        const discordLoginButton = document.getElementById("discordLoginButton");
+
+        const driverNameInput = document.getElementById("driverName");
+        const accessCodeInput = document.getElementById("accessCode");
+        const rememberLoginInput = document.getElementById("rememberLogin");
+
+        const statusCard = document.getElementById("statusCard");
+        const loginStatus = document.getElementById("loginStatus");
+
+        const showDetailsButton = document.getElementById("showDetailsButton");
+        const showLoginButton = document.getElementById("showLoginButton");
+        const helpButton = document.getElementById("helpButton");
+
+        const openDashboardLink = document.getElementById("openDashboardLink");
+        const openDiscordLink = document.getElementById("openDiscordLink");
+        const openSupportLink = document.getElementById("openSupportLink");
+
+        window.EifelLogBridge = {
+            send(type, payload = null) {
+                const message = payload === null
+                    ? type
+                    : JSON.stringify({ type, payload });
+
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage(message);
+                    return true;
+                }
+
+                console.warn("WebView2 Bridge nicht verfügbar:", type, payload);
+                return false;
+            },
+
+            drag() {
+                this.send("window:drag");
+            },
+
+            minimize() {
+                this.send("tracker:minimize");
+            },
+
+            close() {
+                this.send("tracker:close");
+            },
+
+            openExternal(url) {
+                this.send("external:open", { url });
+            },
+
+            authDiscord() {
+                this.send("auth:discord");
+            },
+
+            authLogin(payload) {
+                this.send("auth:login", payload);
+            },
+
+            navigate(page) {
+                this.send("navigation:go", { page });
+            }
+        };
+
+        function setStatus(message, type = "info") {
+            statusCard.className = "status-box " + type;
+            loginStatus.textContent = message;
+        }
+
+        function setLoading(isLoading) {
+            loginButton.disabled = isLoading;
+            discordLoginButton.disabled = isLoading;
+
+            if (isLoading) {
+                loginButton.textContent = "Verbinde...";
+                return;
+            }
+
+            loginButton.textContent = "Tracker verbinden";
+        }
+
+        function showDetails() {
+            if (!parallaxWrapper || !flipCard) return;
+
+            parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
+            flipCard.classList.add("is-flipped");
+        }
+
+        function showLogin() {
+            if (!flipCard) return;
+
+            flipCard.classList.remove("is-flipped");
+        }
+
+        function goToTracker() {
+            window.location.href = "./index.html";
+        }
+
+        function storeSession(payload) {
+            const session = {
+                driverName: payload.driverName,
+                loginMethod: payload.loginMethod,
+                loggedInAt: new Date().toISOString()
+            };
+
+            if (payload.remember) {
+                localStorage.setItem("eifellog_tracker_session", JSON.stringify(session));
+            } else {
+                sessionStorage.setItem("eifellog_tracker_session", JSON.stringify(session));
+            }
+        }
+
+        function getExistingSession() {
+            try {
+                return (
+                    localStorage.getItem("eifellog_tracker_session") ||
+                    sessionStorage.getItem("eifellog_tracker_session")
+                );
+            } catch {
+                return null;
+            }
+        }
+
+        if (scene && parallaxWrapper && flipCard) {
+            scene.addEventListener("mousemove", (event) => {
+                if (flipCard.classList.contains("is-flipped")) {
+                    parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
+                    return;
+                }
+
+                const rect = scene.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const rotateX = ((y / rect.height) - 0.5) * 7;
+                const rotateY = ((x / rect.width) - 0.5) * -7;
+
+                parallaxWrapper.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            scene.addEventListener("mouseleave", () => {
+                parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
+            });
+        }
+
+        discordLoginButton.addEventListener("click", () => {
+            setStatus("Discord Login wird gestartet...", "warning");
+            setLoading(true);
+
+            const bridgeAvailable = EifelLogBridge.authDiscord();
+
+            if (!bridgeAvailable) {
+                setTimeout(() => {
+                    const payload = {
+                        driverName: "Discord Fahrer",
+                        loginMethod: "discord-dev",
+                        remember: true
+                    };
+
+                    storeSession(payload);
+                    setStatus("Dev-Modus: Discord Login simuliert. Tracker wird geöffnet.", "success");
+
+                    setTimeout(goToTracker, 700);
+                }, 700);
+
+                return;
+            }
+
+            setTimeout(() => {
+                setLoading(false);
+                setStatus("Warte auf Discord-Antwort vom Tracker Client.", "warning");
+            }, 1200);
+        });
+
+        loginForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+
+            const driverName = driverNameInput.value.trim();
+            const accessCode = accessCodeInput.value.trim();
+            const remember = rememberLoginInput.checked;
+
+            if (driverName.length < 3) {
+                setStatus("Bitte gib einen gültigen Fahrernamen ein.", "error");
+                driverNameInput.focus();
+                return;
+            }
+
+            if (accessCode.length < 4) {
+                setStatus("Bitte gib einen gültigen Tracker-Code ein.", "error");
+                accessCodeInput.focus();
+                return;
+            }
+
+            const payload = {
+                driverName,
+                accessCode,
+                remember,
+                loginMethod: "tracker-code"
+            };
+
+            setLoading(true);
+            setStatus("Zugangsdaten werden geprüft...", "warning");
+
+            const bridgeAvailable = EifelLogBridge.authLogin(payload);
+
+            if (!bridgeAvailable) {
+                setTimeout(() => {
+                    storeSession(payload);
+                    setStatus("Dev-Modus: Login akzeptiert. Tracker wird geöffnet.", "success");
+                    setTimeout(goToTracker, 750);
+                }, 850);
+
+                return;
+            }
+
+            setTimeout(() => {
+                setLoading(false);
+                setStatus("Login-Anfrage wurde an den C# Client gesendet.", "warning");
+            }, 1200);
+        });
+
+        helpButton.addEventListener("click", () => {
+            setStatus("Deinen Tracker-Code bekommst du im EifelLog Dashboard oder beim Management.", "warning");
+        });
+
+        showDetailsButton.addEventListener("click", showDetails);
+        showLoginButton.addEventListener("click", showLogin);
+
+        openDashboardLink.addEventListener("click", (event) => {
+            event.preventDefault();
+            EifelLogBridge.openExternal("https://eifellog.de/dashboard");
+            setStatus("Dashboard-Link wurde an den Client übergeben.", "info");
+        });
+
+        openDiscordLink.addEventListener("click", (event) => {
+            event.preventDefault();
+            EifelLogBridge.openExternal("https://discord.gg/K47NwSbJuE");
+            setStatus("Discord-Link wurde an den Client übergeben.", "info");
+        });
+
+        openSupportLink.addEventListener("click", (event) => {
+            event.preventDefault();
+            EifelLogBridge.openExternal("https://eifellog.de/support");
+            setStatus("Support-Link wurde an den Client übergeben.", "info");
+        });
+
+        document.querySelectorAll(".drag-region").forEach((region) => {
+            region.addEventListener("mousedown", (event) => {
+                if (event.button !== 0) return;
+
+                if (event.target.closest("button, a, input, label, .no-drag")) {
+                    return;
+                }
+
+                EifelLogBridge.drag();
+            });
+        });
+
+        window.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                showLogin();
+            }
+        });
+
+        window.EifelLogAuth = {
+            loginSuccess(payload = {}) {
+                setLoading(false);
+
+                storeSession({
+                    driverName: payload.driverName || driverNameInput.value.trim() || "EifelLog Fahrer",
+                    loginMethod: payload.loginMethod || "client",
+                    remember: rememberLoginInput.checked
+                });
+
+                setStatus("Login erfolgreich. Tracker wird geöffnet.", "success");
+                setTimeout(goToTracker, 700);
+            },
+
+            loginFailed(message = "Login fehlgeschlagen. Bitte prüfe deine Daten.") {
+                setLoading(false);
+                setStatus(message, "error");
+            },
+
+            logout() {
+                localStorage.removeItem("eifellog_tracker_session");
+                sessionStorage.removeItem("eifellog_tracker_session");
+                setStatus("Du wurdest ausgeloggt.", "warning");
+            }
+        };
+
+        window.addEventListener("DOMContentLoaded", () => {
+            const existingSession = getExistingSession();
+
+            if (existingSession) {
+                setStatus("Gespeicherte Sitzung gefunden. Tracker wird geöffnet.", "success");
+                setTimeout(goToTracker, 600);
+                return;
+            }
+
+            setStatus("Bitte melde dich an, um den EifelLog Tracker freizuschalten.", "info");
+        });
+    </script>
+</body>
+</html>
