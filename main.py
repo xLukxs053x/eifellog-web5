@@ -26,7 +26,6 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
-
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 PROFILE_UPLOAD_FOLDER = os.path.join("static", "uploads", "profiles")
@@ -73,7 +72,7 @@ API_BASE_URL = "https://discord.com/api/v10"
 # ==========================================
 
 MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "eifellog_db")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "eifellog")
 
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI fehlt. Bitte in deiner .env setzen.")
@@ -334,6 +333,21 @@ def get_discord_avatar_url(user_doc):
     return url_for("static", filename="eifellog.jpg")
 
 
+def make_external_url(possible_url):
+    possible_url = safe_str(possible_url)
+
+    if not possible_url:
+        return ""
+
+    if possible_url.startswith("http://") or possible_url.startswith("https://"):
+        return possible_url
+
+    if possible_url.startswith("/"):
+        return request.host_url.rstrip("/") + possible_url
+
+    return request.host_url.rstrip("/") + "/" + possible_url.lstrip("/")
+
+
 def prepare_profile_data(user_doc):
     profile_data = dict(user_doc)
 
@@ -462,6 +476,9 @@ def tracker_profile_payload(user_doc):
     profile = prepare_profile_data(user_doc)
     stats = get_profile_stats(user_doc)
 
+    avatar_url = make_external_url(profile.get("avatar_url"))
+    banner_url = make_external_url(user_doc.get("banner_url"))
+
     return {
         "id": str(user_doc.get("_id")),
         "discordId": safe_str(user_doc.get("discord_id")),
@@ -469,8 +486,8 @@ def tracker_profile_payload(user_doc):
         "displayName": profile.get("display_name"),
         "driverName": profile.get("display_name") or profile.get("username"),
         "discordUsername": safe_str(user_doc.get("discord_username")),
-        "avatarUrl": profile.get("avatar_url"),
-        "bannerUrl": safe_str(user_doc.get("banner_url")),
+        "avatarUrl": avatar_url,
+        "bannerUrl": banner_url,
         "role": get_primary_role_name(user_doc.get("roles", [])),
         "roles": user_doc.get("roles", []),
         "status": profile.get("status"),
@@ -684,10 +701,23 @@ def logout():
 # TRACKER API - LOGIN.HTML / INDEX.HTML
 # ==========================================
 
-@app.route("/api/tracker/login", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/login", methods=["GET", "POST", "OPTIONS"])
 def tracker_login():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST mit JSON.",
+            "method": "POST",
+            "contentType": "application/json",
+            "example": {
+                "driverName": "Fahrername",
+                "trackerCode": "EL-XXXX-XXXX-XXXX",
+                "remember": True
+            }
+        }), 200
 
     data = request.get_json(silent=True) or {}
 
@@ -781,10 +811,20 @@ def tracker_login():
     })
 
 
-@app.route("/api/tracker/session", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/session", methods=["GET", "POST", "OPTIONS"])
 def tracker_session_login():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST mit clientToken.",
+            "method": "POST",
+            "example": {
+                "clientToken": "elt_..."
+            }
+        }), 200
 
     data = request.get_json(silent=True) or {}
 
@@ -879,10 +919,16 @@ def tracker_profile():
     })
 
 
-@app.route("/api/tracker/logout", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/logout", methods=["GET", "POST", "OPTIONS"])
 def tracker_logout():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST mit clientToken."
+        }), 200
 
     data = request.get_json(silent=True) or {}
     client_token = safe_str(data.get("clientToken"))
@@ -906,11 +952,21 @@ def tracker_logout():
     })
 
 
-@app.route("/api/tracker/code/create", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/code/create", methods=["GET", "POST", "OPTIONS"])
 @tracker_api_key_required
 def tracker_create_code_admin():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST mit X-Tracker-Api-Key.",
+            "example": {
+                "driverName": "Fahrername",
+                "forceNew": False
+            }
+        }), 200
 
     data = request.get_json(silent=True) or {}
 
@@ -971,10 +1027,16 @@ def tracker_create_code_admin():
     })
 
 
-@app.route("/api/tracker/code/my", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/code/my", methods=["GET", "POST", "OPTIONS"])
 def tracker_create_code_for_logged_in_user():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST und eine eingeloggte Dashboard-Session."
+        }), 200
 
     current_user = get_current_user()
 
