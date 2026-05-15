@@ -1298,6 +1298,187 @@ def dashboard():
 
 
 # ==========================================
+# Tracker Management, Downloads, Fuhrpark - NUR FÜR DASHBOARD MITGLIEDER
+# ==========================================
+# PERSONALABTEILUNG / TRACKER-CODE VERWALTUNG
+# ==========================================
+
+ROLE_PERSONALABTEILUNG_ID = "1473725287505072174"
+ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
+ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
+
+PERSONALABTEILUNG_ALLOWED_ROLES = {
+    ROLE_PERSONALABTEILUNG_ID,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG_ID
+}
+
+
+def has_personalabteilung_permission(user_roles):
+    clean_user_roles = {str(role).strip() for role in user_roles if role}
+    return bool(clean_user_roles.intersection(PERSONALABTEILUNG_ALLOWED_ROLES))
+
+
+def require_personalabteilung_permission():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user_roles = session.get("user", {}).get("roles", [])
+
+    if not has_personalabteilung_permission(user_roles):
+        flash("Zugriff verweigert. Du benötigst Personalabteilung, Geschäftsführung oder Projektleitung.", "error")
+        return redirect(url_for("dashboard"))
+
+    return None
+
+
+def format_datetime_for_template(value):
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M")
+
+    if value:
+        return str(value)
+
+    return ""
+
+
+def get_role_name_for_driver(user_doc):
+    roles = {str(role).strip() for role in user_doc.get("roles", []) if role}
+
+    if ROLE_GESCHAEFTSFUEHRUNG_ID in roles:
+        return "Geschäftsführung"
+
+    if ROLE_PROJEKTLEITUNG_ID in roles:
+        return "Projektleitung"
+
+    if ROLE_PERSONALABTEILUNG_ID in roles:
+        return "Personalabteilung"
+
+    return get_primary_role_name(user_doc.get("roles", []))
+
+
+def prepare_driver_for_personalabteilung(user_doc):
+    driver = dict(user_doc)
+
+    driver["_id"] = str(driver.get("_id"))
+    driver["display_name"] = (
+        driver.get("display_name")
+        or driver.get("username")
+        or driver.get("discord_username")
+        or "EifelLog Fahrer"
+    )
+    driver["username"] = driver.get("username") or "driver"
+    driver["username_lc"] = driver.get("username_lc") or str(driver["username"]).lower()
+    driver["avatar_url"] = make_external_url(get_discord_avatar_url(driver))
+    driver["banner_url"] = make_external_url(driver.get("banner_url"))
+    driver["primary_role_name"] = get_role_name_for_driver(driver)
+    driver["tracker_enabled"] = driver.get("tracker_enabled", True)
+    driver["last_login"] = format_datetime_for_template(driver.get("last_login"))
+    driver["tracker_last_login"] = format_datetime_for_template(driver.get("tracker_last_login"))
+    driver["tracker_code_created_at"] = format_datetime_for_template(driver.get("tracker_code_created_at"))
+
+    return driver
+
+
+@app.route("/personalabteilung", methods=["GET"])
+def personalabteilung():
+    permission_response = require_personalabteilung_permission()
+
+    if permission_response:
+        return permission_response
+
+    drivers_cursor = users_collection.find({}).sort([
+        ("display_name", ASCENDING),
+        ("username", ASCENDING)
+    ])
+
+    drivers = [
+        prepare_driver_for_personalabteilung(driver)
+        for driver in drivers_cursor
+    ]
+
+    return render_template(
+        "Personalabteilung.html",
+        drivers=drivers
+    )
+
+
+@app.route("/personalabteilung/tracker-code/create", methods=["POST"])
+def personalabteilung_create_tracker_code():
+    permission_response = require_personalabteilung_permission()
+
+    if permission_response:
+        return jsonify({
+            "success": False,
+            "error": "Nicht berechtigt."
+        }), 403
+
+    data = request.get_json(silent=True) or {}
+
+    driver_name = safe_str(data.get("driverName"))
+    discord_id = safe_str(data.get("discordId"))
+    force_new = bool(data.get("forceNew", True))
+
+    if not driver_name and not discord_id:
+        return jsonify({
+            "success": False,
+            "error": "driverName oder discordId fehlt."
+        }), 400
+
+    if discord_id:
+        user_doc = users_collection.find_one({"discord_id": discord_id})
+    else:
+        user_doc = find_user_for_tracker_name(driver_name)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Fahrer wurde nicht gefunden."
+        }), 404
+
+    existing_hash = user_doc.get("tracker_code_hash")
+
+    if existing_hash and not force_new:
+        return jsonify({
+            "success": True,
+            "message": "Für diesen Fahrer existiert bereits ein Tracker-Code.",
+            "trackerCode": None,
+            "driver": tracker_profile_payload(user_doc)
+        })
+
+    tracker_code = generate_tracker_code()
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_code_hash": hash_secret(tracker_code),
+                "tracker_code_created_at": now_utc(),
+                "tracker_enabled": True,
+                "tracker_code_created_by": {
+                    "discord_id": str(session.get("user", {}).get("id", "")),
+                    "username": str(session.get("user", {}).get("username", "")),
+                    "created_at": now_utc()
+                }
+            },
+            "$unset": {
+                "tracker_code": ""
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker-Code wurde erstellt.",
+        "trackerCode": tracker_code,
+        "driver": tracker_profile_payload(fresh_user)
+    })
+# ==========================================
+
+# ==========================================
 # STANDARD ROUTEN
 # ==========================================
 
