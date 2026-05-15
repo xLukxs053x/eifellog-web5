@@ -189,8 +189,20 @@ def dashboard():
     user = session['user']
     user_roles = user.get('roles', [])
     
+    # --- SICHERHEITS-FIX: Rollen bereinigen (verhindert Fehler durch Leerzeichen in der .env) ---
+    clean_user_roles = [str(r).strip() for r in user_roles]
+    clean_allowed_roles = [str(r).strip() for r in ALLOWED_HUB_ROLES if r]
+    
     # 2. Prüfen ob der Nutzer eine der erlaubten Rollen hat
-    has_permission = any(role in user_roles for role in ALLOWED_HUB_ROLES)
+    has_permission = any(role in clean_user_roles for role in clean_allowed_roles)
+    
+    # --- DEBUGGING-AUSGABE IN DER KONSOLE ---
+    print("\n=== LOGIN DEBUG INFO ===")
+    print(f"User: {user['username']}")
+    print(f"User Rollen (Discord): {clean_user_roles}")
+    print(f"Erlaubte Rollen (.env): {clean_allowed_roles}")
+    print(f"Zugriff gewährt: {has_permission}")
+    print("========================\n")
     
     if not has_permission:
         flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle (z.B. Fahrer), um das Dashboard zu betreten.", "error")
@@ -207,19 +219,19 @@ def dashboard():
         
     # 4. Höchste/Wichtigste Rolle für das Dokumenten-Modal ermitteln (Hierarchisch absteigend)
     primary_role_name = "Fahrer"
-    if ROLE_GESCHAEFTSLEITUNG in user_roles:
+    if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles:
         primary_role_name = "Geschäftsleitung"
-    elif ROLE_PROJEKTLEITUNG in user_roles:
+    elif str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles:
         primary_role_name = "Projektleitung"
-    elif ROLE_PERSONALMANAGEMENT in user_roles:
+    elif str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles:
         primary_role_name = "Personalmanagement"
-    elif ROLE_HR_CONTROLLING in user_roles:
+    elif str(ROLE_HR_CONTROLLING).strip() in clean_user_roles:
         primary_role_name = "HR Controlling"
-    elif ROLE_BUCHHALTUNG in user_roles:
+    elif str(ROLE_BUCHHALTUNG).strip() in clean_user_roles:
         primary_role_name = "Buchhaltung"
-    elif ROLE_DISPOSITION in user_roles:
+    elif str(ROLE_DISPOSITION).strip() in clean_user_roles:
         primary_role_name = "Disposition"
-    elif ROLE_FUHRPARKMANAGEMENT in user_roles:
+    elif str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles:
         primary_role_name = "Fuhrparkmanagement"
 
     return render_template('dashboard.html', 
