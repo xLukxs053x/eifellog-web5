@@ -27,7 +27,7 @@
         <svg class="w-6 h-6 text-[var(--text)] group-hover:text-[var(--brand-yellow)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
         </svg>
-        
+
         {% if needs_signature or (user_documents and user_documents|length > 0) %}
             <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full animate-ping"></span>
             <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full shadow-[0_0_10px_rgba(255,159,159,0.8)]"></span>
@@ -43,7 +43,7 @@
         </h3>
         <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--brand-green)] font-normal">km</span></p>
     </div>
-    
+
     <div class="glass-card p-6 flex flex-col justify-center">
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -51,7 +51,7 @@
         </h3>
         <p class="text-3xl font-bold text-white mt-1">0,00 <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span></p>
     </div>
-    
+
     <div class="glass-card p-6 flex flex-col justify-center">
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
@@ -71,19 +71,19 @@
 </div>
 
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
-    
+
     <div class="xl:col-span-2 flex flex-col gap-6">
-        
+
         <div class="glass-card p-6 relative overflow-hidden">
             <div class="absolute -right-10 -top-10 opacity-5">
                 <svg class="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"><path d="M20,8h-3V6c0-1.1-0.9-2-2-2H3C1.9,4,1,4.9,1,6v11h2c0,1.66,1.34,3,3,3s3-1.34,3-3h6c0,1.66,1.34,3,3,3s3-1.34,3-3h2v-5 L20,8z M6,18.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S6.83,18.5,6,18.5z M18,18.5c-0.83,0-1.5-0.67-1.5-1.5 s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S18.83,18.5,18,18.5z M17,12h-4V6h2C16.1,6,17,6.9,17,8V12z"/></svg>
             </div>
-            
+
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse shadow-[0_0_8px_rgba(137,190,50,0.8)]"></span>
                 Aktueller Auftrag
             </h2>
-            
+
             <div class="bg-black/30 rounded-xl p-5 border border-white/5">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6">
                     <div class="flex-1 w-full">
@@ -103,7 +103,7 @@
                             <span class="text-[var(--brand-yellow)]">0% Abgeschlossen</span>
                         </div>
                     </div>
-                    
+
                     <div class="flex-shrink-0 bg-white/5 border border-white/10 rounded-lg p-3 text-center min-w-[150px]">
                         <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Fracht</p>
                         <p class="text-sm font-bold text-white">-</p>
@@ -118,7 +118,7 @@
                 <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">Fahrtenbuch</h2>
                 <button class="text-xs font-orbitron text-[var(--brand-green)] uppercase tracking-wider hover:text-white transition-colors">Alle anzeigen &rarr;</button>
             </div>
-            
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -141,7 +141,7 @@
     </div>
 
     <div class="flex flex-col gap-6 h-full">
-        
+
         <div class="glass-card p-6">
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Schnellzugriff</h2>
             <div class="grid grid-cols-2 gap-3">
@@ -210,37 +210,59 @@
     </div>
 </div>
 
-
-<div id="general-alerts-wrapper" class="fixed inset-0 z-[100] hidden bg-black/50 backdrop-blur-sm transition-opacity duration-300 opacity-0">
+<div id="general-alerts-wrapper" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="alerts-backdrop" class="absolute inset-0 cursor-pointer"></div>
-    
-    <div id="general-alerts-panel" class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[#111] border-l border-white/10 shadow-[-10px_0_30px_rgba(0,0,0,0.5)] transform translate-x-full transition-transform duration-300 flex flex-col p-6 z-10 overflow-hidden">
-        
-        <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4 shrink-0 mt-6 md:mt-0">
-            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide flex items-center gap-2">
-                <svg class="w-5 h-5 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                System Alerts
-            </h2>
-            <button id="btn-close-alerts" class="p-2 rounded-full hover:bg-white/10 text-[var(--muted)] hover:text-white transition-colors cursor-pointer">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
+
+    <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
+
+        <div class="p-6 border-b border-white/10 shrink-0">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center text-[var(--brand-yellow)] shadow-[0_0_25px_rgba(220,226,38,0.08)]">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">EifelLog Hub</span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">System Alerts</h2>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Wichtige Dokumente, Hinweise und Bestätigungen für deinen Account.
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btn-close-alerts" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--muted)] hover:text-white transition-colors cursor-pointer shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
-        
-        <div class="space-y-3 overflow-y-auto flex-grow pr-2">
-            
-            <button class="doc-trigger w-full text-left p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-white/10 transition-all group relative"
+
+        <div class="p-6 space-y-3 overflow-y-auto flex-grow custom-scrollbar">
+
+            <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/70 hover:bg-white/[0.07] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="EifelLog Richtlinien"
                     data-sender="Management"
                     data-date="Standard">
                 <div class="flex items-center gap-4">
-                    <div class="p-2 rounded-lg bg-[var(--brand-green)]/10 text-[var(--brand-green)] group-hover:scale-110 transition-transform">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
                     </div>
-                    <div>
-                        <h4 class="text-sm font-bold font-orbitron text-white">EifelLog.doc</h4>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-3">
+                            <h4 class="text-sm font-bold font-orbitron text-white truncate">EifelLog.doc</h4>
+                            <span class="text-[9px] font-orbitron uppercase tracking-widest text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 rounded-full px-2 py-1">
+                                Standard
+                            </span>
+                        </div>
                         <p class="text-xs text-[var(--muted)] mt-1 font-inter">Allgemeine Speditionsrichtlinien</p>
                     </div>
                 </div>
+
                 <div class="hidden doc-data-content">
                     <p><strong>1. Grundsätze der Eifel LOG</strong><br>
                     Als Mitarbeiter der Eifel LOG repräsentierst du unsere Spedition auf dem virtuellen Asphalt. Real Life geht immer vor, dennoch erwarten wir einen respektvollen und fairen Umgang.</p>
@@ -251,248 +273,347 @@
 
             {% if user_documents %}
                 {% for doc in user_documents %}
-                <button class="doc-trigger w-full text-left p-4 rounded-xl bg-white/5 border border-[var(--brand-yellow)]/30 hover:border-[var(--brand-yellow)] hover:bg-white/10 transition-all group relative"
+                <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.06] border border-[var(--brand-yellow)]/25 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                         data-title="{{ doc.title }}"
                         data-sender="{{ doc.sender }}"
                         data-date="{{ doc.date }}"
                         data-needs-signature="true">
-                    
-                    <span class="absolute top-3 right-3 w-2 h-2 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_8px_rgba(220,226,38,0.8)] animate-pulse"></span>
-                    
-                    <div class="flex items-center gap-4">
-                        <div class="p-2 rounded-lg bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)] group-hover:scale-110 transition-transform">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+
+                    <span class="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
+
+                    <div class="flex items-center gap-4 pr-5">
+                        <div class="p-3 rounded-xl bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)] border border-[var(--brand-yellow)]/20 group-hover:scale-105 transition-transform">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
                         </div>
-                        <div>
-                            <h4 class="text-sm font-bold font-orbitron text-white">{{ doc.title }}</h4>
-                            <p class="text-xs text-[var(--muted)] mt-1 font-inter">{{ doc.sender }} • {{ doc.date }}</p>
+                        <div class="min-w-0 flex-1">
+                            <h4 class="text-sm font-bold font-orbitron text-white truncate">{{ doc.title }}</h4>
+                            <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">{{ doc.sender }} • {{ doc.date }}</p>
+                            <p class="text-[10px] text-[var(--brand-yellow)] font-orbitron uppercase tracking-widest mt-2">Signatur erforderlich</p>
                         </div>
                     </div>
+
                     <div class="hidden doc-data-content">{{ doc.content | safe }}</div>
                 </button>
                 {% endfor %}
             {% endif %}
-            
+
+        </div>
+
+        <div class="px-6 py-4 border-t border-white/10 bg-black/20 shrink-0">
+            <p class="text-[11px] text-[var(--muted)] font-inter leading-relaxed">
+                Tipp: Klicke auf ein Dokument, um es direkt im zentrierten Reader zu öffnen.
+            </p>
         </div>
     </div>
 </div>
 
-<div id="universal-doc-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0">
-    <div class="glass-card p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border-t-[var(--brand-green)]/50 shadow-[0_0_50px_rgba(137,190,50,0.1)] mx-4 relative flex flex-col transform transition-transform duration-300 scale-95" id="univ-doc-panel">
-        
-        <div class="flex justify-between items-center mb-6 shrink-0">
-            <div class="flex items-center gap-3">
-                <svg class="w-6 h-6 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <h2 id="univ-doc-title" class="text-xl md:text-2xl font-orbitron font-bold text-white tracking-wide">Titel</h2>
-            </div>
-            <button id="univ-doc-close" class="p-2 text-[var(--muted)] hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-        
-        <div class="bg-black/40 border border-white/5 p-4 rounded-xl mb-6 text-xs font-orbitron text-[var(--muted)] uppercase tracking-wider grid grid-cols-2 gap-4 shrink-0">
-            <div>
-                <span class="block text-white/40 mb-1">Adressat:</span>
-                <span class="text-white">{{ current_user.username }}</span>
-            </div>
-            <div>
-                <span class="block text-white/40 mb-1">Absender / Rolle:</span>
-                <span id="univ-doc-sender" class="text-[var(--brand-yellow)]">Management</span>
-            </div>
-        </div>
-        
-        <div id="univ-doc-content" class="bg-black/30 border border-white/5 rounded-xl p-6 mb-8 text-sm text-gray-300 font-inter leading-relaxed space-y-4 overflow-y-auto flex-grow custom-scrollbar">
-            </div>
+<div id="universal-doc-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
+    <div class="glass-card max-w-2xl w-full max-h-[90vh] overflow-hidden border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] mx-auto relative flex flex-col transform transition-all duration-300 scale-95 translate-y-4" id="univ-doc-panel">
 
-        <div id="univ-doc-signature-section" class="border-t border-white/10 pt-6 shrink-0 hidden">
+        <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
+            <div class="flex justify-between items-start gap-4">
+                <div class="flex items-start gap-3 min-w-0">
+                    <div class="w-11 h-11 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Dokument Reader</span>
+                        <h2 id="univ-doc-title" class="text-xl md:text-2xl font-orbitron font-bold text-white tracking-wide mt-1 break-words">Titel</h2>
+                    </div>
+                </div>
+
+                <button id="univ-doc-close" class="p-2 text-[var(--muted)] hover:text-white hover:bg-white/10 rounded-full border border-white/10 bg-white/5 transition-colors cursor-pointer shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="px-6 md:px-8 pt-5 shrink-0">
+            <div class="bg-black/40 border border-white/5 p-4 rounded-2xl text-xs font-orbitron text-[var(--muted)] uppercase tracking-wider grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <span class="block text-white/40 mb-1">Adressat:</span>
+                    <span class="text-white">{{ current_user.username }}</span>
+                </div>
+                <div>
+                    <span class="block text-white/40 mb-1">Absender / Rolle:</span>
+                    <span id="univ-doc-sender" class="text-[var(--brand-yellow)]">Management</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 md:px-8 py-5 overflow-y-auto flex-grow custom-scrollbar">
+            <div id="univ-doc-content" class="bg-black/30 border border-white/5 rounded-2xl p-6 text-sm text-gray-300 font-inter leading-relaxed space-y-4">
+            </div>
+        </div>
+
+        <div id="univ-doc-signature-section" class="border-t border-white/10 p-6 md:p-8 pt-6 shrink-0 hidden bg-black/20">
             <label class="block text-xs font-orbitron text-[var(--brand-green)] mb-3 uppercase tracking-wider">
                 Digitale Signatur erforderlich zur Kenntnisnahme
             </label>
-            <input type="text" id="univ-sig-input" placeholder="Tippe deinen Discord-Namen zur Bestätigung ein..." class="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white font-inter focus:outline-none focus:border-[var(--brand-green)] focus:ring-1 focus:ring-[var(--brand-green)] transition-all mb-4">
-            
+
+            <input type="text"
+                   id="univ-sig-input"
+                   placeholder="Tippe deinen Discord-Namen zur Bestätigung ein..."
+                   class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white font-inter focus:outline-none focus:border-[var(--brand-green)] focus:ring-1 focus:ring-[var(--brand-green)] transition-all mb-4">
+
             <button id="univ-btn-submit" class="btn-primary w-full justify-center opacity-50 cursor-not-allowed transition-all" disabled>
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
                 Unterzeichnen & Bestätigen
             </button>
-            <p id="univ-sig-error" class="text-[var(--danger)] text-xs font-inter mt-3 text-center hidden">Fehler beim Bestätigen. Bitte erneut versuchen.</p>
+
+            <p id="univ-sig-error" class="text-[var(--danger)] text-xs font-inter mt-3 text-center hidden">
+                Fehler beim Bestätigen. Bitte erneut versuchen.
+            </p>
         </div>
     </div>
 </div>
 
-<div id="first-login-msg-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-500 opacity-0">
-    <div class="glass-card p-8 max-w-md w-full text-center border-t-[var(--brand-yellow)]/50 shadow-[0_0_50px_rgba(220,226,38,0.1)] mx-4 transform transition-transform duration-500 scale-90" id="first-login-panel">
+<div id="first-login-msg-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-500 opacity-0 px-4 py-6">
+    <div class="glass-card p-8 max-w-md w-full text-center border-t-[var(--brand-yellow)]/50 shadow-[0_0_50px_rgba(220,226,38,0.1)] mx-auto transform transition-all duration-500 scale-90 translate-y-4" id="first-login-panel">
         <div class="w-16 h-16 mx-auto rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center mb-6 text-[var(--brand-yellow)]">
-            <svg class="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <svg class="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
         </div>
-        <h2 class="text-2xl font-orbitron font-bold text-[var(--brand-yellow)] mb-4 tracking-wider">Meldung!</h2>
+
+        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Wichtige Meldung</span>
+        <h2 class="text-2xl font-orbitron font-bold text-white mb-4 mt-2 tracking-wider">System Alert</h2>
+
         <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-8">
             Hallo <strong class="text-white">{{ current_user.username }}</strong>, es warten wichtige System Alerts auf dich, die deine Aufmerksamkeit und Unterschrift erfordern.
         </p>
-        <button id="btn-ok-msg" class="w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/50 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 transition-all cursor-pointer">
+
+        <button id="btn-ok-msg" class="w-full px-8 py-4 rounded-2xl font-orbitron font-bold text-sm uppercase tracking-widest bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/50 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 hover:-translate-y-0.5 transition-all cursor-pointer">
             OK, Verstanden
         </button>
     </div>
 </div>
 
-
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // --- Variablen ---
         const needsGlobalPolicySignature = {{ 'true' if needs_signature else 'false' }};
         const hasPersonalDocs = {{ 'true' if user_documents and user_documents|length > 0 else 'false' }};
-        const currentRole = "{{ primary_role_name }}";
-        
-        // Modal 1: System Alerts (Sidebar)
+        const currentRole = {{ primary_role_name | tojson }};
+
         const alertBell = document.getElementById('alert-bell');
         const alertsWrapper = document.getElementById('general-alerts-wrapper');
         const alertsPanel = document.getElementById('general-alerts-panel');
         const alertsBackdrop = document.getElementById('alerts-backdrop');
         const btnCloseAlerts = document.getElementById('btn-close-alerts');
-        
-        // Modal 2: Universal Document Reader
+
         const univModal = document.getElementById('universal-doc-modal');
         const univPanel = document.getElementById('univ-doc-panel');
         const univTitle = document.getElementById('univ-doc-title');
         const univContent = document.getElementById('univ-doc-content');
         const univSender = document.getElementById('univ-doc-sender');
         const univCloseBtn = document.getElementById('univ-doc-close');
-        
-        // Signatur Bereich
+
         const univSigSection = document.getElementById('univ-doc-signature-section');
         const univSigInput = document.getElementById('univ-sig-input');
         const univBtnSubmit = document.getElementById('univ-btn-submit');
         const univSigError = document.getElementById('univ-sig-error');
 
-        // Modal 3: Erst-Login
         const firstLoginModal = document.getElementById('first-login-msg-modal');
         const firstLoginPanel = document.getElementById('first-login-panel');
         const btnOkMsg = document.getElementById('btn-ok-msg');
 
-        // --- HILFSFUNKTIONEN FÜR SMOOTH FADE/SLIDE ---
-        
-        // Öffnet die Alerts Sidebar
+        const defaultSubmitButtonHtml = univBtnSubmit.innerHTML;
+        let currentDocumentRequiresSignature = false;
+
+        function showCenteredOverlay(element) {
+            element.classList.remove('hidden');
+            element.classList.add('flex');
+        }
+
+        function hideCenteredOverlay(element) {
+            element.classList.add('hidden');
+            element.classList.remove('flex');
+        }
+
+        function lockBodyScroll() {
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function unlockBodyScroll() {
+            if (
+                alertsWrapper.classList.contains('hidden') &&
+                univModal.classList.contains('hidden') &&
+                firstLoginModal.classList.contains('hidden')
+            ) {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
         function openSidebar() {
-            alertsWrapper.classList.remove('hidden');
-            // Timeout nötig für CSS Transition
+            lockBodyScroll();
+            showCenteredOverlay(alertsWrapper);
+
             setTimeout(() => {
                 alertsWrapper.classList.remove('opacity-0');
-                alertsPanel.classList.remove('translate-x-full');
+                alertsPanel.classList.remove('scale-95', 'translate-y-4');
             }, 10);
         }
 
-        // Schließt die Alerts Sidebar
         function closeSidebar() {
             alertsWrapper.classList.add('opacity-0');
-            alertsPanel.classList.add('translate-x-full');
+            alertsPanel.classList.add('scale-95', 'translate-y-4');
+
             setTimeout(() => {
-                alertsWrapper.classList.add('hidden');
-            }, 300); // 300ms = Dauer der Transition
-        }
-
-        // Öffnet das Dokumenten Modal (Fade & Scale In)
-        function openDocumentModal(title, content, sender, requireSignature) {
-            univTitle.innerHTML = title;
-            univContent.innerHTML = content;
-            univSender.innerHTML = sender;
-
-            if (requireSignature) {
-                univCloseBtn.classList.add('hidden'); // Verstecke X
-                univSigSection.classList.remove('hidden'); // Zeige Signatur
-                univSigInput.value = '';
-                univBtnSubmit.disabled = true;
-                univBtnSubmit.classList.add('opacity-50', 'cursor-not-allowed');
-                univSigError.classList.add('hidden');
-            } else {
-                univCloseBtn.classList.remove('hidden'); // Zeige X
-                univSigSection.classList.add('hidden'); // Verstecke Signatur
-            }
-
-            univModal.classList.remove('hidden');
-            setTimeout(() => {
-                univModal.classList.remove('opacity-0');
-                univPanel.classList.remove('scale-95');
-            }, 10);
-        }
-
-        // Schließt das Dokumenten Modal (Fade & Scale Out)
-        function closeDocumentModal() {
-            univModal.classList.add('opacity-0');
-            univPanel.classList.add('scale-95');
-            setTimeout(() => {
-                univModal.classList.add('hidden');
+                hideCenteredOverlay(alertsWrapper);
+                unlockBodyScroll();
             }, 300);
         }
 
+        function openDocumentModal(title, content, sender, requireSignature) {
+            currentDocumentRequiresSignature = requireSignature;
 
-        // --- EVENT LISTENER VERKNÜPFUNGEN ---
+            univTitle.textContent = title || 'Dokument';
+            univContent.innerHTML = content || '';
+            univSender.textContent = sender || 'System';
 
-        // 1. Glocke klicken -> Sidebar auf
+            univContent.scrollTop = 0;
+            univPanel.scrollTop = 0;
+
+            univBtnSubmit.innerHTML = defaultSubmitButtonHtml;
+            univSigError.classList.add('hidden');
+
+            if (requireSignature) {
+                univCloseBtn.classList.add('hidden');
+                univSigSection.classList.remove('hidden');
+                univSigInput.value = '';
+                univBtnSubmit.disabled = true;
+                univBtnSubmit.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                univCloseBtn.classList.remove('hidden');
+                univSigSection.classList.add('hidden');
+            }
+
+            lockBodyScroll();
+            showCenteredOverlay(univModal);
+
+            setTimeout(() => {
+                univModal.classList.remove('opacity-0');
+                univPanel.classList.remove('scale-95', 'translate-y-4');
+
+                if (requireSignature) {
+                    univSigInput.focus();
+                }
+            }, 10);
+        }
+
+        function closeDocumentModal() {
+            univModal.classList.add('opacity-0');
+            univPanel.classList.add('scale-95', 'translate-y-4');
+
+            setTimeout(() => {
+                hideCenteredOverlay(univModal);
+                unlockBodyScroll();
+            }, 300);
+        }
+
+        function openFirstLoginModal() {
+            lockBodyScroll();
+            showCenteredOverlay(firstLoginModal);
+
+            setTimeout(() => {
+                firstLoginModal.classList.remove('opacity-0');
+                firstLoginPanel.classList.remove('scale-90', 'translate-y-4');
+            }, 10);
+        }
+
+        function closeFirstLoginModal(callback) {
+            firstLoginModal.classList.add('opacity-0');
+            firstLoginPanel.classList.add('scale-90', 'translate-y-4');
+
+            setTimeout(() => {
+                hideCenteredOverlay(firstLoginModal);
+                unlockBodyScroll();
+
+                if (typeof callback === 'function') {
+                    callback();
+                }
+            }, 500);
+        }
+
         alertBell.addEventListener('click', openSidebar);
-        
-        // 2. Sidebar schließen (über X oder Klick auf Hintergrund)
         btnCloseAlerts.addEventListener('click', closeSidebar);
         alertsBackdrop.addEventListener('click', closeSidebar);
 
-        // 3. Dokument in der Sidebar anklicken
         const docTriggers = document.querySelectorAll('.doc-trigger');
+
         docTriggers.forEach(btn => {
             btn.addEventListener('click', () => {
                 const title = btn.getAttribute('data-title');
-                const sender = btn.getAttribute('data-sender') || "System";
-                const content = btn.querySelector('.doc-data-content').innerHTML;
-                const requiresSig = btn.getAttribute('data-needs-signature') === "true";
-                
-                // Sidebar zu, Dokument auf
+                const sender = btn.getAttribute('data-sender') || 'System';
+                const contentElement = btn.querySelector('.doc-data-content');
+                const content = contentElement ? contentElement.innerHTML : '';
+                const requiresSig = btn.getAttribute('data-needs-signature') === 'true';
+
                 closeSidebar();
-                // Kurze Verzögerung, damit es flüssiger aussieht
+
                 setTimeout(() => {
                     openDocumentModal(title, content, sender, requiresSig);
-                }, 300); 
+                }, 300);
             });
         });
 
-        // 4. Dokument schließen (X Button)
         univCloseBtn.addEventListener('click', closeDocumentModal);
 
-        // --- AUTOMATISCHER ZWANG BEIM LADEN (Meldung -> Dokument) ---
-        if (needsGlobalPolicySignature || hasPersonalDocs) {
-            // Zeige Warn-Meldung (Fade In)
-            firstLoginModal.classList.remove('hidden');
-            setTimeout(() => {
-                firstLoginModal.classList.remove('opacity-0');
-                firstLoginPanel.classList.remove('scale-90');
-            }, 10);
+        univModal.addEventListener('click', (event) => {
+            if (event.target === univModal && !currentDocumentRequiresSignature) {
+                closeDocumentModal();
+            }
+        });
 
-            // Klick auf "OK, Verstanden"
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+
+            if (!alertsWrapper.classList.contains('hidden')) {
+                closeSidebar();
+                return;
+            }
+
+            if (!univModal.classList.contains('hidden') && !currentDocumentRequiresSignature) {
+                closeDocumentModal();
+            }
+        });
+
+        if (needsGlobalPolicySignature || hasPersonalDocs) {
+            openFirstLoginModal();
+
             btnOkMsg.addEventListener('click', () => {
-                // Fade out Meldung
-                firstLoginModal.classList.add('opacity-0');
-                firstLoginPanel.classList.add('scale-90');
-                
-                setTimeout(() => {
-                    firstLoginModal.classList.add('hidden');
-                    
-                    // Lade direkt das Pflicht-Dokument
+                closeFirstLoginModal(() => {
                     if (needsGlobalPolicySignature) {
                         const policyContent = `
                             <p><strong>1. Grundsätze der Eifel LOG</strong><br>Als Mitarbeiter (${currentRole}) repräsentierst du uns auf dem virtuellen Asphalt. Real Life geht vor.</p>
                             <p class="mt-4"><strong>2. Fuhrpark & Touren</strong><br>Tempolimits sind einzuhalten. Das Ausnutzen von Bugs führt zum Ausschluss.</p>
                             <p class="mt-4"><strong>3. Bestätigung</strong><br>Durch deine digitale Signatur bestätigst du die Regeln.</p>`;
-                        openDocumentModal("EifelLog.doc", policyContent, "Management", true);
+
+                        openDocumentModal('EifelLog.doc', policyContent, 'Management', true);
                     } else if (hasPersonalDocs) {
                         const firstPersonalDoc = document.querySelector('.doc-trigger[data-needs-signature="true"]');
+
                         if (firstPersonalDoc) {
                             const title = firstPersonalDoc.getAttribute('data-title');
-                            const sender = firstPersonalDoc.getAttribute('data-sender');
-                            const content = firstPersonalDoc.querySelector('.doc-data-content').innerHTML;
+                            const sender = firstPersonalDoc.getAttribute('data-sender') || 'System';
+                            const contentElement = firstPersonalDoc.querySelector('.doc-data-content');
+                            const content = contentElement ? contentElement.innerHTML : '';
+
                             openDocumentModal(title, content, sender, true);
                         }
                     }
-                }, 500); // Warten bis Meldung weg ist
+                });
             });
         }
 
-        // --- SIGNATUR EINGABE & SPEICHERN LOGIK ---
         univSigInput.addEventListener('input', (e) => {
             if (e.target.value.trim().length > 2) {
                 univBtnSubmit.disabled = false;
@@ -505,8 +626,17 @@
 
         univBtnSubmit.addEventListener('click', () => {
             const signature = univSigInput.value.trim();
-            univBtnSubmit.innerHTML = '<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Bestätige...';
+
+            univBtnSubmit.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Bestätige...
+            `;
+
             univBtnSubmit.disabled = true;
+            univBtnSubmit.classList.add('opacity-50', 'cursor-not-allowed');
 
             fetch('/api/sign_policy', {
                 method: 'POST',
@@ -516,7 +646,6 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Smooth Fade Out vor dem Reload
                     closeDocumentModal();
                     setTimeout(() => window.location.reload(), 300);
                 } else {
@@ -525,12 +654,13 @@
             })
             .catch(error => {
                 console.error('Error:', error);
+
                 univSigError.classList.remove('hidden');
-                univBtnSubmit.innerHTML = 'Unterzeichnen & Bestätigen';
+                univBtnSubmit.innerHTML = defaultSubmitButtonHtml;
                 univBtnSubmit.disabled = false;
+                univBtnSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
             });
         });
-
     });
 </script>
 {% endblock %}
