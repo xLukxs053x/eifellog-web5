@@ -23,22 +23,34 @@
         </div>
     </div>
 
-    <button id="alert-bell" class="relative p-3 bg-white/5 border border-white/10 rounded-full hover:border-[var(--brand-yellow)] hover:bg-white/10 transition-all duration-300 shadow-lg focus:outline-none group cursor-pointer z-[90]">
-        <svg class="w-6 h-6 text-[var(--text)] group-hover:text-[var(--brand-yellow)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-        </svg>
+    <div class="flex items-center gap-3">
+        <a href="{{ url_for('profile', username=current_user.username) }}"
+           class="hidden sm:inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] shadow-[0_0_18px_rgba(137,190,50,0.12)]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            Mein Profil
+        </a>
 
-        {% if needs_signature or (user_documents and user_documents|length > 0) %}
-            <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full animate-ping"></span>
-            <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full shadow-[0_0_10px_rgba(255,159,159,0.8)]"></span>
-        {% endif %}
-    </button>
+        <button id="alert-bell" class="relative p-3 bg-white/5 border border-white/10 rounded-full hover:border-[var(--brand-yellow)] hover:bg-white/10 transition-all duration-300 shadow-lg focus:outline-none group cursor-pointer z-[90]">
+            <svg class="w-6 h-6 text-[var(--text)] group-hover:text-[var(--brand-yellow)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+
+            {% if needs_signature or (user_documents and user_documents|length > 0) %}
+                <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full animate-ping"></span>
+                <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full shadow-[0_0_10px_rgba(255,159,159,0.8)]"></span>
+            {% endif %}
+        </button>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 relative z-10">
     <div class="glass-card p-6 flex flex-col justify-center">
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+            <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
             Gefahrene KM
         </h3>
         <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--brand-green)] font-normal">km</span></p>
@@ -46,7 +58,9 @@
 
     <div class="glass-card p-6 flex flex-col justify-center">
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
             Kontostand
         </h3>
         <p class="text-3xl font-bold text-white mt-1">0,00 <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span></p>
@@ -54,7 +68,9 @@
 
     <div class="glass-card p-6 flex flex-col justify-center">
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+            <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
             Abgeschlossen
         </h3>
         <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--muted)] font-normal">Touren</span></p>
@@ -63,7 +79,9 @@
     <div class="glass-card p-6 flex flex-col justify-center relative overflow-hidden">
         <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] w-0 shadow-[0_0_10px_rgba(137,190,50,0.8)]"></div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+            </svg>
             Fahrer Level
         </h3>
         <p class="text-3xl font-bold text-white mt-1">- <span class="text-sm text-[var(--brand-green)] font-normal">0 XP</span></p>
@@ -76,7 +94,9 @@
 
         <div class="glass-card p-6 relative overflow-hidden">
             <div class="absolute -right-10 -top-10 opacity-5">
-                <svg class="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"><path d="M20,8h-3V6c0-1.1-0.9-2-2-2H3C1.9,4,1,4.9,1,6v11h2c0,1.66,1.34,3,3,3s3-1.34,3-3h6c0,1.66,1.34,3,3,3s3-1.34,3-3h2v-5 L20,8z M6,18.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S6.83,18.5,6,18.5z M18,18.5c-0.83,0-1.5-0.67-1.5-1.5 s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S18.83,18.5,18,18.5z M17,12h-4V6h2C16.1,6,17,6.9,17,8V12z"/></svg>
+                <svg class="w-48 h-48" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20,8h-3V6c0-1.1-0.9-2-2-2H3C1.9,4,1,4.9,1,6v11h2c0,1.66,1.34,3,3,3s3-1.34,3-3h6c0,1.66,1.34,3,3,3s3-1.34,3-3h2v-5 L20,8z M6,18.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S6.83,18.5,6,18.5z M18,18.5c-0.83,0-1.5-0.67-1.5-1.5 s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S18.83,18.5,18,18.5z M17,12h-4V6h2C16.1,6,17,6.9,17,8V12z"/>
+                </svg>
             </div>
 
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center gap-2">
@@ -146,26 +166,42 @@
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Schnellzugriff</h2>
             <div class="grid grid-cols-2 gap-3">
                 <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
                     <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Tour Eintragen</span>
                 </button>
 
-                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-yellow)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                <a href="/fuhrpark" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/10 transition-all text-center group">
+                    <svg class="w-6 h-6 text-[var(--brand-yellow)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                    </svg>
                     <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Fuhrpark</span>
-                </button>
+                </a>
 
                 <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-white mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <svg class="w-6 h-6 text-white mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
                     <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Statistiken</span>
                 </button>
 
                 <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#5865F2] hover:bg-[#5865F2]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[#5865F2] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>
+                    <svg class="w-6 h-6 text-[#5865F2] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
+                    </svg>
                     <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Support</span>
                 </button>
 
-                <a href="/downloads" class="col-span-2 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
+                <a href="{{ url_for('profile', username=current_user.username) }}" class="p-4 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-center group relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider relative z-10">Mein Profil</span>
+                </a>
+
+                <a href="/downloads" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
                     <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
                     </svg>
@@ -209,7 +245,9 @@
                 </div>
                 <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
                     <span class="text-gray-400 font-inter flex items-center gap-2">
-                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path>
+                        </svg>
                         Wetter (Ingame):
                     </span>
                     <span class="text-white font-inter">-</span>
