@@ -1,22 +1,54 @@
 {% extends "base.html" %}
 
-{% block title %}EifelLog - Driver Hub{% endblock %}
+{% block title %}EifelLog - Hub Access{% endblock %}
 
 {% block content %}
-<div class="glass rounded-3xl p-10 max-w-4xl mx-auto mt-10 relative overflow-hidden">
-    <div class="absolute -top-24 -right-24 w-72 h-72 bg-[#106f2e] rounded-full mix-blend-screen filter blur-[100px] opacity-20 pointer-events-none"></div>
-
-    <div class="flex items-center gap-4 mb-8">
-        <div class="h-1 w-12 bg-gradient-to-r from-[#dce226] to-[#89be32] rounded-full"></div>
-        <h1 class="text-3xl md:text-4xl font-bold">Driver Hub</h1>
-    </div>
+<section class="flex-grow flex items-center justify-center min-h-[70vh] py-12">
     
-    <div class="text-center py-16">
-        <svg class="w-20 h-20 mx-auto text-[#89be32] mb-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
-        <h2 class="text-2xl font-bold text-white mb-4">System im Aufbau</h2>
-        <p class="text-gray-400 max-w-lg mx-auto">
-            Hier entsteht in Kürze das Speditions-System von EifelLog. Bald kannst du hier deine Touren einreichen, Statistiken ansehen und deinen Fuhrpark verwalten.
+    <!-- Login Card -->
+    <div class="glass-card p-10 md:p-14 max-w-lg w-full relative overflow-hidden text-center z-10">
+        
+        <!-- Background Ambient Glow (Discord Blue + Eifel Green) -->
+        <div class="absolute -top-20 -right-20 w-64 h-64 bg-[#5865F2] rounded-full mix-blend-screen filter blur-[80px] opacity-20 pointer-events-none"></div>
+        <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-[var(--brand-green)] rounded-full mix-blend-screen filter blur-[80px] opacity-15 pointer-events-none"></div>
+
+        <!-- Lock/Security Icon -->
+        <div class="w-20 h-20 mx-auto rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,255,255,0.05)] relative z-10">
+            <svg class="w-10 h-10 text-[var(--brand-green)] animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+        </div>
+        
+        <!-- Titel -->
+        <h1 class="text-3xl font-orbitron font-bold text-white mb-2 tracking-wide relative z-10">
+            Driver Hub <span class="text-[var(--brand-green)]">Access</span>
+        </h1>
+        
+        <!-- Untertitel / Info -->
+        <p class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase mb-8 relative z-10">
+            Restricted Area • Eifel LOG Personnel Only
         </p>
+        
+        <!-- Beschreibung -->
+        <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-10 relative z-10">
+            Bitte authentifiziere dich über unseren Discord-Server, um Zugang zum internen Speditions-System zu erhalten.
+            <br><br>
+            <span class="text-white/70 text-xs">
+                Nach erfolgreicher Anmeldung wirst du automatisch auf dein persönliches <strong class="text-white">Dashboard</strong> weitergeleitet.
+            </span>
+        </p>
+        
+        <!-- Discord Login Button -->
+        <div class="relative z-10">
+            <a href="/login" class="flex items-center justify-center w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest transition-all duration-300 bg-[#5865F2]/10 border border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white hover:shadow-[0_0_25px_rgba(88,101,242,0.5)] hover:-translate-y-1">
+                <!-- Discord Logo SVG -->
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" class="mr-3">
+                    <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
+                </svg>
+                Discord Login
+            </a>
+        </div>
+        
     </div>
-</div>
+</section>
 {% endblock %}
