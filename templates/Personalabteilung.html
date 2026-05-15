@@ -50,7 +50,7 @@
     .personal-page {
         position: relative;
         min-height: calc(100vh - 120px);
-        padding: 34px;
+        padding: 34px 34px 150px;
         color: var(--el-text);
         overflow: visible;
         z-index: 1;
@@ -515,30 +515,34 @@
     }
 
     .toast-layer {
-        position: fixed;
+        position: fixed !important;
         right: 24px;
-        bottom: 24px;
-        z-index: 5000;
+        bottom: 104px;
+        z-index: 2147483000;
         display: grid;
         gap: 12px;
         pointer-events: none;
+        max-width: calc(100vw - 48px);
     }
 
     .toast {
-        width: min(440px, calc(100vw - 40px));
+        width: min(440px, calc(100vw - 48px));
+        max-height: calc(100vh - 170px);
+        overflow-y: auto;
         border-radius: 18px;
         padding: 16px 18px;
-        background: rgba(8, 17, 12, 0.96);
-        border: 1px solid rgba(var(--el-green-rgb), 0.24);
-        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.58);
+        background: rgba(8, 17, 12, 0.98);
+        border: 1px solid rgba(var(--el-green-rgb), 0.34);
+        box-shadow: 0 22px 58px rgba(0, 0, 0, 0.72);
         backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
         color: var(--el-text);
         pointer-events: auto;
         animation: toastIn 260ms ease-out forwards;
     }
 
     .toast.error {
-        border-color: rgba(var(--el-danger-rgb), 0.34);
+        border-color: rgba(var(--el-danger-rgb), 0.44);
     }
 
     .toast strong {
@@ -567,7 +571,7 @@
         padding: 12px;
         border-radius: 14px;
         background: rgba(0, 0, 0, 0.34);
-        border: 1px dashed rgba(var(--el-yellow-rgb), 0.32);
+        border: 1px dashed rgba(var(--el-yellow-rgb), 0.42);
         color: var(--el-yellow);
         font-family: "Orbitron", sans-serif;
         font-size: 14px;
@@ -610,7 +614,7 @@
 
     @media (max-width: 720px) {
         .personal-page {
-            padding: 18px;
+            padding: 18px 18px 140px;
         }
 
         .page-head {
@@ -620,6 +624,16 @@
         .role-access,
         .stats-grid {
             grid-template-columns: 1fr;
+        }
+
+        .toast-layer {
+            right: 16px;
+            bottom: 92px;
+            max-width: calc(100vw - 32px);
+        }
+
+        .toast {
+            width: calc(100vw - 32px);
         }
     }
 </style>
