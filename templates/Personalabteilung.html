@@ -1,0 +1,931 @@
+{% extends "base.html" %}
+
+{% block title %}Personalabteilung | EifelLog{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --el-bg-1: #010302;
+        --el-bg-2: #030806;
+        --el-bg-3: #08120c;
+
+        --el-card: rgba(7, 14, 10, 0.72);
+        --el-card-strong: rgba(8, 17, 12, 0.88);
+        --el-card-soft: rgba(12, 22, 16, 0.46);
+
+        --el-line: rgba(255, 255, 255, 0.075);
+        --el-line-green: rgba(111, 146, 50, 0.28);
+
+        --el-text: #edf3ff;
+        --el-muted: #9aa9c4;
+        --el-muted-2: #64718c;
+
+        --el-yellow: #dce226;
+        --el-yellow-rgb: 220, 226, 38;
+
+        --el-green: #6f9232;
+        --el-green-soft: #86ad48;
+        --el-green-rgb: 111, 146, 50;
+
+        --el-danger: #ff9f9f;
+        --el-danger-rgb: 255, 159, 159;
+
+        --el-success: #9fffc0;
+        --el-success-rgb: 159, 255, 192;
+
+        --el-radius-xl: 30px;
+        --el-radius-lg: 24px;
+        --el-radius-md: 16px;
+        --el-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+    }
+
+    .personal-page {
+        position: relative;
+        min-height: calc(100vh - 120px);
+        padding: 34px;
+        color: var(--el-text);
+        overflow: hidden;
+    }
+
+    .personal-page::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        background:
+            radial-gradient(circle at 18% 14%, rgba(var(--el-green-rgb), 0.13), transparent 32%),
+            radial-gradient(circle at 78% 16%, rgba(var(--el-yellow-rgb), 0.07), transparent 30%),
+            linear-gradient(135deg, var(--el-bg-1) 0%, var(--el-bg-2) 48%, #010201 100%);
+    }
+
+    .personal-page::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background:
+            linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(circle at center, black, transparent 82%);
+        opacity: 0.32;
+        pointer-events: none;
+    }
+
+    .personal-shell {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+    }
+
+    .glass-card {
+        position: relative;
+        overflow: hidden;
+        background:
+            linear-gradient(145deg, rgba(13, 24, 15, 0.52) 0%, rgba(2, 6, 3, 0.9) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        border-top: 1px solid rgba(var(--el-green-rgb), 0.2);
+        border-left: 1px solid rgba(var(--el-green-rgb), 0.14);
+        border-radius: var(--el-radius-xl);
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
+        box-shadow: var(--el-shadow);
+    }
+
+    .glass-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 16%;
+        right: 16%;
+        height: 1px;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(var(--el-green-rgb), 0.45),
+            rgba(var(--el-yellow-rgb), 0.26),
+            transparent
+        );
+        opacity: 0.75;
+        pointer-events: none;
+    }
+
+    .page-head {
+        padding: 30px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: center;
+    }
+
+    .page-kicker {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 13px;
+        color: var(--el-yellow);
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-weight: 900;
+    }
+
+    .page-kicker i {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--el-green-soft);
+        box-shadow: 0 0 10px rgba(var(--el-green-rgb), 0.55);
+    }
+
+    .page-head h1 {
+        margin: 0;
+        font-family: "Orbitron", sans-serif;
+        font-size: clamp(28px, 4vw, 52px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+        color: #fff;
+    }
+
+    .page-head h1 span {
+        color: var(--el-green-soft);
+        text-shadow: 0 0 18px rgba(var(--el-green-rgb), 0.18);
+    }
+
+    .page-head p {
+        margin: 18px 0 0;
+        max-width: 780px;
+        color: var(--el-muted);
+        font-size: 14px;
+        line-height: 1.7;
+        font-weight: 500;
+    }
+
+    .role-access {
+        display: grid;
+        gap: 10px;
+        min-width: 320px;
+    }
+
+    .access-pill {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+    }
+
+    .access-pill small {
+        color: var(--el-muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+    }
+
+    .access-pill strong {
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+
+    .stat-card {
+        padding: 22px;
+        border-radius: var(--el-radius-lg);
+        background: rgba(0, 0, 0, 0.32);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .stat-card small {
+        display: block;
+        color: var(--el-muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        margin-bottom: 12px;
+    }
+
+    .stat-card strong {
+        display: block;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 26px;
+        font-weight: 900;
+    }
+
+    .toolbar {
+        padding: 22px;
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) 220px 220px;
+        gap: 14px;
+        align-items: center;
+    }
+
+    .search-box,
+    .filter-select {
+        width: 100%;
+        min-height: 48px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.085);
+        background: rgba(0, 0, 0, 0.38);
+        color: var(--el-text);
+        outline: none;
+        padding: 0 16px;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .search-box::placeholder {
+        color: rgba(154, 169, 196, 0.5);
+    }
+
+    .search-box:focus,
+    .filter-select:focus {
+        border-color: rgba(var(--el-green-rgb), 0.45);
+        box-shadow: 0 0 0 3px rgba(var(--el-green-rgb), 0.055);
+    }
+
+    .table-card {
+        padding: 0;
+    }
+
+    .table-head {
+        padding: 22px 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .table-head h2 {
+        margin: 0;
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+    }
+
+    .table-head span {
+        color: var(--el-muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .driver-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .driver-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1080px;
+    }
+
+    .driver-table thead {
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .driver-table th {
+        padding: 15px 18px;
+        color: var(--el-muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        text-align: left;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        white-space: nowrap;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .driver-table td {
+        padding: 16px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+        color: var(--el-text);
+        font-size: 13px;
+        vertical-align: middle;
+    }
+
+    .driver-table tbody tr {
+        transition: 220ms ease;
+    }
+
+    .driver-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.035);
+    }
+
+    .driver-cell {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 260px;
+    }
+
+    .driver-avatar {
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
+        overflow: hidden;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        background:
+            radial-gradient(circle at 35% 25%, rgba(var(--el-green-rgb), 0.14), transparent 44%),
+            rgba(0, 0, 0, 0.52);
+        border: 1px solid rgba(var(--el-green-rgb), 0.26);
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .driver-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .driver-meta strong {
+        display: block;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 900;
+        margin-bottom: 4px;
+    }
+
+    .driver-meta span {
+        display: block;
+        color: var(--el-muted);
+        font-size: 12px;
+    }
+
+    .role-badge,
+    .token-badge,
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 28px;
+        border-radius: 999px;
+        padding: 0 11px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+        white-space: nowrap;
+    }
+
+    .role-badge {
+        color: var(--el-yellow);
+        border: 1px solid rgba(var(--el-yellow-rgb), 0.25);
+        background: rgba(var(--el-yellow-rgb), 0.065);
+    }
+
+    .token-badge.exists {
+        color: var(--el-success);
+        border: 1px solid rgba(var(--el-success-rgb), 0.28);
+        background: rgba(var(--el-success-rgb), 0.055);
+    }
+
+    .token-badge.empty {
+        color: var(--el-danger);
+        border: 1px solid rgba(var(--el-danger-rgb), 0.28);
+        background: rgba(var(--el-danger-rgb), 0.055);
+    }
+
+    .status-badge.enabled {
+        color: var(--el-green-soft);
+        border: 1px solid rgba(var(--el-green-rgb), 0.28);
+        background: rgba(var(--el-green-rgb), 0.065);
+    }
+
+    .status-badge.disabled {
+        color: var(--el-muted);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.035);
+    }
+
+    .mono {
+        color: var(--el-muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+    }
+
+    .action-wrap {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .token-btn {
+        min-height: 42px;
+        border-radius: 14px;
+        padding: 0 15px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        border: 1px solid rgba(var(--el-green-rgb), 0.38);
+        background:
+            linear-gradient(135deg, rgba(var(--el-green-rgb), 0.18), rgba(var(--el-green-rgb), 0.065));
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+        transition: 220ms ease;
+        white-space: nowrap;
+    }
+
+    .token-btn:hover:not(:disabled) {
+        color: #fff;
+        border-color: rgba(var(--el-green-rgb), 0.52);
+        background: rgba(var(--el-green-rgb), 0.24);
+        transform: translateY(-1px);
+    }
+
+    .token-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        filter: grayscale(0.65);
+    }
+
+    .empty-state {
+        padding: 50px 24px;
+        text-align: center;
+        color: var(--el-muted);
+    }
+
+    .empty-state strong {
+        display: block;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
+
+    .toast-layer {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 5000;
+        display: grid;
+        gap: 12px;
+        pointer-events: none;
+    }
+
+    .toast {
+        width: min(420px, calc(100vw - 40px));
+        border-radius: 18px;
+        padding: 16px 18px;
+        background: rgba(8, 17, 12, 0.94);
+        border: 1px solid rgba(var(--el-green-rgb), 0.24);
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.58);
+        backdrop-filter: blur(18px);
+        color: var(--el-text);
+        pointer-events: auto;
+        animation: toastIn 260ms ease-out forwards;
+    }
+
+    .toast.error {
+        border-color: rgba(var(--el-danger-rgb), 0.34);
+    }
+
+    .toast strong {
+        display: block;
+        font-family: "Orbitron", sans-serif;
+        font-size: 11px;
+        color: var(--el-green-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 6px;
+    }
+
+    .toast.error strong {
+        color: var(--el-danger);
+    }
+
+    .toast p {
+        margin: 0;
+        color: var(--el-muted);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .generated-code-box {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.34);
+        border: 1px dashed rgba(var(--el-yellow-rgb), 0.32);
+        color: var(--el-yellow);
+        font-family: "Orbitron", sans-serif;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        user-select: all;
+    }
+
+    @keyframes toastIn {
+        from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @media (max-width: 1120px) {
+        .page-head {
+            grid-template-columns: 1fr;
+        }
+
+        .role-access {
+            min-width: 0;
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .toolbar {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .personal-page {
+            padding: 18px;
+        }
+
+        .page-head {
+            padding: 24px;
+        }
+
+        .role-access,
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<section class="personal-page">
+    <div class="personal-shell">
+        <header class="glass-card page-head">
+            <div>
+                <span class="page-kicker">
+                    <i></i>
+                    EifelLog Personalabteilung
+                </span>
+
+                <h1>
+                    Fahrer &amp;<br />
+                    <span>Tracker Tokens</span>
+                </h1>
+
+                <p>
+                    Übersicht aller Fahrer aus der MongoDB-Collection <strong>users</strong>.
+                    Für jeden Fahrer kann hier ein fester Tracker-Code erstellt werden, mit dem der lokale Tracker einmalig freigeschaltet wird.
+                </p>
+            </div>
+
+            <div class="role-access" aria-label="Zugriff Rollen">
+                <div class="access-pill">
+                    <small>Personalabteilung</small>
+                    <strong>1473725287505072174</strong>
+                </div>
+
+                <div class="access-pill">
+                    <small>Geschäftsführung</small>
+                    <strong>1473721587122438322</strong>
+                </div>
+
+                <div class="access-pill">
+                    <small>Projektleitung</small>
+                    <strong>1473721587122438321</strong>
+                </div>
+            </div>
+        </header>
+
+        <section class="stats-grid">
+            <div class="glass-card stat-card">
+                <small>Fahrer gesamt</small>
+                <strong id="statTotalDrivers">{{ drivers|length }}</strong>
+            </div>
+
+            <div class="glass-card stat-card">
+                <small>Mit Tracker-Code</small>
+                <strong id="statWithToken">
+                    {{ drivers|selectattr("tracker_code_hash")|list|length }}
+                </strong>
+            </div>
+
+            <div class="glass-card stat-card">
+                <small>Ohne Tracker-Code</small>
+                <strong id="statWithoutToken">
+                    {{ drivers|rejectattr("tracker_code_hash")|list|length }}
+                </strong>
+            </div>
+
+            <div class="glass-card stat-card">
+                <small>Tracker aktiv</small>
+                <strong id="statTrackerEnabled">
+                    {{ drivers|rejectattr("tracker_enabled", "equalto", false)|list|length }}
+                </strong>
+            </div>
+        </section>
+
+        <section class="glass-card toolbar">
+            <input
+                class="search-box"
+                id="driverSearch"
+                type="search"
+                placeholder="Fahrer suchen: Name, Username, Discord-ID..."
+                autocomplete="off"
+            />
+
+            <select class="filter-select" id="tokenFilter">
+                <option value="all">Alle Token-Status</option>
+                <option value="with-token">Mit Tracker-Code</option>
+                <option value="without-token">Ohne Tracker-Code</option>
+            </select>
+
+            <select class="filter-select" id="trackerFilter">
+                <option value="all">Alle Tracker-Status</option>
+                <option value="enabled">Tracker aktiv</option>
+                <option value="disabled">Tracker deaktiviert</option>
+            </select>
+        </section>
+
+        <section class="glass-card table-card">
+            <div class="table-head">
+                <h2>Fahrer Datenbank</h2>
+                <span>
+                    Datenquelle: <strong>eifellog_db.users</strong>
+                </span>
+            </div>
+
+            <div class="driver-table-wrap">
+                <table class="driver-table">
+                    <thead>
+                        <tr>
+                            <th>Fahrer</th>
+                            <th>Discord-ID</th>
+                            <th>Rolle</th>
+                            <th>Status</th>
+                            <th>Tracker-Code</th>
+                            <th>Letzter Login</th>
+                            <th style="text-align: right;">Aktion</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="driverTableBody">
+                        {% for driver in drivers %}
+                            {% set has_token = driver.tracker_code_hash is defined and driver.tracker_code_hash %}
+                            {% set tracker_enabled = driver.tracker_enabled is not defined or driver.tracker_enabled != false %}
+                            {% set display_name = driver.display_name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
+                            {% set username = driver.username or "driver" %}
+                            {% set avatar_url = driver.avatar_url or "" %}
+                            {% set role_name = driver.primary_role_name or driver.role_name or driver.rank or "Fahrer" %}
+
+                            <tr
+                                data-driver-row
+                                data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ (driver.discord_username or '') ~ ' ' ~ (driver.discord_id or ''))|lower }}"
+                                data-token="{{ 'with-token' if has_token else 'without-token' }}"
+                                data-tracker="{{ 'enabled' if tracker_enabled else 'disabled' }}"
+                            >
+                                <td>
+                                    <div class="driver-cell">
+                                        <div class="driver-avatar">
+                                            {% if avatar_url %}
+                                                <img src="{{ avatar_url }}" alt="{{ display_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                <span style="display:none;">EL</span>
+                                            {% else %}
+                                                <span>EL</span>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="driver-meta">
+                                            <strong>{{ display_name }}</strong>
+                                            <span>@{{ username }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="mono">{{ driver.discord_id or "-" }}</span>
+                                </td>
+
+                                <td>
+                                    <span class="role-badge">{{ role_name }}</span>
+                                </td>
+
+                                <td>
+                                    {% if tracker_enabled %}
+                                        <span class="status-badge enabled">Aktiv</span>
+                                    {% else %}
+                                        <span class="status-badge disabled">Deaktiviert</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if has_token %}
+                                        <span class="token-badge exists">Vorhanden</span>
+                                    {% else %}
+                                        <span class="token-badge empty">Fehlt</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if driver.tracker_last_login %}
+                                        <span class="mono">{{ driver.tracker_last_login }}</span>
+                                    {% elif driver.last_login %}
+                                        <span class="mono">{{ driver.last_login }}</span>
+                                    {% else %}
+                                        <span class="mono">-</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    <div class="action-wrap">
+                                        <button
+                                            class="token-btn"
+                                            type="button"
+                                            data-create-token
+                                            data-driver-name="{{ username }}"
+                                            data-display-name="{{ display_name }}"
+                                            data-discord-id="{{ driver.discord_id or '' }}"
+                                            data-force-new="{{ 'true' if has_token else 'false' }}"
+                                        >
+                                            {% if has_token %}
+                                                Neuen Token
+                                            {% else %}
+                                                Token erstellen
+                                            {% endif %}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <strong>Keine Fahrer gefunden</strong>
+                                        In der Collection <code>users</code> wurden keine Fahrer geladen.
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div class="toast-layer" id="toastLayer" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const searchInput = document.getElementById("driverSearch");
+    const tokenFilter = document.getElementById("tokenFilter");
+    const trackerFilter = document.getElementById("trackerFilter");
+    const rows = Array.from(document.querySelectorAll("[data-driver-row]"));
+    const toastLayer = document.getElementById("toastLayer");
+
+    function showToast(title, message, type = "success", code = null) {
+        const toast = document.createElement("div");
+        toast.className = type === "error" ? "toast error" : "toast";
+
+        toast.innerHTML = `
+            <strong>${title}</strong>
+            <p>${message}</p>
+            ${code ? `<div class="generated-code-box">${code}</div>` : ""}
+        `;
+
+        toastLayer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(10px) scale(0.98)";
+            toast.style.transition = "220ms ease";
+
+            setTimeout(() => {
+                toast.remove();
+            }, 260);
+        }, code ? 12000 : 5200);
+    }
+
+    function applyFilters() {
+        const query = String(searchInput.value || "").trim().toLowerCase();
+        const tokenValue = tokenFilter.value;
+        const trackerValue = trackerFilter.value;
+
+        rows.forEach((row) => {
+            const matchesSearch = !query || row.dataset.search.includes(query);
+            const matchesToken = tokenValue === "all" || row.dataset.token === tokenValue;
+            const matchesTracker = trackerValue === "all" || row.dataset.tracker === trackerValue;
+
+            row.style.display = matchesSearch && matchesToken && matchesTracker ? "" : "none";
+        });
+    }
+
+    searchInput.addEventListener("input", applyFilters);
+    tokenFilter.addEventListener("change", applyFilters);
+    trackerFilter.addEventListener("change", applyFilters);
+
+    document.querySelectorAll("[data-create-token]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            const driverName = button.dataset.driverName || "";
+            const displayName = button.dataset.displayName || driverName || "Fahrer";
+            const discordId = button.dataset.discordId || "";
+            const hasExistingToken = button.dataset.forceNew === "true";
+
+            const confirmed = hasExistingToken
+                ? confirm(`Für ${displayName} existiert bereits ein Tracker-Code. Wirklich einen neuen festen Tracker-Code erstellen? Der alte Code wird ersetzt.`)
+                : confirm(`Festen Tracker-Code für ${displayName} erstellen?`);
+
+            if (!confirmed) {
+                return;
+            }
+
+            button.disabled = true;
+            const oldText = button.textContent;
+            button.textContent = "Erstelle...";
+
+            try {
+                const response = await fetch("{{ url_for('personalabteilung_create_tracker_code') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        driverName,
+                        discordId,
+                        forceNew: true
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.message || "Token konnte nicht erstellt werden.");
+                }
+
+                showToast(
+                    "Tracker-Code erstellt",
+                    `Der feste Tracker-Code für ${displayName} wurde erstellt. Diesen Code nur einmalig an den Fahrer senden.`,
+                    "success",
+                    result.trackerCode || null
+                );
+
+                const row = button.closest("[data-driver-row]");
+                if (row) {
+                    row.dataset.token = "with-token";
+
+                    const badge = row.querySelector(".token-badge");
+                    if (badge) {
+                        badge.className = "token-badge exists";
+                        badge.textContent = "Vorhanden";
+                    }
+                }
+
+                button.dataset.forceNew = "true";
+                button.textContent = "Neuen Token";
+            } catch (error) {
+                showToast("Fehler", error.message || "Token konnte nicht erstellt werden.", "error");
+                button.textContent = oldText;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    });
+</script>
+{% endblock %}
