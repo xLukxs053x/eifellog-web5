@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Über uns{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="mb-10 flex-grow flex flex-col justify-center mt-10">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between pb-4 mb-4">
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase">Origin & Core Values</span>
+            <h1 class="text-3xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
+                Die Eifel LOG Story
+            </h1>
+        </div>
+        
+        <div class="mt-4 sm:mt-0 flex items-center gap-4">
+            <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2">
+                <svg class="w-3 h-3 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Company Info
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Intro Panel -->
+    <div class="glass-card p-10 md:p-14 flex flex-col md:flex-row gap-10 relative overflow-hidden">
+        
+        <!-- Text Content -->
+        <div class="flex-1 relative z-10">
+            <h2 class="text-3xl md:text-4xl font-orbitron font-extrabold mb-6 text-[var(--text)] tracking-tight">
+                Struktur & <span class="text-[var(--brand-green)]">Leidenschaft.</span>
+            </h2>
+            
+            <div class="space-y-6 text-base md:text-lg text-[var(--muted)] font-inter leading-relaxed">
+                <p>
+                    Die <strong class="text-white">EifelLog</strong> ist eine virtuelle Spedition mit Struktur und echter Leidenschaft für den Transportalltag. 
+                </p>
+                <p>
+                    Entstanden aus der Eifel, prägt uns eine Region, die für Zusammenhalt, Ehrlichkeit und Bodenständigkeit bekannt ist – Werte, die sich in unserer gesamten Firma bedingungslos widerspiegeln.
+                </p>
+            </div>
+        </div>
+
+        <!-- Vision Highlight Box -->
+        <div class="flex-1">
+            <div class="info-card p-8 h-full border-l-4 border-l-[var(--brand-yellow)] relative overflow-hidden group">
+                <!-- Background Glow -->
+                <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-[var(--brand-yellow)] rounded-full mix-blend-screen filter blur-[50px] opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+                
+                <h3 class="font-orbitron font-bold text-xl text-white mb-4 tracking-wide flex items-center gap-3">
+                    <svg class="w-6 h-6 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    Unsere Vision
+                </h3>
+                <p class="text-sm text-[var(--muted)] font-inter leading-relaxed">
+                    Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Core Values Section -->
+<section class="mb-16">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6">
+        <div>
+            <span class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase">Unsere DNA</span>
+            <h2 class="text-2xl font-orbitron font-bold text-[var(--text)] mt-1">Was uns ausmacht</h2>
+        </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+        
+        <!-- Value 1 -->
+        <article class="info-card p-8 flex flex-col text-center items-center">
+            <div class="w-14 h-14 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center mb-6 text-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.15)]">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Zusammenhalt</h3>
+            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
+                Wir lassen niemanden allein auf der Strecke. Als Team unterstützen wir uns gegenseitig, egal ob bei technischen Fragen oder gemeinsamen Konvois.
+            </p>
+        </article>
+
+        <!-- Value 2 -->
+        <article class="info-card p-8 flex flex-col text-center items-center">
+            <div class="w-14 h-14 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center mb-6 text-[var(--brand-yellow)] shadow-[0_0_15px_rgba(220,226,38,0.15)]">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Ehrlichkeit</h3>
+            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
+                Transparente Kommunikation und ein respektvoller Umgang auf Augenhöhe. Wir versprechen nichts, was wir nicht auch halten können.
+            </p>
+        </article>
+
+        <!-- Value 3 -->
+        <article class="info-card p-8 flex flex-col text-center items-center">
+            <div class="w-14 h-14 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center mb-6 text-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.15)]">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Bodenständigkeit</h3>
+            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
+                Keine elitären Allüren. Wir wissen, wo wir herkommen. Bei uns steht der Mensch hinter dem virtuellen Lenkrad im Mittelpunkt.
+            </p>
+        </article>
+
+    </div>
+</section>
+
+<!-- Call to Action Section -->
+<section class="mb-10">
+    <div class="glass-card p-10 text-center relative overflow-hidden border-t border-t-[var(--brand-yellow)]/30">
+        <!-- Background Ambient -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-full bg-gradient-to-r from-[var(--brand-yellow)]/5 via-[var(--brand-green)]/10 to-transparent blur-[40px] -z-10"></div>
+        
+        <h2 class="text-3xl md:text-4xl font-orbitron font-extrabold text-white mb-4 tracking-wide glow-text">
+            Wir suchen dich!
+        </h2>
+        
+        <p class="text-base text-[var(--muted)] font-inter max-w-xl mx-auto mb-8 leading-relaxed">
+            Du hast Lust auf eine strukturierte, aktive Community? Bei uns ist jeder willkommen, der Motivation und Teamgeist mitbringt. Interesse? Dann werde Teil der EifelLog!
+        </p>
+        
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <!-- Discord Button (Passe den href Link an deinen echten Discord Link an) -->
+            <a href="https://discord.gg/dein-discord-link" target="_blank" rel="noopener noreferrer" class="btn-primary w-full sm:w-auto px-8 py-4 text-sm bg-[#5865F2]/10 border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:shadow-[0_0_20px_rgba(88,101,242,0.4)]">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="mr-2"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
+                Auf Discord beitreten
+            </a>
+            
+            <!-- Socials / Hub Button -->
+            <a href="/hub" class="btn-secondary w-full sm:w-auto px-8 py-4 text-sm">
+                Zum Driver Hub
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
