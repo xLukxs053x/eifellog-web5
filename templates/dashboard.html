@@ -6,7 +6,7 @@
 <!-- ========================================== -->
 <!-- DASHBOARD HEADER & GLOCKE                  -->
 <!-- ========================================== -->
-<div class="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4 mt-6">
+<div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 mt-6">
     <div class="flex items-center gap-4">
         <!-- User Avatar -->
         <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)]">
@@ -17,16 +17,19 @@
             {% endif %}
         </div>
         <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">Willkommen zurück</span>
-            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white">
+            <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">Willkommen im Hub</span>
+            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex items-center gap-3">
                 {{ current_user.username }}
+                <span class="px-2 py-1 rounded bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 text-[var(--brand-yellow)] text-[9px] uppercase tracking-widest font-bold">
+                    {{ primary_role_name }}
+                </span>
             </h1>
         </div>
     </div>
 
     <!-- System Alerts Glocke -->
-    <button id="alert-bell" class="relative p-3 bg-white/5 border border-white/10 rounded-full hover:border-[var(--brand-yellow)] hover:bg-white/10 transition-all duration-300 shadow-lg focus:outline-none">
-        <svg class="w-6 h-6 text-[var(--text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <button id="alert-bell" class="relative p-3 bg-white/5 border border-white/10 rounded-full hover:border-[var(--brand-yellow)] hover:bg-white/10 transition-all duration-300 shadow-lg focus:outline-none group">
+        <svg class="w-6 h-6 text-[var(--text)] group-hover:text-[var(--brand-yellow)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
         </svg>
         
@@ -39,29 +42,146 @@
 </div>
 
 <!-- ========================================== -->
-<!-- DASHBOARD CONTENT (PLATZHALTER)            -->
+<!-- STATISTIKEN (TOP ROW)                      -->
 <!-- ========================================== -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="info-card p-6">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-xs uppercase tracking-wider mb-2">Gefahrene KM</h3>
-        <p class="text-3xl font-bold text-white">0 <span class="text-sm text-[var(--brand-green)]">km</span></p>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+            Gefahrene KM
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--brand-green)] font-normal">km</span></p>
     </div>
-    <div class="info-card p-6">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-xs uppercase tracking-wider mb-2">Kontostand</h3>
-        <p class="text-3xl font-bold text-white">0,00 <span class="text-sm text-[var(--brand-green)]">€</span></p>
+    
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Kontostand
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">0,00 <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span></p>
     </div>
-    <div class="info-card p-6">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-xs uppercase tracking-wider mb-2">Abgeschlossene Touren</h3>
-        <p class="text-3xl font-bold text-white">0</p>
+    
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+            Abgeschlossen
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--muted)] font-normal">Touren</span></p>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+            Fahrer Level
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">Neu <span class="text-sm text-[var(--brand-green)] font-normal">0 XP</span></p>
     </div>
 </div>
 
 <!-- ========================================== -->
-<!-- MODAL SYSTEM (MANDATORY POLICY)            -->
+<!-- MAIN DASHBOARD CONTENT (GRID)              -->
+<!-- ========================================== -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    
+    <!-- Linke Spalte (Breiter): Letzte Touren -->
+    <div class="glass-card p-6 xl:col-span-2 flex flex-col h-[500px]">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">Letzte Fahrten</h2>
+            <button class="text-xs font-orbitron text-[var(--brand-green)] uppercase tracking-wider hover:text-white transition-colors">Alle anzeigen &rarr;</button>
+        </div>
+        
+        <div class="flex-grow flex items-center justify-center border-2 border-dashed border-white/5 rounded-2xl bg-black/20">
+            <div class="text-center">
+                <svg class="w-12 h-12 text-[var(--muted)]/50 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <p class="text-[var(--muted)] font-inter text-sm">Noch keine Touren aufgezeichnet.</p>
+                <p class="text-[var(--muted)]/50 font-inter text-xs mt-1">Deine absolvierten Fahrten erscheinen hier.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Spalte: Quick Actions & News -->
+    <div class="flex flex-col gap-6 h-[500px]">
+        
+        <!-- Schnellzugriff -->
+        <div class="glass-card p-6 flex-1">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Schnellzugriff</h2>
+            <div class="grid grid-cols-2 gap-3">
+                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
+                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Tour Eintragen</span>
+                </button>
+                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/10 transition-all text-center group">
+                    <svg class="w-6 h-6 text-[var(--brand-yellow)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Fuhrpark</span>
+                </button>
+                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-center group">
+                    <svg class="w-6 h-6 text-white mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Statistiken</span>
+                </button>
+                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#5865F2] hover:bg-[#5865F2]/10 transition-all text-center group">
+                    <svg class="w-6 h-6 text-[#5865F2] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Support</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Firmen News -->
+        <div class="glass-card p-6 flex-1 flex flex-col">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
+                Eifel LOG News
+                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+            </h2>
+            <div class="flex-grow space-y-4 overflow-y-auto pr-2">
+                
+                <!-- News Item 1 -->
+                <div class="border-l-2 border-[var(--brand-green)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">Heute</p>
+                    <p class="text-sm font-inter text-white">Das neue Speditions-System befindet sich in der Aufbauphase. Wir bitten um Geduld!</p>
+                </div>
+                
+                <!-- News Item 2 -->
+                <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">Management</p>
+                    <p class="text-sm font-inter text-gray-300">Willkommen an alle neuen Fahrer im Hub der Eifel LOG!</p>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: REGULÄRE SYSTEM ALERTS              -->
+<!-- ========================================== -->
+<div id="general-alerts-modal" class="fixed inset-0 z-[110] hidden items-start justify-end bg-black/40 backdrop-blur-sm transition-opacity duration-300 pt-20 pr-4 sm:pr-8">
+    <div class="glass-card p-6 w-full max-w-sm border-t-[var(--brand-yellow)]/50 shadow-2xl relative">
+        <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide flex items-center gap-2">
+                <svg class="w-5 h-5 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                System Alerts
+            </h2>
+            <button id="btn-close-alerts" class="text-[var(--muted)] hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <div class="space-y-4">
+            <!-- Leerzustand der Benachrichtigungen -->
+            <div class="text-center py-6">
+                <svg class="w-10 h-10 text-[var(--muted)]/30 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                <p class="text-sm font-inter text-[var(--muted)]">Keine neuen Benachrichtigungen.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: MANDATORY POLICY (ERST-LOGIN)       -->
 <!-- ========================================== -->
 {% if needs_signature %}
     <!-- 1. MELDUNG MODAL (Verschwommen) -->
-    <div id="first-login-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-500">
+    <div id="first-login-modal" class="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-500">
         <div class="glass-card p-8 max-w-md w-full text-center border-t-[var(--brand-yellow)]/50 shadow-[0_0_50px_rgba(220,226,38,0.1)] mx-4">
             
             <div class="w-16 h-16 mx-auto rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center mb-6 text-[var(--brand-yellow)]">
@@ -81,7 +201,7 @@
     </div>
 
     <!-- 2. EIFELLOG.DOC MODAL (Policy lesen & unterschreiben) -->
-    <div id="policy-modal" class="fixed inset-0 z-[110] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-500">
+    <div id="policy-modal" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-500">
         <div class="glass-card p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border-t-[var(--brand-green)]/50 shadow-[0_0_50px_rgba(137,190,50,0.1)] mx-4 relative">
             
             <div class="flex items-center gap-3 mb-6">
@@ -134,18 +254,40 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const needsSignature = {{ 'true' if needs_signature else 'false' }};
-        const currentUsername = "{{ current_user.username }}";
+        const alertBell = document.getElementById('alert-bell');
+        const generalAlertsModal = document.getElementById('general-alerts-modal');
+        const btnCloseAlerts = document.getElementById('btn-close-alerts');
         
+        // Logik für die Glocke (öffnet je nach Status das Policy-Dokument oder reguläre Alerts)
+        alertBell.addEventListener('click', () => {
+            if (needsSignature) {
+                const policyModal = document.getElementById('policy-modal');
+                policyModal.classList.remove('hidden');
+                policyModal.classList.add('flex');
+            } else {
+                generalAlertsModal.classList.remove('hidden');
+                generalAlertsModal.classList.add('flex');
+            }
+        });
+
+        // Generelles Alerts-Modal schließen
+        if (btnCloseAlerts) {
+            btnCloseAlerts.addEventListener('click', () => {
+                generalAlertsModal.classList.add('hidden');
+                generalAlertsModal.classList.remove('flex');
+            });
+        }
+
+        // Policy Logik (Nur wenn noch nicht unterschrieben)
         if (needsSignature) {
             const firstLoginModal = document.getElementById('first-login-modal');
             const policyModal = document.getElementById('policy-modal');
             const btnOkMeldung = document.getElementById('btn-ok-meldungsmodal');
-            const alertBell = document.getElementById('alert-bell');
             const sigInput = document.getElementById('signature-input');
             const btnSubmitSig = document.getElementById('btn-submit-signature');
             const errorText = document.getElementById('signature-error');
 
-            // 1. Meldung mit OK bestätigen -> Schließt Blur-Modal, triggert pulsierende Glocke
+            // Erst-Login Meldung bestätigen
             btnOkMeldung.addEventListener('click', () => {
                 firstLoginModal.classList.add('opacity-0');
                 setTimeout(() => {
@@ -153,18 +295,11 @@
                     firstLoginModal.classList.remove('flex');
                     policyModal.classList.remove('hidden');
                     policyModal.classList.add('flex');
-                    // Leichtes Einblenden
                     setTimeout(() => policyModal.classList.remove('opacity-0'), 10);
                 }, 500);
             });
 
-            // 2. Klick auf Glocke öffnet auch das Policy Dokument
-            alertBell.addEventListener('click', () => {
-                policyModal.classList.remove('hidden');
-                policyModal.classList.add('flex');
-            });
-
-            // 3. Input Validierung (Button wird nur grün, wenn man tippt)
+            // Input Validierung für Signatur
             sigInput.addEventListener('input', (e) => {
                 if (e.target.value.trim().length > 2) {
                     btnSubmitSig.disabled = false;
@@ -175,26 +310,21 @@
                 }
             });
 
-            // 4. API Request senden (Speichert Signatur in MongoDB)
+            // API Request senden (Speichert Signatur in MongoDB)
             btnSubmitSig.addEventListener('click', () => {
                 const signature = sigInput.value.trim();
                 
-                // Button auf Loading setzen
                 btnSubmitSig.innerHTML = '<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Speichere...';
                 btnSubmitSig.disabled = true;
 
-                // POST Request an dein Python Backend
                 fetch('/api/sign_policy', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ signature: signature })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Bei Erfolg Seite neu laden (Modal verschwindet und Glocke wird normal)
                         window.location.reload();
                     } else {
                         throw new Error('Fehler beim Speichern');
