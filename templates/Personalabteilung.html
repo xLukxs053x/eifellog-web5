@@ -617,6 +617,12 @@
         background: rgba(var(--el-danger-rgb), 0.08);
     }
 
+    .request-btn.accept {
+        color: var(--el-success);
+        border-color: rgba(var(--el-success-rgb), 0.36);
+        background: rgba(var(--el-success-rgb), 0.08);
+    }
+
     .token-btn:hover:not(:disabled),
     .request-btn:hover:not(:disabled) {
         color: #fff;
@@ -638,6 +644,11 @@
     .request-btn.danger:hover:not(:disabled) {
         border-color: rgba(var(--el-danger-rgb), 0.52);
         background: rgba(var(--el-danger-rgb), 0.14);
+    }
+
+    .request-btn.accept:hover:not(:disabled) {
+        border-color: rgba(var(--el-success-rgb), 0.52);
+        background: rgba(var(--el-success-rgb), 0.14);
     }
 
     .token-btn:disabled,
@@ -919,7 +930,7 @@
 
                 <p>
                     Hier werden neue Fahrer-Registrierungen aus dem Dashboard bearbeitet.
-                    Die Personalabteilung kann einen Antrag claimen, prüfen, genehmigen oder ablehnen.
+                    Die Personalabteilung kann einen Antrag claimen, prüfen, annehmen oder ablehnen.
                     Nach Genehmigung wird dem User über sein System-Postfach ein Bestätigungsdokument inklusive Token bereitgestellt.
                 </p>
             </div>
@@ -1029,6 +1040,8 @@
                                     data-request-row
                                     data-request-id="{{ req_id }}"
                                     data-request-status="{{ req_status }}"
+                                    data-request-name="{{ req_name }}"
+                                    data-request-role="{{ req_role }}"
                                     data-search="{{ (req_name ~ ' ' ~ req_username ~ ' ' ~ req_role ~ ' ' ~ req_discord_id ~ ' ' ~ req_handler)|lower }}"
                                 >
                                     <td>
@@ -1087,7 +1100,13 @@
                                     </td>
 
                                     <td>
-                                        <div class="action-wrap">
+                                        <div
+                                            class="action-wrap"
+                                            data-request-action-wrap
+                                            data-request-id="{{ req_id }}"
+                                            data-user-name="{{ req_name }}"
+                                            data-user-role="{{ req_role }}"
+                                        >
                                             {% if req_status == "pending" or req_status == "open" %}
                                                 <button
                                                     class="request-btn blue"
@@ -1095,21 +1114,20 @@
                                                     data-action="claim-registration"
                                                     data-request-id="{{ req_id }}"
                                                     data-user-name="{{ req_name }}"
+                                                    data-user-role="{{ req_role }}"
                                                 >
                                                     Claimen
                                                 </button>
-                                            {% endif %}
-
-                                            {% if req_status == "pending" or req_status == "open" or req_status == "claimed" %}
+                                            {% elif req_status == "claimed" %}
                                                 <button
-                                                    class="request-btn"
+                                                    class="request-btn accept"
                                                     type="button"
                                                     data-action="approve-registration"
                                                     data-request-id="{{ req_id }}"
                                                     data-user-name="{{ req_name }}"
                                                     data-user-role="{{ req_role }}"
                                                 >
-                                                    Genehmigen
+                                                    Annehmen
                                                 </button>
 
                                                 <button
@@ -1118,6 +1136,7 @@
                                                     data-action="reject-registration"
                                                     data-request-id="{{ req_id }}"
                                                     data-user-name="{{ req_name }}"
+                                                    data-user-role="{{ req_role }}"
                                                 >
                                                     Ablehnen
                                                 </button>
@@ -1229,7 +1248,7 @@
                                         <div class="action-wrap">
                                             {% if token_req_status == "pending" or token_req_status == "open" %}
                                                 <button
-                                                    class="request-btn"
+                                                    class="request-btn accept"
                                                     type="button"
                                                     data-action="approve-token-request"
                                                     data-request-id="{{ token_req_id }}"
@@ -1612,6 +1631,66 @@
             });
         }
 
+        function createActionButton(className, action, requestId, userName, userRole, label) {
+            const button = document.createElement("button");
+
+            button.className = className;
+            button.type = "button";
+            button.dataset.action = action;
+            button.dataset.requestId = requestId || "";
+            button.dataset.userName = userName || "User";
+            button.dataset.userRole = userRole || "";
+            button.textContent = label;
+
+            return button;
+        }
+
+        function renderClaimedActionButtons(row) {
+            if (!row) return;
+
+            const actionWrap = row.querySelector("[data-request-action-wrap]") || row.querySelector(".action-wrap");
+
+            if (!actionWrap) return;
+
+            const requestId = row.dataset.requestId || actionWrap.dataset.requestId || "";
+            const userName = row.dataset.requestName || actionWrap.dataset.userName || "User";
+            const userRole = row.dataset.requestRole || actionWrap.dataset.userRole || "";
+
+            actionWrap.innerHTML = "";
+
+            actionWrap.appendChild(
+                createActionButton(
+                    "request-btn accept",
+                    "approve-registration",
+                    requestId,
+                    userName,
+                    userRole,
+                    "Annehmen"
+                )
+            );
+
+            actionWrap.appendChild(
+                createActionButton(
+                    "request-btn danger",
+                    "reject-registration",
+                    requestId,
+                    userName,
+                    userRole,
+                    "Ablehnen"
+                )
+            );
+        }
+
+        function renderClosedAction(row) {
+            if (!row) return;
+
+            const actionWrap = row.querySelector("[data-request-action-wrap]") || row.querySelector(".action-wrap");
+
+            if (actionWrap) {
+                actionWrap.innerHTML = `<span class="mono">Abgeschlossen</span>`;
+            }
+        }
+
         function setRowStatus(row, status, handlerName = null) {
             if (!row) return;
 
@@ -1642,17 +1721,9 @@
             }
 
             if (status === "approved" || status === "rejected") {
-                const actionWrap = row.querySelector(".action-wrap");
-
-                if (actionWrap) {
-                    actionWrap.innerHTML = `<span class="mono">Abgeschlossen</span>`;
-                }
+                renderClosedAction(row);
             } else if (status === "claimed") {
-                const claimButton = row.querySelector("[data-action='claim-registration']");
-
-                if (claimButton) {
-                    claimButton.remove();
-                }
+                renderClaimedActionButtons(row);
             }
 
             updateStats();
@@ -1796,6 +1867,7 @@
                     const row = document.querySelector(`[data-token-request-row] [data-request-id="${CSS.escape(id)}"]`)?.closest("[data-token-request-row]");
                     if (row) {
                         row.dataset.tokenRequestStatus = "rejected";
+
                         const statusBadge = row.querySelector(".status-badge");
                         if (statusBadge) {
                             statusBadge.className = "status-badge rejected";
@@ -1858,7 +1930,7 @@
 
                     showToast(
                         "Antrag geclaimt",
-                        `${userName} ist jetzt deinem Bearbeitungsbereich zugewiesen.`
+                        `${userName} ist jetzt deinem Bearbeitungsbereich zugewiesen. Du kannst den Antrag nun annehmen oder ablehnen.`
                     );
                 });
 
@@ -1866,11 +1938,11 @@
             }
 
             if (action === "approve-registration") {
-                const confirmed = confirm(`Fahrer-Registrierung für ${userName} genehmigen und Token-Dokument ins Postfach senden?`);
+                const confirmed = confirm(`Fahrer-Registrierung für ${userName} annehmen und Token-Dokument ins Postfach senden?`);
 
                 if (!confirmed) return;
 
-                await runButtonAction(button, "Genehmige...", async () => {
+                await runButtonAction(button, "Nehme an...", async () => {
                     const result = await postJson(APPROVE_REGISTRATION_URL, {
                         requestId: requestId,
                         createToken: true,
@@ -1881,8 +1953,8 @@
                     setRowStatus(row, "approved", result.handlerName || result.approvedByName || null);
 
                     showToast(
-                        "Registrierung genehmigt",
-                        result.message || `Der User ${userName} wurde genehmigt. Das Bestätigungsdokument wurde an das System-Postfach gesendet.`,
+                        "Registrierung angenommen",
+                        result.message || `Der User ${userName} wurde angenommen. Das Bestätigungsdokument wurde an das System-Postfach gesendet.`,
                         "success",
                         result.trackerCode || result.token || null
                     );
