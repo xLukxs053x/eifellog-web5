@@ -323,13 +323,17 @@
     }
 
     .bh2-table-wrap {
-        max-height: clamp(360px, 58vh, 720px);
-        overflow: auto;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: scroll;
+        overflow-y: hidden;
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.07);
         background: rgba(0, 0, 0, 0.28);
         scrollbar-width: thin;
         scrollbar-color: rgba(var(--brand-green-rgb), 0.65) rgba(0, 0, 0, 0.30);
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
     }
 
     .bh2-table-wrap::-webkit-scrollbar {
@@ -353,8 +357,8 @@
     }
 
     .bh2-table {
-        width: 100%;
-        min-width: 960px;
+        width: max-content;
+        min-width: 1320px;
         border-collapse: collapse;
     }
 
@@ -367,18 +371,13 @@
     }
 
     .bh2-table th {
-        position: sticky;
-        top: 0;
-        z-index: 2;
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
         font-size: 8.5px;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.13em;
-        background: rgba(0, 0, 0, 0.88);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        background: rgba(0, 0, 0, 0.22);
     }
 
     .bh2-table td {
