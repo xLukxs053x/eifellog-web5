@@ -52,17 +52,48 @@
 
 {% block content %}
 <style>
-    #general-alerts-wrapper.flex,
-    #new-doc-alert-wrapper.flex {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* Modal-Zentrierung: immer exakt im Viewport, unabhängig vom Dashboard-Layout. */
+    :where(#new-doc-alert-wrapper,
+           #general-alerts-wrapper,
+           #universal-doc-modal,
+           #driver-registration-modal,
+           #token-request-modal) {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        min-height: 100vh !important;
+        min-height: 100dvh !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 1.5rem 1rem !important;
+        box-sizing: border-box !important;
+        overflow-y: auto !important;
     }
 
-    #general-alerts-panel,
-    #new-doc-alert-panel {
-        margin: auto;
+    :where(#new-doc-alert-wrapper,
+           #general-alerts-wrapper,
+           #universal-doc-modal,
+           #driver-registration-modal,
+           #token-request-modal).hidden {
+        display: none !important;
     }
+
+    :where(#new-doc-alert-wrapper,
+           #general-alerts-wrapper,
+           #universal-doc-modal,
+           #driver-registration-modal,
+           #token-request-modal).flex {
+        display: flex !important;
+    }
+
+    :where(#new-doc-alert-panel,
+           #general-alerts-panel,
+           #univ-doc-panel,
+           #driver-registration-panel,
+           #token-request-panel) {
+        margin: auto !important;
+    }
+
 
     #alert-badge {
         line-height: 1.25rem;
@@ -509,7 +540,7 @@
     </div>
 </div>
 
-<div id="new-doc-alert-wrapper" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="new-doc-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="new-doc-alert-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/25 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.8)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
@@ -540,7 +571,7 @@
     </div>
 </div>
 
-<div id="general-alerts-wrapper" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="general-alerts-wrapper" aria-hidden="true" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="alerts-backdrop" class="absolute inset-0 cursor-pointer"></div>
 
     <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl mx-auto max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
@@ -684,7 +715,7 @@
     </div>
 </div>
 
-<div id="universal-doc-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="universal-doc-modal" aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div class="glass-card max-w-2xl w-full max-h-[90vh] overflow-hidden border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] mx-auto relative flex flex-col transform transition-all duration-300 scale-95 translate-y-4" id="univ-doc-panel">
         <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
             <div class="flex justify-between items-start gap-4">
@@ -749,7 +780,7 @@
     </div>
 </div>
 
-<div id="driver-registration-modal" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="driver-registration-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="driver-registration-panel" class="relative z-10 w-full max-w-xl max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
         <div class="p-6 border-b border-white/10 shrink-0">
             <div class="flex items-start justify-between gap-4">
@@ -865,7 +896,7 @@
     </div>
 </div>
 
-<div id="token-request-modal" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="token-request-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="token-request-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 border-b border-white/10">
             <div class="flex items-start justify-between gap-4">
@@ -972,6 +1003,24 @@
         const tokenRequestError = document.getElementById('token-request-error');
         const tokenRequestReason = document.getElementById('token-request-reason');
 
+        /*
+         * Wichtig für echtes Viewport-Centering:
+         * Falls base.html oder ein Parent-Container transform/filter/perspective nutzt,
+         * würden fixed-Modals sonst relativ zu diesem Parent statt zum Viewport sitzen.
+         * Darum werden alle Modal-Wrapper direkt an <body> gehängt.
+         */
+        [
+            newDocAlertWrapper,
+            alertsWrapper,
+            univModal,
+            driverRegistrationModal,
+            tokenRequestModal
+        ].forEach((modalWrapper) => {
+            if (modalWrapper && modalWrapper.parentElement !== document.body) {
+                document.body.appendChild(modalWrapper);
+            }
+        });
+
         const defaultSubmitButtonHtml = univBtnSubmit ? univBtnSubmit.innerHTML : '';
         const defaultDriverSubmitHtml = driverRegistrationSubmit ? driverRegistrationSubmit.innerHTML : '';
         const defaultTokenSubmitHtml = tokenRequestSubmit ? tokenRequestSubmit.innerHTML : '';
@@ -981,12 +1030,15 @@
             if (!element) return;
             element.classList.remove('hidden');
             element.classList.add('flex');
+            element.setAttribute('aria-hidden', 'false');
+            element.scrollTop = 0;
         }
 
         function hideCenteredOverlay(element) {
             if (!element) return;
             element.classList.add('hidden');
             element.classList.remove('flex');
+            element.setAttribute('aria-hidden', 'true');
         }
 
         function lockBodyScroll() {
