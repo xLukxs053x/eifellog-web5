@@ -92,6 +92,22 @@
            #driver-registration-panel,
            #token-request-panel) {
         margin: auto !important;
+        position: relative !important;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        transform-origin: center center !important;
+    }
+
+    #universal-doc-modal.flex {
+        display: flex !important;
+        place-items: center !important;
+    }
+
+    #univ-doc-panel {
+        width: min(100%, 42rem) !important;
+        max-height: calc(100dvh - 3rem) !important;
     }
 
 
@@ -716,7 +732,7 @@
 </div>
 
 <div id="universal-doc-modal" aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
-    <div class="glass-card max-w-2xl w-full max-h-[90vh] overflow-hidden border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] mx-auto relative flex flex-col transform transition-all duration-300 scale-95 translate-y-4" id="univ-doc-panel">
+    <div id="univ-doc-panel" class="glass-card relative z-10 w-full max-w-2xl mx-auto max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] flex flex-col transform transition-all duration-300 scale-95 translate-y-4">
         <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex items-start gap-3 min-w-0">
