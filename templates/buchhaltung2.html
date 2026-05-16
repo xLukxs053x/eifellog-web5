@@ -1,4 +1,15 @@
-ation, Buttons und das Grundlayout aus base.html.
+{% extends "base.html" %}
+
+{% block title %}Buchhaltung | Eifel LOG{% endblock %}
+
+{% block content %}
+{% set session_user = session.get('user', {}) %}
+{% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Buchhaltung' %}
+
+<style>
+    /*
+        buchhaltung2.html
+        Nutzt bewusst den Hintergrund, die Slideshow, Navigation, Buttons und das Grundlayout aus base.html.
         Deshalb wird hier KEIN eigener Seitenhintergrund gesetzt.
     */
 
@@ -320,7 +331,7 @@ ation, Buttons und das Grundlayout aus base.html.
 
     .bh2-table {
         width: 100%;
-        min-width: 960px;
+        min-width: 860px;
         border-collapse: collapse;
     }
 
@@ -573,13 +584,13 @@ ation, Buttons und das Grundlayout aus base.html.
         <div class="bh2-stat">
             <small>Einnahmen brutto</small>
             <strong id="stat-income">0,00 €</strong>
-            <span>Alle sichtbaren Einnahmen im freigegebenen Speicher.</span>
+            <span>Alle erfassten Einnahmen im aktuellen Speicher.</span>
         </div>
 
         <div class="bh2-stat">
             <small>Ausgaben brutto</small>
             <strong id="stat-expense">0,00 €</strong>
-            <span>Alle sichtbaren Kosten, Belege und sonstigen Ausgaben.</span>
+            <span>Alle erfassten Kosten, Belege und sonstigen Ausgaben.</span>
         </div>
 
         <div class="bh2-stat">
@@ -614,7 +625,7 @@ ation, Buttons und das Grundlayout aus base.html.
                     <h2>Buchung erfassen</h2>
                     <p>Nutze dieses Formular für Tour-Einnahmen, Tankbelege, Reparaturen, Lohnpositionen oder sonstige tägliche Buchhaltungsvorgänge.</p>
                 </div>
-                <span id="bh2-storage-label" class="bh2-mini-label">Server wird geprüft</span>
+                <span class="bh2-mini-label">Lokal gespeichert</span>
             </div>
 
             <form id="bh2-entry-form" class="bh2-form" autocomplete="off">
@@ -831,7 +842,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                             <th>USt.</th>
                             <th>Beleg</th>
                             <th>Status</th>
-                            <th>Erfasst von</th>
                             <th>Info</th>
                             <th>Aktion</th>
                         </tr>
@@ -849,73 +859,10 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-        /*
-            Wichtig:
-            - Gemeinsame Daten für mehrere Benutzer funktionieren NICHT mit localStorage allein.
-            - Diese Seite nutzt deshalb zuerst die serverseitige API /api/buchhaltung/entries.
-            - Benutzer mit Recht "buchhaltung.view_all" bzw. Admin-Rolle laden scope=all.
-            - Alle anderen laden scope=own.
-            - Falls die API im Backend noch fehlt, läuft die Seite weiter mit lokalem Fallback.
-
-            Erwartete Backend-Endpunkte:
-            GET    /api/buchhaltung/entries?scope=all|own
-            POST   /api/buchhaltung/entries
-            PATCH  /api/buchhaltung/entries/<id>
-            DELETE /api/buchhaltung/entries/<id>
-
-            Die echte Rechteprüfung muss IM BACKEND erfolgen. Frontend-Prüfungen sind nur Anzeige-/Komfortlogik.
-        */
-
+    document.addEventListener("DOMContentLoaded", () => {
         const storageKey = "eifellog.buchhaltung2.entries";
         const taskStorageKey = "eifellog.buchhaltung2.tasks";
         const currentUser = {{ display_name|tojson }};
-        const sessionUser = {{ session_user|tojson }};
-
-        const apiBase = "/api/buchhaltung/entries";
-        const requestApi = "/api/buchhaltung/request";
-
-        function toArray(value) {
-            if (Array.isArray(value)) return value;
-            if (typeof value === "string") return value.split(/[;,\s]+/).filter(Boolean);
-            if (value && typeof value === "object") return Object.values(value).flatMap(toArray);
-            return [];
-        }
-
-        const userRoles = [
-            ...toArray(sessionUser.roles),
-            ...toArray(sessionUser.role),
-            ...toArray(sessionUser.groups),
-            ...toArray(sessionUser.permissions),
-            ...toArray(sessionUser.perms),
-            ...toArray(sessionUser.rights)
-        ].map((value) => String(value).toLowerCase());
-
-        const canViewAllEntries = Boolean(
-            sessionUser.is_admin ||
-            sessionUser.admin ||
-            sessionUser.superadmin ||
-            sessionUser.is_owner ||
-            sessionUser.can_view_all_buchhaltung ||
-            sessionUser.buchhaltung_view_all ||
-            userRoles.some((right) => [
-                "admin",
-                "owner",
-                "verwaltung",
-                "buchhaltung",
-                "accounting",
-                "finance",
-                "buchhaltung.view_all",
-                "buchhaltung:all",
-                "buchhaltung_all",
-                "buchhaltung.view.all",
-                "buchhaltung_admin",
-                "finance_admin"
-            ].includes(right))
-        );
-
-        let serverMode = true;
-        let entries = [];
 
         const form = document.getElementById("bh2-entry-form");
         const fields = {
@@ -946,7 +893,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
         const entryCounter = document.getElementById("entry-counter");
         const reportBox = document.getElementById("bh2-report");
         const toast = document.getElementById("bh2-toast");
-        const storageLabel = document.getElementById("bh2-storage-label");
 
         const searchInput = document.getElementById("bh2-search");
         const filterType = document.getElementById("bh2-filter-type");
@@ -954,6 +900,8 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 
         const taskInputs = Array.from(document.querySelectorAll("#bh2-task-list input[type='checkbox']"));
         const taskCounter = document.getElementById("task-counter");
+
+        let entries = loadEntries();
 
         function todayIso() {
             return new Date().toISOString().slice(0, 10);
@@ -1001,33 +949,19 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 .replace(/'/g, "&#039;");
         }
 
-        function readLocalEntries() {
+        function loadEntries() {
             try {
                 const raw = localStorage.getItem(storageKey);
                 const parsed = raw ? JSON.parse(raw) : [];
-                return Array.isArray(parsed) ? parsed.map(normalizeEntry) : [];
+                return Array.isArray(parsed) ? parsed : [];
             } catch (error) {
-                console.warn("Lokale Buchhaltungsdaten konnten nicht geladen werden.", error);
+                console.warn("Buchhaltungsdaten konnten nicht geladen werden.", error);
                 return [];
             }
         }
 
-        function saveLocalEntries() {
+        function saveEntries() {
             localStorage.setItem(storageKey, JSON.stringify(entries));
-        }
-
-        function setStorageLabel() {
-            if (!storageLabel) return;
-
-            if (serverMode) {
-                storageLabel.textContent = canViewAllEntries ? "Server: alle Einträge" : "Server: eigene Einträge";
-                storageLabel.title = canViewAllEntries
-                    ? "Du hast laut Session ein Recht für alle Buchhaltungseinträge. Das Backend muss dieses Recht ebenfalls prüfen."
-                    : "Du siehst nur eigene Buchhaltungseinträge. Verwaltung/Admins sehen über scope=all alle Einträge.";
-            } else {
-                storageLabel.textContent = "Lokal fallback";
-                storageLabel.title = "Die Server-API /api/buchhaltung/entries ist nicht erreichbar. Daten sind nur in diesem Browser sichtbar.";
-            }
         }
 
         function showToast(title, text) {
@@ -1035,114 +969,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             toast.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span>`;
             toast.classList.add("active");
             window.clearTimeout(showToast.timeout);
-            showToast.timeout = window.setTimeout(() => toast.classList.remove("active"), 3600);
-        }
-
-        async function apiRequest(url, options = {}) {
-            const headers = {
-                "Accept": "application/json",
-                "X-Requested-With": "XMLHttpRequest",
-                ...(options.headers || {})
-            };
-
-            if (options.body && !(options.body instanceof FormData)) {
-                headers["Content-Type"] = "application/json";
-            }
-
-            const response = await fetch(url, {
-                credentials: "same-origin",
-                ...options,
-                headers
-            });
-
-            const contentType = response.headers.get("content-type") || "";
-            const data = contentType.includes("application/json")
-                ? await response.json().catch(() => ({}))
-                : await response.text().catch(() => "");
-
-            if (!response.ok) {
-                const message = typeof data === "object" && data
-                    ? data.message || data.error || `HTTP ${response.status}`
-                    : `HTTP ${response.status}`;
-                const error = new Error(message);
-                error.status = response.status;
-                error.data = data;
-                throw error;
-            }
-
-            return data;
-        }
-
-        function normalizeEntry(entry) {
-            const raw = entry || {};
-            const type = raw.type === "expense" ? "expense" : "income";
-            const amount = Number(raw.amount ?? raw.gross_amount ?? raw.brutto ?? 0);
-            const vatRate = Number(raw.vatRate ?? raw.vat_rate ?? raw.vat ?? raw.tax_rate ?? 0);
-            const vatAmount = Number(raw.vatAmount ?? raw.vat_amount ?? raw.tax_amount ?? calculateVat(amount, vatRate));
-
-            return {
-                id: String(raw.id ?? raw.entry_id ?? raw.uuid ?? uid()),
-                createdAt: raw.createdAt || raw.created_at || raw.created || new Date().toISOString(),
-                createdBy: raw.createdBy || raw.created_by || raw.username || raw.user || raw.author || currentUser,
-                userId: raw.userId || raw.user_id || raw.owner_id || null,
-                date: raw.date || todayIso(),
-                type,
-                typeLabel: raw.typeLabel || raw.type_label || (type === "income" ? "Einnahme" : "Ausgabe"),
-                category: raw.category || "Sonstiges",
-                amount: Number.isFinite(amount) ? amount : 0,
-                vatRate: Number.isFinite(vatRate) ? vatRate : 0,
-                vatAmount: Number.isFinite(vatAmount) ? vatAmount : 0,
-                documentNo: raw.documentNo || raw.document_no || raw.document || raw.invoice_no || "",
-                partner: raw.partner || raw.customer || raw.supplier || raw.driver || "",
-                tour: raw.tour || raw.plate || raw.vehicle || "",
-                receipt: raw.receipt || raw.receipt_status || "Vorhanden",
-                payment: raw.payment || raw.payment_status || "Offen",
-                note: raw.note || raw.notes || ""
-            };
-        }
-
-        function entryToPayload(entry) {
-            return {
-                date: entry.date,
-                type: entry.type,
-                category: entry.category,
-                amount: entry.amount,
-                vat_rate: entry.vatRate,
-                vat_amount: entry.vatAmount,
-                document_no: entry.documentNo,
-                partner: entry.partner,
-                tour: entry.tour,
-                receipt_status: entry.receipt,
-                payment_status: entry.payment,
-                note: entry.note,
-                source: "buchhaltung2"
-            };
-        }
-
-        async function loadEntriesFromServer() {
-            const scope = canViewAllEntries ? "all" : "own";
-            const data = await apiRequest(`${apiBase}?scope=${encodeURIComponent(scope)}`);
-            const list = Array.isArray(data) ? data : (data.entries || data.data || []);
-            return Array.isArray(list) ? list.map(normalizeEntry) : [];
-        }
-
-        async function loadInitialEntries() {
-            try {
-                serverMode = true;
-                entries = await loadEntriesFromServer();
-                setStorageLabel();
-                renderEntries();
-            } catch (error) {
-                console.warn("Server-Buchhaltung nicht erreichbar, nutze lokalen Fallback.", error);
-                serverMode = false;
-                entries = readLocalEntries();
-                setStorageLabel();
-                renderEntries();
-                showToast(
-                    "Lokaler Fallback",
-                    "Die API /api/buchhaltung/entries ist nicht erreichbar. Gemeinsame Ansicht funktioniert erst mit Backend-Speicherung."
-                );
-            }
+            showToast.timeout = window.setTimeout(() => toast.classList.remove("active"), 3200);
         }
 
         function getFilteredEntries() {
@@ -1160,7 +987,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     entry.tour,
                     entry.receipt,
                     entry.payment,
-                    entry.createdBy,
                     entry.note
                 ].join(" ").toLowerCase();
 
@@ -1199,7 +1025,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 
             filtered
                 .slice()
-                .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)))
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)))
                 .forEach((entry) => {
                     const tr = document.createElement("tr");
                     const typeBadge = entry.type === "income"
@@ -1214,10 +1040,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                         <td>${escapeHtml(formatMoney(entry.vatAmount))}<br><span class="bh2-badge">${escapeHtml(entry.vatRate)} %</span></td>
                         <td>${escapeHtml(entry.documentNo || "-")}<br>${statusBadge(entry.receipt, "receipt")}</td>
                         <td>${statusBadge(entry.payment, "payment")}</td>
-                        <td>
-                            <strong>${escapeHtml(entry.createdBy || "-")}</strong><br>
-                            <span style="color: var(--muted);">${escapeHtml(entry.createdAt ? new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.createdAt)) : "")}</span>
-                        </td>
                         <td>
                             <strong>${escapeHtml(entry.partner || "-")}</strong><br>
                             ${escapeHtml(entry.tour || "-")}<br>
@@ -1276,29 +1098,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             fields.payment.value = "Offen";
         }
 
-        async function createEntryOnServer(entry) {
-            const data = await apiRequest(apiBase, {
-                method: "POST",
-                body: JSON.stringify(entryToPayload(entry))
-            });
-            return normalizeEntry(data.entry || data.data || data);
-        }
-
-        async function patchEntryOnServer(id, patch) {
-            const data = await apiRequest(`${apiBase}/${encodeURIComponent(id)}`, {
-                method: "PATCH",
-                body: JSON.stringify(patch)
-            });
-            return normalizeEntry(data.entry || data.data || data);
-        }
-
-        async function deleteEntryOnServer(id) {
-            await apiRequest(`${apiBase}/${encodeURIComponent(id)}`, {
-                method: "DELETE"
-            });
-        }
-
-        async function addEntry(event) {
+        function addEntry(event) {
             event.preventDefault();
 
             const amount = parseAmount(fields.amount.value);
@@ -1311,7 +1111,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             const vatRate = Number(fields.vat.value || 0);
             const type = fields.type.value;
 
-            const localEntry = normalizeEntry({
+            const entry = {
                 id: uid(),
                 createdAt: new Date().toISOString(),
                 createdBy: currentUser,
@@ -1328,31 +1128,16 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 receipt: fields.receipt.value,
                 payment: fields.payment.value,
                 note: fields.note.value.trim()
-            });
+            };
 
-            try {
-                let savedEntry = localEntry;
-                if (serverMode) {
-                    savedEntry = await createEntryOnServer(localEntry);
-                }
-
-                entries.unshift(savedEntry);
-                if (!serverMode) saveLocalEntries();
-                renderEntries();
-                resetForm();
-                showToast(
-                    "Buchung gespeichert",
-                    serverMode
-                        ? "Der Vorgang wurde serverseitig gespeichert und ist je nach Rechteumfang für andere sichtbar."
-                        : "Der Vorgang wurde nur lokal gespeichert, weil die Server-API nicht erreichbar ist."
-                );
-            } catch (error) {
-                console.error("Buchung konnte serverseitig nicht gespeichert werden.", error);
-                showToast("Nicht gespeichert", error.message || "Die Buchung konnte nicht gespeichert werden.");
-            }
+            entries.unshift(entry);
+            saveEntries();
+            renderEntries();
+            resetForm();
+            showToast("Buchung gespeichert", "Der Vorgang wurde in der lokalen Buchhaltungsliste erfasst.");
         }
 
-        async function handleTableAction(event) {
+        function handleTableAction(event) {
             const button = event.target.closest("[data-action]");
             if (!button) return;
 
@@ -1361,50 +1146,25 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             const index = entries.findIndex((entry) => entry.id === id);
             if (index === -1) return;
 
-            button.disabled = true;
-
-            try {
-                if (action === "paid") {
-                    if (serverMode) {
-                        const updated = await patchEntryOnServer(id, { payment_status: "Bezahlt", payment: "Bezahlt" });
-                        entries[index] = { ...entries[index], ...updated, payment: "Bezahlt" };
-                    } else {
-                        entries[index].payment = "Bezahlt";
-                        saveLocalEntries();
-                    }
-                    showToast("Status aktualisiert", "Der Zahlungsstatus wurde auf bezahlt gesetzt.");
-                }
-
-                if (action === "receipt") {
-                    if (serverMode) {
-                        const updated = await patchEntryOnServer(id, { receipt_status: "Vorhanden", receipt: "Vorhanden" });
-                        entries[index] = { ...entries[index], ...updated, receipt: "Vorhanden" };
-                    } else {
-                        entries[index].receipt = "Vorhanden";
-                        saveLocalEntries();
-                    }
-                    showToast("Beleg aktualisiert", "Der Belegstatus wurde auf vorhanden gesetzt.");
-                }
-
-                if (action === "delete") {
-                    const confirmed = window.confirm("Diese Buchung wirklich löschen?");
-                    if (!confirmed) return;
-
-                    if (serverMode) {
-                        await deleteEntryOnServer(id);
-                    }
-                    entries.splice(index, 1);
-                    if (!serverMode) saveLocalEntries();
-                    showToast("Buchung gelöscht", "Der Eintrag wurde entfernt.");
-                }
-
-                renderEntries();
-            } catch (error) {
-                console.error("Aktion fehlgeschlagen.", error);
-                showToast("Aktion fehlgeschlagen", error.message || "Der Vorgang konnte nicht aktualisiert werden.");
-            } finally {
-                button.disabled = false;
+            if (action === "paid") {
+                entries[index].payment = "Bezahlt";
+                showToast("Status aktualisiert", "Der Zahlungsstatus wurde auf bezahlt gesetzt.");
             }
+
+            if (action === "receipt") {
+                entries[index].receipt = "Vorhanden";
+                showToast("Beleg aktualisiert", "Der Belegstatus wurde auf vorhanden gesetzt.");
+            }
+
+            if (action === "delete") {
+                const confirmed = window.confirm("Diese Buchung wirklich löschen?");
+                if (!confirmed) return;
+                entries.splice(index, 1);
+                showToast("Buchung gelöscht", "Der Eintrag wurde entfernt.");
+            }
+
+            saveEntries();
+            renderEntries();
         }
 
         function loadTasks() {
@@ -1453,7 +1213,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 "EIFEL LOG - TAGESABSCHLUSS BUCHHALTUNG",
                 `Erstellt am: ${new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" }).format(new Date())}`,
                 `Bearbeiter: ${currentUser}`,
-                `Datenumfang: ${serverMode ? (canViewAllEntries ? "Server / alle sichtbaren Einträge" : "Server / eigene Einträge") : "Lokaler Browser-Fallback"}`,
                 "",
                 "ÜBERSICHT",
                 `- Buchungen gesamt: ${entries.length}`,
@@ -1469,23 +1228,21 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 "",
                 "OFFENE ZAHLUNGEN",
                 openPayments.length
-                    ? openPayments.map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.documentNo || "-"} | Erfasst von: ${entry.createdBy || "-"}`).join("\n")
+                    ? openPayments.map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.documentNo || "-"}`).join("\n")
                     : "- Keine offenen Zahlungen.",
                 "",
                 "FEHLENDE BELEGE",
                 missingReceipts.length
-                    ? missingReceipts.map((entry) => `- ${formatDate(entry.date)} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.tour || "-"} | Erfasst von: ${entry.createdBy || "-"}`).join("\n")
+                    ? missingReceipts.map((entry) => `- ${formatDate(entry.date)} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.tour || "-"}`).join("\n")
                     : "- Keine fehlenden Belege.",
                 "",
                 "LETZTE BUCHUNGEN",
                 entries.length
-                    ? entries.slice(0, 10).map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | Zahlung: ${entry.payment} | Beleg: ${entry.receipt} | Von: ${entry.createdBy || "-"}`).join("\n")
+                    ? entries.slice(0, 10).map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | Zahlung: ${entry.payment} | Beleg: ${entry.receipt}`).join("\n")
                     : "- Noch keine Buchungen erfasst.",
                 "",
                 "HINWEIS",
-                serverMode
-                    ? "Dieser Bericht wird aus serverseitig geladenen Buchhaltungsdaten generiert. Die Rechteprüfung muss im Backend enforced werden."
-                    : "Dieser Bericht wird nur aus lokal im Browser gespeicherten Daten generiert. Für gemeinsame Ansicht muss /api/buchhaltung/entries angebunden werden."
+                "Dieser Bericht wird im Browser aus den lokal erfassten Daten generiert. Für eine echte Finanzbuchhaltung muss die Datenhaltung serverseitig angebunden und fachlich geprüft werden."
             ];
 
             return lines.join("\n");
@@ -1550,30 +1307,24 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 .join("\n");
 
             downloadFile(`eifellog-buchhaltung-${todayIso()}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
-            showToast("CSV exportiert", "Die sichtbare Buchungsliste wurde als CSV heruntergeladen.");
+            showToast("CSV exportiert", "Die Buchungsliste wurde als CSV heruntergeladen.");
         }
 
         function exportJson() {
             downloadFile(
                 `eifellog-buchhaltung-${todayIso()}.json`,
-                JSON.stringify({
-                    exportedAt: new Date().toISOString(),
-                    user: currentUser,
-                    scope: serverMode ? (canViewAllEntries ? "all" : "own") : "local-fallback",
-                    entries
-                }, null, 2),
+                JSON.stringify({ exportedAt: new Date().toISOString(), user: currentUser, entries }, null, 2),
                 "application/json;charset=utf-8"
             );
-            showToast("JSON exportiert", "Die sichtbare Buchungsliste wurde als JSON heruntergeladen.");
+            showToast("JSON exportiert", "Die Buchungsliste wurde als JSON heruntergeladen.");
         }
 
         async function sendRequest() {
             const report = buildReport();
 
             try {
-                const response = await fetch(requestApi, {
+                const response = await fetch("/api/buchhaltung/request", {
                     method: "POST",
-                    credentials: "same-origin",
                     headers: {
                         "Content-Type": "application/json",
                         "X-Requested-With": "XMLHttpRequest"
@@ -1581,7 +1332,6 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     body: JSON.stringify({
                         message: report,
                         source: "buchhaltung2",
-                        scope: serverMode ? (canViewAllEntries ? "all" : "own") : "local-fallback",
                         entries
                     })
                 });
@@ -1598,31 +1348,17 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             }
         }
 
-        async function clearAll() {
-            const confirmed = window.confirm(
-                serverMode
-                    ? "Alle sichtbaren Buchhaltungsdaten löschen? Das Backend muss dafür die nötigen Rechte prüfen."
-                    : "Alle lokalen Buchhaltungsdaten und Tagesaufgaben löschen?"
-            );
+        function clearAll() {
+            const confirmed = window.confirm("Alle lokalen Buchhaltungsdaten und Tagesaufgaben löschen?");
             if (!confirmed) return;
 
-            try {
-                if (serverMode) {
-                    const ids = entries.map((entry) => entry.id);
-                    await Promise.all(ids.map((id) => deleteEntryOnServer(id)));
-                }
-
-                entries = [];
-                localStorage.removeItem(storageKey);
-                localStorage.removeItem(taskStorageKey);
-                reportBox.textContent = "Noch kein Tagesbericht erstellt.\n\nKlicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.";
-                loadTasks();
-                renderEntries();
-                showToast("Zurückgesetzt", serverMode ? "Alle sichtbaren Server-Einträge wurden gelöscht." : "Alle lokalen Buchhaltungsdaten wurden gelöscht.");
-            } catch (error) {
-                console.error("Löschen fehlgeschlagen.", error);
-                showToast("Nicht gelöscht", error.message || "Die Einträge konnten nicht gelöscht werden.");
-            }
+            entries = [];
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem(taskStorageKey);
+            reportBox.textContent = "Noch kein Tagesbericht erstellt.\n\nKlicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.";
+            loadTasks();
+            renderEntries();
+            showToast("Zurückgesetzt", "Alle lokalen Buchhaltungsdaten wurden gelöscht.");
         }
 
         form?.addEventListener("submit", addEntry);
@@ -1641,8 +1377,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 
         resetForm();
         loadTasks();
-        await loadInitialEntries();
+        renderEntries();
     });
 </script>
-
 {% endblock %}
