@@ -379,8 +379,57 @@
     .request-table-wrap {
         width: 100%;
         overflow-x: auto;
+        overflow-y: hidden;
         position: relative;
         z-index: 10;
+        padding-bottom: 14px;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(var(--el-green-rgb), 0.65) rgba(255, 255, 255, 0.08) !important;
+        scroll-behavior: smooth;
+    }
+
+    /*
+        Sichtbare horizontale Scroll-Leiste unten:
+        base.html blendet Scrollbars global aus. Diese Regeln holen sie
+        gezielt für die Tabellen der Personalabteilung zurück.
+    */
+    .personal-page .driver-table-wrap::-webkit-scrollbar,
+    .personal-page .request-table-wrap::-webkit-scrollbar {
+        display: block !important;
+        height: 14px !important;
+        width: 14px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+    }
+
+    .personal-page .driver-table-wrap::-webkit-scrollbar-track,
+    .personal-page .request-table-wrap::-webkit-scrollbar-track {
+        display: block !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-radius: 999px !important;
+        margin: 0 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .personal-page .driver-table-wrap::-webkit-scrollbar-thumb,
+    .personal-page .request-table-wrap::-webkit-scrollbar-thumb {
+        display: block !important;
+        background: linear-gradient(
+            90deg,
+            rgba(var(--el-green-rgb), 0.75),
+            rgba(var(--el-yellow-rgb), 0.62)
+        ) !important;
+        border-radius: 999px !important;
+        border: 3px solid rgba(6, 12, 8, 0.92) !important;
+        box-shadow: 0 0 14px rgba(var(--el-green-rgb), 0.25) !important;
+    }
+
+    .personal-page .driver-table-wrap::-webkit-scrollbar-thumb:hover,
+    .personal-page .request-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+            90deg,
+            rgba(var(--el-green-rgb), 0.95),
+            rgba(var(--el-yellow-rgb), 0.82)
+        ) !important;
     }
 
     .driver-table,
