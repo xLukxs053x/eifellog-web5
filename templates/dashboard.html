@@ -31,6 +31,23 @@
 {% set fahrer_token_value = fahrer_token_value|default('', true) %}
 {% set fahrer_token_created_at = fahrer_token_created_at|default('Heute', true) %}
 
+{# Navigation zur Personalabteilung nur für berechtigte Rollen #}
+{% set current_user_roles = current_user.roles|default([], true) %}
+{% set personalabteilung_nav_roles = [
+    '1473725287505072174',
+    '1473721587122438322',
+    '1473721587122438321'
+] %}
+{% set personalabteilung_nav = namespace(allowed=false) %}
+{% for role_id in personalabteilung_nav_roles %}
+    {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
+        {% set personalabteilung_nav.allowed = true %}
+    {% endif %}
+{% endfor %}
+{% if primary_role_display in ['Personalabteilung', 'Geschäftsführung', 'Projektleitung'] %}
+    {% set personalabteilung_nav.allowed = true %}
+{% endif %}
+
 {% block title %}EifelLog - Dashboard{% endblock %}
 
 {% block content %}
@@ -342,6 +359,35 @@
                         </span>
                     </div>
                 </button>
+
+                {% if personalabteilung_nav.allowed %}
+                <a href="{{ url_for('personalabteilung') }}"
+                   class="col-span-2 p-5 rounded-2xl border border-[var(--brand-green)]/35 bg-[var(--brand-green)]/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-left group relative overflow-hidden shadow-[0_0_18px_rgba(137,190,50,0.08)]">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center">
+                                <svg class="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-[0.2em] mb-1">Personalabteilung</span>
+                                <span class="block text-sm font-orbitron font-bold text-white uppercase tracking-wider">
+                                    Zum Personalabteilung Dashboard
+                                </span>
+                                <span class="block text-xs text-[var(--muted)] font-inter mt-1">
+                                    Fahrer-Anträge, Token-Anfragen und Aufgaben verwalten
+                                </span>
+                            </div>
+                        </div>
+
+                        <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-3 py-1 border text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25 whitespace-nowrap">
+                            Öffnen
+                        </span>
+                    </div>
+                </a>
+                {% endif %}
 
                 <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
                     <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
