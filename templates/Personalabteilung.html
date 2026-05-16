@@ -3,6 +3,10 @@
 {% block title %}Personalabteilung | EifelLog{% endblock %}
 
 {% block content %}
+{% set safe_drivers = drivers|default([], true) %}
+{% set safe_requests = fahrer_registration_requests|default(registration_requests|default([], true), true) %}
+{% set safe_token_requests = token_requests|default([], true) %}
+
 <style>
     :root {
         --el-bg-1: #010302;
@@ -33,6 +37,9 @@
         --el-success: #9fffc0;
         --el-success-rgb: 159, 255, 192;
 
+        --el-blue: #7ba7ff;
+        --el-blue-rgb: 123, 167, 255;
+
         --el-radius-xl: 30px;
         --el-radius-lg: 24px;
         --el-radius-md: 16px;
@@ -43,7 +50,10 @@
     .personal-shell,
     .driver-table-wrap,
     .driver-table,
-    .token-btn {
+    .request-table,
+    .token-btn,
+    .request-btn,
+    .tab-btn {
         pointer-events: auto;
     }
 
@@ -175,7 +185,7 @@
 
     .page-head p {
         margin: 18px 0 0;
-        max-width: 780px;
+        max-width: 840px;
         color: var(--el-muted);
         font-size: 14px;
         line-height: 1.7;
@@ -247,6 +257,45 @@
         font-weight: 900;
     }
 
+    .tabbar {
+        padding: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .tab-btn {
+        min-height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        border-radius: 16px;
+        padding: 0 18px;
+        background: rgba(0, 0, 0, 0.32);
+        color: var(--el-muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        cursor: pointer;
+        transition: 220ms ease;
+    }
+
+    .tab-btn:hover,
+    .tab-btn.active {
+        color: #fff;
+        border-color: rgba(var(--el-green-rgb), 0.45);
+        background: rgba(var(--el-green-rgb), 0.14);
+        transform: translateY(-1px);
+    }
+
+    .tab-panel {
+        display: none;
+    }
+
+    .tab-panel.active {
+        display: block;
+    }
+
     .toolbar {
         padding: 22px;
         display: grid;
@@ -255,8 +304,14 @@
         align-items: center;
     }
 
+    .toolbar.requests {
+        grid-template-columns: minmax(260px, 1fr) 220px;
+    }
+
     .search-box,
-    .filter-select {
+    .filter-select,
+    .modal-input,
+    .modal-textarea {
         width: 100%;
         min-height: 48px;
         border-radius: 16px;
@@ -269,12 +324,23 @@
         font-weight: 700;
     }
 
-    .search-box::placeholder {
+    .modal-textarea {
+        min-height: 120px;
+        padding: 14px 16px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+
+    .search-box::placeholder,
+    .modal-input::placeholder,
+    .modal-textarea::placeholder {
         color: rgba(154, 169, 196, 0.5);
     }
 
     .search-box:focus,
-    .filter-select:focus {
+    .filter-select:focus,
+    .modal-input:focus,
+    .modal-textarea:focus {
         border-color: rgba(var(--el-green-rgb), 0.45);
         box-shadow: 0 0 0 3px rgba(var(--el-green-rgb), 0.055);
     }
@@ -309,24 +375,32 @@
         font-weight: 700;
     }
 
-    .driver-table-wrap {
+    .driver-table-wrap,
+    .request-table-wrap {
         width: 100%;
         overflow-x: auto;
         position: relative;
         z-index: 10;
     }
 
-    .driver-table {
+    .driver-table,
+    .request-table {
         width: 100%;
         border-collapse: collapse;
         min-width: 1080px;
     }
 
-    .driver-table thead {
+    .request-table {
+        min-width: 1220px;
+    }
+
+    .driver-table thead,
+    .request-table thead {
         background: rgba(0, 0, 0, 0.2);
     }
 
-    .driver-table th {
+    .driver-table th,
+    .request-table th {
         padding: 15px 18px;
         color: var(--el-muted);
         font-family: "Orbitron", sans-serif;
@@ -338,7 +412,8 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .driver-table td {
+    .driver-table td,
+    .request-table td {
         padding: 16px 18px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.045);
         color: var(--el-text);
@@ -348,11 +423,13 @@
         z-index: 12;
     }
 
-    .driver-table tbody tr {
+    .driver-table tbody tr,
+    .request-table tbody tr {
         transition: 220ms ease;
     }
 
-    .driver-table tbody tr:hover {
+    .driver-table tbody tr:hover,
+    .request-table tbody tr:hover {
         background: rgba(255, 255, 255, 0.035);
     }
 
@@ -403,7 +480,8 @@
 
     .role-badge,
     .token-badge,
-    .status-badge {
+    .status-badge,
+    .deadline-badge {
         display: inline-flex;
         align-items: center;
         width: fit-content;
@@ -436,16 +514,47 @@
         background: rgba(var(--el-danger-rgb), 0.055);
     }
 
+    .status-badge.pending {
+        color: var(--el-yellow);
+        border: 1px solid rgba(var(--el-yellow-rgb), 0.28);
+        background: rgba(var(--el-yellow-rgb), 0.07);
+    }
+
+    .status-badge.claimed {
+        color: var(--el-blue);
+        border: 1px solid rgba(var(--el-blue-rgb), 0.28);
+        background: rgba(var(--el-blue-rgb), 0.07);
+    }
+
+    .status-badge.approved,
     .status-badge.enabled {
         color: var(--el-green-soft);
         border: 1px solid rgba(var(--el-green-rgb), 0.28);
         background: rgba(var(--el-green-rgb), 0.065);
     }
 
+    .status-badge.rejected {
+        color: var(--el-danger);
+        border: 1px solid rgba(var(--el-danger-rgb), 0.28);
+        background: rgba(var(--el-danger-rgb), 0.065);
+    }
+
     .status-badge.disabled {
         color: var(--el-muted);
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: rgba(255, 255, 255, 0.035);
+    }
+
+    .deadline-badge {
+        color: var(--el-yellow);
+        border: 1px solid rgba(var(--el-yellow-rgb), 0.24);
+        background: rgba(var(--el-yellow-rgb), 0.055);
+    }
+
+    .deadline-badge.expired {
+        color: var(--el-danger);
+        border-color: rgba(var(--el-danger-rgb), 0.34);
+        background: rgba(var(--el-danger-rgb), 0.07);
     }
 
     .mono {
@@ -457,11 +566,14 @@
     .action-wrap {
         display: flex;
         justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
         position: relative;
         z-index: 50;
     }
 
-    .token-btn {
+    .token-btn,
+    .request-btn {
         position: relative;
         z-index: 100;
         min-height: 42px;
@@ -487,14 +599,49 @@
         user-select: none;
     }
 
-    .token-btn:hover:not(:disabled) {
+    .request-btn.yellow {
+        color: var(--el-yellow);
+        border-color: rgba(var(--el-yellow-rgb), 0.35);
+        background: rgba(var(--el-yellow-rgb), 0.08);
+    }
+
+    .request-btn.blue {
+        color: var(--el-blue);
+        border-color: rgba(var(--el-blue-rgb), 0.35);
+        background: rgba(var(--el-blue-rgb), 0.08);
+    }
+
+    .request-btn.danger {
+        color: var(--el-danger);
+        border-color: rgba(var(--el-danger-rgb), 0.35);
+        background: rgba(var(--el-danger-rgb), 0.08);
+    }
+
+    .token-btn:hover:not(:disabled),
+    .request-btn:hover:not(:disabled) {
         color: #fff;
         border-color: rgba(var(--el-green-rgb), 0.52);
         background: rgba(var(--el-green-rgb), 0.24);
         transform: translateY(-1px);
     }
 
-    .token-btn:disabled {
+    .request-btn.yellow:hover:not(:disabled) {
+        border-color: rgba(var(--el-yellow-rgb), 0.52);
+        background: rgba(var(--el-yellow-rgb), 0.15);
+    }
+
+    .request-btn.blue:hover:not(:disabled) {
+        border-color: rgba(var(--el-blue-rgb), 0.52);
+        background: rgba(var(--el-blue-rgb), 0.15);
+    }
+
+    .request-btn.danger:hover:not(:disabled) {
+        border-color: rgba(var(--el-danger-rgb), 0.52);
+        background: rgba(var(--el-danger-rgb), 0.14);
+    }
+
+    .token-btn:disabled,
+    .request-btn:disabled {
         opacity: 0.55;
         cursor: not-allowed;
         filter: grayscale(0.65);
@@ -579,9 +726,121 @@
         letter-spacing: 0.08em;
         user-select: all;
         cursor: copy;
+        overflow-wrap: anywhere;
+    }
+
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 2147482000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .modal-backdrop.active {
+        display: flex;
+    }
+
+    .modal-card {
+        width: min(620px, 100%);
+        max-height: 88vh;
+        overflow: hidden;
+        border-radius: 28px;
+        background: rgba(8, 17, 12, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 34px 90px rgba(0, 0, 0, 0.78);
+        display: flex;
+        flex-direction: column;
+        animation: modalIn 220ms ease-out forwards;
+    }
+
+    .modal-head {
+        padding: 22px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+    }
+
+    .modal-head small {
+        display: block;
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.17em;
+        margin-bottom: 8px;
+    }
+
+    .modal-head h3 {
+        margin: 0;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 20px;
+        font-weight: 900;
+    }
+
+    .modal-close {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--el-muted);
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    .modal-body {
+        padding: 24px;
+        overflow-y: auto;
+        display: grid;
+        gap: 16px;
+    }
+
+    .modal-info {
+        border-radius: 18px;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        padding: 14px;
+        display: grid;
+        gap: 9px;
+        color: var(--el-muted);
+        font-size: 13px;
+    }
+
+    .modal-info strong {
+        color: #fff;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 6px;
     }
 
     @keyframes toastIn {
+        from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @keyframes modalIn {
         from {
             opacity: 0;
             transform: translateY(12px) scale(0.98);
@@ -607,7 +866,8 @@
             grid-template-columns: repeat(2, 1fr);
         }
 
-        .toolbar {
+        .toolbar,
+        .toolbar.requests {
             grid-template-columns: 1fr;
         }
     }
@@ -623,6 +883,11 @@
 
         .role-access,
         .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .tabbar {
+            display: grid;
             grid-template-columns: 1fr;
         }
 
@@ -649,12 +914,13 @@
 
                 <h1>
                     Fahrer &amp;<br />
-                    <span>Tracker Tokens</span>
+                    <span>Registrierungen</span>
                 </h1>
 
                 <p>
-                    Übersicht aller Fahrer aus der MongoDB-Collection <strong>users</strong>.
-                    Für jeden Fahrer kann hier ein fester Tracker-Code erstellt werden, mit dem der lokale Tracker einmalig freigeschaltet wird.
+                    Hier werden neue Fahrer-Registrierungen aus dem Dashboard bearbeitet.
+                    Die Personalabteilung kann einen Antrag claimen, prüfen, genehmigen oder ablehnen.
+                    Nach Genehmigung wird dem User über sein System-Postfach ein Bestätigungsdokument inklusive Token bereitgestellt.
                 </p>
             </div>
 
@@ -678,191 +944,561 @@
 
         <section class="stats-grid">
             <div class="glass-card stat-card">
+                <small>Registrierungen offen</small>
+                <strong id="statOpenRequests">0</strong>
+            </div>
+
+            <div class="glass-card stat-card">
+                <small>In Bearbeitung</small>
+                <strong id="statClaimedRequests">0</strong>
+            </div>
+
+            <div class="glass-card stat-card">
                 <small>Fahrer gesamt</small>
-                <strong id="statTotalDrivers">{{ drivers|length }}</strong>
+                <strong id="statTotalDrivers">{{ safe_drivers|length }}</strong>
             </div>
 
             <div class="glass-card stat-card">
                 <small>Mit Tracker-Code</small>
-                <strong id="statWithToken">{{ drivers|selectattr("tracker_code_hash")|list|length }}</strong>
-            </div>
-
-            <div class="glass-card stat-card">
-                <small>Ohne Tracker-Code</small>
-                <strong id="statWithoutToken">{{ drivers|rejectattr("tracker_code_hash")|list|length }}</strong>
-            </div>
-
-            <div class="glass-card stat-card">
-                <small>Tracker aktiv</small>
-                <strong id="statTrackerEnabled">{{ drivers|rejectattr("tracker_enabled", "equalto", false)|list|length }}</strong>
+                <strong id="statWithToken">{{ safe_drivers|selectattr("tracker_code_hash")|list|length }}</strong>
             </div>
         </section>
 
-        <section class="glass-card toolbar">
-            <input
-                class="search-box"
-                id="driverSearch"
-                type="search"
-                placeholder="Fahrer suchen: Name, Username, Discord-ID..."
-                autocomplete="off"
-            />
-
-            <select class="filter-select" id="tokenFilter">
-                <option value="all">Alle Token-Status</option>
-                <option value="with-token">Mit Tracker-Code</option>
-                <option value="without-token">Ohne Tracker-Code</option>
-            </select>
-
-            <select class="filter-select" id="trackerFilter">
-                <option value="all">Alle Tracker-Status</option>
-                <option value="enabled">Tracker aktiv</option>
-                <option value="disabled">Tracker deaktiviert</option>
-            </select>
+        <section class="glass-card tabbar">
+            <button class="tab-btn active" type="button" data-tab-target="registrations">Fahrer Registrierungen</button>
+            <button class="tab-btn" type="button" data-tab-target="tokenRequests">Token Anfragen</button>
+            <button class="tab-btn" type="button" data-tab-target="drivers">Fahrer Datenbank</button>
         </section>
 
-        <section class="glass-card table-card">
-            <div class="table-head">
-                <h2>Fahrer Datenbank</h2>
-                <span>
-                    Datenquelle: <strong>eifellog_db.users</strong>
-                </span>
-            </div>
+        <div id="registrations" class="tab-panel active">
+            <section class="glass-card toolbar requests">
+                <input
+                    class="search-box"
+                    id="requestSearch"
+                    type="search"
+                    placeholder="Antrag suchen: Name, Rolle, Discord-ID, Sachbearbeiter..."
+                    autocomplete="off"
+                />
 
-            <div class="driver-table-wrap">
-                <table class="driver-table">
-                    <thead>
-                        <tr>
-                            <th>Fahrer</th>
-                            <th>Discord-ID</th>
-                            <th>Rolle</th>
-                            <th>Status</th>
-                            <th>Tracker-Code</th>
-                            <th>Letzter Login</th>
-                            <th style="text-align: right;">Aktion</th>
-                        </tr>
-                    </thead>
+                <select class="filter-select" id="requestStatusFilter">
+                    <option value="all">Alle Anträge</option>
+                    <option value="pending">Offen</option>
+                    <option value="claimed">Geclaimt</option>
+                    <option value="approved">Genehmigt</option>
+                    <option value="rejected">Abgelehnt</option>
+                </select>
+            </section>
 
-                    <tbody id="driverTableBody">
-                        {% for driver in drivers %}
-                            {% set has_token = driver.tracker_code_hash is defined and driver.tracker_code_hash %}
-                            {% set tracker_enabled = driver.tracker_enabled is not defined or driver.tracker_enabled != false %}
-                            {% set display_name = driver.display_name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
-                            {% set username = driver.username or "driver" %}
-                            {% set avatar_url = driver.avatar_url or "" %}
-                            {% set role_name = driver.primary_role_name or driver.role_name or driver.rank or "Fahrer" %}
+            <section class="glass-card table-card">
+                <div class="table-head">
+                    <h2>Fahrer Registrierungs-Anträge</h2>
+                    <span>
+                        Quelle: <strong>Dashboard Schnellaktion</strong>
+                    </span>
+                </div>
 
-                            <tr
-                                data-driver-row
-                                data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ (driver.discord_username or '') ~ ' ' ~ (driver.discord_id or ''))|lower }}"
-                                data-token="{{ 'with-token' if has_token else 'without-token' }}"
-                                data-tracker="{{ 'enabled' if tracker_enabled else 'disabled' }}"
-                            >
-                                <td>
-                                    <div class="driver-cell">
-                                        <div class="driver-avatar">
-                                            {% if avatar_url %}
-                                                <img src="{{ avatar_url }}" alt="{{ display_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-                                                <span style="display:none;">EL</span>
-                                            {% else %}
-                                                <span>EL</span>
-                                            {% endif %}
-                                        </div>
-
-                                        <div class="driver-meta">
-                                            <strong>{{ display_name }}</strong>
-                                            <span>@{{ username }}</span>
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="mono">{{ driver.discord_id or "-" }}</span>
-                                </td>
-
-                                <td>
-                                    <span class="role-badge">{{ role_name }}</span>
-                                </td>
-
-                                <td>
-                                    {% if tracker_enabled %}
-                                        <span class="status-badge enabled">Aktiv</span>
-                                    {% else %}
-                                        <span class="status-badge disabled">Deaktiviert</span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if has_token %}
-                                        <span class="token-badge exists">Vorhanden</span>
-                                    {% else %}
-                                        <span class="token-badge empty">Fehlt</span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if driver.tracker_last_login %}
-                                        <span class="mono">{{ driver.tracker_last_login }}</span>
-                                    {% elif driver.last_login %}
-                                        <span class="mono">{{ driver.last_login }}</span>
-                                    {% else %}
-                                        <span class="mono">-</span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    <div class="action-wrap">
-                                        <button
-                                            class="token-btn"
-                                            type="button"
-                                            data-create-token="true"
-                                            data-driver-name="{{ username }}"
-                                            data-display-name="{{ display_name }}"
-                                            data-discord-id="{{ driver.discord_id or '' }}"
-                                            data-force-new="{{ 'true' if has_token else 'false' }}"
-                                        >
-                                            {% if has_token %}
-                                                Neuen Token
-                                            {% else %}
-                                                Token erstellen
-                                            {% endif %}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
+                <div class="request-table-wrap">
+                    <table class="request-table">
+                        <thead>
                             <tr>
-                                <td colspan="7">
-                                    <div class="empty-state">
-                                        <strong>Keine Fahrer gefunden</strong>
-                                        In der Collection <code>users</code> wurden keine Fahrer geladen.
-                                    </div>
-                                </td>
+                                <th>User</th>
+                                <th>Discord-ID</th>
+                                <th>Beantragte Rolle</th>
+                                <th>Status</th>
+                                <th>Sachbearbeiter</th>
+                                <th>Deadline</th>
+                                <th>Eingang</th>
+                                <th style="text-align: right;">Aktion</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                        </thead>
+
+                        <tbody id="requestTableBody">
+                            {% for req in safe_requests %}
+                                {% set req_id = req.id or req._id or req.request_id %}
+                                {% set req_status = req.status or "pending" %}
+                                {% set req_name = req.name or req.display_name or req.username or "Unbekannter User" %}
+                                {% set req_username = req.username or req.discord_username or req_name %}
+                                {% set req_role = req.role or req.primary_role_name or req.role_name or "Fahrer" %}
+                                {% set req_discord_id = req.discord_id or req.user_id or "-" %}
+                                {% set req_handler = req.claimed_by_name or req.handler_name or req.sachbearbeiter_name or req.claimed_by or "Noch nicht geclaimt" %}
+                                {% set req_deadline = req.deadline_display or req.deadline or req.deadline_at or "1-2 Stunden" %}
+                                {% set req_created = req.created_at or req.requested_at or "-" %}
+                                {% set req_note = req.note or req.comment or "" %}
+
+                                <tr
+                                    data-request-row
+                                    data-request-id="{{ req_id }}"
+                                    data-request-status="{{ req_status }}"
+                                    data-search="{{ (req_name ~ ' ' ~ req_username ~ ' ' ~ req_role ~ ' ' ~ req_discord_id ~ ' ' ~ req_handler)|lower }}"
+                                >
+                                    <td>
+                                        <div class="driver-cell">
+                                            <div class="driver-avatar">
+                                                {% if req.avatar_url %}
+                                                    <img src="{{ req.avatar_url }}" alt="{{ req_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                    <span style="display:none;">EL</span>
+                                                {% else %}
+                                                    <span>EL</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="driver-meta">
+                                                <strong>{{ req_name }}</strong>
+                                                <span>@{{ req_username }}</span>
+                                                {% if req_note %}
+                                                    <span>{{ req_note }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ req_discord_id }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="role-badge">{{ req_role }}</span>
+                                    </td>
+
+                                    <td>
+                                        {% if req_status == "approved" %}
+                                            <span class="status-badge approved">Genehmigt</span>
+                                        {% elif req_status == "rejected" %}
+                                            <span class="status-badge rejected">Abgelehnt</span>
+                                        {% elif req_status == "claimed" %}
+                                            <span class="status-badge claimed">Geclaimt</span>
+                                        {% else %}
+                                            <span class="status-badge pending">Offen</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ req_handler }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="deadline-badge" data-deadline-value="{{ req.deadline_at or req.deadline_iso or '' }}">
+                                            {{ req_deadline }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ req_created }}</span>
+                                    </td>
+
+                                    <td>
+                                        <div class="action-wrap">
+                                            {% if req_status == "pending" or req_status == "open" %}
+                                                <button
+                                                    class="request-btn blue"
+                                                    type="button"
+                                                    data-action="claim-registration"
+                                                    data-request-id="{{ req_id }}"
+                                                    data-user-name="{{ req_name }}"
+                                                >
+                                                    Claimen
+                                                </button>
+                                            {% endif %}
+
+                                            {% if req_status == "pending" or req_status == "open" or req_status == "claimed" %}
+                                                <button
+                                                    class="request-btn"
+                                                    type="button"
+                                                    data-action="approve-registration"
+                                                    data-request-id="{{ req_id }}"
+                                                    data-user-name="{{ req_name }}"
+                                                    data-user-role="{{ req_role }}"
+                                                >
+                                                    Genehmigen
+                                                </button>
+
+                                                <button
+                                                    class="request-btn danger"
+                                                    type="button"
+                                                    data-action="reject-registration"
+                                                    data-request-id="{{ req_id }}"
+                                                    data-user-name="{{ req_name }}"
+                                                >
+                                                    Ablehnen
+                                                </button>
+                                            {% else %}
+                                                <span class="mono">Abgeschlossen</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8">
+                                        <div class="empty-state">
+                                            <strong>Keine offenen Fahrer-Registrierungen</strong>
+                                            Sobald ein User im Dashboard auf „Fahrer registrieren“ klickt, erscheint der Antrag hier.
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div id="tokenRequests" class="tab-panel">
+            <section class="glass-card table-card">
+                <div class="table-head">
+                    <h2>Neue Token-Anfragen</h2>
+                    <span>
+                        Quelle: <strong>Dashboard „Neuen Token anfordern“</strong>
+                    </span>
+                </div>
+
+                <div class="request-table-wrap">
+                    <table class="request-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Discord-ID</th>
+                                <th>Rolle</th>
+                                <th>Status</th>
+                                <th>Grund</th>
+                                <th>Eingang</th>
+                                <th style="text-align: right;">Aktion</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="tokenRequestTableBody">
+                            {% for token_req in safe_token_requests %}
+                                {% set token_req_id = token_req.id or token_req._id or token_req.request_id %}
+                                {% set token_req_status = token_req.status or "pending" %}
+                                {% set token_req_name = token_req.name or token_req.display_name or token_req.username or "Unbekannter User" %}
+                                {% set token_req_username = token_req.username or token_req.discord_username or token_req_name %}
+                                {% set token_req_role = token_req.role or token_req.primary_role_name or token_req.role_name or "Fahrer" %}
+                                {% set token_req_discord_id = token_req.discord_id or token_req.user_id or "-" %}
+                                {% set token_req_reason = token_req.reason or "Kein Grund angegeben" %}
+                                {% set token_req_created = token_req.created_at or token_req.requested_at or "-" %}
+
+                                <tr
+                                    data-token-request-row
+                                    data-token-request-status="{{ token_req_status }}"
+                                >
+                                    <td>
+                                        <div class="driver-cell">
+                                            <div class="driver-avatar">
+                                                {% if token_req.avatar_url %}
+                                                    <img src="{{ token_req.avatar_url }}" alt="{{ token_req_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                    <span style="display:none;">EL</span>
+                                                {% else %}
+                                                    <span>EL</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="driver-meta">
+                                                <strong>{{ token_req_name }}</strong>
+                                                <span>@{{ token_req_username }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ token_req_discord_id }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="role-badge">{{ token_req_role }}</span>
+                                    </td>
+
+                                    <td>
+                                        {% if token_req_status == "approved" %}
+                                            <span class="status-badge approved">Erledigt</span>
+                                        {% elif token_req_status == "rejected" %}
+                                            <span class="status-badge rejected">Abgelehnt</span>
+                                        {% else %}
+                                            <span class="status-badge pending">Offen</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ token_req_reason }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ token_req_created }}</span>
+                                    </td>
+
+                                    <td>
+                                        <div class="action-wrap">
+                                            {% if token_req_status == "pending" or token_req_status == "open" %}
+                                                <button
+                                                    class="request-btn"
+                                                    type="button"
+                                                    data-action="approve-token-request"
+                                                    data-request-id="{{ token_req_id }}"
+                                                    data-user-name="{{ token_req_name }}"
+                                                    data-discord-id="{{ token_req_discord_id }}"
+                                                >
+                                                    Token erstellen
+                                                </button>
+
+                                                <button
+                                                    class="request-btn danger"
+                                                    type="button"
+                                                    data-action="reject-token-request"
+                                                    data-request-id="{{ token_req_id }}"
+                                                    data-user-name="{{ token_req_name }}"
+                                                >
+                                                    Ablehnen
+                                                </button>
+                                            {% else %}
+                                                <span class="mono">Abgeschlossen</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <strong>Keine Token-Anfragen</strong>
+                                            Genehmigte Fahrer können im Dashboard einen neuen Token anfordern. Diese Anfrage erscheint dann hier.
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div id="drivers" class="tab-panel">
+            <section class="glass-card toolbar">
+                <input
+                    class="search-box"
+                    id="driverSearch"
+                    type="search"
+                    placeholder="Fahrer suchen: Name, Username, Discord-ID..."
+                    autocomplete="off"
+                />
+
+                <select class="filter-select" id="tokenFilter">
+                    <option value="all">Alle Token-Status</option>
+                    <option value="with-token">Mit Tracker-Code</option>
+                    <option value="without-token">Ohne Tracker-Code</option>
+                </select>
+
+                <select class="filter-select" id="trackerFilter">
+                    <option value="all">Alle Tracker-Status</option>
+                    <option value="enabled">Tracker aktiv</option>
+                    <option value="disabled">Tracker deaktiviert</option>
+                </select>
+            </section>
+
+            <section class="glass-card table-card">
+                <div class="table-head">
+                    <h2>Fahrer Datenbank</h2>
+                    <span>
+                        Datenquelle: <strong>eifellog_db.users</strong>
+                    </span>
+                </div>
+
+                <div class="driver-table-wrap">
+                    <table class="driver-table">
+                        <thead>
+                            <tr>
+                                <th>Fahrer</th>
+                                <th>Discord-ID</th>
+                                <th>Rolle</th>
+                                <th>Status</th>
+                                <th>Tracker-Code</th>
+                                <th>Letzter Login</th>
+                                <th style="text-align: right;">Aktion</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="driverTableBody">
+                            {% for driver in safe_drivers %}
+                                {% set has_token = driver.tracker_code_hash is defined and driver.tracker_code_hash %}
+                                {% set tracker_enabled = driver.tracker_enabled is not defined or driver.tracker_enabled != false %}
+                                {% set display_name = driver.display_name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
+                                {% set username = driver.username or "driver" %}
+                                {% set avatar_url = driver.avatar_url or "" %}
+                                {% set role_name = driver.primary_role_name or driver.role_name or driver.rank or "Fahrer" %}
+
+                                <tr
+                                    data-driver-row
+                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ (driver.discord_username or '') ~ ' ' ~ (driver.discord_id or ''))|lower }}"
+                                    data-token="{{ 'with-token' if has_token else 'without-token' }}"
+                                    data-tracker="{{ 'enabled' if tracker_enabled else 'disabled' }}"
+                                >
+                                    <td>
+                                        <div class="driver-cell">
+                                            <div class="driver-avatar">
+                                                {% if avatar_url %}
+                                                    <img src="{{ avatar_url }}" alt="{{ display_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                    <span style="display:none;">EL</span>
+                                                {% else %}
+                                                    <span>EL</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="driver-meta">
+                                                <strong>{{ display_name }}</strong>
+                                                <span>@{{ username }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="mono">{{ driver.discord_id or "-" }}</span>
+                                    </td>
+
+                                    <td>
+                                        <span class="role-badge">{{ role_name }}</span>
+                                    </td>
+
+                                    <td>
+                                        {% if tracker_enabled %}
+                                            <span class="status-badge enabled">Aktiv</span>
+                                        {% else %}
+                                            <span class="status-badge disabled">Deaktiviert</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if has_token %}
+                                            <span class="token-badge exists">Vorhanden</span>
+                                        {% else %}
+                                            <span class="token-badge empty">Fehlt</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if driver.tracker_last_login %}
+                                            <span class="mono">{{ driver.tracker_last_login }}</span>
+                                        {% elif driver.last_login %}
+                                            <span class="mono">{{ driver.last_login }}</span>
+                                        {% else %}
+                                            <span class="mono">-</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <div class="action-wrap">
+                                            <button
+                                                class="token-btn"
+                                                type="button"
+                                                data-create-token="true"
+                                                data-driver-name="{{ username }}"
+                                                data-display-name="{{ display_name }}"
+                                                data-discord-id="{{ driver.discord_id or '' }}"
+                                                data-force-new="{{ 'true' if has_token else 'false' }}"
+                                            >
+                                                {% if has_token %}
+                                                    Neuen Token
+                                                {% else %}
+                                                    Token erstellen
+                                                {% endif %}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <strong>Keine Fahrer gefunden</strong>
+                                            In der Collection <code>users</code> wurden keine Fahrer geladen.
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </div>
 
     <div class="toast-layer" id="toastLayer" aria-live="polite"></div>
 </section>
 
+<div class="modal-backdrop" id="rejectModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <small>Personalabteilung</small>
+                <h3 id="rejectModalTitle">Antrag ablehnen</h3>
+            </div>
+
+            <button class="modal-close" type="button" data-close-modal="rejectModal">×</button>
+        </div>
+
+        <form class="modal-body" id="rejectForm">
+            <input type="hidden" id="rejectRequestId" />
+            <input type="hidden" id="rejectType" />
+
+            <div class="modal-info">
+                <span>User: <strong id="rejectUserName">-</strong></span>
+                <span>Diese Notiz wird als Bearbeitungshinweis gespeichert.</span>
+            </div>
+
+            <textarea
+                class="modal-textarea"
+                id="rejectReason"
+                placeholder="Grund der Ablehnung eintragen..."
+                required
+            ></textarea>
+
+            <div class="modal-actions">
+                <button class="request-btn danger" type="submit">Ablehnung senden</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const CREATE_TOKEN_URL = "{{ url_for('personalabteilung_create_tracker_code') }}";
 
+        const CLAIM_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/claim";
+        const APPROVE_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/approve";
+        const REJECT_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/reject";
+
+        const APPROVE_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/approve";
+        const REJECT_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/reject";
+
         const searchInput = document.getElementById("driverSearch");
         const tokenFilter = document.getElementById("tokenFilter");
         const trackerFilter = document.getElementById("trackerFilter");
+
+        const requestSearch = document.getElementById("requestSearch");
+        const requestStatusFilter = document.getElementById("requestStatusFilter");
+
         const toastLayer = document.getElementById("toastLayer");
+
+        const rejectModal = document.getElementById("rejectModal");
+        const rejectForm = document.getElementById("rejectForm");
+        const rejectRequestId = document.getElementById("rejectRequestId");
+        const rejectType = document.getElementById("rejectType");
+        const rejectReason = document.getElementById("rejectReason");
+        const rejectUserName = document.getElementById("rejectUserName");
+        const rejectModalTitle = document.getElementById("rejectModalTitle");
 
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
         }
 
+        function getRequestRows() {
+            return Array.from(document.querySelectorAll("[data-request-row]"));
+        }
+
+        function getTokenRequestRows() {
+            return Array.from(document.querySelectorAll("[data-token-request-row]"));
+        }
+
         function setText(id, value) {
             const node = document.getElementById(id);
+
             if (node) {
                 node.textContent = String(value);
             }
@@ -870,15 +1506,23 @@
 
         function updateStats() {
             const rows = getRows();
+            const requestRows = getRequestRows();
+
             const total = rows.length;
             const withToken = rows.filter((row) => row.dataset.token === "with-token").length;
-            const withoutToken = rows.filter((row) => row.dataset.token === "without-token").length;
-            const enabled = rows.filter((row) => row.dataset.tracker === "enabled").length;
+
+            const openRequests = requestRows.filter((row) => {
+                return row.dataset.requestStatus === "pending" || row.dataset.requestStatus === "open";
+            }).length;
+
+            const claimedRequests = requestRows.filter((row) => {
+                return row.dataset.requestStatus === "claimed";
+            }).length;
 
             setText("statTotalDrivers", total);
             setText("statWithToken", withToken);
-            setText("statWithoutToken", withoutToken);
-            setText("statTrackerEnabled", enabled);
+            setText("statOpenRequests", openRequests);
+            setText("statClaimedRequests", claimedRequests);
         }
 
         function showToast(title, message, type = "success", code = null) {
@@ -930,7 +1574,7 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function applyFilters() {
+        function applyDriverFilters() {
             const rows = getRows();
             const query = String(searchInput?.value || "").trim().toLowerCase();
             const tokenValue = tokenFilter?.value || "all";
@@ -945,17 +1589,356 @@
             });
         }
 
+        function applyRequestFilters() {
+            const rows = getRequestRows();
+            const query = String(requestSearch?.value || "").trim().toLowerCase();
+            const statusValue = requestStatusFilter?.value || "all";
+
+            rows.forEach((row) => {
+                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
+                const matchesStatus = statusValue === "all" || row.dataset.requestStatus === statusValue;
+
+                row.style.display = matchesSearch && matchesStatus ? "" : "none";
+            });
+        }
+
+        function activateTab(tabId) {
+            document.querySelectorAll("[data-tab-target]").forEach((button) => {
+                button.classList.toggle("active", button.dataset.tabTarget === tabId);
+            });
+
+            document.querySelectorAll(".tab-panel").forEach((panel) => {
+                panel.classList.toggle("active", panel.id === tabId);
+            });
+        }
+
+        function setRowStatus(row, status, handlerName = null) {
+            if (!row) return;
+
+            row.dataset.requestStatus = status;
+
+            const statusBadge = row.querySelector(".status-badge");
+            if (statusBadge) {
+                statusBadge.className = `status-badge ${status}`;
+
+                if (status === "approved") {
+                    statusBadge.textContent = "Genehmigt";
+                } else if (status === "rejected") {
+                    statusBadge.textContent = "Abgelehnt";
+                } else if (status === "claimed") {
+                    statusBadge.textContent = "Geclaimt";
+                } else {
+                    statusBadge.textContent = "Offen";
+                }
+            }
+
+            if (handlerName) {
+                const handlerCell = row.children[4];
+                const handlerText = handlerCell ? handlerCell.querySelector(".mono") : null;
+
+                if (handlerText) {
+                    handlerText.textContent = handlerName;
+                }
+            }
+
+            if (status === "approved" || status === "rejected") {
+                const actionWrap = row.querySelector(".action-wrap");
+
+                if (actionWrap) {
+                    actionWrap.innerHTML = `<span class="mono">Abgeschlossen</span>`;
+                }
+            } else if (status === "claimed") {
+                const claimButton = row.querySelector("[data-action='claim-registration']");
+
+                if (claimButton) {
+                    claimButton.remove();
+                }
+            }
+
+            updateStats();
+            applyRequestFilters();
+        }
+
+        async function postJson(url, payload) {
+            const response = await fetch(url, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify(payload || {})
+            });
+
+            let result = null;
+
+            try {
+                result = await response.json();
+            } catch {
+                throw new Error("Server hat keine gültige JSON-Antwort gesendet.");
+            }
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || result.message || "Aktion konnte nicht ausgeführt werden.");
+            }
+
+            return result;
+        }
+
+        async function runButtonAction(button, loadingText, callback) {
+            const oldText = button.textContent.trim();
+
+            button.disabled = true;
+            button.textContent = loadingText;
+
+            try {
+                await callback();
+            } catch (error) {
+                showToast("Fehler", error.message || "Aktion fehlgeschlagen.", "error");
+                button.textContent = oldText;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function openRejectModal(type, requestId, userName) {
+            rejectRequestId.value = requestId || "";
+            rejectType.value = type || "registration";
+            rejectReason.value = "";
+            rejectUserName.textContent = userName || "-";
+
+            rejectModalTitle.textContent = type === "token"
+                ? "Token-Anfrage ablehnen"
+                : "Fahrer-Registrierung ablehnen";
+
+            rejectModal.classList.add("active");
+            document.body.style.overflow = "hidden";
+
+            setTimeout(() => {
+                rejectReason.focus();
+            }, 60);
+        }
+
+        function closeRejectModal() {
+            rejectModal.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+
+        document.querySelectorAll("[data-close-modal]").forEach((button) => {
+            button.addEventListener("click", () => {
+                closeRejectModal();
+            });
+        });
+
+        rejectModal.addEventListener("click", (event) => {
+            if (event.target === rejectModal) {
+                closeRejectModal();
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && rejectModal.classList.contains("active")) {
+                closeRejectModal();
+            }
+        });
+
+        document.querySelectorAll("[data-tab-target]").forEach((button) => {
+            button.addEventListener("click", () => {
+                activateTab(button.dataset.tabTarget);
+            });
+        });
+
         if (searchInput) {
-            searchInput.addEventListener("input", applyFilters);
+            searchInput.addEventListener("input", applyDriverFilters);
         }
 
         if (tokenFilter) {
-            tokenFilter.addEventListener("change", applyFilters);
+            tokenFilter.addEventListener("change", applyDriverFilters);
         }
 
         if (trackerFilter) {
-            trackerFilter.addEventListener("change", applyFilters);
+            trackerFilter.addEventListener("change", applyDriverFilters);
         }
+
+        if (requestSearch) {
+            requestSearch.addEventListener("input", applyRequestFilters);
+        }
+
+        if (requestStatusFilter) {
+            requestStatusFilter.addEventListener("change", applyRequestFilters);
+        }
+
+        rejectForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const id = rejectRequestId.value;
+            const type = rejectType.value;
+            const reason = rejectReason.value.trim();
+
+            if (!id || reason.length < 2) {
+                showToast("Fehler", "Bitte einen Ablehnungsgrund eintragen.", "error");
+                return;
+            }
+
+            const submitButton = rejectForm.querySelector("button[type='submit']");
+            const oldText = submitButton.textContent.trim();
+
+            submitButton.disabled = true;
+            submitButton.textContent = "Sende...";
+
+            try {
+                if (type === "token") {
+                    await postJson(REJECT_TOKEN_REQUEST_URL, {
+                        requestId: id,
+                        reason: reason
+                    });
+
+                    const row = document.querySelector(`[data-token-request-row] [data-request-id="${CSS.escape(id)}"]`)?.closest("[data-token-request-row]");
+                    if (row) {
+                        row.dataset.tokenRequestStatus = "rejected";
+                        const statusBadge = row.querySelector(".status-badge");
+                        if (statusBadge) {
+                            statusBadge.className = "status-badge rejected";
+                            statusBadge.textContent = "Abgelehnt";
+                        }
+
+                        const actionWrap = row.querySelector(".action-wrap");
+                        if (actionWrap) {
+                            actionWrap.innerHTML = `<span class="mono">Abgeschlossen</span>`;
+                        }
+                    }
+
+                    showToast("Token-Anfrage abgelehnt", "Die Token-Anfrage wurde abgelehnt.", "success");
+                } else {
+                    await postJson(REJECT_REGISTRATION_URL, {
+                        requestId: id,
+                        reason: reason
+                    });
+
+                    const row = document.querySelector(`[data-request-row][data-request-id="${CSS.escape(id)}"]`);
+                    setRowStatus(row, "rejected");
+
+                    showToast("Registrierung abgelehnt", "Der Antrag wurde abgelehnt und gespeichert.", "success");
+                }
+
+                closeRejectModal();
+            } catch (error) {
+                showToast("Fehler", error.message || "Ablehnung konnte nicht gesendet werden.", "error");
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = oldText;
+            }
+        });
+
+        document.addEventListener("click", async (event) => {
+            const button = event.target.closest("[data-action]");
+
+            if (!button) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            const action = button.dataset.action;
+            const requestId = button.dataset.requestId || "";
+            const userName = button.dataset.userName || "User";
+
+            if (!requestId) {
+                showToast("Fehler", "Keine Request-ID vorhanden.", "error");
+                return;
+            }
+
+            if (action === "claim-registration") {
+                await runButtonAction(button, "Claime...", async () => {
+                    const result = await postJson(CLAIM_REGISTRATION_URL, {
+                        requestId: requestId
+                    });
+
+                    const row = button.closest("[data-request-row]");
+                    setRowStatus(row, "claimed", result.handlerName || result.claimedByName || "Du");
+
+                    showToast(
+                        "Antrag geclaimt",
+                        `${userName} ist jetzt deinem Bearbeitungsbereich zugewiesen.`
+                    );
+                });
+
+                return;
+            }
+
+            if (action === "approve-registration") {
+                const confirmed = confirm(`Fahrer-Registrierung für ${userName} genehmigen und Token-Dokument ins Postfach senden?`);
+
+                if (!confirmed) return;
+
+                await runButtonAction(button, "Genehmige...", async () => {
+                    const result = await postJson(APPROVE_REGISTRATION_URL, {
+                        requestId: requestId,
+                        createToken: true,
+                        sendSystemDocument: true
+                    });
+
+                    const row = button.closest("[data-request-row]");
+                    setRowStatus(row, "approved", result.handlerName || result.approvedByName || null);
+
+                    showToast(
+                        "Registrierung genehmigt",
+                        result.message || `Der User ${userName} wurde genehmigt. Das Bestätigungsdokument wurde an das System-Postfach gesendet.`,
+                        "success",
+                        result.trackerCode || result.token || null
+                    );
+                });
+
+                return;
+            }
+
+            if (action === "reject-registration") {
+                openRejectModal("registration", requestId, userName);
+                return;
+            }
+
+            if (action === "approve-token-request") {
+                const confirmed = confirm(`Neuen Token für ${userName} erstellen und als Dokument ins Postfach senden?`);
+
+                if (!confirmed) return;
+
+                await runButtonAction(button, "Erstelle...", async () => {
+                    const result = await postJson(APPROVE_TOKEN_REQUEST_URL, {
+                        requestId: requestId,
+                        createToken: true,
+                        sendSystemDocument: true
+                    });
+
+                    const row = button.closest("[data-token-request-row]");
+                    if (row) {
+                        row.dataset.tokenRequestStatus = "approved";
+
+                        const statusBadge = row.querySelector(".status-badge");
+                        if (statusBadge) {
+                            statusBadge.className = "status-badge approved";
+                            statusBadge.textContent = "Erledigt";
+                        }
+
+                        const actionWrap = row.querySelector(".action-wrap");
+                        if (actionWrap) {
+                            actionWrap.innerHTML = `<span class="mono">Abgeschlossen</span>`;
+                        }
+                    }
+
+                    showToast(
+                        "Neuer Token erstellt",
+                        result.message || `Der neue Token für ${userName} wurde erstellt und ins Postfach gesendet.`,
+                        "success",
+                        result.trackerCode || result.token || null
+                    );
+                });
+
+                return;
+            }
+
+            if (action === "reject-token-request") {
+                openRejectModal("token", requestId, userName);
+            }
+        });
 
         document.addEventListener("click", async (event) => {
             const button = event.target.closest("[data-create-token='true']");
@@ -985,37 +1968,17 @@
             button.textContent = "Erstelle...";
 
             try {
-                const response = await fetch(CREATE_TOKEN_URL, {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Requested-With": "XMLHttpRequest"
-                    },
-                    body: JSON.stringify({
-                        driverName,
-                        discordId,
-                        forceNew: true
-                    })
+                const result = await postJson(CREATE_TOKEN_URL, {
+                    driverName,
+                    discordId,
+                    forceNew: true
                 });
-
-                let result = null;
-
-                try {
-                    result = await response.json();
-                } catch {
-                    throw new Error("Server hat keine gültige JSON-Antwort gesendet.");
-                }
-
-                if (!response.ok || !result.success) {
-                    throw new Error(result.error || result.message || "Token konnte nicht erstellt werden.");
-                }
 
                 showToast(
                     "Tracker-Code erstellt",
                     `Der feste Tracker-Code für ${displayName} wurde erstellt. Diesen Code nur einmalig an den Fahrer senden.`,
                     "success",
-                    result.trackerCode || null
+                    result.trackerCode || result.token || null
                 );
 
                 const row = button.closest("[data-driver-row]");
@@ -1040,7 +2003,7 @@
                 button.textContent = "Neuen Token";
 
                 updateStats();
-                applyFilters();
+                applyDriverFilters();
             } catch (error) {
                 showToast("Fehler", error.message || "Token konnte nicht erstellt werden.", "error");
                 button.textContent = oldText;
@@ -1050,7 +2013,8 @@
         });
 
         updateStats();
-        applyFilters();
+        applyRequestFilters();
+        applyDriverFilters();
     });
 </script>
 {% endblock %}
