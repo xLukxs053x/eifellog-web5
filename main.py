@@ -1902,26 +1902,83 @@ def personalabteilung():
 # BUCHHALTUNG / PERSONALABTEILUNG DOKUMENTE
 # ==========================================
 
-def user_has_role(user_roles, allowed_roles):
-    clean_user_roles = clean_roles(user_roles)
-    clean_allowed_roles = clean_roles(allowed_roles)
-    return any(role in clean_user_roles for role in clean_allowed_roles)
+BUCHHALTUNG_ALLOWED_ROLES = {
+    ROLE_BUCHHALTUNG_ID,
+    ROLE_BUCHHALTUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG_ID,
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_PROJEKTLEITUNG
+}
 
 
-def require_logged_in_user():
+def role_set(user_roles):
+    return {str(role).strip() for role in (user_roles or []) if role and str(role).strip()}
+
+
+def has_buchhaltung_permission(user_roles):
+    return bool(role_set(user_roles).intersection(role_set(BUCHHALTUNG_ALLOWED_ROLES)))
+
+
+def require_buchhaltung_permission():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
-        return None
-    return session.get("user")
+        return redirect(url_for("hub"))
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_buchhaltung_permission(user_roles):
+        flash("Zugriff verweigert. Du benötigst Buchhaltung, Geschäftsführung oder Projektleitung.", "error")
+        return redirect(url_for("dashboard"))
+
+    return None
+
+
+def require_buchhaltung_api_permission():
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte zuerst einloggen."}), 401
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_buchhaltung_permission(user_roles):
+        return jsonify({"success": False, "message": "Nicht berechtigt."}), 403
+
+    return None
+
+
+def current_account_identity():
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+    username = safe_str(session_user.get("username") or session_user.get("discord_username"), "User")
+
+    db_user = None
+    if discord_id:
+        db_user = users_collection.find_one({"discord_id": discord_id})
+
+    display_name = username
+    if db_user:
+        display_name = (
+            db_user.get("display_name")
+            or db_user.get("username")
+            or db_user.get("discord_username")
+            or username
+        )
+
+    return {
+        "discord_id": discord_id,
+        "username": username,
+        "display_name": display_name,
+        "roles": session_user.get("roles", []),
+        "at": now_utc()
+    }
 
 
 def get_all_drivers_for_select():
-    drivers = users_collection.find(
+    drivers_cursor = users_collection.find(
         {},
         {
             "_id": 1,
             "discord_id": 1,
             "username": 1,
+            "username_lc": 1,
             "display_name": 1,
             "discord_username": 1,
             "avatar": 1,
@@ -1929,11 +1986,11 @@ def get_all_drivers_for_select():
             "roles": 1,
             "aktenzeichen": 1
         }
-    ).sort("username_lc", ASCENDING)
+    ).sort([("display_name", ASCENDING), ("username", ASCENDING)])
 
-    prepared = []
-    for driver in drivers:
-        prepared.append({
+    drivers = []
+    for driver in drivers_cursor:
+        drivers.append({
             "id": str(driver.get("_id")),
             "discord_id": driver.get("discord_id"),
             "username": driver.get("username") or driver.get("discord_username") or "Unbekannt",
@@ -1944,91 +2001,127 @@ def get_all_drivers_for_select():
             "aktenzeichen": driver.get("aktenzeichen") or "Nicht vergeben"
         })
 
-    return prepared
+    return drivers
 
 
 @app.route("/buchhaltung", methods=["GET"])
 def buchhaltung():
-    current_user = require_logged_in_user()
-    if not current_user:
-        return redirect(url_for("hub"))
+    permission_response = require_buchhaltung_permission()
+    if permission_response:
+        return permission_response
 
-    user_roles = current_user.get("roles", [])
-
-    allowed_roles = {
-        ROLE_BUCHHALTUNG_ID,
-        ROLE_GESCHAEFTSFUEHRUNG_ID,
-        ROLE_PROJEKTLEITUNG_ID,
-        ROLE_BUCHHALTUNG
-    }
-
-    if not user_has_role(user_roles, allowed_roles):
-        flash("Zugriff verweigert! Du benötigst die Buchhaltung-Rolle.", "error")
-        return redirect(url_for("dashboard"))
-
-    requests_cursor = buchhaltung_requests_collection.find(
-        {"archived": {"$ne": True}}
-    ).sort("created_at", DESCENDING)
-
-    buchhaltung_requests = []
-    for item in requests_cursor:
-        buchhaltung_requests.append({
-            "id": str(item.get("_id")),
-            "request_id": item.get("request_id") or str(item.get("_id")),
-            "type": item.get("type") or "Allgemein",
-            "category": item.get("category") or item.get("type") or "Allgemein",
-            "title": item.get("title") or "Buchhaltungs-Anfrage",
-            "description": item.get("description") or item.get("message") or "",
-            "amount": item.get("amount") or 0,
-            "currency": item.get("currency") or "EUR",
-            "status": item.get("status") or "open",
-            "priority": item.get("priority") or "normal",
-            "created_at": format_datetime_for_template(item.get("created_at")) or "-",
-            "updated_at": format_datetime_for_template(item.get("updated_at")) or "-",
-            "created_by_name": item.get("created_by_name") or item.get("created_by", {}).get("display_name") or "Unbekannt",
-            "assigned_to_name": item.get("assigned_to_name") or item.get("assigned_to", {}).get("display_name") or "Nicht zugewiesen",
-            "note": item.get("note") or ""
-        })
-
-    stats = {
-        "open": buchhaltung_requests_collection.count_documents({
-            "archived": {"$ne": True},
-            "status": {"$in": ["open", "pending", "new"]}
-        }),
-        "in_progress": buchhaltung_requests_collection.count_documents({
-            "archived": {"$ne": True},
-            "status": {"$in": ["claimed", "in_progress"]}
-        }),
-        "done": buchhaltung_requests_collection.count_documents({
-            "archived": {"$ne": True},
-            "status": {"$in": ["done", "approved", "paid"]}
-        }),
-        "total": buchhaltung_requests_collection.count_documents({
-            "archived": {"$ne": True}
-        })
-    }
+    actor = current_account_identity()
 
     return render_template(
         "buchhaltung.html",
-        current_user=current_user,
-        buchhaltung_requests=buchhaltung_requests,
-        stats=stats
+        current_user=session.get("user"),
+        display_name=actor.get("username") or actor.get("display_name"),
+        staff_name=actor.get("display_name"),
+        buchhaltung_requests=[],
+        requests=[],
+        transactions=[],
+        buchhaltung_transactions=[],
+        buchhaltung_stats={
+            "open_requests": 0,
+            "done_requests": 0,
+            "open_transactions": 0,
+            "paid_transactions": 0,
+            "total_amount": 0
+        }
     )
+
+
+@app.route("/api/buchhaltung/request", methods=["GET", "POST", "OPTIONS"])
+def api_buchhaltung_request():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = require_buchhaltung_api_permission()
+    if permission_response:
+        return permission_response
+
+    if request.method == "GET":
+        items = list(
+            buchhaltung_requests_collection.find(
+                {"archived": {"$ne": True}},
+                {"_id": 0}
+            ).sort("created_at", DESCENDING).limit(100)
+        )
+        return jsonify({"success": True, "requests": items})
+
+    data = request.get_json(silent=True) or {}
+
+    category = safe_str(data.get("category") or data.get("type"), "Allgemeine Rückfrage")[:120]
+    title = safe_str(data.get("title") or data.get("subject"), "Buchhaltungs-Anfrage")[:160]
+    message = safe_str(data.get("message") or data.get("description") or data.get("content"))[:2000]
+    amount = parse_number(data.get("amount"), 0)
+    priority = safe_str(data.get("priority"), "normal")[:40]
+
+    if not message:
+        return jsonify({
+            "success": False,
+            "message": "Bitte eine Nachricht eingeben."
+        }), 400
+
+    actor = current_account_identity()
+    now = now_utc()
+    request_id = uuid.uuid4().hex
+
+    request_doc = {
+        "request_id": request_id,
+        "category": category,
+        "type": category,
+        "title": title,
+        "description": message,
+        "message": message,
+        "amount": amount,
+        "currency": "EUR",
+        "priority": priority,
+        "status": "open",
+        "archived": False,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": actor,
+        "created_by_name": actor.get("display_name"),
+        "sender_discord_id": actor.get("discord_id"),
+        "sender_username": actor.get("username"),
+        "source": "buchhaltung"
+    }
+
+    insert_result = buchhaltung_requests_collection.insert_one(request_doc)
+
+    task_doc = {
+        "title": f"Buchhaltung: {title}",
+        "type": "Buchhaltung",
+        "priority": priority,
+        "description": message,
+        "status": "open",
+        "created_at": now,
+        "updated_at": now,
+        "assignee": None,
+        "source": "buchhaltung",
+        "buchhaltung_request_id": str(insert_result.inserted_id),
+        "request_id": request_id,
+        "created_by": actor
+    }
+
+    tasks_collection.insert_one(task_doc)
+
+    return jsonify({
+        "success": True,
+        "message": "Buchhaltungs-Anfrage wurde gespeichert.",
+        "requestId": request_id
+    })
 
 
 @app.route("/personalabteilung/dokumente", methods=["GET", "POST"])
 def personalabteilung_dokumente():
-    current_user = require_logged_in_user()
-    if not current_user:
-        return redirect(url_for("hub"))
-
-    user_roles = current_user.get("roles", [])
-
-    if not user_has_role(user_roles, PERSONALABTEILUNG_ALLOWED_ROLES):
-        flash("Zugriff verweigert! Du benötigst eine Personalabteilung-Rolle.", "error")
-        return redirect(url_for("dashboard"))
+    permission_response = require_personalabteilung_permission()
+    if permission_response:
+        return permission_response
 
     drivers = get_all_drivers_for_select()
+    actor = current_account_identity()
 
     if request.method == "POST":
         discord_id = safe_str(request.form.get("discord_id"))
@@ -2043,16 +2136,22 @@ def personalabteilung_dokumente():
             flash("Bitte wähle einen Fahrer aus.", "error")
             return render_template(
                 "buchhaltung_form.html",
-                current_user=current_user,
-                drivers=drivers
+                current_user=session.get("user"),
+                display_name=actor.get("username") or actor.get("display_name"),
+                staff_name=actor.get("display_name"),
+                drivers=drivers,
+                fahrer=drivers
             )
 
         if not title or not content:
             flash("Titel und Inhalt müssen ausgefüllt sein.", "error")
             return render_template(
                 "buchhaltung_form.html",
-                current_user=current_user,
-                drivers=drivers
+                current_user=session.get("user"),
+                display_name=actor.get("username") or actor.get("display_name"),
+                staff_name=actor.get("display_name"),
+                drivers=drivers,
+                fahrer=drivers
             )
 
         target_user = users_collection.find_one({"discord_id": discord_id})
@@ -2060,11 +2159,12 @@ def personalabteilung_dokumente():
             flash("Der ausgewählte Fahrer wurde nicht gefunden.", "error")
             return render_template(
                 "buchhaltung_form.html",
-                current_user=current_user,
-                drivers=drivers
+                current_user=session.get("user"),
+                display_name=actor.get("username") or actor.get("display_name"),
+                staff_name=actor.get("display_name"),
+                drivers=drivers,
+                fahrer=drivers
             )
-
-        actor = current_staff_identity()
 
         create_system_document_for_user(
             discord_id=discord_id,
@@ -2087,8 +2187,11 @@ def personalabteilung_dokumente():
 
     return render_template(
         "buchhaltung_form.html",
-        current_user=current_user,
-        drivers=drivers
+        current_user=session.get("user"),
+        display_name=actor.get("username") or actor.get("display_name"),
+        staff_name=actor.get("display_name"),
+        drivers=drivers,
+        fahrer=drivers
     )
 
 
