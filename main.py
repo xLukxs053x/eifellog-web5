@@ -609,26 +609,227 @@ def prepare_system_document_for_dashboard(document):
     }
 
 
-def get_system_documents_for_user(discord_id, limit=30):
+def get_system_documents_for_user(discord_id, limit=30, user_doc=None, latest_registration=None):
+    discord_id = safe_str(discord_id)
+
+    if not discord_id:
+        return []
+
+    registration_approved = user_registration_is_approved(
+        discord_id,
+        user_doc=user_doc,
+        latest_registration=latest_registration
+    )
+
+    approved_ids = approved_registration_request_ids(
+        discord_id,
+        user_doc=user_doc,
+        latest_registration=latest_registration
+    )
+
     documents = system_documents_collection.find(
-        {"discord_id": str(discord_id)},
+        {
+            "discord_id": discord_id,
+            "archived": {"$ne": True},
+            "hidden": {"$ne": True}
+        },
         {"_id": 0}
     ).sort("created_at", DESCENDING).limit(limit)
 
-    return [prepare_system_document_for_dashboard(doc) for doc in documents]
+    prepared_documents = []
+
+    for document in documents:
+        if document_contains_tracker_code(document):
+            # Token-/Tracker-Dokumente werden nur angezeigt, wenn der User wirklich
+            # durch die Personalabteilung angenommen wurde.
+            if not registration_approved:
+                continue
+
+            document_request_id = safe_str(
+                document.get("registration_request_id")
+                or document.get("request_id")
+            )
+
+            # Alte Token-Dokumente ohne passenden aktuellen genehmigten Antrag
+            # werden ausgeblendet. Das verhindert, dass gelöschte/neu angelegte
+            # User alte Tokens wieder angezeigt bekommen.
+            if approved_ids:
+                if not document_request_id or document_request_id not in approved_ids:
+                    continue
+
+        prepared_documents.append(prepare_system_document_for_dashboard(document))
+
+    return prepared_documents
 
 
 def get_latest_registration_request_for_user(discord_id):
     return fahrer_registration_collection.find_one(
-        {"discord_id": str(discord_id)},
+        {
+            "discord_id": str(discord_id),
+            "archived": {"$ne": True}
+        },
         sort=[("created_at", DESCENDING)]
     )
 
 
 def get_latest_token_request_for_user(discord_id):
     return token_request_collection.find_one(
-        {"discord_id": str(discord_id)},
+        {
+            "discord_id": str(discord_id),
+            "archived": {"$ne": True}
+        },
         sort=[("created_at", DESCENDING)]
+    )
+
+
+TOKEN_DOCUMENT_TYPES = {
+    "driver_registration_approval",
+    "new_token_approval",
+    "manual_token_create"
+}
+
+
+def registration_public_id(request_doc):
+    if not request_doc:
+        return ""
+
+    return safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+
+
+def document_contains_tracker_code(document):
+    document_type = safe_str(document.get("type"))
+
+    if document.get("contains_tracker_code") is True:
+        return True
+
+    if document_type in TOKEN_DOCUMENT_TYPES:
+        return True
+
+    title = safe_str(document.get("title")).lower()
+
+    return "token" in title or "tracker" in title
+
+
+def user_registration_is_approved(discord_id, user_doc=None, latest_registration=None):
+    discord_id = safe_str(discord_id)
+
+    if not discord_id:
+        return False
+
+    if latest_registration is None:
+        latest_registration = get_latest_registration_request_for_user(discord_id)
+
+    # WICHTIG:
+    # Wenn es einen aktuellen Antrag gibt, entscheidet ausschließlich dessen Status.
+    # Ein alter tracker_code_hash darf NIEMALS automatisch als Freigabe gelten.
+    if latest_registration:
+        return safe_str(latest_registration.get("status")) == "approved"
+
+    if user_doc:
+        return safe_str(user_doc.get("fahrer_registration_status")) == "approved"
+
+    return False
+
+
+def approved_registration_request_ids(discord_id, user_doc=None, latest_registration=None):
+    discord_id = safe_str(discord_id)
+    approved_ids = set()
+
+    if not discord_id:
+        return approved_ids
+
+    if latest_registration is None:
+        latest_registration = get_latest_registration_request_for_user(discord_id)
+
+    if latest_registration and safe_str(latest_registration.get("status")) == "approved":
+        latest_public_id = registration_public_id(latest_registration)
+
+        if latest_public_id:
+            approved_ids.add(latest_public_id)
+
+        if latest_registration.get("_id"):
+            approved_ids.add(str(latest_registration.get("_id")))
+
+        if latest_registration.get("request_id"):
+            approved_ids.add(str(latest_registration.get("request_id")))
+
+    elif user_doc and safe_str(user_doc.get("fahrer_registration_status")) == "approved":
+        request_id = safe_str(user_doc.get("fahrer_registration_request_id"))
+
+        if request_id:
+            approved_ids.add(request_id)
+
+    return approved_ids
+
+
+def archive_token_documents_for_user(discord_id, reason=""):
+    discord_id = safe_str(discord_id)
+
+    if not discord_id:
+        return
+
+    now = now_utc()
+
+    system_documents_collection.update_many(
+        {
+            "discord_id": discord_id,
+            "$or": [
+                {"contains_tracker_code": True},
+                {"type": {"$in": list(TOKEN_DOCUMENT_TYPES)}},
+                {"title": {"$regex": "token|tracker", "$options": "i"}}
+            ]
+        },
+        {
+            "$set": {
+                "archived": True,
+                "hidden": True,
+                "archived_at": now,
+                "archived_reason": safe_str(reason, "registration_reset")
+            }
+        }
+    )
+
+
+def reset_registration_state_for_recreated_user(discord_id):
+    discord_id = safe_str(discord_id)
+
+    if not discord_id:
+        return
+
+    now = now_utc()
+
+    archive_token_documents_for_user(discord_id, reason="user_account_recreated")
+
+    fahrer_registration_collection.update_many(
+        {
+            "discord_id": discord_id,
+            "archived": {"$ne": True}
+        },
+        {
+            "$set": {
+                "archived": True,
+                "status": "archived",
+                "archived_at": now,
+                "archived_reason": "User-Account wurde neu angelegt. Alte Fahrer-Freigaben wurden zurückgesetzt.",
+                "updated_at": now
+            }
+        }
+    )
+
+    token_request_collection.update_many(
+        {
+            "discord_id": discord_id,
+            "archived": {"$ne": True}
+        },
+        {
+            "$set": {
+                "archived": True,
+                "status": "archived",
+                "archived_at": now,
+                "archived_reason": "User-Account wurde neu angelegt. Alte Token-Anfragen wurden zurückgesetzt.",
+                "updated_at": now
+            }
+        }
     )
 
 
@@ -732,8 +933,18 @@ def rejection_document_content(title, reason, handler_name):
     """
 
 
-def create_tracker_code_for_user_doc(user_doc, actor=None):
+def create_tracker_code_for_user_doc(user_doc, actor=None, allow_unapproved=False):
+    if not user_doc:
+        raise ValueError("User-Dokument fehlt.")
+
     actor = actor or current_staff_identity()
+    discord_id = safe_str(user_doc.get("discord_id"))
+
+    if not allow_unapproved and not user_registration_is_approved(discord_id, user_doc=user_doc):
+        raise PermissionError(
+            "Tracker-Token darf erst erstellt werden, nachdem die Personalabteilung den Fahrer-Antrag angenommen hat."
+        )
+
     tracker_code = generate_tracker_code()
 
     users_collection.update_one(
@@ -906,7 +1117,9 @@ def user_has_tracker_access(user_doc):
     if user_doc.get("tracker_enabled") is False:
         return False
 
-    return True
+    # Ein vorhandener Hash allein zählt nicht als Freigabe.
+    # Tracker-Zugriff gibt es erst nach genehmigter Fahrer-Registrierung.
+    return user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc)
 
 
 def tracker_profile_payload(user_doc):
@@ -1423,6 +1636,11 @@ def callback():
 
     existing_user = users_collection.find_one({"discord_id": discord_id})
 
+    # Wenn der User-Datensatz gelöscht und später durch Discord-Login neu erstellt wird,
+    # dürfen alte Fahrer-Freigaben, Token-Anfragen und Token-Dokumente nicht wieder gelten.
+    if not existing_user:
+        reset_registration_state_for_recreated_user(discord_id)
+
     if existing_user and existing_user.get("username"):
         profile_username = existing_user.get("username")
     else:
@@ -1892,6 +2110,12 @@ def tracker_create_code_admin():
             "error": "Fahrer wurde nicht gefunden."
         }), 404
 
+    if not user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Code darf erst nach angenommener Fahrer-Registrierung erstellt werden."
+        }), 403
+
     existing_hash = user_doc.get("tracker_code_hash")
 
     if existing_hash and not force_new:
@@ -1933,57 +2157,10 @@ def tracker_create_code_for_logged_in_user():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    if request.method == "GET":
-        return jsonify({
-            "success": False,
-            "message": "Dieser Endpoint ist aktiv, erwartet aber POST und eine eingeloggte Dashboard-Session."
-        }), 200
-
-    current_user = get_current_user()
-
-    if not current_user:
-        return jsonify({
-            "success": False,
-            "error": "Bitte zuerst im Dashboard einloggen."
-        }), 401
-
-    data = request.get_json(silent=True) or {}
-    force_new = bool(data.get("forceNew", False))
-
-    existing_hash = current_user.get("tracker_code_hash")
-
-    if existing_hash and not force_new:
-        return jsonify({
-            "success": True,
-            "message": "Tracker-Code existiert bereits. Er wird nicht erneut angezeigt.",
-            "trackerCode": None,
-            "driver": tracker_profile_payload(current_user)
-        })
-
-    tracker_code = generate_tracker_code()
-
-    users_collection.update_one(
-        {"_id": current_user["_id"]},
-        {
-            "$set": {
-                "tracker_code_hash": hash_secret(tracker_code),
-                "tracker_code_created_at": now_utc(),
-                "tracker_enabled": True
-            },
-            "$unset": {
-                "tracker_code": ""
-            }
-        }
-    )
-
-    fresh_user = users_collection.find_one({"_id": current_user["_id"]})
-
     return jsonify({
-        "success": True,
-        "message": "Tracker-Code erstellt.",
-        "trackerCode": tracker_code,
-        "driver": tracker_profile_payload(fresh_user)
-    })
+        "success": False,
+        "message": "Tracker-Tokens werden nicht automatisch im Dashboard erstellt. Bitte nutze 'Neuen Token anfordern'; die Personalabteilung muss die Anfrage manuell bearbeiten."
+    }), 403
 
 
 # ==========================================
@@ -2189,14 +2366,25 @@ def dashboard():
     user_documents = []
     all_documents = load_json_file("documents.json")
     user_id_str = str(user["id"])
+    latest_registration = get_latest_registration_request_for_user(user_id_str)
+
+    if not user_registration_is_approved(user_id_str, user_doc=db_user, latest_registration=latest_registration):
+        archive_token_documents_for_user(user_id_str, reason="dashboard_non_approved_cleanup")
 
     for document in all_documents:
         if str(document.get("discord_id")) == user_id_str:
+            # Lokale JSON-Dokumente bleiben erhalten. Token-Dokumente gehören
+            # ausschließlich in system_documents und werden dort streng gefiltert.
             user_documents.append(document)
 
-    user_documents.extend(get_system_documents_for_user(user_id_str))
+    user_documents.extend(
+        get_system_documents_for_user(
+            user_id_str,
+            user_doc=db_user,
+            latest_registration=latest_registration
+        )
+    )
 
-    latest_registration = get_latest_registration_request_for_user(user_id_str)
     registration_context = dashboard_registration_context(db_user, latest_registration)
 
     return render_template(
@@ -2247,6 +2435,7 @@ def api_fahrer_registration():
 
     existing_open = fahrer_registration_collection.find_one({
         "discord_id": discord_id,
+        "archived": {"$ne": True},
         "status": {"$in": ["pending", "open", "claimed"]}
     })
 
@@ -2280,6 +2469,24 @@ def api_fahrer_registration():
         "source": "dashboard_quick_action",
         "note": "Antrag wurde über das Web Dashboard gestellt."
     }
+
+    # Neuer Antrag = kein alter Token darf mehr im Postfach sichtbar bleiben.
+    # Dadurch bekommen gelöschte/neu angelegte Accounts keine alten Tokens angezeigt.
+    archive_token_documents_for_user(discord_id, reason="new_driver_registration_started")
+
+    token_request_collection.update_many(
+        {
+            "discord_id": discord_id,
+            "status": {"$in": ["pending", "open", "claimed"]}
+        },
+        {
+            "$set": {
+                "status": "rejected",
+                "reject_reason": "Automatisch geschlossen, weil eine neue Fahrer-Registrierung gestartet wurde.",
+                "updated_at": now
+            }
+        }
+    )
 
     fahrer_registration_collection.insert_one(request_doc)
 
@@ -2332,16 +2539,22 @@ def api_new_token_request():
             "message": "User wurde in der Datenbank nicht gefunden."
         }), 404
 
-    is_approved = db_user.get("fahrer_registration_status") == "approved" or bool(db_user.get("tracker_code_hash"))
+    latest_registration = get_latest_registration_request_for_user(discord_id)
+    is_approved = user_registration_is_approved(
+        discord_id,
+        user_doc=db_user,
+        latest_registration=latest_registration
+    )
 
     if not is_approved:
         return jsonify({
             "success": False,
-            "message": "Du bist noch nicht als Fahrer genehmigt."
+            "message": "Du bist noch nicht als Fahrer genehmigt. Ein alter Tracker-Code oder Token zählt nicht als Freigabe."
         }), 403
 
     existing_open = token_request_collection.find_one({
         "discord_id": discord_id,
+        "archived": {"$ne": True},
         "status": {"$in": ["pending", "open", "claimed"]}
     })
 
@@ -2358,8 +2571,11 @@ def api_new_token_request():
     now = now_utc()
     request_id = uuid.uuid4().hex
 
+    approved_registration_id = registration_public_id(latest_registration) if latest_registration else safe_str(db_user.get("fahrer_registration_request_id"))
+
     request_doc = {
         "request_id": request_id,
+        "registration_request_id": approved_registration_id,
         "discord_id": discord_id,
         "user_id": discord_id,
         "username": db_user.get("username") or session_user.get("username"),
@@ -2492,7 +2708,9 @@ def personalabteilung():
         for driver in drivers_cursor
     ]
 
-    registration_requests_cursor = fahrer_registration_collection.find({}).sort([
+    registration_requests_cursor = fahrer_registration_collection.find({
+        "archived": {"$ne": True}
+    }).sort([
         ("created_at", DESCENDING)
     ]).limit(250)
 
@@ -2501,7 +2719,9 @@ def personalabteilung():
         for item in registration_requests_cursor
     ]
 
-    token_requests_cursor = token_request_collection.find({}).sort([
+    token_requests_cursor = token_request_collection.find({
+        "archived": {"$ne": True}
+    }).sort([
         ("created_at", DESCENDING)
     ]).limit(250)
 
@@ -2662,7 +2882,7 @@ def api_personalabteilung_approve_registration():
         return claim_error
 
     now = now_utc()
-    tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
+    tracker_code = create_tracker_code_for_user_doc(user_doc, actor, allow_unapproved=True)
 
     approved_name = request_doc.get("name") or user_doc.get("display_name") or user_doc.get("username") or "EifelLog Fahrer"
     approved_role = request_doc.get("role") or get_primary_role_name(user_doc.get("roles", []))
@@ -2852,6 +3072,12 @@ def api_personalabteilung_approve_token_request():
             "message": "Der User zur Token-Anfrage wurde nicht gefunden."
         }), 404
 
+    if not user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc):
+        return jsonify({
+            "success": False,
+            "message": "Für diesen User darf kein neuer Token erstellt werden, weil keine angenommene Fahrer-Registrierung vorliegt."
+        }), 403
+
     actor = current_staff_identity()
     now = now_utc()
     handler_name = actor.get("display_name") or "Personalabteilung"
@@ -2878,6 +3104,7 @@ def api_personalabteilung_approve_token_request():
         needs_signature=False,
         extra={
             "request_id": str(request_doc.get("request_id") or request_doc.get("_id")),
+            "registration_request_id": safe_str(request_doc.get("registration_request_id") or user_doc.get("fahrer_registration_request_id")),
             "token_created_at": now,
             "contains_tracker_code": True
         }
@@ -3017,6 +3244,12 @@ def personalabteilung_create_tracker_code():
             "error": "Fahrer wurde nicht gefunden."
         }), 404
 
+    if not user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Dieser User ist noch nicht als Fahrer angenommen. Bitte erst Fahrer-Registrierung claimen und annehmen."
+        }), 403
+
     existing_hash = user_doc.get("tracker_code_hash")
 
     if existing_hash and not force_new:
@@ -3030,17 +3263,9 @@ def personalabteilung_create_tracker_code():
     actor = current_staff_identity()
     tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
 
-    users_collection.update_one(
-        {"_id": user_doc["_id"]},
-        {
-            "$set": {
-                "fahrer_registration_status": "approved",
-                "fahrer_registration_handler": actor.get("display_name") or "Personalabteilung"
-            }
-        }
-    )
-
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+    latest_registration = get_latest_registration_request_for_user(fresh_user.get("discord_id"))
+    latest_request_id = registration_public_id(latest_registration) if latest_registration else safe_str(fresh_user.get("fahrer_registration_request_id"))
 
     create_system_document_for_user(
         fresh_user.get("discord_id"),
@@ -3056,6 +3281,7 @@ def personalabteilung_create_tracker_code():
         doc_type="manual_token_create",
         needs_signature=False,
         extra={
+            "request_id": latest_request_id,
             "token_created_at": now_utc(),
             "contains_tracker_code": True
         }
