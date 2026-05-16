@@ -478,7 +478,6 @@ def load_json_file(path):
         return []
 
 
-
 # ==========================================
 # SYSTEM-DOKUMENTE / FAHRER-REGISTRIERUNG
 # ==========================================
