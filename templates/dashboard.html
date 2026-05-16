@@ -1,5 +1,33 @@
 {% extends "base.html" %}
 
+{#
+    Erwartete Backend-Variablen optional:
+    - fahrer_registration_status: "none", "pending", "approved", "rejected"
+    - fahrer_registration_name
+    - fahrer_registration_role
+    - fahrer_registration_handler
+    - fahrer_registration_deadline
+    - fahrer_registration_requested_at
+    - fahrer_registration_note
+    - fahrer_token_value
+    - fahrer_token_created_at
+#}
+
+{% set primary_role_display = primary_role_name|default('User', true) %}
+{% set safe_user_documents = user_documents|default([], true) %}
+{% set safe_news_items = news_items|default([], true) %}
+{% set needs_signature_flag = needs_signature|default(false, true) %}
+
+{% set fahrer_reg_status = fahrer_registration_status|default('none', true) %}
+{% set fahrer_reg_name = fahrer_registration_name|default(current_user.username, true) %}
+{% set fahrer_reg_role = fahrer_registration_role|default(primary_role_display, true) %}
+{% set fahrer_reg_handler = fahrer_registration_handler|default('Noch nicht zugewiesen', true) %}
+{% set fahrer_reg_deadline = fahrer_registration_deadline|default('1-2 Stunden je nach Uhrzeit und Tag', true) %}
+{% set fahrer_reg_requested_at = fahrer_registration_requested_at|default('-', true) %}
+{% set fahrer_reg_note = fahrer_registration_note|default('', true) %}
+{% set fahrer_token_value = fahrer_token_value|default('', true) %}
+{% set fahrer_token_created_at = fahrer_token_created_at|default('Heute', true) %}
+
 {% block title %}EifelLog - Dashboard{% endblock %}
 
 {% block content %}
@@ -17,7 +45,7 @@
             <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex items-center gap-3">
                 {{ current_user.username }}
                 <span class="px-2 py-1 rounded bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 text-[var(--brand-yellow)] text-[9px] uppercase tracking-widest font-bold">
-                    {{ primary_role_name }}
+                    {{ primary_role_display }}
                 </span>
             </h1>
         </div>
@@ -37,7 +65,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
             </svg>
 
-            {% if needs_signature or (user_documents and user_documents|length > 0) %}
+            {% if needs_signature_flag or (safe_user_documents and safe_user_documents|length > 0) or (fahrer_reg_status == 'approved' and fahrer_token_value) %}
                 <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full animate-ping"></span>
                 <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full shadow-[0_0_10px_rgba(255,159,159,0.8)]"></span>
             {% endif %}
@@ -91,6 +119,71 @@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
 
     <div class="xl:col-span-2 flex flex-col gap-6">
+
+        {% if fahrer_reg_status in ['pending', 'approved', 'rejected'] %}
+        <div class="glass-card p-6 relative overflow-hidden border 
+            {% if fahrer_reg_status == 'approved' %}border-[var(--brand-green)]/25{% elif fahrer_reg_status == 'pending' %}border-[var(--brand-yellow)]/25{% else %}border-[var(--danger)]/25{% endif %}">
+            <div class="absolute -right-8 -top-8 opacity-5">
+                <svg class="w-40 h-40" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1c0 .552.448 1 1 1h14c.552 0 1-.448 1-1v-1c0-2.761-3.582-5-8-5z"></path>
+                </svg>
+            </div>
+
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold tracking-[0.22em] uppercase
+                        {% if fahrer_reg_status == 'approved' %}text-[var(--brand-green)]{% elif fahrer_reg_status == 'pending' %}text-[var(--brand-yellow)]{% else %}text-[var(--danger)]{% endif %}">
+                        Fahrer Registrierung
+                    </span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                        {% if fahrer_reg_status == 'approved' %}
+                            Genehmigt
+                        {% elif fahrer_reg_status == 'pending' %}
+                            Antrag in Bearbeitung
+                        {% else %}
+                            Antrag abgelehnt
+                        {% endif %}
+                    </h2>
+                    <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                        {% if fahrer_reg_status == 'approved' %}
+                            Deine Registrierung wurde bestätigt. Du kannst jetzt bei Bedarf einen neuen Token anfordern.
+                        {% elif fahrer_reg_status == 'pending' %}
+                            Deine Anfrage liegt bei der Personalabteilung. Bearbeitungszeit: {{ fahrer_reg_deadline }}.
+                        {% else %}
+                            Dein letzter Antrag wurde abgelehnt. Du kannst eine neue Anfrage stellen.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="bg-black/30 border border-white/10 rounded-2xl p-4 min-w-[230px]">
+                    <div class="space-y-2 text-xs font-inter">
+                        <div class="flex justify-between gap-4">
+                            <span class="text-white/40">Name</span>
+                            <span class="text-white font-bold text-right">{{ fahrer_reg_name }}</span>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <span class="text-white/40">Rolle</span>
+                            <span class="text-[var(--brand-yellow)] font-bold text-right">{{ fahrer_reg_role }}</span>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <span class="text-white/40">Sachbearbeiter</span>
+                            <span class="text-white font-bold text-right">{{ fahrer_reg_handler }}</span>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <span class="text-white/40">Eingang</span>
+                            <span class="text-white font-bold text-right">{{ fahrer_reg_requested_at }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if fahrer_reg_note %}
+            <div class="mt-4 rounded-2xl bg-black/30 border border-white/10 p-4">
+                <p class="text-xs text-[var(--muted)] font-inter leading-relaxed">{{ fahrer_reg_note }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
 
         <div class="glass-card p-6 relative overflow-hidden">
             <div class="absolute -right-10 -top-10 opacity-5">
@@ -165,6 +258,79 @@
         <div class="glass-card p-6">
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Schnellzugriff</h2>
             <div class="grid grid-cols-2 gap-3">
+
+                <button id="btn-driver-registration"
+                        type="button"
+                        class="col-span-2 p-5 rounded-2xl border transition-all text-left group relative overflow-hidden
+                        {% if fahrer_reg_status == 'approved' %}
+                            bg-[var(--brand-green)]/10 border-[var(--brand-green)]/35 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20
+                        {% elif fahrer_reg_status == 'pending' %}
+                            bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/35 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20
+                        {% elif fahrer_reg_status == 'rejected' %}
+                            bg-[var(--danger)]/10 border-[var(--danger)]/35 hover:border-[var(--danger)] hover:bg-[var(--danger)]/20
+                        {% else %}
+                            bg-white/5 border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10
+                        {% endif %}">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl flex items-center justify-center border
+                                {% if fahrer_reg_status == 'approved' %}
+                                    bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25 text-[var(--brand-green)]
+                                {% elif fahrer_reg_status == 'pending' %}
+                                    bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25 text-[var(--brand-yellow)]
+                                {% elif fahrer_reg_status == 'rejected' %}
+                                    bg-[var(--danger)]/10 border-[var(--danger)]/25 text-[var(--danger)]
+                                {% else %}
+                                    bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25 text-[var(--brand-green)]
+                                {% endif %}">
+                                <svg class="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {% if fahrer_reg_status == 'approved' %}
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                                    {% else %}
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1h9"></path>
+                                    {% endif %}
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-[0.2em] mb-1">Personalabteilung</span>
+                                <span class="block text-sm font-orbitron font-bold text-white uppercase tracking-wider">
+                                    {% if fahrer_reg_status == 'approved' %}
+                                        Neuen Token anfordern
+                                    {% elif fahrer_reg_status == 'pending' %}
+                                        Antrag läuft
+                                    {% elif fahrer_reg_status == 'rejected' %}
+                                        Fahrer Registrierung erneut
+                                    {% else %}
+                                        Fahrer registrieren
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-3 py-1 border
+                            {% if fahrer_reg_status == 'approved' %}
+                                text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25
+                            {% elif fahrer_reg_status == 'pending' %}
+                                text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25
+                            {% elif fahrer_reg_status == 'rejected' %}
+                                text-[var(--danger)] bg-[var(--danger)]/10 border-[var(--danger)]/25
+                            {% else %}
+                                text-white/60 bg-white/5 border-white/10
+                            {% endif %}">
+                            {% if fahrer_reg_status == 'approved' %}
+                                Aktiv
+                            {% elif fahrer_reg_status == 'pending' %}
+                                Offen
+                            {% elif fahrer_reg_status == 'rejected' %}
+                                Abgelehnt
+                            {% else %}
+                                Neu
+                            {% endif %}
+                        </span>
+                    </div>
+                </button>
+
                 <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
                     <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -216,8 +382,8 @@
                 <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
             </h2>
             <div class="flex-grow space-y-4 overflow-y-auto pr-2">
-                {% if news_items %}
-                    {% for news in news_items %}
+                {% if safe_news_items %}
+                    {% for news in safe_news_items %}
                         <div class="border-l-2 {% if loop.index == 1 %}border-[var(--brand-green)]{% else %}border-[var(--brand-yellow)]{% endif %} pl-3">
                             <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">{{ news.date }} - {{ news.category }}</p>
                             <p class="text-sm font-inter text-gray-300">{{ news.content }}</p>
@@ -319,8 +485,43 @@
                 </div>
             </button>
 
-            {% if user_documents %}
-                {% for doc in user_documents %}
+            {% if fahrer_reg_status == 'approved' and fahrer_token_value %}
+            <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
+                    data-title="Fahrer Token Bestätigung"
+                    data-sender="{{ fahrer_reg_handler }}"
+                    data-date="{{ fahrer_token_created_at }}">
+
+                <span class="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
+
+                <div class="flex items-center gap-4 pr-5">
+                    <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-bold font-orbitron text-white truncate">Fahrer_Token_Bestaetigung.doc</h4>
+                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">{{ fahrer_reg_handler }} • {{ fahrer_token_created_at }}</p>
+                        <p class="text-[10px] text-[var(--brand-green)] font-orbitron uppercase tracking-widest mt-2">Token freigegeben</p>
+                    </div>
+                </div>
+
+                <div class="hidden doc-data-content">
+                    <p><strong>Bestätigung Fahrer Registrierung</strong></p>
+                    <p class="mt-4">Hiermit wird bestätigt, dass <strong>{{ fahrer_reg_name }}</strong> mit der Rolle <strong>{{ fahrer_reg_role }}</strong> durch die Personalabteilung genehmigt wurde.</p>
+                    <p class="mt-4"><strong>Sachbearbeiter:</strong> {{ fahrer_reg_handler }}<br>
+                    <strong>Freigabe:</strong> {{ fahrer_token_created_at }}</p>
+                    <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Persönlicher Token</p>
+                        <p class="text-lg font-orbitron font-bold text-white break-all">{{ fahrer_token_value }}</p>
+                    </div>
+                    <p class="mt-4 text-xs text-gray-400">Bewahre diesen Token sicher auf. Gib ihn nicht öffentlich weiter.</p>
+                </div>
+            </button>
+            {% endif %}
+
+            {% if safe_user_documents %}
+                {% for doc in safe_user_documents %}
                 <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.06] border border-[var(--brand-yellow)]/25 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                         data-title="{{ doc.title }}"
                         data-sender="{{ doc.sender }}"
@@ -396,8 +597,7 @@
         </div>
 
         <div class="px-6 md:px-8 py-5 overflow-y-auto flex-grow custom-scrollbar">
-            <div id="univ-doc-content" class="bg-black/30 border border-white/5 rounded-2xl p-6 text-sm text-gray-300 font-inter leading-relaxed space-y-4">
-            </div>
+            <div id="univ-doc-content" class="bg-black/30 border border-white/5 rounded-2xl p-6 text-sm text-gray-300 font-inter leading-relaxed space-y-4"></div>
         </div>
 
         <div id="univ-doc-signature-section" class="border-t border-white/10 p-6 md:p-8 pt-6 shrink-0 hidden bg-black/20">
@@ -424,6 +624,174 @@
     </div>
 </div>
 
+<div id="driver-registration-modal" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+    <div id="driver-registration-panel" class="relative z-10 w-full max-w-xl max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
+        <div class="p-6 border-b border-white/10 shrink-0">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)]">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1h9"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Fahrer Registrierung</span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                            {% if fahrer_reg_status == 'pending' %}
+                                Antrag in Bearbeitung
+                            {% elif fahrer_reg_status == 'rejected' %}
+                                Neuer Antrag möglich
+                            {% else %}
+                                Registrierung beantragen
+                            {% endif %}
+                        </h2>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Der Antrag wird an die Personalabteilung gesendet. Ein Sachbearbeiter kann den User claimen und anschließend genehmigen.
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btn-close-driver-registration" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--muted)] hover:text-white transition-colors cursor-pointer shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto custom-scrollbar">
+            {% if fahrer_reg_status == 'pending' %}
+                <div class="rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 p-5">
+                    <p class="text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest mb-2">Status offen</p>
+                    <p class="text-sm text-white font-inter leading-relaxed">
+                        Deine Anfrage wurde bereits an die Personalabteilung geschickt.
+                    </p>
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-inter">
+                        <div class="bg-black/30 border border-white/10 rounded-xl p-3">
+                            <span class="block text-white/40 mb-1">Bearbeitungszeit</span>
+                            <span class="text-white font-bold">{{ fahrer_reg_deadline }}</span>
+                        </div>
+                        <div class="bg-black/30 border border-white/10 rounded-xl p-3">
+                            <span class="block text-white/40 mb-1">Sachbearbeiter</span>
+                            <span class="text-white font-bold">{{ fahrer_reg_handler }}</span>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                {% if fahrer_reg_status == 'rejected' %}
+                <div class="rounded-2xl bg-[var(--danger)]/10 border border-[var(--danger)]/25 p-4 mb-5">
+                    <p class="text-xs text-[var(--danger)] font-orbitron uppercase tracking-widest mb-2">Letzter Antrag abgelehnt</p>
+                    <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                        Du kannst einen neuen Antrag stellen. Prüfe Name und Rolle sorgfältig.
+                    </p>
+                </div>
+                {% endif %}
+
+                <form id="driver-registration-form" class="space-y-5">
+                    <div>
+                        <label for="driver-reg-name" class="block text-xs font-orbitron text-[var(--brand-green)] mb-2 uppercase tracking-wider">Name</label>
+                        <input type="text"
+                               id="driver-reg-name"
+                               name="name"
+                               value="{{ fahrer_reg_name }}"
+                               autocomplete="name"
+                               class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white font-inter focus:outline-none focus:border-[var(--brand-green)] focus:ring-1 focus:ring-[var(--brand-green)] transition-all"
+                               placeholder="Dein Name">
+                    </div>
+
+                    <div>
+                        <label for="driver-reg-role" class="block text-xs font-orbitron text-[var(--brand-green)] mb-2 uppercase tracking-wider">Rolle</label>
+                        <input type="text"
+                               id="driver-reg-role"
+                               name="role"
+                               value="{{ fahrer_reg_role }}"
+                               class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white font-inter focus:outline-none focus:border-[var(--brand-green)] focus:ring-1 focus:ring-[var(--brand-green)] transition-all"
+                               placeholder="z. B. Fahrer">
+                    </div>
+
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                        <p class="text-xs text-[var(--muted)] font-inter leading-relaxed">
+                            Nach dem Absenden kann die Personalabteilung den Antrag claimen. Der zuständige Sachbearbeiter prüft deinen Antrag und muss ihn innerhalb der Deadline bearbeiten.
+                        </p>
+                        <p class="text-xs text-[var(--brand-yellow)] font-orbitron uppercase tracking-widest mt-3">
+                            Bearbeitungszeit: 1-2 Stunden je nach Uhrzeit und Tag
+                        </p>
+                    </div>
+
+                    <button id="driver-reg-submit" type="submit" class="btn-primary w-full justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        An Personalabteilung senden
+                    </button>
+
+                    <p id="driver-reg-error" class="text-[var(--danger)] text-xs font-inter text-center hidden"></p>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="token-request-modal" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+    <div id="token-request-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
+        <div class="p-6 border-b border-white/10">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)]">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Token Service</span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Neuen Token anfordern</h2>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Deine Fahrer-Registrierung ist genehmigt. Du kannst einen neuen Token beantragen.
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btn-close-token-request" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--muted)] hover:text-white transition-colors cursor-pointer shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <form id="token-request-form" class="p-6 space-y-5">
+            <div class="rounded-2xl bg-black/30 border border-white/10 p-4 text-xs font-inter">
+                <div class="flex justify-between gap-4 mb-2">
+                    <span class="text-white/40">User</span>
+                    <span class="text-white font-bold text-right">{{ fahrer_reg_name }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-white/40">Rolle</span>
+                    <span class="text-[var(--brand-yellow)] font-bold text-right">{{ fahrer_reg_role }}</span>
+                </div>
+            </div>
+
+            <div>
+                <label for="token-request-reason" class="block text-xs font-orbitron text-[var(--brand-green)] mb-2 uppercase tracking-wider">Grund optional</label>
+                <textarea id="token-request-reason"
+                          name="reason"
+                          rows="3"
+                          class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white font-inter focus:outline-none focus:border-[var(--brand-green)] focus:ring-1 focus:ring-[var(--brand-green)] transition-all resize-none"
+                          placeholder="z. B. Token verloren oder neu benötigt"></textarea>
+            </div>
+
+            <button id="token-request-submit" type="submit" class="btn-primary w-full justify-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                </svg>
+                Token Anfrage senden
+            </button>
+
+            <p id="token-request-error" class="text-[var(--danger)] text-xs font-inter text-center hidden"></p>
+        </form>
+    </div>
+</div>
+
 <div id="first-login-msg-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-500 opacity-0 px-4 py-6">
     <div class="glass-card p-8 max-w-md w-full text-center border-t-[var(--brand-yellow)]/50 shadow-[0_0_50px_rgba(220,226,38,0.1)] mx-auto transform transition-all duration-500 scale-90 translate-y-4" id="first-login-panel">
         <div class="w-16 h-16 mx-auto rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center mb-6 text-[var(--brand-yellow)]">
@@ -447,9 +815,10 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const needsGlobalPolicySignature = {{ 'true' if needs_signature else 'false' }};
-        const hasPersonalDocs = {{ 'true' if user_documents and user_documents|length > 0 else 'false' }};
-        const currentRole = {{ primary_role_name | tojson }};
+        const needsGlobalPolicySignature = {{ 'true' if needs_signature_flag else 'false' }};
+        const hasPersonalDocs = {{ 'true' if safe_user_documents and safe_user_documents|length > 0 else 'false' }};
+        const currentRole = {{ primary_role_display | tojson }};
+        const fahrerRegistrationStatus = {{ fahrer_reg_status | tojson }};
 
         const alertBell = document.getElementById('alert-bell');
         const alertsWrapper = document.getElementById('general-alerts-wrapper');
@@ -473,7 +842,27 @@
         const firstLoginPanel = document.getElementById('first-login-panel');
         const btnOkMsg = document.getElementById('btn-ok-msg');
 
+        const driverRegistrationBtn = document.getElementById('btn-driver-registration');
+        const driverRegistrationModal = document.getElementById('driver-registration-modal');
+        const driverRegistrationPanel = document.getElementById('driver-registration-panel');
+        const btnCloseDriverRegistration = document.getElementById('btn-close-driver-registration');
+        const driverRegistrationForm = document.getElementById('driver-registration-form');
+        const driverRegistrationSubmit = document.getElementById('driver-reg-submit');
+        const driverRegistrationError = document.getElementById('driver-reg-error');
+        const driverRegName = document.getElementById('driver-reg-name');
+        const driverRegRole = document.getElementById('driver-reg-role');
+
+        const tokenRequestModal = document.getElementById('token-request-modal');
+        const tokenRequestPanel = document.getElementById('token-request-panel');
+        const btnCloseTokenRequest = document.getElementById('btn-close-token-request');
+        const tokenRequestForm = document.getElementById('token-request-form');
+        const tokenRequestSubmit = document.getElementById('token-request-submit');
+        const tokenRequestError = document.getElementById('token-request-error');
+        const tokenRequestReason = document.getElementById('token-request-reason');
+
         const defaultSubmitButtonHtml = univBtnSubmit.innerHTML;
+        const defaultDriverSubmitHtml = driverRegistrationSubmit ? driverRegistrationSubmit.innerHTML : '';
+        const defaultTokenSubmitHtml = tokenRequestSubmit ? tokenRequestSubmit.innerHTML : '';
         let currentDocumentRequiresSignature = false;
 
         function showCenteredOverlay(element) {
@@ -491,33 +880,54 @@
         }
 
         function unlockBodyScroll() {
+            const driverHidden = !driverRegistrationModal || driverRegistrationModal.classList.contains('hidden');
+            const tokenHidden = !tokenRequestModal || tokenRequestModal.classList.contains('hidden');
+
             if (
                 alertsWrapper.classList.contains('hidden') &&
                 univModal.classList.contains('hidden') &&
-                firstLoginModal.classList.contains('hidden')
+                firstLoginModal.classList.contains('hidden') &&
+                driverHidden &&
+                tokenHidden
             ) {
                 document.body.classList.remove('overflow-hidden');
             }
         }
 
-        function openSidebar() {
+        function openAnimatedModal(wrapper, panel, focusTarget = null) {
             lockBodyScroll();
-            showCenteredOverlay(alertsWrapper);
+            showCenteredOverlay(wrapper);
 
             setTimeout(() => {
-                alertsWrapper.classList.remove('opacity-0');
-                alertsPanel.classList.remove('scale-95', 'translate-y-4');
+                wrapper.classList.remove('opacity-0');
+                panel.classList.remove('scale-95', 'translate-y-4');
+
+                if (focusTarget) {
+                    focusTarget.focus();
+                }
             }, 10);
         }
 
-        function closeSidebar() {
-            alertsWrapper.classList.add('opacity-0');
-            alertsPanel.classList.add('scale-95', 'translate-y-4');
+        function closeAnimatedModal(wrapper, panel, callback = null) {
+            wrapper.classList.add('opacity-0');
+            panel.classList.add('scale-95', 'translate-y-4');
 
             setTimeout(() => {
-                hideCenteredOverlay(alertsWrapper);
+                hideCenteredOverlay(wrapper);
                 unlockBodyScroll();
+
+                if (typeof callback === 'function') {
+                    callback();
+                }
             }, 300);
+        }
+
+        function openSidebar() {
+            openAnimatedModal(alertsWrapper, alertsPanel);
+        }
+
+        function closeSidebar() {
+            closeAnimatedModal(alertsWrapper, alertsPanel);
         }
 
         function openDocumentModal(title, content, sender, requireSignature) {
@@ -544,27 +954,11 @@
                 univSigSection.classList.add('hidden');
             }
 
-            lockBodyScroll();
-            showCenteredOverlay(univModal);
-
-            setTimeout(() => {
-                univModal.classList.remove('opacity-0');
-                univPanel.classList.remove('scale-95', 'translate-y-4');
-
-                if (requireSignature) {
-                    univSigInput.focus();
-                }
-            }, 10);
+            openAnimatedModal(univModal, univPanel, requireSignature ? univSigInput : null);
         }
 
         function closeDocumentModal() {
-            univModal.classList.add('opacity-0');
-            univPanel.classList.add('scale-95', 'translate-y-4');
-
-            setTimeout(() => {
-                hideCenteredOverlay(univModal);
-                unlockBodyScroll();
-            }, 300);
+            closeAnimatedModal(univModal, univPanel);
         }
 
         function openFirstLoginModal() {
@@ -591,9 +985,63 @@
             }, 500);
         }
 
+        function openDriverRegistrationModal() {
+            if (!driverRegistrationModal || !driverRegistrationPanel) return;
+            openAnimatedModal(driverRegistrationModal, driverRegistrationPanel, driverRegName);
+        }
+
+        function closeDriverRegistrationModal() {
+            if (!driverRegistrationModal || !driverRegistrationPanel) return;
+            closeAnimatedModal(driverRegistrationModal, driverRegistrationPanel);
+        }
+
+        function openTokenRequestModal() {
+            if (!tokenRequestModal || !tokenRequestPanel) return;
+            openAnimatedModal(tokenRequestModal, tokenRequestPanel, tokenRequestReason);
+        }
+
+        function closeTokenRequestModal() {
+            if (!tokenRequestModal || !tokenRequestPanel) return;
+            closeAnimatedModal(tokenRequestModal, tokenRequestPanel);
+        }
+
         alertBell.addEventListener('click', openSidebar);
         btnCloseAlerts.addEventListener('click', closeSidebar);
         alertsBackdrop.addEventListener('click', closeSidebar);
+
+        if (driverRegistrationBtn) {
+            driverRegistrationBtn.addEventListener('click', () => {
+                if (fahrerRegistrationStatus === 'approved') {
+                    openTokenRequestModal();
+                } else {
+                    openDriverRegistrationModal();
+                }
+            });
+        }
+
+        if (btnCloseDriverRegistration) {
+            btnCloseDriverRegistration.addEventListener('click', closeDriverRegistrationModal);
+        }
+
+        if (btnCloseTokenRequest) {
+            btnCloseTokenRequest.addEventListener('click', closeTokenRequestModal);
+        }
+
+        if (driverRegistrationModal) {
+            driverRegistrationModal.addEventListener('click', (event) => {
+                if (event.target === driverRegistrationModal) {
+                    closeDriverRegistrationModal();
+                }
+            });
+        }
+
+        if (tokenRequestModal) {
+            tokenRequestModal.addEventListener('click', (event) => {
+                if (event.target === tokenRequestModal) {
+                    closeTokenRequestModal();
+                }
+            });
+        }
 
         const docTriggers = document.querySelectorAll('.doc-trigger');
 
@@ -631,6 +1079,16 @@
 
             if (!univModal.classList.contains('hidden') && !currentDocumentRequiresSignature) {
                 closeDocumentModal();
+                return;
+            }
+
+            if (driverRegistrationModal && !driverRegistrationModal.classList.contains('hidden')) {
+                closeDriverRegistrationModal();
+                return;
+            }
+
+            if (tokenRequestModal && !tokenRequestModal.classList.contains('hidden')) {
+                closeTokenRequestModal();
             }
         });
 
@@ -697,7 +1155,7 @@
                     closeDocumentModal();
                     setTimeout(() => window.location.reload(), 300);
                 } else {
-                    throw new Error('Fehler beim Speichern');
+                    throw new Error(data.message || 'Fehler beim Speichern');
                 }
             })
             .catch(error => {
@@ -709,6 +1167,110 @@
                 univBtnSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
             });
         });
+
+        if (driverRegistrationForm) {
+            driverRegistrationForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                const name = driverRegName.value.trim();
+                const role = driverRegRole.value.trim();
+
+                driverRegistrationError.classList.add('hidden');
+                driverRegistrationError.textContent = '';
+
+                if (name.length < 2 || role.length < 2) {
+                    driverRegistrationError.textContent = 'Bitte Name und Rolle vollständig ausfüllen.';
+                    driverRegistrationError.classList.remove('hidden');
+                    return;
+                }
+
+                driverRegistrationSubmit.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sende...
+                `;
+                driverRegistrationSubmit.disabled = true;
+                driverRegistrationSubmit.classList.add('opacity-50', 'cursor-not-allowed');
+
+                fetch('/api/fahrer_registration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        role: role
+                    })
+                })
+                .then(async response => {
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Antrag konnte nicht gesendet werden.');
+                    }
+
+                    closeDriverRegistrationModal();
+                    setTimeout(() => window.location.reload(), 300);
+                })
+                .catch(error => {
+                    console.error('Driver registration error:', error);
+
+                    driverRegistrationError.textContent = error.message || 'Fehler beim Senden. Bitte erneut versuchen.';
+                    driverRegistrationError.classList.remove('hidden');
+
+                    driverRegistrationSubmit.innerHTML = defaultDriverSubmitHtml;
+                    driverRegistrationSubmit.disabled = false;
+                    driverRegistrationSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            });
+        }
+
+        if (tokenRequestForm) {
+            tokenRequestForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                tokenRequestError.classList.add('hidden');
+                tokenRequestError.textContent = '';
+
+                tokenRequestSubmit.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sende...
+                `;
+                tokenRequestSubmit.disabled = true;
+                tokenRequestSubmit.classList.add('opacity-50', 'cursor-not-allowed');
+
+                fetch('/api/new_token_request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reason: tokenRequestReason.value.trim()
+                    })
+                })
+                .then(async response => {
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Token Anfrage konnte nicht gesendet werden.');
+                    }
+
+                    closeTokenRequestModal();
+                    setTimeout(() => window.location.reload(), 300);
+                })
+                .catch(error => {
+                    console.error('Token request error:', error);
+
+                    tokenRequestError.textContent = error.message || 'Fehler beim Senden. Bitte erneut versuchen.';
+                    tokenRequestError.classList.remove('hidden');
+
+                    tokenRequestSubmit.innerHTML = defaultTokenSubmitHtml;
+                    tokenRequestSubmit.disabled = false;
+                    tokenRequestSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            });
+        }
     });
 </script>
 {% endblock %}
