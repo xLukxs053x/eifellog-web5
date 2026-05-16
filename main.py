@@ -534,6 +534,35 @@ def current_staff_identity():
     }
 
 
+def request_is_claimed_by_actor(request_doc, actor):
+    claimed_by = request_doc.get("claimed_by") or {}
+    claimed_discord_id = safe_str(claimed_by.get("discord_id"))
+    actor_discord_id = safe_str(actor.get("discord_id"))
+
+    return bool(claimed_discord_id and actor_discord_id and claimed_discord_id == actor_discord_id)
+
+
+def require_request_claimed_by_actor(request_doc, actor):
+    status = safe_str(request_doc.get("status"), "pending")
+
+    if status != "claimed":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Antrag muss zuerst geclaimt werden. Claimen übernimmt nur die Bearbeitung und gibt den Antrag nicht frei."
+        }), 409
+
+    if not request_is_claimed_by_actor(request_doc, actor):
+        claimed_by = request_doc.get("claimed_by") or {}
+        claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+
+        return jsonify({
+            "success": False,
+            "message": f"Dieser Antrag ist bereits von {claimed_name} geclaimt. Nur der zuständige Sachbearbeiter kann ihn annehmen oder ablehnen."
+        }), 403
+
+    return None
+
+
 def calculate_registration_deadline(start_time=None):
     start_time = start_time or now_utc()
 
@@ -2514,7 +2543,9 @@ def api_personalabteilung_claim_registration():
             "message": "Antrag wurde nicht gefunden."
         }), 404
 
-    if request_doc.get("status") in {"approved", "rejected"}:
+    current_status = safe_str(request_doc.get("status"), "pending")
+
+    if current_status in {"approved", "rejected"}:
         return jsonify({
             "success": False,
             "message": "Dieser Antrag ist bereits abgeschlossen."
@@ -2522,6 +2553,32 @@ def api_personalabteilung_claim_registration():
 
     actor = current_staff_identity()
     now = now_utc()
+
+    # WICHTIG:
+    # Claimen übernimmt nur die Bearbeitung. Es wird KEIN Token erstellt,
+    # KEIN Dokument verschickt und KEINE Freigabe gesetzt.
+    if current_status == "claimed":
+        if request_is_claimed_by_actor(request_doc, actor):
+            return jsonify({
+                "success": True,
+                "message": "Du hast diesen Antrag bereits geclaimt.",
+                "handlerName": actor.get("display_name"),
+                "status": "claimed"
+            })
+
+        claimed_by = request_doc.get("claimed_by") or {}
+        claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+
+        return jsonify({
+            "success": False,
+            "message": f"Dieser Antrag ist bereits von {claimed_name} geclaimt."
+        }), 409
+
+    if current_status not in {"pending", "open"}:
+        return jsonify({
+            "success": False,
+            "message": f"Dieser Antrag kann im Status '{current_status}' nicht geclaimt werden."
+        }), 409
 
     fahrer_registration_collection.update_one(
         {"_id": request_doc["_id"]},
@@ -2548,7 +2605,7 @@ def api_personalabteilung_claim_registration():
 
     return jsonify({
         "success": True,
-        "message": "Antrag wurde geclaimt.",
+        "message": "Antrag wurde geclaimt. Du kannst ihn jetzt annehmen oder ablehnen.",
         "handlerName": actor.get("display_name"),
         "status": "claimed"
     })
@@ -2599,6 +2656,11 @@ def api_personalabteilung_approve_registration():
         }), 404
 
     actor = current_staff_identity()
+    claim_error = require_request_claimed_by_actor(request_doc, actor)
+
+    if claim_error:
+        return claim_error
+
     now = now_utc()
     tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
 
@@ -2698,6 +2760,11 @@ def api_personalabteilung_reject_registration():
 
     user_doc = find_user_for_request_doc(request_doc)
     actor = current_staff_identity()
+    claim_error = require_request_claimed_by_actor(request_doc, actor)
+
+    if claim_error:
+        return claim_error
+
     now = now_utc()
     handler_name = actor.get("display_name") or "Personalabteilung"
 
