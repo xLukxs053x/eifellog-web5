@@ -2013,7 +2013,7 @@ def buchhaltung():
     actor = current_account_identity()
 
     return render_template(
-        "buchhaltung.html",
+        "buchhaltung2.html",
         current_user=session.get("user"),
         display_name=actor.get("username") or actor.get("display_name"),
         staff_name=actor.get("display_name"),
