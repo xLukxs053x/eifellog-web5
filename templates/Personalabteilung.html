@@ -6,6 +6,7 @@
 {% set safe_drivers = drivers|default([], true) %}
 {% set safe_requests = fahrer_registration_requests|default(registration_requests|default([], true), true) %}
 {% set safe_token_requests = token_requests|default([], true) %}
+{% set safe_tasks = tasks|default([], true) %} <!-- Neu für den Aufgaben Pool -->
 
 <style>
     :root {
@@ -642,20 +643,23 @@
         background: rgba(var(--el-danger-rgb), 0.055);
     }
 
-    .status-badge.pending {
+    .status-badge.pending,
+    .status-badge.open {
         color: var(--el-yellow);
         border: 1px solid rgba(var(--el-yellow-rgb), 0.28);
         background: rgba(var(--el-yellow-rgb), 0.07);
     }
 
-    .status-badge.claimed {
+    .status-badge.claimed,
+    .status-badge.in-progress {
         color: var(--el-blue);
         border: 1px solid rgba(var(--el-blue-rgb), 0.28);
         background: rgba(var(--el-blue-rgb), 0.07);
     }
 
     .status-badge.approved,
-    .status-badge.enabled {
+    .status-badge.enabled,
+    .status-badge.done {
         color: var(--el-green-soft);
         border: 1px solid rgba(var(--el-green-rgb), 0.28);
         background: rgba(var(--el-green-rgb), 0.065);
@@ -1138,6 +1142,8 @@
             <button class="tab-btn active" type="button" data-tab-target="registrations">Fahrer Registrierungen</button>
             <button class="tab-btn" type="button" data-tab-target="tokenRequests">Token Anfragen</button>
             <button class="tab-btn" type="button" data-tab-target="drivers">Fahrer Datenbank</button>
+            <!-- NEU: Aufgaben Pool Tab -->
+            <button class="tab-btn" type="button" data-tab-target="taskPool">Aufgaben Pool</button>
         </section>
 
         <div id="registrations" class="tab-panel active">
@@ -1631,6 +1637,117 @@
                 </div>
             </section>
         </div>
+
+        <!-- NEU: Aufgaben Pool Tab Panel -->
+        <div id="taskPool" class="tab-panel">
+            <section class="glass-card toolbar">
+                <input
+                    class="search-box"
+                    id="taskSearch"
+                    type="search"
+                    placeholder="Aufgabe suchen: Titel, Typ, Zugewiesen an..."
+                    autocomplete="off"
+                />
+
+                <select class="filter-select" id="taskStatusFilter">
+                    <option value="all">Alle Status</option>
+                    <option value="open">Offen</option>
+                    <option value="in-progress">In Bearbeitung</option>
+                    <option value="done">Erledigt</option>
+                </select>
+
+                <button class="request-btn blue" style="height: 48px; border-radius: 16px; width: 100%;" type="button" data-action="new-task">
+                    + Neue Aufgabe
+                </button>
+            </section>
+
+            <section class="glass-card table-card">
+                <div class="table-head">
+                    <h2>Interner Aufgaben Pool</h2>
+                    <span>
+                        Quelle: <strong>Personalmanagement</strong>
+                    </span>
+                </div>
+
+                <div class="request-table-wrap">
+                    <table class="request-table">
+                        <thead>
+                            <tr>
+                                <th>Aufgabe / Titel</th>
+                                <th>Typ / Bereich</th>
+                                <th>Priorität</th>
+                                <th>Status</th>
+                                <th>Zugewiesen an</th>
+                                <th>Fällig bis</th>
+                                <th style="text-align: right;">Aktion</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="taskTableBody">
+                            {% for task in safe_tasks %}
+                                {% set task_status = task.status or "open" %}
+                                {% set task_priority = task.priority or "medium" %}
+                                
+                                <tr data-task-row data-task-status="{{ task_status }}" data-search="{{ (task.title ~ ' ' ~ task.type ~ ' ' ~ task.assignee)|lower }}">
+                                    <td>
+                                        <div class="driver-meta">
+                                            <strong>{{ task.title or "Unbenannte Aufgabe" }}</strong>
+                                            {% if task.description %}
+                                                <span>{{ task.description|truncate(40) }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="role-badge">{{ task.type or "Allgemein" }}</span>
+                                    </td>
+                                    <td>
+                                        {% if task_priority == "high" %}
+                                            <span class="deadline-badge expired">Hoch</span>
+                                        {% elif task_priority == "low" %}
+                                            <span class="status-badge approved">Niedrig</span>
+                                        {% else %}
+                                            <span class="deadline-badge">Mittel</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task_status == "done" %}
+                                            <span class="status-badge approved">Erledigt</span>
+                                        {% elif task_status == "in-progress" %}
+                                            <span class="status-badge claimed">In Bearbeitung</span>
+                                        {% else %}
+                                            <span class="status-badge pending">Offen</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="mono">{{ task.assignee or "Nicht zugewiesen" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="mono">{{ task.due_date or "-" }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="action-wrap">
+                                            <button class="request-btn blue" type="button" data-action="edit-task" data-task-id="{{ task.id }}">
+                                                Bearbeiten
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <strong>Keine Aufgaben im Pool</strong>
+                                            Aktuell liegen keine offenen Aufgaben für die Personalabteilung vor.
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
     </div>
 
     <div class="toast-layer" id="toastLayer" aria-live="polite"></div>
@@ -1712,6 +1829,53 @@
     </div>
 </div>
 
+<!-- NEU: Aufgabe erstellen Modal -->
+<div class="modal-backdrop" id="taskModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <small>Aufgaben Pool</small>
+                <h3>Neue Aufgabe erstellen</h3>
+            </div>
+            <button class="modal-close" type="button" data-close-modal="taskModal">×</button>
+        </div>
+
+        <form class="modal-body" id="taskForm">
+            <input 
+                class="modal-input" 
+                type="text" 
+                id="taskTitle" 
+                placeholder="Titel der Aufgabe" 
+                required 
+            />
+
+            <select class="filter-select" id="taskType" required>
+                <option value="" disabled selected>Bereich / Typ auswählen...</option>
+                <option value="Bewerbung">Bewerbung</option>
+                <option value="Onboarding">Onboarding</option>
+                <option value="Kündigung">Kündigung / Austritt</option>
+                <option value="Allgemein">Allgemein</option>
+            </select>
+
+            <select class="filter-select" id="taskPriority">
+                <option value="low">Niedrige Priorität</option>
+                <option value="medium" selected>Mittlere Priorität</option>
+                <option value="high">Hohe Priorität</option>
+            </select>
+
+            <textarea
+                class="modal-textarea"
+                id="taskDescription"
+                placeholder="Beschreibung der Aufgabe..."
+            ></textarea>
+
+            <div class="modal-actions">
+                <button class="request-btn blue" type="submit">Aufgabe speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const CREATE_TOKEN_URL = "{{ url_for('personalabteilung_create_tracker_code') }}";
@@ -1733,6 +1897,9 @@
         const requestSearch = document.getElementById("requestSearch");
         const requestStatusFilter = document.getElementById("requestStatusFilter");
 
+        const taskSearch = document.getElementById("taskSearch");
+        const taskStatusFilter = document.getElementById("taskStatusFilter");
+
         const toastLayer = document.getElementById("toastLayer");
 
         const rejectModal = document.getElementById("rejectModal");
@@ -1750,6 +1917,9 @@
         const documentTitle = document.getElementById("documentTitle");
         const documentMessage = document.getElementById("documentMessage");
 
+        const taskModal = document.getElementById("taskModal");
+        const taskForm = document.getElementById("taskForm");
+
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
         }
@@ -1760,6 +1930,10 @@
 
         function getTokenRequestRows() {
             return Array.from(document.querySelectorAll("[data-token-request-row]"));
+        }
+
+        function getTaskRows() {
+            return Array.from(document.querySelectorAll("[data-task-row]"));
         }
 
         function setText(id, value) {
@@ -1863,6 +2037,19 @@
             rows.forEach((row) => {
                 const matchesSearch = !query || String(row.dataset.search || "").includes(query);
                 const matchesStatus = statusValue === "all" || row.dataset.requestStatus === statusValue;
+
+                row.style.display = matchesSearch && matchesStatus ? "" : "none";
+            });
+        }
+
+        function applyTaskFilters() {
+            const rows = getTaskRows();
+            const query = String(taskSearch?.value || "").trim().toLowerCase();
+            const statusValue = taskStatusFilter?.value || "all";
+
+            rows.forEach((row) => {
+                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
+                const matchesStatus = statusValue === "all" || row.dataset.taskStatus === statusValue;
 
                 row.style.display = matchesSearch && matchesStatus ? "" : "none";
             });
@@ -2072,10 +2259,25 @@
             document.body.style.overflow = "";
         }
 
+        function openTaskModal() {
+            taskForm.reset();
+            taskModal.classList.add("active");
+            document.body.style.overflow = "hidden";
+            setTimeout(() => {
+                document.getElementById("taskTitle").focus();
+            }, 60);
+        }
+
+        function closeTaskModal() {
+            taskModal.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+
         document.querySelectorAll("[data-close-modal]").forEach((button) => {
             button.addEventListener("click", () => {
                 if(button.dataset.closeModal === "rejectModal") closeRejectModal();
                 if(button.dataset.closeModal === "documentModal") closeDocumentModal();
+                if(button.dataset.closeModal === "taskModal") closeTaskModal();
             });
         });
 
@@ -2087,10 +2289,15 @@
             if (event.target === documentModal) closeDocumentModal();
         });
 
+        taskModal.addEventListener("click", (event) => {
+            if (event.target === taskModal) closeTaskModal();
+        });
+
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 if (rejectModal.classList.contains("active")) closeRejectModal();
                 if (documentModal.classList.contains("active")) closeDocumentModal();
+                if (taskModal.classList.contains("active")) closeTaskModal();
             }
         });
 
@@ -2103,8 +2310,12 @@
         if (searchInput) searchInput.addEventListener("input", applyDriverFilters);
         if (tokenFilter) tokenFilter.addEventListener("change", applyDriverFilters);
         if (trackerFilter) trackerFilter.addEventListener("change", applyDriverFilters);
+        
         if (requestSearch) requestSearch.addEventListener("input", applyRequestFilters);
         if (requestStatusFilter) requestStatusFilter.addEventListener("change", applyRequestFilters);
+
+        if (taskSearch) taskSearch.addEventListener("input", applyTaskFilters);
+        if (taskStatusFilter) taskStatusFilter.addEventListener("change", applyTaskFilters);
 
         rejectForm.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -2204,6 +2415,13 @@
             }
         });
 
+        taskForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            // Platzhalter für das Speichern der Aufgabe (API Endpunkt noch zu erstellen)
+            showToast("Information", "Aufgabe erfolgreich gespeichert. (API Endpunkt zur Verarbeitung erforderlich)", "success");
+            closeTaskModal();
+        });
+
         document.addEventListener("click", async (event) => {
             const button = event.target.closest("[data-action]");
 
@@ -2215,6 +2433,16 @@
             const action = button.dataset.action;
             const requestId = button.dataset.requestId || "";
             const userName = button.dataset.userName || "User";
+
+            if (action === "new-task") {
+                openTaskModal();
+                return;
+            }
+
+            if (action === "edit-task") {
+                showToast("In Entwicklung", "Die Bearbeitungsfunktion für Aufgaben folgt in Kürze.", "success");
+                return;
+            }
 
             if (action === "send-document") {
                 const driverId = button.dataset.driverId;
@@ -2418,6 +2646,7 @@
         updateStats();
         applyRequestFilters();
         applyDriverFilters();
+        applyTaskFilters();
     });
 </script>
 {% endblock %}
