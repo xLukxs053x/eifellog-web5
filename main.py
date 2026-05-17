@@ -262,9 +262,19 @@ PERSONALABTEILUNG_ALLOWED_ROLES = {
 DISPOSITION_ALLOWED_ROLES = {
     ROLE_DISPOSITION,
     ROLE_DISPOSITION_ID,
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG,
+    ROLE_PROJEKTLEITUNG_ID,
     "Disposition",
     "disposition",
-    "dispo"
+    "dispo",
+    "Geschäftsleitung",
+    "Geschaeftsleitung",
+    "Geschäftsführung",
+    "Geschaeftsfuehrung",
+    "Projektleitung",
+    "projektleitung"
 }
 
 
@@ -297,19 +307,21 @@ def has_disposition_permission(user_roles):
     clean_allowed_roles = set(clean_roles(DISPOSITION_ALLOWED_ROLES))
     if clean_user_roles.intersection(clean_allowed_roles):
         return True
-    return get_primary_role_name(user_roles) == "Disposition"
+
+    primary_role_name = get_primary_role_name(user_roles)
+    return primary_role_name in {"Disposition", "Projektleitung", "Geschäftsleitung"}
 
 
 def get_primary_role_name(user_roles):
     clean_user_roles = clean_roles(user_roles)
 
-    if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles: return "Geschäftsleitung"
-    if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles: return "Projektleitung"
+    if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles or str(ROLE_GESCHAEFTSFUEHRUNG_ID).strip() in clean_user_roles: return "Geschäftsleitung"
+    if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Projektleitung"
     if str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Stellvertretende Projektleitung"
     if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles: return "Personalmanagement"
     if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles: return "HR Controlling"
     if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles: return "Buchhaltung"
-    if str(ROLE_DISPOSITION).strip() in clean_user_roles: return "Disposition"
+    if str(ROLE_DISPOSITION).strip() in clean_user_roles or str(ROLE_DISPOSITION_ID).strip() in clean_user_roles: return "Disposition"
     if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles: return "Fuhrparkmanagement"
 
     return "Fahrer"
@@ -2763,7 +2775,7 @@ def require_disposition_permission():
 
     user_roles = session.get("user", {}).get("roles", [])
     if not has_disposition_permission(user_roles):
-        flash("Zugriff verweigert. Du benötigst die Rolle Disposition.", "error")
+        flash("Zugriff verweigert. Du benötigst die Rolle Disposition oder mindestens Projektleitung.", "error")
         return redirect(url_for("dashboard"))
 
     return None
