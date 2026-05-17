@@ -205,28 +205,32 @@ ensure_indexes()
 ROLE_FAHRER = os.getenv("ROLE_FAHRER")
 ROLE_GESCHAEFTSLEITUNG = os.getenv("ROLE_GESCHAEFTSLEITUNG")
 ROLE_PROJEKTLEITUNG = os.getenv("ROLE_PROJEKTLEITUNG")
+ROLE_STELLVERTRETENDE_PROJEKTLEITUNG = os.getenv("ROLE_STELLVERTRETENDE_PROJEKTLEITUNG")
 ROLE_FUHRPARKMANAGEMENT = os.getenv("ROLE_FUHRPARKMANAGEMENT")
 ROLE_BUCHHALTUNG = os.getenv("ROLE_BUCHHALTUNG")
 ROLE_HR_CONTROLLING = os.getenv("ROLE_HR_CONTROLLING")
 ROLE_DISPOSITION = os.getenv("ROLE_DISPOSITION")
 ROLE_PERSONALMANAGEMENT = os.getenv("ROLE_PERSONALMANAGEMENT")
 
-ALLOWED_HUB_ROLES = [
-    ROLE_FAHRER,
-    ROLE_GESCHAEFTSLEITUNG,
-    ROLE_PROJEKTLEITUNG,
-    ROLE_FUHRPARKMANAGEMENT,
-    ROLE_BUCHHALTUNG,
-    ROLE_HR_CONTROLLING,
-    ROLE_DISPOSITION,
-    ROLE_PERSONALMANAGEMENT
-]
-
 # Hardcoded Rollen IDs basierend auf Vorgaben
 ROLE_PERSONALABTEILUNG_ID = "1473725287505072174"
 ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
 ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
+ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
 ROLE_BUCHHALTUNG_ID = "1473730533593845951"
+
+ALLOWED_HUB_ROLES = [
+    ROLE_FAHRER,
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_PROJEKTLEITUNG,
+    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
+    ROLE_FUHRPARKMANAGEMENT,
+    ROLE_BUCHHALTUNG,
+    ROLE_HR_CONTROLLING,
+    ROLE_DISPOSITION,
+    ROLE_PERSONALMANAGEMENT,
+    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID
+]
 
 PERSONALABTEILUNG_ALLOWED_ROLES = {
     ROLE_PERSONALABTEILUNG_ID,
@@ -264,6 +268,7 @@ def get_primary_role_name(user_roles):
 
     if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles: return "Geschäftsleitung"
     if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles: return "Projektleitung"
+    if str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Stellvertretende Projektleitung"
     if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles: return "Personalmanagement"
     if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles: return "HR Controlling"
     if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles: return "Buchhaltung"
@@ -2647,6 +2652,7 @@ def get_role_name_for_driver(user_doc):
     roles = {str(role).strip() for role in user_doc.get("roles", []) if role}
     if ROLE_GESCHAEFTSFUEHRUNG_ID in roles: return "Geschäftsführung"
     if ROLE_PROJEKTLEITUNG_ID in roles: return "Projektleitung"
+    if ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID in roles: return "Stellvertretende Projektleitung"
     if ROLE_PERSONALABTEILUNG_ID in roles: return "Personalabteilung"
     return get_primary_role_name(user_doc.get("roles", []))
 
