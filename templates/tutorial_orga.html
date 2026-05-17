@@ -3,62 +3,75 @@
 {% block title %}Tutorial: Disposition & Fuhrpark | Eifel LOG{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+<div class="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
     <!-- Header -->
-    <div class="mb-10 text-center">
-        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Disposition & Fuhrpark</h1>
-        <p class="mt-2 text-gray-400">Koordiniere Routen und verwalte die LKW-Flotte. Deine Rolle: <span class="text-orange-400">{{ primary_role_name }}</span></p>
+    <div class="mb-12 text-center">
+        <p class="text-[10px] font-orbitron text-[var(--brand-blue)] uppercase tracking-widest mb-2">Eifel LOG System</p>
+        <h1 class="text-4xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Disposition & Fuhrpark</h1>
+        <p class="mt-4 text-gray-400 text-lg">
+            Koordiniere Routen und verwalte die LKW-Flotte. Deine Rolle: 
+            <span class="text-[var(--brand-blue)] font-orbitron uppercase tracking-widest text-sm ml-1">{{ primary_role_name }}</span>
+        </p>
     </div>
 
     <!-- Step 1 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-orange-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
-            <h2 class="text-xl font-bold text-white">Live-Map & Aktive Fahrer</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">1</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Live-Map & Aktive Fahrer</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Die wichtigste Aufgabe der Disposition ist es zu wissen, wo sich unsere Fahrer aktuell befinden.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Behalte die Liste der aktiven Fahrer im Blick. Der Tracker überträgt alle 2 Minuten die aktuelle Position und den Status.</li>
-            <li>Prüfe Start- und Zielstädte, um Leerfahrten zu vermeiden und Anschlussfrachten optimal zu planen.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Die wichtigste Aufgabe der Disposition ist es zu wissen, wo sich unsere Fahrer aktuell befinden.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Tracking:</strong> Behalte die Liste der aktiven Fahrer im Blick. Der Tracker überträgt alle 2 Minuten die aktuelle Position und den Status.</li>
+                <li><strong class="text-gray-200">Planung:</strong> Prüfe Start- und Zielstädte, um Leerfahrten zu vermeiden und Anschlussfrachten optimal zu planen.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 2 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-orange-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
-            <h2 class="text-xl font-bold text-white">Fuhrpark verwalten</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">2</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Fuhrpark verwalten</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Das Fuhrparkmanagement achtet auf den Zustand der Eifel LOG Flotte im Spiel.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Achte auf die Schadensmeldungen (`damagePercent`), die bei abgeschlossenen Touren oder im Live-Tracker gemeldet werden.</li>
-            <li>Wenn Fahrzeuge oft stark beschädigt ankommen, reiche entsprechende Notizen an die Personalabteilung oder direkt an den Fahrer weiter.</li>
-            <li>Im Bereich "Fuhrpark" findest du Übersichten zu unseren zugelassenen Firmen-Truck-Designs und Lackierungen.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Das Fuhrparkmanagement achtet auf den Zustand der Eifel LOG Flotte im Spiel.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Schäden prüfen:</strong> Achte auf die Schadensmeldungen (<code class="bg-black/80 border border-[var(--brand-blue)]/50 px-2 py-1 rounded text-[var(--brand-blue)] text-sm">damagePercent</code>), die bei abgeschlossenen Touren oder im Live-Tracker gemeldet werden.</li>
+                <li><strong class="text-gray-200">Kommunikation:</strong> Wenn Fahrzeuge oft stark beschädigt ankommen, reiche entsprechende Notizen an die Personalabteilung oder direkt an den Fahrer weiter.</li>
+                <li><strong class="text-gray-200">Vorgaben:</strong> Im Bereich "Fuhrpark" findest du Übersichten zu unseren zugelassenen Firmen-Truck-Designs und Lackierungen.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 3 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-orange-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
-            <h2 class="text-xl font-bold text-white">Konvois planen</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-8 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">3</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Konvois planen</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Die Organisation von Firmenkonvois fällt in deinen Aufgabenbereich.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Lege Routen (Start, Ziel, Pausenpunkte) für das nächste Wochenende fest.</li>
-            <li>Stelle sicher, dass alle Teilnehmer die gleichen LKW-Konfigurationen und Trailer-Typen nutzen, falls es Vorgaben gibt.</li>
-            <li>Kommuniziere die Termine rechtzeitig über den Discord-Server und gegebenenfalls über das Dashboard.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Die Organisation von Firmenkonvois fällt in deinen Aufgabenbereich.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Routen:</strong> Lege Routen (Start, Ziel, Pausenpunkte) für das nächste Wochenende fest.</li>
+                <li><strong class="text-gray-200">Fahrzeuge:</strong> Stelle sicher, dass alle Teilnehmer die gleichen LKW-Konfigurationen und Trailer-Typen nutzen, falls es Vorgaben gibt.</li>
+                <li><strong class="text-gray-200">Ankündigung:</strong> Kommuniziere die Termine rechtzeitig über den Discord-Server und gegebenenfalls über das Dashboard.</li>
+            </ul>
+        </div>
     </div>
 
-    <div class="text-center mt-8">
-        <a href="{{ url_for('dashboard') }}" class="bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zum Dashboard</a>
+    <!-- Action Button -->
+    <div class="text-center mt-12">
+        <a href="{{ url_for('dashboard') }}" class="inline-flex items-center justify-center bg-[var(--brand-blue)]/10 hover:bg-[var(--brand-blue)]/20 border border-[var(--brand-blue)]/50 text-white font-orbitron uppercase tracking-widest text-sm py-4 px-10 rounded-xl transition-all duration-300">
+            Zurück zum Dashboard
+        </a>
     </div>
 </div>
 {% endblock %}

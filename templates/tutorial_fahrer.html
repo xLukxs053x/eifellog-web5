@@ -3,64 +3,76 @@
 {% block title %}Tutorial: Fahrer | Eifel LOG{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+<div class="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
     <!-- Header -->
-    <div class="mb-10 text-center">
-        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Fahrer Tutorial</h1>
-        <p class="mt-2 text-gray-400">Willkommen bei Eifel LOG, {{ current_user.username }}! Hier erfährst du, wie du startest.</p>
+    <div class="mb-12 text-center">
+        <p class="text-[10px] font-orbitron text-[var(--brand-blue)] uppercase tracking-widest mb-2">Eifel LOG System</p>
+        <h1 class="text-4xl font-bold text-white font-orbitron uppercase tracking-wider">Fahrer Tutorial</h1>
+        <p class="mt-4 text-gray-400 text-lg">
+            Willkommen bei Eifel LOG, <span class="text-[var(--brand-blue)] font-orbitron tracking-wide">{{ current_user.username }}</span>! Hier erfährst du, wie du startest.
+        </p>
     </div>
 
     <!-- Step 1 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
-            <h2 class="text-xl font-bold text-white">Registrierung & Tracker Token</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">1</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Registrierung & Tracker Token</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Bevor du Touren für Eifel LOG fahren kannst, musst du im Dashboard deine <strong>Fahrer-Registrierung</strong> abschicken. 
-            Sobald die Personalabteilung diese annimmt, erhältst du ein System-Dokument mit deinem persönlichen <strong>Tracker Token</strong>.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Gehe ins Dashboard und klicke auf "Registrieren".</li>
-            <li>Warte auf die Freigabe der Personalabteilung.</li>
-            <li>Prüfe deine System-Dokumente auf den Tracker-Code (z.B. <code class="bg-black px-2 py-1 rounded text-green-400">EL-ABCD-1234-WXYZ</code>).</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Bevor du Touren für Eifel LOG fahren kannst, musst du im Dashboard deine <strong class="text-white">Fahrer-Registrierung</strong> abschicken. 
+                Sobald die Personalabteilung diese annimmt, erhältst du ein System-Dokument mit deinem persönlichen <strong class="text-[var(--brand-blue)]">Tracker Token</strong>.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li>Gehe ins Dashboard und klicke auf <strong class="text-gray-200">"Registrieren"</strong>.</li>
+                <li>Warte auf die Freigabe der Personalabteilung.</li>
+                <li>Prüfe deine System-Dokumente auf den Tracker-Code (z.B. <code class="bg-black/80 border border-[var(--brand-blue)]/50 px-2 py-1 rounded text-[var(--brand-blue)] font-orbitron font-bold tracking-widest text-sm ml-1">EL-ABCD-1234-WXYZ</code>).</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 2 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
-            <h2 class="text-xl font-bold text-white">Den Eifel LOG Tracker nutzen</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">2</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Den Eifel LOG Tracker nutzen</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Der Tracker läuft im Hintergrund, während du ETS2 oder ATS spielst, und erfasst deine Telemetrie-Daten automatisch.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Starte den Eifel LOG Tracker auf deinem PC.</li>
-            <li>Gib deinen Benutzernamen und deinen <strong>Tracker Token</strong> ein.</li>
-            <li>Sobald du im Spiel bist, zeigt der Tracker "Verbunden" an.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Der Tracker läuft im Hintergrund, während du ETS2 oder ATS spielst, und erfasst deine Telemetrie-Daten vollautomatisch.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li>Starte den Eifel LOG Tracker auf deinem PC.</li>
+                <li>Gib deinen Benutzernamen und deinen <strong class="text-[var(--brand-blue)]">Tracker Token</strong> ein.</li>
+                <li>Sobald du im Spiel bist, zeigt der Tracker <strong class="text-green-400">"Verbunden"</strong> an.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 3 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
-            <h2 class="text-xl font-bold text-white">Touren abgeben & Abrechnung</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-8 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">3</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Touren abgeben & Abrechnung</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Wenn du eine Fracht im Spiel abgeliefert hast, musst du die Tour über den Tracker an das System senden.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Klicke im Tracker nach Abschluss der Fahrt auf <strong>"Tour abgeben"</strong>.</li>
-            <li>Das System generiert automatisch einen PDF-Beleg und leitet ihn an die Buchhaltung weiter.</li>
-            <li>Du siehst deine gefahrenen Kilometer und Einnahmen sofort in deinem Profil!</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Wenn du eine Fracht im Spiel abgeliefert hast, musst du die Tour über den Tracker an das System senden.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li>Klicke im Tracker nach Abschluss der Fahrt auf <strong class="text-white">"Tour abgeben"</strong>.</li>
+                <li>Das System generiert automatisch einen PDF-Beleg und leitet ihn an die Buchhaltung weiter.</li>
+                <li>Du siehst deine gefahrenen Kilometer und Einnahmen sofort in deinem Profil!</li>
+            </ul>
+        </div>
     </div>
 
-    <div class="text-center mt-8">
-        <a href="{{ url_for('dashboard') }}" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zurück zum Dashboard</a>
+    <!-- Action Button -->
+    <div class="text-center mt-12">
+        <a href="{{ url_for('dashboard') }}" class="inline-flex items-center justify-center bg-[var(--brand-blue)]/10 hover:bg-[var(--brand-blue)]/20 border border-[var(--brand-blue)]/50 text-white font-orbitron uppercase tracking-widest text-sm py-4 px-10 rounded-xl transition-all duration-300">
+            Zurück zum Dashboard
+        </a>
     </div>
 </div>
 {% endblock %}

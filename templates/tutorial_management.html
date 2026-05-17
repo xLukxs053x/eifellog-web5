@@ -3,62 +3,75 @@
 {% block title %}Tutorial: Management | Eifel LOG{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+<div class="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
     <!-- Header -->
-    <div class="mb-10 text-center">
-        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Management</h1>
-        <p class="mt-2 text-gray-400">Übersicht und Firmensteuerung. Deine Rolle: <span class="text-purple-400">{{ primary_role_name }}</span></p>
+    <div class="mb-12 text-center">
+        <p class="text-[10px] font-orbitron text-[var(--brand-blue)] uppercase tracking-widest mb-2">Eifel LOG System</p>
+        <h1 class="text-4xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Management</h1>
+        <p class="mt-4 text-gray-400 text-lg">
+            Übersicht und Firmensteuerung. Deine Rolle: 
+            <span class="text-[var(--brand-blue)] font-orbitron uppercase tracking-widest text-sm ml-1">{{ primary_role_name }}</span>
+        </p>
     </div>
 
     <!-- Step 1 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-purple-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
-            <h2 class="text-xl font-bold text-white">Firmenstatistiken & Dashboard</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">1</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Firmenstatistiken & Dashboard</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Als Management hast du den vollen Überblick über die Leistung der Spedition. Das Dashboard und der Tracker zeigen dir die wichtigsten KPIs (Key Performance Indicators).
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Überwache den Gesamtumsatz, die gesamten Kilometer und die aktiven Fahrer in Echtzeit.</li>
-            <li>Prüfe die monatlichen Wachstumsraten bei gefahrenen Kilometern und Einnahmen.</li>
-            <li>Nutze diese Daten, um strategische Entscheidungen für den Ausbau der Flotte zu treffen.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Als Management hast du den vollen Überblick über die Leistung der Spedition. Das Dashboard und der Tracker zeigen dir die wichtigsten KPIs (Key Performance Indicators).
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Echtzeit-Überwachung:</strong> Behalte den Gesamtumsatz, die gesamten Kilometer und die aktiven Fahrer im Blick.</li>
+                <li><strong class="text-gray-200">Wachstum:</strong> Prüfe die monatlichen Wachstumsraten bei gefahrenen Kilometern und Einnahmen.</li>
+                <li><strong class="text-gray-200">Strategie:</strong> Nutze diese Daten, um strategische Entscheidungen für den Ausbau der Flotte zu treffen.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 2 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-purple-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
-            <h2 class="text-xl font-bold text-white">Abteilungsübergreifende Kontrolle</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-6 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">2</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Abteilungsübergreifende Kontrolle</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Durch deine Rolle hast du erweiterte Rechte in den meisten Systembereichen, um bei Bedarf eingreifen zu können.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li><strong>Personalabteilung:</strong> Du kannst Fahrer-Registrierungen einsehen und Notfall-Freigaben erteilen.</li>
-            <li><strong>Buchhaltung:</strong> Du hast Zugriff auf alle Buchungssätze ("View All" Rechte) und kannst die Bilanz überprüfen.</li>
-            <li>Achte darauf, bei operativen Aufgaben primär die jeweiligen Abteilungsleiter agieren zu lassen.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Durch deine Rolle hast du erweiterte Rechte in den meisten Systembereichen, um bei Bedarf abteilungsübergreifend eingreifen zu können.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Personalabteilung:</strong> Du kannst Fahrer-Registrierungen einsehen und Notfall-Freigaben erteilen.</li>
+                <li><strong class="text-gray-200">Buchhaltung:</strong> Du hast Zugriff auf alle Buchungssätze ("View All" Rechte) und kannst die Bilanz überprüfen.</li>
+                <li><strong class="text-gray-200">Delegation:</strong> Achte darauf, bei operativen Aufgaben primär die jeweiligen Abteilungsleiter agieren zu lassen.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Step 3 -->
-    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
-        <div class="flex items-center mb-4">
-            <div class="bg-purple-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
-            <h2 class="text-xl font-bold text-white">Kommunikation & News</h2>
+    <div class="bg-black/50 border border-white/10 rounded-2xl p-6 mb-8 backdrop-blur-md hover:border-[var(--brand-blue)]/30 transition-all duration-300">
+        <div class="flex items-center mb-6 border-b border-white/5 pb-4">
+            <div class="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 text-[var(--brand-blue)] rounded-xl h-12 w-12 flex items-center justify-center font-orbitron font-bold text-xl mr-4 shadow-[0_0_10px_rgba(var(--brand-blue-rgb),0.1)]">3</div>
+            <h2 class="text-2xl font-bold text-white font-orbitron tracking-wide">Kommunikation & News</h2>
         </div>
-        <p class="text-gray-300 mb-4">
-            Wichtige Ankündigungen für alle Mitarbeiter können zentral gesteuert werden.
-        </p>
-        <ul class="list-disc list-inside text-gray-400 space-y-2">
-            <li>Firmen-News werden im Dashboard für alle angemeldeten Benutzer prominent angezeigt.</li>
-            <li>Bei schwerwiegenden Änderungen (z.B. neue Tracker-Versionen) kannst du systemweite Alert-Dokumente auslösen lassen.</li>
-        </ul>
+        <div class="text-gray-300 space-y-4 pl-2 lg:pl-16">
+            <p class="leading-relaxed">
+                Wichtige Ankündigungen für alle Mitarbeiter können zentral gesteuert werden.
+            </p>
+            <ul class="list-disc list-inside text-gray-400 space-y-2 marker:text-[var(--brand-blue)]">
+                <li><strong class="text-gray-200">Firmen-News:</strong> Werden im Dashboard für alle angemeldeten Benutzer prominent und direkt sichtbar angezeigt.</li>
+                <li><strong class="text-gray-200">System-Alerts:</strong> Bei schwerwiegenden Änderungen (z.B. neue Tracker-Versionen) kannst du systemweite Dokumente auslösen lassen.</li>
+            </ul>
+        </div>
     </div>
 
-    <div class="text-center mt-8">
-        <a href="{{ url_for('dashboard') }}" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zum Dashboard</a>
+    <!-- Action Button -->
+    <div class="text-center mt-12">
+        <a href="{{ url_for('dashboard') }}" class="inline-flex items-center justify-center bg-[var(--brand-blue)]/10 hover:bg-[var(--brand-blue)]/20 border border-[var(--brand-blue)]/50 text-white font-orbitron uppercase tracking-widest text-sm py-4 px-10 rounded-xl transition-all duration-300">
+            Zurück zum Dashboard
+        </a>
     </div>
 </div>
 {% endblock %}
