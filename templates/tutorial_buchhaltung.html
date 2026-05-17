@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Tutorial: Buchhaltung | Eifel LOG{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="mb-10 text-center">
+        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Buchhaltung</h1>
+        <p class="mt-2 text-gray-400">Verwalte die Finanzen und prüfe Tour-Belege. Deine Rolle: <span class="text-green-400">{{ primary_role_name }}</span></p>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-green-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
+            <h2 class="text-xl font-bold text-white">Das Buchhaltungs-Dashboard</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Im Menü unter "Buchhaltung" findest du alle aktuellen Transaktionen, Rechnungen und Tour-Belege.
+            Als Mitglied der Buchhaltung bist du dafür verantwortlich, dass alle Einträge korrekt dokumentiert sind.
+        </p>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-green-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
+            <h2 class="text-xl font-bold text-white">Tour-Belege prüfen</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Sobald ein Fahrer eine Tour abschließt, landet der PDF-Beleg automatisch im System und im Discord-Kanal.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Öffne den Reiter "Tour-Belege" oder prüfe die Einträge im Dashboard.</li>
+            <li>Gleiche die Kilometer und den Umsatz ab (Satz: 3,20€ pro km, sofern nicht anders definiert).</li>
+            <li>Setze den Status der Zahlung auf <strong>"Bezahlt"</strong> oder <strong>"Geprüft"</strong>.</li>
+        </ul>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-green-600 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
+            <h2 class="text-xl font-bold text-white">Manuelle Buchungen (Einnahmen/Ausgaben)</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Neben den automatischen Touren müssen auch Serverkosten, Wartungskosten oder Boni gebucht werden.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Klicke auf "Neuer Eintrag".</li>
+            <li>Wähle den Typ: <strong>Einnahme</strong> oder <strong>Ausgabe</strong>.</li>
+            <li>Gib den Bruttobetrag und die Kategorie (z.B. "Reparatur" oder "Gehalt") an.</li>
+            <li>Speichere den Eintrag. Das System berechnet automatisch die Umsatzsteuer.</li>
+        </ul>
+    </div>
+
+    <div class="text-center mt-8">
+        <a href="{{ url_for('buchhaltung') }}" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zur Buchhaltung</a>
+    </div>
+</div>
+{% endblock %}

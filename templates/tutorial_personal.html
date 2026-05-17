@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Tutorial: Personalabteilung | Eifel LOG{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="mb-10 text-center">
+        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Tutorial: Personalwesen</h1>
+        <p class="mt-2 text-gray-400">Verwalte Bewerber, Fahrer und Systemdokumente. Deine Rolle: <span class="text-blue-400">{{ primary_role_name }}</span></p>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-indigo-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
+            <h2 class="text-xl font-bold text-white">Fahrer-Registrierungen bearbeiten</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Wenn sich neue Fahrer über ihr Dashboard anmelden, landet der Antrag in der Personalabteilung.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Navigiere zum Reiter <strong>Personalabteilung</strong>.</li>
+            <li>Klicke bei einem offenen Antrag zunächst auf <strong>Claimen</strong>, um ihn zur Bearbeitung an dich zu binden.</li>
+            <li>Nach der Prüfung klickst du auf <strong>Annehmen</strong>. Das System generiert daraufhin automatisch einen Tracker-Token und ein Aktenzeichen für den Fahrer.</li>
+        </ul>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-indigo-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
+            <h2 class="text-xl font-bold text-white">Tokens & Aktenzeichen</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Jeder Fahrer benötigt ein <strong>Aktenzeichen (z.B. AZ-XY-12345)</strong> und einen <strong>Tracker Token</strong>.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Diese werden bei der Annahme der Registrierung automatisch erstellt.</li>
+            <li>Wenn ein Fahrer seinen Token verliert, kann er einen neuen beantragen. Auch diesen kannst du in deinem Bereich freigeben.</li>
+            <li>Aus Sicherheitsgründen haben alte Tokens keine Gültigkeit mehr, sobald ein neuer generiert wurde.</li>
+        </ul>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-indigo-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
+            <h2 class="text-xl font-bold text-white">Dokumente verschicken</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Du kannst offiziellen Schriftverkehr an Fahrer senden (z.B. Abmahnungen, Beförderungen oder Infos).
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Gehe auf <strong>Dokumente</strong> im Personalbereich.</li>
+            <li>Wähle den Fahrer aus dem Dropdown-Menü aus.</li>
+            <li>Verfasse den Text. Das System legt es automatisch in das Postfach des Fahrers in seinem Dashboard.</li>
+        </ul>
+    </div>
+
+    <div class="text-center mt-8">
+        <a href="{{ url_for('personalabteilung') }}" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zur Personalabteilung</a>
+    </div>
+</div>
+{% endblock %}

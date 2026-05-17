@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Tutorial: Fahrer | Eifel LOG{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="mb-10 text-center">
+        <h1 class="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Fahrer Tutorial</h1>
+        <p class="mt-2 text-gray-400">Willkommen bei Eifel LOG, {{ current_user.username }}! Hier erfährst du, wie du startest.</p>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">1</div>
+            <h2 class="text-xl font-bold text-white">Registrierung & Tracker Token</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Bevor du Touren für Eifel LOG fahren kannst, musst du im Dashboard deine <strong>Fahrer-Registrierung</strong> abschicken. 
+            Sobald die Personalabteilung diese annimmt, erhältst du ein System-Dokument mit deinem persönlichen <strong>Tracker Token</strong>.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Gehe ins Dashboard und klicke auf "Registrieren".</li>
+            <li>Warte auf die Freigabe der Personalabteilung.</li>
+            <li>Prüfe deine System-Dokumente auf den Tracker-Code (z.B. <code class="bg-black px-2 py-1 rounded text-green-400">EL-ABCD-1234-WXYZ</code>).</li>
+        </ul>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">2</div>
+            <h2 class="text-xl font-bold text-white">Den Eifel LOG Tracker nutzen</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Der Tracker läuft im Hintergrund, während du ETS2 oder ATS spielst, und erfasst deine Telemetrie-Daten automatisch.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Starte den Eifel LOG Tracker auf deinem PC.</li>
+            <li>Gib deinen Benutzernamen und deinen <strong>Tracker Token</strong> ein.</li>
+            <li>Sobald du im Spiel bist, zeigt der Tracker "Verbunden" an.</li>
+        </ul>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <div class="bg-blue-500 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg mr-4">3</div>
+            <h2 class="text-xl font-bold text-white">Touren abgeben & Abrechnung</h2>
+        </div>
+        <p class="text-gray-300 mb-4">
+            Wenn du eine Fracht im Spiel abgeliefert hast, musst du die Tour über den Tracker an das System senden.
+        </p>
+        <ul class="list-disc list-inside text-gray-400 space-y-2">
+            <li>Klicke im Tracker nach Abschluss der Fahrt auf <strong>"Tour abgeben"</strong>.</li>
+            <li>Das System generiert automatisch einen PDF-Beleg und leitet ihn an die Buchhaltung weiter.</li>
+            <li>Du siehst deine gefahrenen Kilometer und Einnahmen sofort in deinem Profil!</li>
+        </ul>
+    </div>
+
+    <div class="text-center mt-8">
+        <a href="{{ url_for('dashboard') }}" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Zurück zum Dashboard</a>
+    </div>
+</div>
+{% endblock %}

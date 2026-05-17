@@ -2625,6 +2625,53 @@ def api_new_token_request():
 
 
 # ==========================================
+# STANDARD ROUTEN
+# ==========================================
+
+@app.route("/tutorial")
+def tutorial():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session["user"]
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle.", "error")
+        return redirect(url_for("home"))
+
+    role_name = get_primary_role_name(user_roles)
+
+    # Je nach Rolle ein anderes Tutorial-Template ausspielen
+    if role_name in ["Geschäftsleitung", "Projektleitung", "Stellvertretende Projektleitung"]:
+        template_name = "tutorial_management.html"
+    elif role_name in ["Personalmanagement", "HR Controlling", "Personalabteilung"]:
+        template_name = "tutorial_personal.html"
+    elif role_name == "Buchhaltung":
+        template_name = "tutorial_buchhaltung.html"
+    elif role_name in ["Disposition", "Fuhrparkmanagement"]:
+        template_name = "tutorial_orga.html"
+    else:
+        template_name = "tutorial_fahrer.html"
+
+    # Hinweis: Stelle sicher, dass diese HTML-Dateien im `templates` Ordner existieren!
+    # Wenn du nur eine Datei (tutorial.html) verwenden willst, passe hier den Namen an 
+    # oder nutze Jinja-If-Abfragen in einer globalen tutorial.html.
+    return render_template(template_name, current_user=user, primary_role_name=role_name)
+
+
+@app.route("/downloads")
+def downloads():
+    if "user" not in session: return redirect(url_for("login"))
+    return render_template("download.html")
+
+@app.route("/fuhrpark")
+def fuhrpark():
+    return render_template("fuhrpark.html")
+
+
+# ==========================================
 # PERSONALABTEILUNG / BUCHHALTUNG / TASKS
 # ==========================================
 
@@ -3499,8 +3546,6 @@ def api_personalabteilung_send_document():
     
     return jsonify({"success": True, "message": "Wichtiges Dokument ausgestellt."})
 
-# [Hier folgen die bestehenden Approve/Reject API Methoden für die Personalabteilung in gekürzter Wiederholung...]
-
 @app.route("/api/personalabteilung/fahrer_registration/claim", methods=["POST"])
 def api_personalabteilung_claim_registration():
     permission_response = require_personalabteilung_api_permission()
@@ -3724,20 +3769,6 @@ def personalabteilung_create_tracker_code():
     )
 
     return jsonify({"success": True, "message": "Tracker-Code wurde erstellt und als System-Dokument gesendet.", "trackerCode": tracker_code, "driver": tracker_profile_payload(fresh_user)})
-
-
-# ==========================================
-# STANDARD ROUTEN
-# ==========================================
-
-@app.route("/downloads")
-def downloads():
-    if "user" not in session: return redirect(url_for("login"))
-    return render_template("download.html")
-
-@app.route("/fuhrpark")
-def fuhrpark():
-    return render_template("fuhrpark.html")
 
 
 # ==========================================
