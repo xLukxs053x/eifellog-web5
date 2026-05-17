@@ -236,7 +236,7 @@ ROLE_PROJEKTLEITUNG = os.getenv("ROLE_PROJEKTLEITUNG")
 ROLE_STELLVERTRETENDE_PROJEKTLEITUNG = os.getenv("ROLE_STELLVERTRETENDE_PROJEKTLEITUNG")
 ROLE_FUHRPARKMANAGEMENT = os.getenv("ROLE_FUHRPARKMANAGEMENT")
 ROLE_BUCHHALTUNG = os.getenv("ROLE_BUCHHALTUNG")
-ROLE_HR_CONTROLLING = os.getenv("ROLE_HR_CONTROLLING")
+ROLE_HR_CONTROLLING = env_first("ROLE_HR_CONTROLLING", "HR_CONTROLLING_ROLE_ID", default="1473726292963885188")
 ROLE_DISPOSITION = os.getenv("ROLE_DISPOSITION")
 ROLE_PERSONALMANAGEMENT = os.getenv("ROLE_PERSONALMANAGEMENT")
 
@@ -246,6 +246,7 @@ ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
 ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
 ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
 ROLE_BUCHHALTUNG_ID = "1473730533593845951"
+ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
 ALLOWED_HUB_ROLES = [
@@ -256,6 +257,7 @@ ALLOWED_HUB_ROLES = [
     ROLE_FUHRPARKMANAGEMENT,
     ROLE_BUCHHALTUNG,
     ROLE_HR_CONTROLLING,
+    ROLE_HR_CONTROLLING_ID,
     ROLE_DISPOSITION,
     ROLE_DISPOSITION_ID,
     ROLE_PERSONALMANAGEMENT,
@@ -265,7 +267,14 @@ ALLOWED_HUB_ROLES = [
 PERSONALABTEILUNG_ALLOWED_ROLES = {
     ROLE_PERSONALABTEILUNG_ID,
     ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG_ID
+    ROLE_PROJEKTLEITUNG_ID,
+    ROLE_HR_CONTROLLING,
+    ROLE_HR_CONTROLLING_ID,
+    "1473726292963885188",
+    "HR-Controlling",
+    "HR Controlling",
+    "hr-controlling",
+    "hr controlling"
 }
 
 DISPOSITION_ALLOWED_ROLES = {
@@ -328,7 +337,8 @@ def get_primary_role_name(user_roles):
     if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Projektleitung"
     if str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Stellvertretende Projektleitung"
     if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles: return "Personalmanagement"
-    if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles: return "HR Controlling"
+    if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles or str(ROLE_HR_CONTROLLING_ID).strip() in clean_user_roles: return "HR-Controlling"
+    if "HR-Controlling" in clean_user_roles or "HR Controlling" in clean_user_roles: return "HR-Controlling"
     if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles: return "Buchhaltung"
     if str(ROLE_DISPOSITION).strip() in clean_user_roles or str(ROLE_DISPOSITION_ID).strip() in clean_user_roles: return "Disposition"
     if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles: return "Fuhrparkmanagement"
@@ -2792,7 +2802,7 @@ def tutorial():
     # Je nach Rolle ein anderes Tutorial-Template ausspielen
     if role_name in ["Geschäftsleitung", "Projektleitung", "Stellvertretende Projektleitung"]:
         template_name = "tutorial_management.html"
-    elif role_name in ["Personalmanagement", "HR Controlling", "Personalabteilung"]:
+    elif role_name in ["Personalmanagement", "HR Controlling", "HR-Controlling", "Personalabteilung"]:
         template_name = "tutorial_personal.html"
     elif role_name == "Buchhaltung":
         template_name = "tutorial_buchhaltung.html"
@@ -3267,7 +3277,8 @@ def dispo_assign_tour(tour_id=None):
 
 def has_personalabteilung_permission(user_roles):
     clean_user_roles = {str(role).strip() for role in user_roles if role}
-    return bool(clean_user_roles.intersection(PERSONALABTEILUNG_ALLOWED_ROLES))
+    clean_allowed_roles = {str(role).strip() for role in PERSONALABTEILUNG_ALLOWED_ROLES if role}
+    return bool(clean_user_roles.intersection(clean_allowed_roles))
 
 def require_personalabteilung_permission():
     if "user" not in session:
@@ -3275,7 +3286,7 @@ def require_personalabteilung_permission():
         return redirect(url_for("hub"))
     user_roles = session.get("user", {}).get("roles", [])
     if not has_personalabteilung_permission(user_roles):
-        flash("Zugriff verweigert. Du benötigst Personalabteilung, Geschäftsführung oder Projektleitung.", "error")
+        flash("Zugriff verweigert. Du benötigst Personalabteilung, HR-Controlling, Geschäftsführung oder Projektleitung.", "error")
         return redirect(url_for("dashboard"))
     return None
 
@@ -3291,6 +3302,7 @@ def get_role_name_for_driver(user_doc):
     if ROLE_PROJEKTLEITUNG_ID in roles: return "Projektleitung"
     if ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID in roles: return "Stellvertretende Projektleitung"
     if ROLE_PERSONALABTEILUNG_ID in roles: return "Personalabteilung"
+    if ROLE_HR_CONTROLLING_ID in roles or ROLE_HR_CONTROLLING in roles: return "HR-Controlling"
     return get_primary_role_name(user_doc.get("roles", []))
 
 def prepare_driver_for_personalabteilung(user_doc):
