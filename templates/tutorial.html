@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - System Tutorial{% endblock %}
+
+{% block content %}
+<style>
+    /* Custom Scrollbar für den Tutorial-Inhalt */
+    .tutorial-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    .tutorial-content::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+    }
+    .tutorial-content::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+    .tutorial-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(88, 101, 242, 0.5); /* Discord Blue Hover */
+    }
+
+    .nav-item.active {
+        background: rgba(88, 101, 242, 0.15);
+        border-color: rgba(88, 101, 242, 0.5);
+        color: white;
+    }
+    .nav-item.active .nav-icon {
+        color: #5865F2;
+    }
+    
+    .tutorial-step {
+        animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/30 flex items-center justify-center text-[#5865F2] shadow-[0_0_20px_rgba(88,101,242,0.15)] shrink-0">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+        </div>
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">EifelLog Hub</span>
+            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white tracking-wide">
+                System Tutorial
+            </h1>
+        </div>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        Zurück zum Dashboard
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10 mb-10">
+    
+    <!-- Sidebar Navigation -->
+    <div class="lg:col-span-1 glass-card p-5 h-fit sticky top-6">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-4">Kapitel</h3>
+        
+        <nav class="space-y-2" id="tutorial-nav">
+            <button data-step="1" class="nav-item active w-full text-left p-3 rounded-xl border border-transparent hover:bg-white/5 hover:border-white/10 transition-all flex items-center gap-3 group">
+                <div class="nav-icon text-[var(--muted)] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-orbitron font-bold">1. Willkommen</span>
+                </div>
+            </button>
+
+            <button data-step="2" class="nav-item w-full text-left p-3 rounded-xl border border-transparent text-[var(--muted)] hover:text-white hover:bg-white/5 hover:border-white/10 transition-all flex items-center gap-3 group">
+                <div class="nav-icon text-[var(--muted)] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-orbitron font-bold">2. Dashboard</span>
+                </div>
+            </button>
+
+            <button data-step="3" class="nav-item w-full text-left p-3 rounded-xl border border-transparent text-[var(--muted)] hover:text-white hover:bg-white/5 hover:border-white/10 transition-all flex items-center gap-3 group">
+                <div class="nav-icon text-[var(--muted)] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-orbitron font-bold">3. Postfach</span>
+                </div>
+            </button>
+
+            <button data-step="4" class="nav-item w-full text-left p-3 rounded-xl border border-transparent text-[var(--muted)] hover:text-white hover:bg-white/5 hover:border-white/10 transition-all flex items-center gap-3 group">
+                <div class="nav-icon text-[var(--muted)] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-orbitron font-bold">4. Registrierung</span>
+                </div>
+            </button>
+            
+            <button data-step="5" class="nav-item w-full text-left p-3 rounded-xl border border-transparent text-[var(--muted)] hover:text-white hover:bg-white/5 hover:border-white/10 transition-all flex items-center gap-3 group">
+                <div class="nav-icon text-[var(--muted)] group-hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-orbitron font-bold">5. Abschluss</span>
+                </div>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="lg:col-span-3 glass-card p-6 md:p-10 min-h-[500px] flex flex-col">
+        
+        <div id="tutorial-content-container" class="flex-grow tutorial-content">
+            
+            <!-- STEP 1: Willkommen -->
+            <div id="step-content-1" class="tutorial-step block">
+                <h2 class="text-2xl font-orbitron font-bold text-white mb-4">Willkommen bei EifelLog!</h2>
+                <p class="text-gray-300 font-inter leading-relaxed mb-6">
+                    Schön, dass du da bist! Dieses System ist deine zentrale Anlaufstelle für alles rund um unsere Spedition. Egal ob du Fahrer, Disponent oder im Management bist – hier läuft alles zusammen.
+                </p>
+                <div class="bg-[#5865F2]/10 border border-[#5865F2]/30 rounded-2xl p-5 mb-6">
+                    <h4 class="font-orbitron font-bold text-[#5865F2] text-sm mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Was ist das EifelLog System?
+                    </h4>
+                    <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                        Wir nutzen dieses Panel, um Fahrtenbücher zu verwalten, wichtige Dokumente auszutauschen und dir deinen Tracker-Token zur Verfügung zu stellen. Es ist direkt mit unserem Discord verbunden.
+                    </p>
+                </div>
+                <p class="text-gray-300 font-inter leading-relaxed">
+                    Klicke unten auf <strong>Weiter</strong>, um einen kurzen Rundgang durch die wichtigsten Funktionen zu starten.
+                </p>
+            </div>
+
+            <!-- STEP 2: Dashboard -->
+            <div id="step-content-2" class="tutorial-step hidden">
+                <h2 class="text-2xl font-orbitron font-bold text-white mb-4">Dein Dashboard</h2>
+                <p class="text-gray-300 font-inter leading-relaxed mb-6">
+                    Das Dashboard ist deine Startseite. Hier siehst du auf einen Blick alle wichtigen Informationen.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-black/30 border border-white/10 rounded-2xl p-5">
+                        <div class="text-[var(--brand-green)] mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        </div>
+                        <h4 class="font-orbitron font-bold text-white text-sm mb-1">Statistiken</h4>
+                        <p class="text-xs text-gray-400 font-inter">Ganz oben findest du deine gefahrenen Kilometer, deinen Kontostand und dein aktuelles Fahrer-Level.</p>
+                    </div>
+                    
+                    <div class="bg-black/30 border border-white/10 rounded-2xl p-5">
+                        <div class="text-white mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                        </div>
+                        <h4 class="font-orbitron font-bold text-white text-sm mb-1">Schnellzugriff</h4>
+                        <p class="text-xs text-gray-400 font-inter">Über das Menü rechts kannst du blitzschnell neue Touren eintragen, den Fuhrpark prüfen oder den Support kontaktieren.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: Postfach & Dokumente -->
+            <div id="step-content-3" class="tutorial-step hidden">
+                <h2 class="text-2xl font-orbitron font-bold text-white mb-4">System-Postfach</h2>
+                <p class="text-gray-300 font-inter leading-relaxed mb-6">
+                    Rechts oben neben deinem Profil findest du eine Glocke <svg class="w-4 h-4 inline text-white mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>. Das ist dein System-Postfach.
+                </p>
+
+                <div class="border-l-2 border-[var(--brand-yellow)] pl-4 py-2 mb-6">
+                    <h4 class="font-orbitron font-bold text-[var(--brand-yellow)] text-sm mb-2">Wichtige Dokumente & Signaturen</h4>
+                    <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                        Wenn dir die Geschäftsführung oder die Personalabteilung ein Dokument zuweist, landet es hier. Einige Dokumente (wie z.B. unsere Richtlinien) erfordern eine <strong>Digitale Signatur</strong>. Dafür tippst du einfach deinen Discord-Namen zur Bestätigung ein.
+                    </p>
+                </div>
+                
+                <p class="text-gray-300 font-inter text-sm bg-black/30 p-4 rounded-xl border border-white/5">
+                    <strong>Tipp:</strong> Ein leuchtender roter oder gelber Punkt an der Glocke zeigt dir an, dass neue ungelesene Dokumente auf dich warten.
+                </p>
+            </div>
+
+            <!-- STEP 4: Registrierung -->
+            <div id="step-content-4" class="tutorial-step hidden">
+                <h2 class="text-2xl font-orbitron font-bold text-white mb-4">Fahrer Registrierung & Tokens</h2>
+                <p class="text-gray-300 font-inter leading-relaxed mb-6">
+                    Um im Speditions-System vollständig aktiv zu sein (Touren fahren, Tracker nutzen), musst du dich initial registrieren.
+                </p>
+
+                <ul class="space-y-4 font-inter text-sm text-gray-300">
+                    <li class="flex items-start gap-3">
+                        <div class="mt-0.5 w-5 h-5 rounded-full bg-[var(--brand-green)]/20 text-[var(--brand-green)] flex items-center justify-center shrink-0 border border-[var(--brand-green)]/30">1</div>
+                        <div>
+                            <strong class="text-white block mb-0.5">Antrag stellen</strong>
+                            Klicke im Dashboard auf "Fahrer registrieren". Trage deinen Namen und deine Rolle ein und sende es ab.
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="mt-0.5 w-5 h-5 rounded-full bg-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] flex items-center justify-center shrink-0 border border-[var(--brand-yellow)]/30">2</div>
+                        <div>
+                            <strong class="text-white block mb-0.5">Warten auf Bearbeitung</strong>
+                            Die Personalabteilung wird deinen Antrag prüfen und übernehmen ("Claimen"). Dies dauert in der Regel 1-2 Stunden.
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="mt-0.5 w-5 h-5 rounded-full bg-[#5865F2]/20 text-[#5865F2] flex items-center justify-center shrink-0 border border-[#5865F2]/30">3</div>
+                        <div>
+                            <strong class="text-white block mb-0.5">Token erhalten</strong>
+                            Sobald du angenommen bist, erhältst du ein offizielles Dokument in dein Postfach, welches deinen persönlichen <strong>Fahrer Token</strong> enthält. Bewahre diesen gut auf!
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- STEP 5: Abschluss -->
+            <div id="step-content-5" class="tutorial-step hidden">
+                <div class="text-center py-6">
+                    <div class="w-20 h-20 mx-auto rounded-full bg-[var(--brand-green)]/10 border-2 border-[var(--brand-green)] flex items-center justify-center text-[var(--brand-green)] shadow-[0_0_30px_rgba(137,190,50,0.3)] mb-6">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-orbitron font-bold text-white mb-3">Du bist bereit!</h2>
+                    <p class="text-gray-300 font-inter leading-relaxed max-w-lg mx-auto mb-8">
+                        Du kennst nun die wichtigsten Funktionen des Hubs. Solltest du Fragen haben, kannst du jederzeit ein Support-Ticket im Discord eröffnen. Gute Fahrt!
+                    </p>
+                    
+                    <a href="{{ url_for('dashboard') }}" class="inline-flex items-center justify-center px-8 py-4 rounded-xl bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/30 hover:text-white hover:-translate-y-1 transition-all duration-300 font-orbitron text-xs font-bold uppercase tracking-[0.15em] shadow-[0_0_20px_rgba(137,190,50,0.2)]">
+                        Zurück zum Dashboard
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Navigation Buttons Bottom -->
+        <div class="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
+            <button id="btn-prev" class="hidden items-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Zurück
+            </button>
+            
+            <div class="flex-grow"></div> <!-- Spacer -->
+
+            <button id="btn-next" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#5865F2]/15 border border-[#5865F2]/30 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
+                Weiter
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const totalSteps = 5;
+        let currentStep = 1;
+
+        const navButtons = document.querySelectorAll('.nav-item');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+
+        function updateUI(newStep) {
+            // Verstecke alle Steps
+            for (let i = 1; i <= totalSteps; i++) {
+                const content = document.getElementById(`step-content-${i}`);
+                if (content) {
+                    content.classList.add('hidden');
+                    content.classList.remove('block');
+                }
+            }
+
+            // Zeige den aktiven Step
+            const activeContent = document.getElementById(`step-content-${newStep}`);
+            if (activeContent) {
+                activeContent.classList.remove('hidden');
+                activeContent.classList.add('block');
+            }
+
+            // Update Navigation Styles
+            navButtons.forEach(btn => {
+                const step = parseInt(btn.getAttribute('data-step'));
+                if (step === newStep) {
+                    btn.classList.add('active', 'text-white');
+                    btn.classList.remove('text-[var(--muted)]', 'border-transparent');
+                } else {
+                    btn.classList.remove('active', 'text-white');
+                    btn.classList.add('text-[var(--muted)]', 'border-transparent');
+                }
+            });
+
+            // Buttons aktualisieren
+            if (newStep === 1) {
+                btnPrev.classList.add('hidden');
+                btnPrev.classList.remove('inline-flex');
+            } else {
+                btnPrev.classList.remove('hidden');
+                btnPrev.classList.add('inline-flex');
+            }
+
+            if (newStep === totalSteps) {
+                btnNext.classList.add('hidden');
+                btnNext.classList.remove('inline-flex');
+            } else {
+                btnNext.classList.remove('hidden');
+                btnNext.classList.add('inline-flex');
+            }
+
+            currentStep = newStep;
+        }
+
+        // Event Listener für Sidebar-Navigation
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetStep = parseInt(btn.getAttribute('data-step'));
+                updateUI(targetStep);
+            });
+        });
+
+        // Event Listener für Zurück-Button
+        if (btnPrev) {
+            btnPrev.addEventListener('click', () => {
+                if (currentStep > 1) {
+                    updateUI(currentStep - 1);
+                }
+            });
+        }
+
+        // Event Listener für Weiter-Button
+        if (btnNext) {
+            btnNext.addEventListener('click', () => {
+                if (currentStep < totalSteps) {
+                    updateUI(currentStep + 1);
+                }
+            });
+        }
+
+        // Initialisierung
+        updateUI(currentStep);
+    });
+</script>
+{% endblock %}
