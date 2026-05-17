@@ -1,45 +1,25 @@
 [
   {
-    "version": "v2.1.0",
+    "version": "v1.1.0",
     "tag": "Update",
     "is_latest": true,
-    "date": "17. Mai 2026",
+    "date": "16. Mai 2026",
     "added": [
-      "Neues <strong>Driver Hub Dashboard</strong> für verbesserte Tourenübersicht implementiert.",
-      "Live-Tracking Modul für spezielle Schwertransporte hinzugefügt.",
-      "Neue dynamische Hintergrund-Slideshow (Sci-Fi Look) integriert."
+      "Rollenspezifische Dashboards implementiert: Jede Position im Unternehmen verfügt nun über ein eigenes, fest zugewiesenes Dashboard."
     ],
-    "changed": [
-      "Vollständige UI-Überarbeitung: Mehr Glassmorphism und optimierte Typografie.",
-      "Globale Skalierung für Monitore > 1536px angepasst, um das Layout besser auszubalancieren."
-    ],
-    "fixed": [
-      "Fehlende Fade-Out Animation bei Logout-Routing gefixt.",
-      "Z-Index Problem bei Flash-Messages über der mobilen Navigation behoben."
-    ]
+    "changed": [],
+    "fixed": []
   },
   {
-    "version": "v2.0.5",
-    "tag": "Hotfix",
-    "is_latest": false,
-    "date": "02. April 2026",
-    "added": [],
-    "changed": [
-      "Performance-Optimierung der Datenbankabfragen für den Fuhrpark."
-    ],
-    "fixed": [
-      "Kritischer Fehler beim Speichern von Frachtpapieren behoben.",
-      "Login-Timeout auf 24 Stunden verlängert."
-    ]
-  },
-  {
-    "version": "v2.0.0",
+    "version": "v1.0.0",
     "tag": "Neuerungen",
     "is_latest": false,
-    "date": "15. März 2026",
+    "date": "15. Mai 2026",
     "added": [
-      "Launch des neuen <strong>Eifel LOG</strong> Systems.",
-      "Initialer Aufbau der Datenbank."
+      "Offizieller Launch der <strong>Eifel LOG</strong> Webseite.",
+      "Initiale Implementierung des Dashboards.",
+      "Zugang zum Driver Hub hinzugefügt.",
+      "Aufbau der grundlegenden technischen Infrastruktur und Datenbank."
     ],
     "changed": [],
     "fixed": []
