@@ -1993,6 +1993,46 @@ def home():
 def about():
     return render_template("about.html")
 
+@app.route('/changelog')
+def changelog():
+    # Pfad zur JSON-Datei (hier wird davon ausgegangen, dass sie im Hauptverzeichnis liegt)
+    # Falls sie im static-Ordner liegt, nutze: os.path.join(app.root_path, 'static', 'changelog.json')
+    json_path = os.path.join(app.root_path, 'changelog.json')
+    
+    changelog_data = []
+    
+    # Changelog JSON laden
+    try:
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                changelog_data = json.load(f)
+    except Exception as e:
+        print(f"Fehler beim Laden der Changelog-Daten: {e}")
+
+    # Roadmap-Daten (Könntest du später auch in eine roadmap.json auslagern)
+    roadmap_data = [
+        {
+            "status": "in_progress",
+            "title": "Economy System V2",
+            "eta": "In Progress",
+            "description": "Komplette Überarbeitung des Finanzsystems inklusive dynamischer Frachtpreise und Wartungskosten."
+        },
+        {
+            "status": "planned",
+            "title": "Speditions-Events",
+            "eta": "Q3 2026",
+            "description": "Wöchentliche Konvois mit Leaderboard und speziellen Belohnungen für aktive Fahrer."
+        },
+        {
+            "status": "planned",
+            "title": "API Integration",
+            "eta": "Planned",
+            "description": "Direkte Schnittstelle zu Telemetrie-Daten aus dem Spiel zur automatischen Fahrtenbuch-Eintragung."
+        }
+    ]
+
+    return render_template('changelog.html', changelog=changelog_data, roadmap=roadmap_data)
+
 
 # ==========================================
 # AUTHENTIFIZIERUNG

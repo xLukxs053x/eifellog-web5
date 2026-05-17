@@ -1,139 +1,242 @@
 {% extends "base.html" %}
 
-{% block title %}Changelog - Eifel LOG{% endblock %}
+{% block title %}Changelog & Roadmap - Eifel LOG{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-4xl mx-auto flex flex-col gap-10">
+<div class="w-full max-w-[var(--site-max-width)] mx-auto flex flex-col gap-10">
     
     <!-- Seiten-Header -->
-    <div class="text-center mt-4 mb-2">
-        <h1 class="text-3xl md:text-5xl font-orbitron font-bold text-[var(--text)] uppercase tracking-wider mb-3">System Changelog</h1>
+    <div class="text-center mt-4 mb-4">
+        <h1 class="text-3xl md:text-5xl font-orbitron font-bold text-[var(--text)] uppercase tracking-wider mb-3">System Log</h1>
         <div class="flex items-center justify-center gap-3">
             <div class="w-12 h-px bg-[var(--line)]"></div>
-            <p class="text-[var(--brand-green)] font-orbitron text-xs tracking-[0.2em] uppercase">Patch Notes & Updates</p>
+            <p class="text-[var(--brand-green)] font-orbitron text-xs tracking-[0.2em] uppercase">Patch Notes & Roadmap</p>
             <div class="w-12 h-px bg-[var(--line)]"></div>
         </div>
     </div>
 
-    <!-- Changelog Container -->
-    <div class="flex flex-col gap-8 relative">
-        <!-- Vertikale Timeline-Linie im Hintergrund (nur Desktop) -->
-        <div class="hidden md:block absolute left-8 top-4 bottom-4 w-px bg-[var(--line)] z-0"></div>
+    <!-- Main Layout Grid: Links Changelog (8 Spalten), Rechts Roadmap (4 Spalten) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
 
-        <!-- === UPDATE v2.1.0 === -->
-        <div class="glass-card p-6 md:p-8 border-l-4 border-l-[var(--brand-green)] relative z-10 transition-transform duration-300 hover:-translate-y-1">
-            <!-- Header des Eintrags -->
-            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 pb-4 border-b border-[var(--line)]">
-                <div class="flex items-center gap-4">
-                    <span class="text-2xl font-orbitron font-bold text-[var(--text)]">v2.1.0</span>
-                    <span class="px-3 py-1 bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/30 rounded-lg text-[10px] font-orbitron tracking-widest uppercase shadow-[0_0_10px_rgba(137,190,50,0.1)]">Latest</span>
+        <!-- ==========================================
+             LINKER BEREICH: CHANGELOG (JSON LOOP)
+        =========================================== -->
+        <div class="lg:col-span-8 flex flex-col gap-8 relative">
+            <!-- Vertikale Timeline-Linie im Hintergrund (nur Desktop) -->
+            <div class="hidden md:block absolute left-8 top-4 bottom-4 w-px bg-[var(--line)] z-0"></div>
+
+            {% if changelog %}
+                {% for entry in changelog %}
+                    
+                    <!-- Dynamische Farbzuweisung für Tags -->
+                    {% set tag_color = 'var(--text)' %}
+                    {% set tag_bg = 'rgba(255,255,255,0.05)' %}
+                    {% set tag_border = 'rgba(255,255,255,0.1)' %}
+                    {% set tag_shadow = 'none' %}
+                    
+                    {% set tag_lower = entry.tag | lower %}
+                    
+                    {% if tag_lower == 'hotfix' %}
+                        {% set tag_color = 'var(--danger)' %}
+                        {% set tag_bg = 'rgba(255,159,159,0.1)' %}
+                        {% set tag_border = 'rgba(255,159,159,0.3)' %}
+                        {% set tag_shadow = '0 0 10px rgba(255,159,159,0.15)' %}
+                    {% elif tag_lower == 'update' %}
+                        {% set tag_color = 'var(--brand-green)' %}
+                        {% set tag_bg = 'rgba(137,190,50,0.1)' %}
+                        {% set tag_border = 'rgba(137,190,50,0.3)' %}
+                        {% set tag_shadow = '0 0 10px rgba(137,190,50,0.15)' %}
+                    {% elif tag_lower == 'neuerungen' %}
+                        {% set tag_color = '#60a5fa' %} <!-- Sci-Fi Blue -->
+                        {% set tag_bg = 'rgba(96,165,250,0.1)' %}
+                        {% set tag_border = 'rgba(96,165,250,0.3)' %}
+                        {% set tag_shadow = '0 0 10px rgba(96,165,250,0.15)' %}
+                    {% elif tag_lower == 'patch notes' %}
+                        {% set tag_color = 'var(--brand-yellow)' %}
+                        {% set tag_bg = 'rgba(220,226,38,0.1)' %}
+                        {% set tag_border = 'rgba(220,226,38,0.3)' %}
+                        {% set tag_shadow = '0 0 10px rgba(220,226,38,0.15)' %}
+                    {% endif %}
+
+                    <!-- Changelog Karte -->
+                    <div class="glass-card p-6 md:p-8 {% if entry.is_latest %}border-l-4 border-l-[var(--brand-green)]{% endif %} relative z-10 transition-transform duration-300 hover:-translate-y-1 {% if not entry.is_latest %}opacity-80 hover:opacity-100{% endif %}">
+                        
+                        <!-- Header des Eintrags -->
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 pb-4 border-b border-[var(--line)]">
+                            <div class="flex flex-wrap items-center gap-4">
+                                <span class="text-2xl font-orbitron font-bold text-[var(--text)]">{{ entry.version }}</span>
+                                
+                                <!-- Typ-Tag (Hotfix, Update etc.) -->
+                                <span class="px-3 py-1 rounded-lg text-[10px] font-orbitron tracking-widest uppercase"
+                                      style="color: {{ tag_color }}; background-color: {{ tag_bg }}; border: 1px solid {{ tag_border }}; box-shadow: {{ tag_shadow }};">
+                                    {{ entry.tag }}
+                                </span>
+
+                                <!-- Optional: Latest Badge -->
+                                {% if entry.is_latest %}
+                                    <span class="px-3 py-1 bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/30 rounded-lg text-[10px] font-orbitron tracking-widest uppercase shadow-[0_0_10px_rgba(137,190,50,0.1)]">
+                                        Latest
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <span class="text-[12px] font-orbitron text-[var(--muted)] tracking-widest">{{ entry.date }}</span>
+                        </div>
+
+                        <!-- Content des Eintrags -->
+                        <div class="space-y-6 font-inter text-[var(--text)] text-sm md:text-base">
+                            
+                            <!-- Added / Hinzugefügt -->
+                            {% if entry.added %}
+                            <div>
+                                <h3 class="font-orbitron text-[11px] text-[var(--brand-green)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Hinzugefügt
+                                </h3>
+                                <ul class="space-y-2 text-[var(--muted)] ml-1">
+                                    {% for item in entry.added %}
+                                    <li class="flex items-start gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]/50 mt-1.5 shrink-0"></div>
+                                        <span>{{ item | safe }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- Changed / Geändert -->
+                            {% if entry.changed %}
+                            <div>
+                                <h3 class="font-orbitron text-[11px] text-[var(--brand-yellow)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    Geändert
+                                </h3>
+                                <ul class="space-y-2 text-[var(--muted)] ml-1">
+                                    {% for item in entry.changed %}
+                                    <li class="flex items-start gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-yellow)]/50 mt-1.5 shrink-0"></div>
+                                        <span>{{ item | safe }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- Fixed / Behoben -->
+                            {% if entry.fixed %}
+                            <div>
+                                <h3 class="font-orbitron text-[11px] text-[var(--danger)] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                    Behoben
+                                </h3>
+                                <ul class="space-y-2 text-[var(--muted)] ml-1">
+                                    {% for item in entry.fixed %}
+                                    <li class="flex items-start gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-[var(--danger)]/50 mt-1.5 shrink-0"></div>
+                                        <span>{{ item | safe }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="glass-card p-8 text-center text-[var(--muted)] z-10">
+                    <p class="font-orbitron uppercase tracking-widest text-xs">Keine System-Logs gefunden.</p>
                 </div>
-                <span class="text-[12px] font-orbitron text-[var(--muted)] tracking-widest">17. Mai 2026</span>
-            </div>
+            {% endif %}
 
-            <!-- Content des Eintrags -->
-            <div class="space-y-6 font-inter text-[var(--text)] text-sm md:text-base">
+            <!-- Info Card für ältere Versionen -->
+            <div class="mt-2 flex justify-center">
+                <span class="px-6 py-3 rounded-full bg-black/40 border border-[var(--line)] backdrop-blur-md text-xs font-inter text-[var(--muted)] shadow-xl">
+                    Ältere Einträge wurden archiviert.
+                </span>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             RECHTER BEREICH: ROADMAP (STICKY)
+        =========================================== -->
+        <div class="lg:col-span-4">
+            <div class="glass-card p-6 md:p-8 sticky top-28 z-20">
                 
-                <!-- Added -->
-                <div>
-                    <h3 class="font-orbitron text-[11px] text-[var(--brand-green)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Hinzugefügt
-                    </h3>
-                    <ul class="space-y-2 text-[var(--muted)] ml-1">
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]/50 mt-1.5 shrink-0"></div>
-                            <span>Neues <strong>Driver Hub Dashboard</strong> für verbesserte Tourenübersicht implementiert.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]/50 mt-1.5 shrink-0"></div>
-                            <span>Live-Tracking Modul für spezielle Schwertransporte hinzugefügt.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]/50 mt-1.5 shrink-0"></div>
-                            <span>Neue dynamische Hintergrund-Slideshow (Sci-Fi Look) integriert.</span>
-                        </li>
-                    </ul>
+                <div class="flex items-center gap-3 mb-8 border-b border-[var(--line)] pb-4">
+                    <div class="w-8 h-8 rounded-full bg-[var(--brand-yellow)]/10 flex items-center justify-center border border-[var(--brand-yellow)]/30 shrink-0">
+                        <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-orbitron font-bold text-[var(--text)] uppercase tracking-wider">Roadmap</h2>
+                        <span class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Upcoming Features</span>
+                    </div>
                 </div>
 
-                <!-- Changed -->
-                <div>
-                    <h3 class="font-orbitron text-[11px] text-[var(--brand-yellow)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        Geändert
-                    </h3>
-                    <ul class="space-y-2 text-[var(--muted)] ml-1">
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-yellow)]/50 mt-1.5 shrink-0"></div>
-                            <span>Vollständige UI-Überarbeitung: Mehr Glassmorphism und optimierte Typografie.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--brand-yellow)]/50 mt-1.5 shrink-0"></div>
-                            <span>Globale Skalierung für Monitore > 1536px angepasst, um das Layout besser auszubalancieren.</span>
-                        </li>
-                    </ul>
-                </div>
+                <!-- Roadmap Items (auch als Loop möglich, hier als Design-Vorgabe) -->
+                <div class="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-[var(--brand-yellow)] before:via-[var(--line)] before:to-transparent">
+                    
+                    {% if roadmap %}
+                        {% for task in roadmap %}
+                        <div class="relative flex items-start gap-4">
+                            <!-- Status Indicator -->
+                            <div class="relative z-10 w-5 h-5 flex items-center justify-center bg-[var(--bg-1)] rounded-full border-2 {% if task.status == 'in_progress' %}border-[var(--brand-yellow)] animate-pulse{% else %}border-[var(--line)]{% endif %} shrink-0 mt-0.5">
+                                {% if task.status == 'in_progress' %}
+                                    <div class="w-1.5 h-1.5 bg-[var(--brand-yellow)] rounded-full"></div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Task Content -->
+                            <div class="flex-1">
+                                <h4 class="font-orbitron text-[13px] font-bold text-[var(--text)] tracking-wider">{{ task.title }}</h4>
+                                <span class="inline-block mt-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-orbitron uppercase text-[var(--muted)] tracking-wider">
+                                    {{ task.eta }}
+                                </span>
+                                <p class="mt-2 text-xs font-inter text-[var(--muted)] leading-relaxed">
+                                    {{ task.description }}
+                                </p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Static Fallback / Dummy Data für die Roadmap -->
+                        <div class="relative flex items-start gap-4">
+                            <div class="relative z-10 w-5 h-5 flex items-center justify-center bg-[var(--bg-1)] rounded-full border-2 border-[var(--brand-yellow)] shrink-0 mt-0.5 shadow-[0_0_10px_rgba(220,226,38,0.4)]">
+                                <div class="w-1.5 h-1.5 bg-[var(--brand-yellow)] rounded-full animate-ping absolute"></div>
+                                <div class="w-1.5 h-1.5 bg-[var(--brand-yellow)] rounded-full relative"></div>
+                            </div>
+                            <div class="flex-1 pb-4">
+                                <h4 class="font-orbitron text-[13px] font-bold text-[var(--text)] tracking-wider">Economy System V2</h4>
+                                <span class="inline-block mt-1 px-2 py-0.5 bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 rounded text-[9px] font-orbitron uppercase text-[var(--brand-yellow)] tracking-wider">In Progress</span>
+                                <p class="mt-2 text-xs font-inter text-[var(--muted)] leading-relaxed">
+                                    Komplette Überarbeitung des Finanzsystems inklusive dynamischer Frachtpreise und Wartungskosten.
+                                </p>
+                            </div>
+                        </div>
 
-                <!-- Fixed -->
-                <div>
-                    <h3 class="font-orbitron text-[11px] text-[var(--danger)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                        Behoben
-                    </h3>
-                    <ul class="space-y-2 text-[var(--muted)] ml-1">
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--danger)]/50 mt-1.5 shrink-0"></div>
-                            <span>Fehlende Fade-Out Animation bei Logout-Routing gefixt.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--danger)]/50 mt-1.5 shrink-0"></div>
-                            <span>Z-Index Problem bei Flash-Messages über der mobilen Navigation behoben.</span>
-                        </li>
-                    </ul>
-                </div>
+                        <div class="relative flex items-start gap-4">
+                            <div class="relative z-10 w-5 h-5 flex items-center justify-center bg-[var(--bg-1)] rounded-full border-2 border-[var(--line)] shrink-0 mt-0.5"></div>
+                            <div class="flex-1 pb-4">
+                                <h4 class="font-orbitron text-[13px] font-bold text-[var(--text)] tracking-wider">Speditions-Events</h4>
+                                <span class="inline-block mt-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-orbitron uppercase text-[var(--muted)] tracking-wider">Q3 2026</span>
+                                <p class="mt-2 text-xs font-inter text-[var(--muted)] leading-relaxed">
+                                    Wöchentliche Konvois mit Leaderboard und speziellen Belohnungen für aktive Fahrer.
+                                </p>
+                            </div>
+                        </div>
 
-            </div>
-        </div>
-
-        <!-- === UPDATE v2.0.5 === -->
-        <div class="glass-card p-6 md:p-8 relative z-10 transition-transform duration-300 hover:-translate-y-1 opacity-80 hover:opacity-100">
-            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 pb-4 border-b border-[var(--line)]">
-                <div class="flex items-center gap-4">
-                    <span class="text-xl font-orbitron font-bold text-[var(--text)]">v2.0.5</span>
-                    <span class="px-3 py-1 bg-white/5 text-[var(--muted)] border border-white/10 rounded-lg text-[10px] font-orbitron tracking-widest uppercase">Stable</span>
-                </div>
-                <span class="text-[12px] font-orbitron text-[var(--muted)] tracking-widest">02. April 2026</span>
-            </div>
-
-            <div class="space-y-4 font-inter text-[var(--text)] text-sm md:text-base">
-                <div>
-                    <h3 class="font-orbitron text-[11px] text-[var(--brand-yellow)] uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        Geändert & Behoben
-                    </h3>
-                    <ul class="space-y-2 text-[var(--muted)] ml-1">
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--muted)]/50 mt-1.5 shrink-0"></div>
-                            <span>Performance-Optimierung der Datenbankabfragen für den Fuhrpark.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--muted)]/50 mt-1.5 shrink-0"></div>
-                            <span>Scrollbars global ausgeblendet für einen cleaneren Look.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-[var(--muted)]/50 mt-1.5 shrink-0"></div>
-                            <span>Kleinere CSS-Bugs auf der "Über uns" Seite korrigiert.</span>
-                        </li>
-                    </ul>
+                        <div class="relative flex items-start gap-4">
+                            <div class="relative z-10 w-5 h-5 flex items-center justify-center bg-[var(--bg-1)] rounded-full border-2 border-[var(--line)] shrink-0 mt-0.5"></div>
+                            <div class="flex-1">
+                                <h4 class="font-orbitron text-[13px] font-bold text-[var(--text)] tracking-wider">API Integration</h4>
+                                <span class="inline-block mt-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-orbitron uppercase text-[var(--muted)] tracking-wider">Planned</span>
+                                <p class="mt-2 text-xs font-inter text-[var(--muted)] leading-relaxed">
+                                    Direkte Schnittstelle zu Telemetrie-Daten aus dem Spiel zur automatischen Fahrtenbuch-Eintragung.
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-        </div>
-
-        <!-- Info Card für ältere Versionen -->
-        <div class="mt-4 flex justify-center">
-            <span class="px-6 py-3 rounded-full bg-black/40 border border-[var(--line)] backdrop-blur-md text-xs font-inter text-[var(--muted)]">
-                Ältere Einträge wurden archiviert.
-            </span>
         </div>
 
     </div>
