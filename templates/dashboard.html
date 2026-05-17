@@ -115,8 +115,305 @@
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.2);
     }
+
+    /* ---------------------------------------------------------
+       Responsive Dashboard-Fit
+       - Desktop/Laptop: leicht herausgezoomt über CSS-Scale.
+       - Tablet/Mobile: kein Scale, dafür kompaktere Abstände.
+       - Verhindert horizontales Überlaufen bei fremden Auflösungen.
+    --------------------------------------------------------- */
+    html,
+    body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .dashboard-responsive-shell {
+        --dashboard-scale: 1;
+        --dashboard-radius: clamp(1rem, 1.2vw, 1.5rem);
+        --dashboard-card-padding: clamp(1rem, 1.15vw, 1.5rem);
+        --dashboard-gap: clamp(0.875rem, 1.1vw, 1.5rem);
+        width: min(100%, 1880px);
+        margin-inline: auto;
+        transform-origin: top center;
+        will-change: transform;
+    }
+
+    .dashboard-responsive-shell,
+    .dashboard-responsive-shell * {
+        box-sizing: border-box;
+    }
+
+    .dashboard-responsive-shell .glass-card {
+        padding: var(--dashboard-card-padding) !important;
+        border-radius: var(--dashboard-radius);
+    }
+
+    .dashboard-responsive-shell .gap-6 {
+        gap: var(--dashboard-gap) !important;
+    }
+
+    .dashboard-responsive-shell .mb-8 {
+        margin-bottom: clamp(1.25rem, 1.5vw, 2rem) !important;
+    }
+
+    .dashboard-responsive-shell .mt-6 {
+        margin-top: clamp(1rem, 1.2vw, 1.5rem) !important;
+    }
+
+    .dashboard-responsive-shell h1 {
+        font-size: clamp(1.35rem, 1.75vw, 1.875rem) !important;
+        line-height: 1.12 !important;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .dashboard-responsive-shell h2 {
+        font-size: clamp(1rem, 1.05vw, 1.125rem) !important;
+        line-height: 1.25 !important;
+    }
+
+    .dashboard-responsive-shell .text-3xl {
+        font-size: clamp(1.55rem, 1.75vw, 1.875rem) !important;
+        line-height: 1.15 !important;
+    }
+
+    .dashboard-responsive-shell .text-2xl {
+        font-size: clamp(1.25rem, 1.45vw, 1.5rem) !important;
+        line-height: 1.2 !important;
+    }
+
+    .dashboard-responsive-shell .grid,
+    .dashboard-responsive-shell .flex {
+        min-width: 0;
+    }
+
+    .dashboard-responsive-shell table {
+        min-width: 620px;
+    }
+
+    .dashboard-responsive-shell img,
+    .dashboard-responsive-shell svg {
+        max-width: 100%;
+    }
+
+    .dashboard-responsive-shell [class*="tracking-"] {
+        text-wrap: balance;
+    }
+
+    /* Laptop- und Desktop-Fit: Layout optisch etwas herauszoomen */
+    @media (min-width: 1024px) {
+        .dashboard-responsive-shell {
+            transform: scale(var(--dashboard-scale));
+            width: calc(100% / var(--dashboard-scale));
+            max-width: calc(1880px / var(--dashboard-scale));
+            margin-left: calc((100% - (100% / var(--dashboard-scale))) / 2);
+            margin-right: auto;
+        }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1279px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.92;
+            --dashboard-card-padding: 1rem;
+            --dashboard-gap: 1rem;
+        }
+
+        .dashboard-responsive-shell .xl\:col-span-2 {
+            grid-column: span 2 / span 2;
+        }
+    }
+
+    @media (min-width: 1280px) and (max-width: 1439px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.94;
+            --dashboard-card-padding: 1.05rem;
+            --dashboard-gap: 1.05rem;
+        }
+    }
+
+    @media (min-width: 1440px) and (max-width: 1599px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.96;
+        }
+    }
+
+    @media (min-width: 1600px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.98;
+        }
+    }
+
+    @media (max-height: 780px) and (min-width: 1024px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.88;
+            --dashboard-card-padding: 0.95rem;
+            --dashboard-gap: 0.9rem;
+        }
+    }
+
+    @media (max-height: 680px) and (min-width: 1024px) {
+        .dashboard-responsive-shell {
+            --dashboard-scale: 0.84;
+        }
+    }
+
+    /* Tablet/Mobile: kein globaler Scale, sondern kompakteres Layout */
+    @media (max-width: 1023px) {
+        .dashboard-responsive-shell {
+            transform: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-inline: 0 !important;
+            --dashboard-card-padding: 1rem;
+            --dashboard-gap: 1rem;
+        }
+
+        .dashboard-responsive-shell .grid {
+            gap: var(--dashboard-gap) !important;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .dashboard-responsive-shell {
+            --dashboard-card-padding: 0.875rem;
+            --dashboard-gap: 0.875rem;
+        }
+
+        .dashboard-responsive-shell .glass-card {
+            border-radius: 1rem !important;
+        }
+
+        .dashboard-responsive-shell .p-6 {
+            padding: 0.875rem !important;
+        }
+
+        .dashboard-responsive-shell .p-5 {
+            padding: 0.875rem !important;
+        }
+
+        .dashboard-responsive-shell .p-4 {
+            padding: 0.75rem !important;
+        }
+
+        .dashboard-responsive-shell .w-16.h-16 {
+            width: 3rem !important;
+            height: 3rem !important;
+        }
+
+        .dashboard-responsive-shell .w-12.h-12 {
+            width: 2.75rem !important;
+            height: 2.75rem !important;
+        }
+
+        .dashboard-responsive-shell .text-3xl {
+            font-size: 1.45rem !important;
+        }
+
+        .dashboard-responsive-shell h1 {
+            font-size: 1.35rem !important;
+        }
+
+        .dashboard-responsive-shell .font-orbitron {
+            letter-spacing: 0.08em;
+        }
+
+        .dashboard-responsive-shell [class*="tracking-[0.2em]"],
+        .dashboard-responsive-shell [class*="tracking-[0.18em]"],
+        .dashboard-responsive-shell [class*="tracking-widest"] {
+            letter-spacing: 0.08em !important;
+        }
+
+        .dashboard-responsive-shell table {
+            min-width: 560px;
+        }
+
+        #alert-bell {
+            padding: 0.65rem !important;
+        }
+    }
+
+    @media (max-width: 420px) {
+        .dashboard-responsive-shell {
+            --dashboard-card-padding: 0.75rem;
+            --dashboard-gap: 0.75rem;
+        }
+
+        .dashboard-responsive-shell .grid-cols-2 {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .dashboard-responsive-shell .col-span-2 {
+            grid-column: auto !important;
+        }
+
+        .dashboard-responsive-shell .text-sm {
+            font-size: 0.8125rem !important;
+        }
+
+        .dashboard-responsive-shell .text-xs {
+            font-size: 0.72rem !important;
+        }
+
+        .dashboard-responsive-shell .min-w-\[230px\],
+        .dashboard-responsive-shell .min-w-\[150px\] {
+            min-width: 0 !important;
+            width: 100% !important;
+        }
+    }
+
+    /* Modals auf kleinen Displays besser einpassen */
+    @media (max-width: 640px) {
+        #tutorial-alert-wrapper,
+        #new-doc-alert-wrapper,
+        #general-alerts-wrapper,
+        #universal-doc-modal,
+        #driver-registration-modal,
+        #token-request-modal {
+            padding: 0.5rem !important;
+            align-items: center !important;
+        }
+
+        #tutorial-alert-panel,
+        #new-doc-alert-panel,
+        #general-alerts-panel,
+        #univ-doc-panel,
+        #driver-registration-panel,
+        #token-request-panel {
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
+            border-radius: 1.25rem !important;
+        }
+
+        #tutorial-alert-panel .p-6,
+        #tutorial-alert-panel .p-7,
+        #new-doc-alert-panel .p-6,
+        #new-doc-alert-panel .p-7,
+        #general-alerts-panel .p-6,
+        #univ-doc-panel .p-6,
+        #univ-doc-panel .p-8,
+        #driver-registration-panel .p-6,
+        #driver-registration-panel .p-8,
+        #token-request-panel .p-6,
+        #token-request-panel .p-8 {
+            padding: 1rem !important;
+        }
+
+        #univ-doc-title {
+            font-size: 1.15rem !important;
+            line-height: 1.25 !important;
+        }
+
+        #univ-doc-content {
+            padding: 1rem !important;
+            font-size: 0.875rem !important;
+        }
+    }
+
 </style>
 
+<div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
 <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 mt-6">
     <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)]">
@@ -1050,6 +1347,65 @@
         </form>
     </div>
 </div>
+
+
+<script>
+    (function () {
+        function setDashboardViewportHeight() {
+            document.documentElement.style.setProperty('--dashboard-vh', `${window.innerHeight * 0.01}px`);
+        }
+
+        function setDashboardScale() {
+            const shell = document.getElementById('dashboard-responsive-shell');
+            if (!shell) return;
+
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            let scale = 1;
+
+            if (width >= 1600) {
+                scale = 0.98;
+            } else if (width >= 1440) {
+                scale = 0.96;
+            } else if (width >= 1280) {
+                scale = 0.94;
+            } else if (width >= 1024) {
+                scale = 0.92;
+            }
+
+            if (width >= 1024 && height < 780) {
+                scale = Math.min(scale, 0.88);
+            }
+
+            if (width >= 1024 && height < 680) {
+                scale = Math.min(scale, 0.84);
+            }
+
+            if (width < 1024) {
+                scale = 1;
+            }
+
+            shell.style.setProperty('--dashboard-scale', String(scale));
+        }
+
+        function updateDashboardFit() {
+            setDashboardViewportHeight();
+            setDashboardScale();
+        }
+
+        let resizeFrame = null;
+        window.addEventListener('resize', () => {
+            if (resizeFrame) {
+                window.cancelAnimationFrame(resizeFrame);
+            }
+            resizeFrame = window.requestAnimationFrame(updateDashboardFit);
+        }, { passive: true });
+
+        window.addEventListener('orientationchange', updateDashboardFit, { passive: true });
+        document.addEventListener('DOMContentLoaded', updateDashboardFit);
+        updateDashboardFit();
+    })();
+</script>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
