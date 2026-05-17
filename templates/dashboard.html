@@ -39,7 +39,8 @@
 {% set personalabteilung_nav_roles = [
     '1473725287505072174',
     '1473721587122438322',
-    '1473721587122438321'
+    '1473721587122438321',
+    '1473726292963885188'
 ] %}
 {% set personalabteilung_nav = namespace(allowed=false) %}
 {% for role_id in personalabteilung_nav_roles %}
@@ -47,7 +48,7 @@
         {% set personalabteilung_nav.allowed = true %}
     {% endif %}
 {% endfor %}
-{% if primary_role_display in ['Personalabteilung', 'Geschäftsführung', 'Projektleitung'] %}
+{% if primary_role_display in ['Personalabteilung', 'Geschäftsführung', 'Projektleitung', 'HR-Controlling'] %}
     {% set personalabteilung_nav.allowed = true %}
 {% endif %}
 
