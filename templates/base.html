@@ -183,9 +183,16 @@
             box-shadow: var(--shadow);
         }
 
+        /* Spezialanpassung für das Security Modal */
+        .glass-card-danger {
+            border-top: 1px solid rgba(255, 159, 159, 0.3);
+            border-left: 1px solid rgba(255, 159, 159, 0.3);
+        }
+
         /* === BUTTONS === */
         .btn-primary,
-        .btn-secondary {
+        .btn-secondary,
+        .btn-danger {
             font-family: 'Orbitron', sans-serif;
             font-size: 10px;
             font-weight: 700;
@@ -227,6 +234,20 @@
         .btn-secondary:hover {
             background: rgba(255, 255, 255, 0.08);
             border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: rgba(255, 159, 159, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(255, 159, 159, 0.4);
+            box-shadow: 0 0 15px rgba(255, 159, 159, 0.1);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 159, 159, 0.3);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(255, 159, 159, 0.4);
             transform: translateY(-2px);
         }
 
@@ -316,7 +337,8 @@
             }
 
             .btn-primary,
-            .btn-secondary {
+            .btn-secondary,
+            .btn-danger {
                 width: 100%;
             }
         }
@@ -378,6 +400,9 @@
                     }
                 });
             });
+
+            // === SICHERHEITSSYSTEM INIT ===
+            initSecuritySystem();
         });
 
         // Mobile Menü Toggle
@@ -388,6 +413,66 @@
 
             menu.classList.toggle('hidden');
             menu.classList.toggle('flex');
+        }
+
+        // === SICHERHEITSSYSTEM FUNKTIONEN ===
+        function initSecuritySystem() {
+            const modal = document.getElementById('security-modal');
+            const modalCard = modal.querySelector('.glass-card');
+
+            // Modal einblenden
+            window.showSecurityAlert = function(e) {
+                if(e) e.preventDefault();
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                // Kurze Verzögerung für saubere Transition
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.classList.add('opacity-100');
+                    modalCard.classList.remove('scale-95');
+                    modalCard.classList.add('scale-100');
+                }, 10);
+            };
+
+            // Modal schließen
+            window.closeSecurityAlert = function() {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0');
+                modalCard.classList.remove('scale-100');
+                modalCard.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 300);
+            };
+
+            // 1. Rechtsklick (Context Menu) blockieren
+            document.addEventListener('contextmenu', function(e) {
+                showSecurityAlert(e);
+            }, false);
+
+            // 2. Tasten-Kombinationen blockieren
+            document.addEventListener('keydown', function(e) {
+                // F12 Taste
+                if (e.key === 'F12' || e.keyCode === 123) {
+                    showSecurityAlert(e);
+                }
+                
+                // Strg + Shift + I (Chrome DevTools)
+                // Strg + Shift + J (Chrome Console)
+                // Strg + Shift + C (Chrome Element Inspector)
+                // Strg + U (Seitenquelltext anzeigen)
+                if (e.ctrlKey) {
+                    if (e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
+                        showSecurityAlert(e);
+                    }
+                    if (e.key === 'U' || e.key === 'u' || e.keyCode === 85) {
+                        showSecurityAlert(e);
+                    }
+                }
+            }, false);
         }
     </script>
 </head>
@@ -534,6 +619,33 @@
             </p>
         </div>
     </footer>
+
+    <!-- ========================================== -->
+    <!-- SECURITY MODAL (F12 / Rechtsklick Warnung) -->
+    <!-- ========================================== -->
+    <div id="security-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 backdrop-blur-md opacity-0 transition-opacity duration-300 pointer-events-auto">
+        <div class="glass-card glass-card-danger max-w-md w-full mx-4 p-8 text-center transform scale-95 transition-transform duration-300 relative">
+            <!-- Glow Effect -->
+            <div class="absolute -inset-2 bg-[var(--danger)]/10 blur-2xl rounded-full z-[-1]"></div>
+            
+            <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--danger)]/50 flex items-center justify-center bg-[var(--danger)]/10 text-[var(--danger)] shadow-[0_0_15px_rgba(255,159,159,0.3)]">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            
+            <h2 class="font-orbitron text-lg font-bold text-[var(--text)] tracking-widest mb-3 uppercase">Zugriff blockiert</h2>
+            
+            <p class="font-inter text-[var(--muted)] text-sm mb-8 leading-relaxed">
+                Quellcode-Inspektion und das Kontextmenü sind aus Sicherheitsgründen deaktiviert.<br>
+                <span class="text-[11px] uppercase tracking-wider text-[var(--danger)]/80 mt-2 block font-orbitron">Sicherheitsrichtlinie Eifel LOG</span>
+            </p>
+            
+            <button onclick="closeSecurityAlert()" class="btn-danger w-full justify-center">
+                System Alert schließen
+            </button>
+        </div>
+    </div>
 
 </body>
 </html>
