@@ -528,11 +528,11 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const repo = '{{ github_repo }}';
+        const repo = {{ github_repo|tojson }};
         const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
 
-        const telemetryDllFileName = '{{ telemetry_dll_file }}';
-        const telemetryDllUrl = '{{ telemetry_dll_url }}';
+        const telemetryDllFileName = {{ telemetry_dll_file|tojson }};
+        const telemetryDllUrl = {{ telemetry_dll_url|tojson }};
 
         const setupVersion = document.getElementById('setup-version');
         const setupSize = document.getElementById('setup-size');
@@ -570,42 +570,80 @@
         let latestVersion = 'Latest';
 
         function formatBytes(bytes) {
-            if (!bytes || Number.isNaN(bytes)) return '-';
-            const mb = bytes / (1024 * 1024);
-            if (mb >= 1) {
-                return `${mb.toFixed(2)} MB`;
+            const value = Number(bytes);
+            if (!Number.isFinite(value) || value <= 0) return '-';
+
+            const mb = value / (1024 * 1024);
+            if (mb >= 1) return `${mb.toFixed(2)} MB`;
+
+            const kb = value / 1024;
+            if (kb >= 1) return `${kb.toFixed(1)} KB`;
+
+            return `${value} B`;
+        }
+
+        function normalizeName(value) {
+            return String(value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[_\s]+/g, '-')
+                .trim();
+        }
+
+        function setStatusColor(element, colorClass) {
+            if (!element) return;
+            element.classList.remove('text-[var(--brand-green)]', 'text-[var(--brand-yellow)]', 'text-red-400', 'text-[#9AA2FF]');
+            element.classList.add(colorClass);
+        }
+
+        function setDisabledLink(link, disabled) {
+            if (!link) return;
+
+            if (disabled) {
+                link.setAttribute('aria-disabled', 'true');
+                link.classList.add('opacity-60', 'cursor-not-allowed');
+            } else {
+                link.removeAttribute('aria-disabled');
+                link.classList.remove('opacity-60', 'cursor-not-allowed', 'opacity-50');
             }
-            const kb = bytes / 1024;
-            return `${kb.toFixed(1)} KB`;
+        }
+
+        function findAsset(assets, options = {}) {
+            if (!Array.isArray(assets)) return null;
+
+            const names = (options.names || []).map(normalizeName);
+            const includes = (options.includes || []).map(normalizeName);
+            const extensions = (options.extensions || []).map(extension => extension.toLowerCase());
+
+            return assets.find(asset => {
+                const assetName = asset.name || '';
+                const normalized = normalizeName(assetName);
+                const lowerName = assetName.toLowerCase();
+
+                const matchesName = names.length === 0 || names.some(name => normalized === name || normalized.startsWith(name));
+                const matchesIncludes = includes.length === 0 || includes.some(keyword => normalized.includes(keyword));
+                const matchesExtension = extensions.length === 0 || extensions.some(extension => lowerName.endsWith(extension));
+
+                return matchesName && matchesIncludes && matchesExtension;
+            }) || null;
         }
 
         function findSetupAsset(assets) {
-            if (!Array.isArray(assets)) return null;
-
-            const setupKeywords = [
-                'setup', 'installer', 'install', 'eifellog', 'eifel-log', 'tracking', 'fahrer'
-            ];
-            const setupExtensions = ['.exe', '.msi', '.zip'];
-
-            return assets.find(asset => {
-                const name = (asset.name || '').toLowerCase();
-                const hasSetupKeyword = setupKeywords.some(keyword => name.includes(keyword));
-                const hasSetupExtension = setupExtensions.some(extension => name.endsWith(extension));
-                return hasSetupExtension && hasSetupKeyword;
-            }) || assets.find(asset => {
-                const name = (asset.name || '').toLowerCase();
-                return name.endsWith('.exe') || name.endsWith('.msi');
-            }) || assets.find(asset => {
-                const name = (asset.name || '').toLowerCase();
-                return name.endsWith('.zip');
-            }) || null;
+            return findAsset(assets, {
+                includes: ['setup', 'installer', 'install', 'eifellog', 'eifel-log', 'tracking', 'fahrer'],
+                extensions: ['.exe', '.msi', '.zip']
+            }) || findAsset(assets, {
+                extensions: ['.exe', '.msi']
+            }) || findAsset(assets, {
+                extensions: ['.zip']
+            });
         }
 
         function setSetupButtonLoading() {
             setupDownloadBtn.href = '#';
             setupDownloadBtn.removeAttribute('download');
-            setupDownloadBtn.setAttribute('aria-disabled', 'true');
-            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(setupDownloadBtn, true);
             setupDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -618,8 +656,7 @@
         function setSetupButtonReady(asset) {
             setupDownloadBtn.href = asset.browser_download_url;
             setupDownloadBtn.setAttribute('download', asset.name || 'EifelLog-Setup');
-            setupDownloadBtn.removeAttribute('aria-disabled');
-            setupDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(setupDownloadBtn, false);
 
             setupDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -629,34 +666,30 @@
             `;
         }
 
-        function setSetupButtonUnavailable() {
+        function setSetupButtonUnavailable(label = 'Setup nicht verfügbar') {
             setupDownloadBtn.href = '#';
             setupDownloadBtn.removeAttribute('download');
-            setupDownloadBtn.setAttribute('aria-disabled', 'true');
-            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(setupDownloadBtn, true);
 
             setupDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
                 </svg>
-                Setup nicht verfügbar
+                ${label}
             `;
         }
 
         function setTelemetryDllLoading() {
             telemetryDllDownloadBtn.href = telemetryDllUrl;
             telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
-            telemetryDllDownloadBtn.setAttribute('aria-disabled', 'true');
-            telemetryDllDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(telemetryDllDownloadBtn, true);
 
             telemetryDllSize.textContent = 'Prüfe...';
             telemetryDllStatus.textContent = 'Prüfe...';
-            telemetryDllStatus.classList.remove('text-[var(--brand-green)]');
-            telemetryDllStatus.classList.add('text-[var(--brand-yellow)]');
+            setStatusColor(telemetryDllStatus, 'text-[var(--brand-yellow)]');
 
             releaseStatusDll.textContent = 'Prüfe...';
-            releaseStatusDll.classList.remove('text-[var(--brand-green)]');
-            releaseStatusDll.classList.add('text-[var(--brand-yellow)]');
+            setStatusColor(releaseStatusDll, 'text-[var(--brand-yellow)]');
 
             telemetryDllDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -670,17 +703,14 @@
         function setTelemetryDllReady(sizeText) {
             telemetryDllDownloadBtn.href = telemetryDllUrl;
             telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
-            telemetryDllDownloadBtn.removeAttribute('aria-disabled');
-            telemetryDllDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(telemetryDllDownloadBtn, false);
 
             telemetryDllSize.textContent = sizeText || '-';
             telemetryDllStatus.textContent = 'Bereit';
-            telemetryDllStatus.classList.remove('text-[var(--brand-yellow)]');
-            telemetryDllStatus.classList.add('text-[var(--brand-green)]');
+            setStatusColor(telemetryDllStatus, 'text-[var(--brand-green)]');
 
             releaseStatusDll.textContent = 'Bereit';
-            releaseStatusDll.classList.remove('text-[var(--brand-yellow)]');
-            releaseStatusDll.classList.add('text-[var(--brand-green)]');
+            setStatusColor(releaseStatusDll, 'text-[var(--brand-green)]');
 
             telemetryDllDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -690,20 +720,17 @@
             `;
         }
 
-        function setTelemetryDllUnavailable() {
-            telemetryDllDownloadBtn.href = telemetryDllUrl;
+        function setTelemetryDllUnavailable(label = 'Datei fehlt') {
+            telemetryDllDownloadBtn.href = telemetryDllUrl || '#';
             telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
-            telemetryDllDownloadBtn.setAttribute('aria-disabled', 'true');
-            telemetryDllDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setDisabledLink(telemetryDllDownloadBtn, true);
 
             telemetryDllSize.textContent = '-';
-            telemetryDllStatus.textContent = 'Datei fehlt';
-            telemetryDllStatus.classList.remove('text-[var(--brand-green)]');
-            telemetryDllStatus.classList.add('text-[var(--brand-yellow)]');
+            telemetryDllStatus.textContent = label;
+            setStatusColor(telemetryDllStatus, 'text-[var(--brand-yellow)]');
 
-            releaseStatusDll.textContent = 'Fehlt';
-            releaseStatusDll.classList.remove('text-[var(--brand-green)]');
-            releaseStatusDll.classList.add('text-[var(--brand-yellow)]');
+            releaseStatusDll.textContent = label === 'Datei fehlt' ? 'Fehlt' : 'Fehler';
+            setStatusColor(releaseStatusDll, 'text-[var(--brand-yellow)]');
 
             telemetryDllDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -713,35 +740,50 @@
             `;
         }
 
-        function checkTelemetryDll() {
+        async function checkTelemetryDll() {
             setTelemetryDllLoading();
 
-            fetch(telemetryDllUrl, {
-                method: 'HEAD',
-                cache: 'no-store'
-            })
-            .then(response => {
+            try {
+                const response = await fetch(telemetryDllUrl, {
+                    method: 'HEAD',
+                    cache: 'no-store'
+                });
+
                 if (!response.ok) {
-                    throw new Error('DLL nicht gefunden');
+                    throw new Error(`DLL nicht gefunden: HTTP ${response.status}`);
                 }
 
                 const contentLength = response.headers.get('content-length');
-                const sizeText = contentLength ? formatBytes(Number(contentLength)) : '-';
+                const sizeText = contentLength ? formatBytes(contentLength) : '-';
 
                 setTelemetryDllReady(sizeText);
-            })
-            .catch(error => {
-                console.warn('Telemetry DLL konnte nicht geladen werden:', error);
-                setTelemetryDllUnavailable();
-            });
+            } catch (headError) {
+                try {
+                    const response = await fetch(telemetryDllUrl, {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`DLL nicht gefunden: HTTP ${response.status}`);
+                    }
+
+                    const contentLength = response.headers.get('content-length');
+                    const sizeText = contentLength ? formatBytes(contentLength) : '-';
+
+                    setTelemetryDllReady(sizeText);
+                } catch (getError) {
+                    console.warn('Telemetry DLL konnte nicht geladen werden:', headError, getError);
+                    setTelemetryDllUnavailable('Datei fehlt');
+                }
+            }
         }
 
-        function setUnavailableState() {
+        function setUnavailableState(message = 'Kein Release') {
             setupVersion.textContent = '-';
             setupSize.textContent = '-';
-            setupStatus.textContent = 'Kein Release';
-            setupStatus.classList.remove('text-[var(--brand-green)]');
-            setupStatus.classList.add('text-[var(--brand-yellow)]');
+            setupStatus.textContent = message;
+            setStatusColor(setupStatus, 'text-[var(--brand-yellow)]');
 
             releaseStatusVersion.textContent = '-';
             releaseStatusFiles.textContent = '0 Dateien';
@@ -754,77 +796,75 @@
             docNutzungSize.textContent = 'Größe: -';
         }
 
-        setSetupButtonLoading();
-        checkTelemetryDll();
+        function updateDocAssetUi(assetKey, asset, version) {
+            const isFracht = assetKey === 'Frachtterminal.doc';
+            const versionElement = isFracht ? docFrachtterminalVersion : docNutzungVersion;
+            const sizeElement = isFracht ? docFrachtterminalSize : docNutzungSize;
 
-        fetch(releaseApiUrl, {
-            headers: {
-                'Accept': 'application/vnd.github+json'
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Kein Release gefunden');
-            }
-            return response.json();
-        })
-        .then(release => {
-            const assets = Array.isArray(release.assets) ? release.assets : [];
-            latestVersion = release.tag_name || release.name || 'Latest';
-
-            releaseStatusVersion.textContent = latestVersion;
-            releaseStatusFiles.textContent = `${assets.length} Dateien`;
-
-            const setupAsset = findSetupAsset(assets);
-
-            if (setupAsset) {
-                setupVersion.textContent = latestVersion;
-                setupSize.textContent = formatBytes(setupAsset.size);
-                setupStatus.textContent = 'Bereit';
-                setupStatus.classList.remove('text-[var(--brand-yellow)]');
-                setupStatus.classList.add('text-[var(--brand-green)]');
-
-                setSetupButtonReady(setupAsset);
+            if (asset) {
+                knownAssets[assetKey] = asset;
+                versionElement.textContent = `Version: ${version}`;
+                sizeElement.textContent = `Größe: ${formatBytes(asset.size)}`;
             } else {
-                setupVersion.textContent = latestVersion;
-                setupSize.textContent = '-';
-                setupStatus.textContent = 'Setup fehlt';
-                setupStatus.classList.remove('text-[var(--brand-green)]');
-                setupStatus.classList.add('text-[var(--brand-yellow)]');
-
-                setSetupButtonUnavailable();
+                knownAssets[assetKey] = null;
+                versionElement.textContent = `Version: ${version}`;
+                sizeElement.textContent = 'Größe: Datei fehlt';
             }
+        }
 
-            assets.forEach(asset => {
-                const assetNameLower = (asset.name || '').toLowerCase();
+        async function loadLatestRelease() {
+            setSetupButtonLoading();
 
-                if (assetNameLower.includes('frachtterminal')) {
-                    knownAssets['Frachtterminal.doc'] = asset;
-                    docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
-                    docFrachtterminalSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+            try {
+                const response = await fetch(releaseApiUrl, {
+                    cache: 'no-store',
+                    headers: {
+                        'Accept': 'application/vnd.github+json',
+                        'X-GitHub-Api-Version': '2022-11-28'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`GitHub Release konnte nicht geladen werden: HTTP ${response.status}`);
                 }
 
-                if (assetNameLower.includes('nutzung')) {
-                    knownAssets['nutzungsbedingungen.doc'] = asset;
-                    docNutzungVersion.textContent = `Version: ${latestVersion}`;
-                    docNutzungSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+                const release = await response.json();
+                const assets = Array.isArray(release.assets) ? release.assets : [];
+
+                latestVersion = release.tag_name || release.name || 'Latest';
+                releaseStatusVersion.textContent = latestVersion;
+                releaseStatusFiles.textContent = `${assets.length} ${assets.length === 1 ? 'Datei' : 'Dateien'}`;
+
+                const setupAsset = findSetupAsset(assets);
+
+                if (setupAsset && setupAsset.browser_download_url) {
+                    setupVersion.textContent = latestVersion;
+                    setupSize.textContent = formatBytes(setupAsset.size);
+                    setupStatus.textContent = 'Bereit';
+                    setStatusColor(setupStatus, 'text-[var(--brand-green)]');
+                    setSetupButtonReady(setupAsset);
+                } else {
+                    setupVersion.textContent = latestVersion;
+                    setupSize.textContent = '-';
+                    setupStatus.textContent = 'Setup fehlt';
+                    setStatusColor(setupStatus, 'text-[var(--brand-yellow)]');
+                    setSetupButtonUnavailable('Setup fehlt');
                 }
-            });
 
-            if (!knownAssets['Frachtterminal.doc']) {
-                docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
-                docFrachtterminalSize.textContent = 'Größe: Datei fehlt';
-            }
+                updateDocAssetUi('Frachtterminal.doc', findAsset(assets, {
+                    includes: ['frachtterminal'],
+                    extensions: ['.doc', '.docx', '.pdf']
+                }), latestVersion);
 
-            if (!knownAssets['nutzungsbedingungen.doc']) {
-                docNutzungVersion.textContent = `Version: ${latestVersion}`;
-                docNutzungSize.textContent = 'Größe: Datei fehlt';
+                updateDocAssetUi('nutzungsbedingungen.doc', findAsset(assets, {
+                    includes: ['nutzungsbedingungen', 'nutzung', 'bedingungen'],
+                    extensions: ['.doc', '.docx', '.pdf']
+                }), latestVersion);
+            } catch (error) {
+                console.warn('GitHub Release konnte nicht geladen werden:', error);
+                setUnavailableState('GitHub Fehler');
             }
-        })
-        .catch(error => {
-            console.warn('GitHub Release konnte nicht geladen werden:', error);
-            setUnavailableState();
-        });
+        }
 
         function lockBodyScroll() {
             document.body.classList.add('overflow-hidden');
@@ -853,7 +893,7 @@
                 docModalDownload.href = asset.browser_download_url;
                 docModalDownload.setAttribute('download', asset.name || file);
                 docModalDownload.removeAttribute('aria-disabled');
-                docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
+                docModalDownload.classList.remove('opacity-50', 'opacity-60', 'cursor-not-allowed');
                 docModalDownload.innerHTML = `
                     <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
@@ -877,7 +917,7 @@
             docModal.classList.remove('hidden');
             docModal.classList.add('flex');
 
-            setTimeout(() => {
+            window.setTimeout(() => {
                 docModal.classList.remove('opacity-0');
                 docModalPanel.classList.remove('scale-95', 'translate-y-4');
             }, 10);
@@ -887,34 +927,27 @@
             docModal.classList.add('opacity-0');
             docModalPanel.classList.add('scale-95', 'translate-y-4');
 
-            setTimeout(() => {
+            window.setTimeout(() => {
                 docModal.classList.add('hidden');
                 docModal.classList.remove('flex');
                 unlockBodyScroll();
             }, 300);
         }
 
+        function preventDisabledDownload(event) {
+            const link = event.currentTarget;
+            if (link && link.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+            }
+        }
+
         document.querySelectorAll('.doc-modal-trigger').forEach(button => {
             button.addEventListener('click', () => openDocModal(button));
         });
 
-        setupDownloadBtn.addEventListener('click', event => {
-            if (setupDownloadBtn.getAttribute('aria-disabled') === 'true') {
-                event.preventDefault();
-            }
-        });
-
-        telemetryDllDownloadBtn.addEventListener('click', event => {
-            if (telemetryDllDownloadBtn.getAttribute('aria-disabled') === 'true') {
-                event.preventDefault();
-            }
-        });
-
-        docModalDownload.addEventListener('click', event => {
-            if (docModalDownload.getAttribute('aria-disabled') === 'true') {
-                event.preventDefault();
-            }
-        });
+        setupDownloadBtn.addEventListener('click', preventDisabledDownload);
+        telemetryDllDownloadBtn.addEventListener('click', preventDisabledDownload);
+        docModalDownload.addEventListener('click', preventDisabledDownload);
 
         docModalClose.addEventListener('click', closeDocModal);
 
@@ -929,6 +962,9 @@
                 closeDocModal();
             }
         });
+
+        checkTelemetryDll();
+        loadLatestRelease();
     });
 </script>
 
