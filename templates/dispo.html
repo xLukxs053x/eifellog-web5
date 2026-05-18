@@ -47,23 +47,86 @@
 
 {% block content %}
 <style>
+    /* Angepasste vertikale Scrollbar für Standard-Listen */
     .dispo-scrollbar::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 12px;
+        height: 12px;
+        background: rgba(255, 255, 255, 0.035);
     }
 
     .dispo-scrollbar::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.12);
+        background: rgba(255, 255, 255, 0.06);
         border-radius: 999px;
+        margin: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .dispo-scrollbar::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.12);
+        background: linear-gradient(
+            180deg,
+            rgba(88, 101, 242, 0.75),
+            rgba(137, 190, 50, 0.62)
+        );
         border-radius: 999px;
+        border: 3px solid rgba(13, 15, 12, 0.92);
+        box-shadow: 0 0 14px rgba(88, 101, 242, 0.25);
     }
 
     .dispo-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.22);
+        background: linear-gradient(
+            180deg,
+            rgba(88, 101, 242, 0.95),
+            rgba(137, 190, 50, 0.82)
+        );
+    }
+
+    /* Neue Wrapper-Klasse für die Tabelle (für die horizontale Scroll-Linie wie in der Personalabteilung) */
+    .dispo-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 400px;
+        position: relative;
+        z-index: 10;
+        padding-bottom: 14px;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(88, 101, 242, 0.65) rgba(255, 255, 255, 0.08) !important;
+        scroll-behavior: smooth;
+    }
+
+    .dispo-table-wrap::-webkit-scrollbar {
+        display: block !important;
+        height: 14px !important;
+        width: 14px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+    }
+
+    .dispo-table-wrap::-webkit-scrollbar-track {
+        display: block !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-radius: 999px !important;
+        margin: 0 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .dispo-table-wrap::-webkit-scrollbar-thumb {
+        display: block !important;
+        background: linear-gradient(
+            90deg,
+            rgba(88, 101, 242, 0.75),
+            rgba(137, 190, 50, 0.62)
+        ) !important;
+        border-radius: 999px !important;
+        border: 3px solid rgba(13, 15, 12, 0.92) !important;
+        box-shadow: 0 0 14px rgba(88, 101, 242, 0.25) !important;
+    }
+
+    .dispo-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+            90deg,
+            rgba(88, 101, 242, 0.95),
+            rgba(137, 190, 50, 0.82)
+        ) !important;
     }
 
     .dispo-status-dot {
@@ -337,8 +400,7 @@
                 </div>
             </div>
 
-            <!-- HIER WURDE DIE MAXIMALE HÖHE UND VERTIKALE SCROLLBAR HINZUGEFÜGT -->
-            <div class="overflow-auto max-h-[400px] dispo-scrollbar flex-grow pr-1">
+            <div class="dispo-table-wrap pr-1">
                 <table class="w-full text-left border-collapse min-w-[900px] relative">
                     <thead class="sticky top-0 bg-[#0d0f0c]/95 backdrop-blur-sm z-10">
                         <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
@@ -396,51 +458,6 @@
                         {% endif %}
                     </tbody>
                 </table>
-            </div>
-        </div>
-
-        <div class="glass-card p-6 flex flex-col min-h-[360px]">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-                <div>
-                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Live Monitoring</span>
-                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Aktive Touren</h2>
-                </div>
-            </div>
-
-            <div class="space-y-3 overflow-y-auto dispo-scrollbar pr-1">
-                {% if safe_active_tours %}
-                    {% for tour in safe_active_tours %}
-                        {% set progress = tour.progress|default(0, true) %}
-                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4 hover:border-[#5865F2]/40 transition-all">
-                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center gap-2 mb-2">
-                                        <span class="dispo-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Aktiv</span>
-                                        <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">{{ tour.id|default(loop.index, true) }}</span>
-                                    </div>
-                                    <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wide">
-                                        {{ tour.route_from|default('-', true) }} → {{ tour.route_to|default('-', true) }}
-                                    </h3>
-                                    <p class="text-xs text-[var(--muted)] mt-2 font-inter">
-                                        Fahrer: <span class="text-white font-bold">{{ tour.assigned_driver|default('Nicht gesetzt', true) }}</span> · Fracht: {{ tour.cargo|default('-', true) }}
-                                    </p>
-                                </div>
-                                <div class="min-w-[170px] text-right">
-                                    <p class="text-xs text-[var(--muted)] font-inter mb-2">Fortschritt</p>
-                                    <p class="font-orbitron font-bold text-white">{{ progress }}%</p>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
-                                <div class="h-full rounded-full bg-gradient-to-r from-[#5865F2] to-[var(--brand-green)]" style="width: {{ progress }}%;"></div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="rounded-2xl bg-black/30 border border-white/10 p-8 text-center text-white/50">
-                        Aktuell laufen keine disponierten Touren.
-                    </div>
-                {% endif %}
             </div>
         </div>
     </div>
