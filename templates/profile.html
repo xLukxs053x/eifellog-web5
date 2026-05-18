@@ -63,11 +63,14 @@
         --driver-yellow: var(--brand-yellow, #dce226);
         --driver-muted: var(--muted, rgba(255,255,255,0.62));
         --driver-text: var(--text, #f6fff1);
-        --driver-shadow: 0 30px 100px rgba(0, 0, 0, 0.42);
+        --driver-shadow: 0 1.6rem 5rem rgba(0, 0, 0, 0.38);
         width: 100%;
         display: flex;
         flex-direction: column;
-        gap: 26px;
+        gap: 1.35rem;
+        max-width: 100%;
+        margin: 0 auto;
+        isolation: isolate;
     }
 
     .driver-profile *,
@@ -78,9 +81,9 @@
 
     .driver-hero {
         position: relative;
-        min-height: 440px;
+        min-height: 25.5rem;
         overflow: hidden;
-        border-radius: 34px;
+        border-radius: 1.75rem;
         border: 1px solid rgba(255,255,255,0.08);
         box-shadow: var(--driver-shadow);
         background:
@@ -106,7 +109,7 @@
                 rgba(255,255,255,0.035) 0,
                 rgba(255,255,255,0.035) 1px,
                 transparent 1px,
-                transparent 92px
+                transparent 5.75rem
             );
         z-index: 1;
     }
@@ -114,70 +117,70 @@
     .driver-hero::after {
         content: "";
         position: absolute;
-        width: 540px;
-        height: 540px;
-        right: -180px;
-        bottom: -220px;
-        border-radius: 999px;
+        width: 28rem;
+        height: 28rem;
+        right: -9rem;
+        bottom: -11rem;
+        border-radius: 62.4375rem;
         background: radial-gradient(circle, rgba(var(--brand-green-rgb), 0.26), transparent 67%);
-        filter: blur(4px);
+        filter: blur(0.25rem);
         z-index: 1;
     }
 
     .driver-hero-inner {
         position: relative;
         z-index: 2;
-        min-height: 440px;
+        min-height: 25.5rem;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 360px;
-        gap: 28px;
+        grid-template-columns: minmax(0, 1fr) 22.5rem;
+        gap: 1.75rem;
         align-items: end;
-        padding: 34px;
+        padding: 2.125rem;
     }
 
     .driver-hero-main {
         display: grid;
-        gap: 26px;
-        max-width: 920px;
+        gap: 1.25rem;
+        max-width: 48rem;
     }
 
     .driver-breadcrumb {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 0.625rem;
         color: var(--driver-muted);
-        font-size: 11px;
+        font-size: 0.6875rem;
         letter-spacing: 0.16em;
         text-transform: uppercase;
         font-weight: 800;
     }
 
     .driver-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
+        width: 0.4375rem;
+        height: 0.4375rem;
+        border-radius: 62.4375rem;
         background: var(--driver-green);
-        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.75);
+        box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.75);
     }
 
     .driver-title-row {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        gap: 22px;
+        gap: 1.15rem;
         align-items: center;
     }
 
     .driver-avatar-frame {
-        width: 132px;
-        height: 132px;
-        padding: 4px;
-        border-radius: 32px;
+        width: 7.25rem;
+        height: 7.25rem;
+        padding: 0.25rem;
+        border-radius: 1.65rem;
         background: linear-gradient(135deg, var(--driver-yellow), var(--driver-green));
         box-shadow:
-            0 0 0 8px rgba(4,10,6,0.54),
-            0 24px 70px rgba(0,0,0,0.42),
-            0 0 42px rgba(var(--brand-green-rgb), 0.28);
+            0 0 0 0.5rem rgba(4,10,6,0.54),
+            0 1.5rem 4.375rem rgba(0,0,0,0.42),
+            0 0 2.625rem rgba(var(--brand-green-rgb), 0.28);
         position: relative;
         flex: 0 0 auto;
     }
@@ -185,23 +188,23 @@
     .driver-avatar-frame::after {
         content: "";
         position: absolute;
-        right: 11px;
-        bottom: 11px;
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
+        right: 0.6875rem;
+        bottom: 0.6875rem;
+        width: 1.125rem;
+        height: 1.125rem;
+        border-radius: 62.4375rem;
         background: var(--driver-green);
-        border: 3px solid rgba(4,10,6,1);
-        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.95);
+        border: 0.1875rem solid rgba(4,10,6,1);
+        box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.95);
     }
 
     .driver-avatar {
         width: 100%;
         height: 100%;
         display: block;
-        border-radius: 28px;
+        border-radius: 1.75rem;
         object-fit: cover;
-        border: 3px solid rgba(4,10,6,0.94);
+        border: 0.1875rem solid rgba(4,10,6,0.94);
         background: rgba(0,0,0,0.35);
     }
 
@@ -209,46 +212,46 @@
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 14px;
+        gap: 0.625rem;
+        margin-bottom: 0.875rem;
     }
 
     .driver-name {
         margin: 0;
         color: var(--driver-text);
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(2.35rem, 5vw, 5.5rem);
+        font-size: clamp(2.05rem, 4.2vw, 4.35rem);
         line-height: 0.92;
         font-weight: 950;
         letter-spacing: -0.04em;
         text-transform: uppercase;
         text-wrap: balance;
-        text-shadow: 0 22px 60px rgba(0,0,0,0.5);
+        text-shadow: 0 1rem 2.8rem rgba(0,0,0,0.48);
     }
 
     .driver-username {
-        margin-top: 13px;
+        margin-top: 0.8125rem;
         color: rgba(255,255,255,0.72);
-        font-size: 15px;
+        font-size: 0.9375rem;
         letter-spacing: 0.08em;
     }
 
     .driver-status {
-        max-width: 780px;
-        padding: 18px 20px;
-        border-radius: 24px;
+        max-width: 43rem;
+        padding: 1rem 1.1rem;
+        border-radius: 1.3rem;
         color: rgba(255,255,255,0.88);
         line-height: 1.7;
         background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
         border: 1px solid rgba(255,255,255,0.08);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
+        backdrop-filter: blur(1.5rem);
+        -webkit-backdrop-filter: blur(1.5rem);
     }
 
     .driver-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 0.75rem;
         align-items: center;
     }
 
@@ -264,14 +267,14 @@
     .driver-pill {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        min-height: 34px;
-        padding: 8px 13px;
-        border-radius: 999px;
+        gap: 0.5rem;
+        min-height: 2.125rem;
+        padding: 0.5rem 0.8125rem;
+        border-radius: 62.4375rem;
         color: var(--driver-muted);
         background: rgba(255,255,255,0.055);
         border: 1px solid rgba(255,255,255,0.09);
-        font-size: 10px;
+        font-size: 0.625rem;
         font-weight: 850;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -293,16 +296,16 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        min-height: 46px;
-        padding: 13px 18px;
-        border-radius: 999px;
+        gap: 0.625rem;
+        min-height: 2.55rem;
+        padding: 0.72rem 1rem;
+        border-radius: 62.4375rem;
         border: 1px solid rgba(255,255,255,0.1);
         outline: 0;
         cursor: pointer;
         text-decoration: none;
         color: #fff;
-        font-size: 10px;
+        font-size: 0.625rem;
         font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -310,20 +313,20 @@
     }
 
     .driver-btn:hover {
-        transform: translateY(-2px);
+        transform: translateY(-0.125rem);
     }
 
     .driver-btn-primary {
         background: linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.96), rgba(220, 226, 38, 0.86));
         color: rgba(4,10,6,0.96);
-        box-shadow: 0 18px 45px rgba(var(--brand-green-rgb), 0.22);
+        box-shadow: 0 1.125rem 2.8125rem rgba(var(--brand-green-rgb), 0.22);
     }
 
     .driver-btn-secondary {
         background: rgba(255,255,255,0.055);
         color: rgba(255,255,255,0.88);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(1.25rem);
+        -webkit-backdrop-filter: blur(1.25rem);
     }
 
     .driver-btn-secondary:hover {
@@ -336,18 +339,18 @@
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
-        gap: 14px;
+        gap: 0.875rem;
     }
 
     .driver-glass-card {
         position: relative;
         overflow: hidden;
-        border-radius: 28px;
+        border-radius: 1.75rem;
         background: linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
         border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 24px 70px rgba(0,0,0,0.28);
-        backdrop-filter: blur(26px);
-        -webkit-backdrop-filter: blur(26px);
+        box-shadow: 0 1.5rem 4.375rem rgba(0,0,0,0.28);
+        backdrop-filter: blur(1.625rem);
+        -webkit-backdrop-filter: blur(1.625rem);
     }
 
     .driver-glass-card::before {
@@ -366,34 +369,34 @@
     }
 
     .driver-card-padding {
-        padding: 22px;
+        padding: 1.375rem;
     }
 
     .driver-progress-top {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
-        gap: 18px;
-        margin-bottom: 14px;
+        gap: 1.125rem;
+        margin-bottom: 0.875rem;
     }
 
     .driver-progress-title {
         color: rgba(255,255,255,0.9);
         font-weight: 800;
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 
     .driver-progress-value {
         color: var(--driver-green);
         font-family: 'Orbitron', sans-serif;
-        font-size: 28px;
+        font-size: 1.75rem;
         line-height: 1;
         font-weight: 950;
     }
 
     .driver-progress-track {
-        height: 10px;
-        border-radius: 999px;
+        height: 0.625rem;
+        border-radius: 62.4375rem;
         overflow: hidden;
         background: rgba(0,0,0,0.32);
         border: 1px solid rgba(255,255,255,0.08);
@@ -404,63 +407,63 @@
         width: var(--completion);
         border-radius: inherit;
         background: linear-gradient(90deg, var(--driver-green), var(--driver-yellow));
-        box-shadow: 0 0 22px rgba(var(--brand-green-rgb), 0.42);
+        box-shadow: 0 0 1.375rem rgba(var(--brand-green-rgb), 0.42);
     }
 
     .driver-mini-meta {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-top: 16px;
+        gap: 0.75rem;
+        margin-top: 1rem;
     }
 
     .driver-mini-card {
-        padding: 14px;
-        border-radius: 20px;
+        padding: 0.875rem;
+        border-radius: 1.25rem;
         background: rgba(0,0,0,0.22);
         border: 1px solid rgba(255,255,255,0.07);
     }
 
     .driver-mini-label {
         color: var(--driver-muted);
-        font-size: 9px;
+        font-size: 0.5625rem;
         letter-spacing: 0.15em;
         text-transform: uppercase;
         font-weight: 850;
     }
 
     .driver-mini-value {
-        margin-top: 8px;
+        margin-top: 0.5rem;
         color: var(--driver-text);
-        font-size: 14px;
+        font-size: 0.875rem;
         font-weight: 700;
         overflow-wrap: anywhere;
     }
 
     .driver-layout {
         display: grid;
-        grid-template-columns: 360px minmax(0, 1fr);
-        gap: 26px;
+        grid-template-columns: 20rem minmax(0, 1fr);
+        gap: 1.35rem;
         align-items: start;
     }
 
     .driver-sidebar,
     .driver-main {
         display: grid;
-        gap: 22px;
+        gap: 1.15rem;
     }
 
     .driver-card {
         position: relative;
         overflow: hidden;
-        border-radius: 30px;
+        border-radius: 1.65rem;
         background:
             linear-gradient(145deg, rgba(255,255,255,0.058), rgba(255,255,255,0.022)),
             rgba(4,10,6,0.62);
         border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 24px 80px rgba(0,0,0,0.28);
-        backdrop-filter: blur(28px);
-        -webkit-backdrop-filter: blur(28px);
+        box-shadow: 0 1.5rem 5rem rgba(0,0,0,0.28);
+        backdrop-filter: blur(1.75rem);
+        -webkit-backdrop-filter: blur(1.75rem);
     }
 
     .driver-card::before {
@@ -479,21 +482,21 @@
     }
 
     .driver-section {
-        padding: 24px;
+        padding: 1.25rem;
     }
 
     .driver-section-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 18px;
-        margin-bottom: 18px;
+        gap: 1.125rem;
+        margin-bottom: 1.125rem;
     }
 
     .driver-section-title {
         margin: 0;
         font-family: 'Orbitron', sans-serif;
-        font-size: 13px;
+        font-size: 0.8125rem;
         font-weight: 950;
         letter-spacing: 0.17em;
         text-transform: uppercase;
@@ -503,13 +506,13 @@
     .driver-section-line {
         height: 1px;
         flex: 1;
-        min-width: 40px;
+        min-width: 2.5rem;
         background: linear-gradient(90deg, rgba(var(--brand-green-rgb), 0.48), transparent);
     }
 
     .driver-section-kicker {
         color: var(--driver-muted);
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 850;
         letter-spacing: 0.17em;
         text-transform: uppercase;
@@ -518,17 +521,17 @@
 
     .driver-info-list {
         display: grid;
-        gap: 10px;
+        gap: 0.625rem;
     }
 
     .driver-info-row {
         display: grid;
-        grid-template-columns: 118px minmax(0, 1fr);
-        gap: 14px;
+        grid-template-columns: 7.375rem minmax(0, 1fr);
+        gap: 0.875rem;
         align-items: center;
-        min-height: 54px;
-        padding: 13px 14px;
-        border-radius: 18px;
+        min-height: 3.375rem;
+        padding: 0.8125rem 0.875rem;
+        border-radius: 1.125rem;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.065);
     }
@@ -536,7 +539,7 @@
     .driver-info-label {
         color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 850;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -545,7 +548,7 @@
     .driver-info-value {
         color: rgba(255,255,255,0.9);
         text-align: right;
-        font-size: 14px;
+        font-size: 0.875rem;
         overflow-wrap: anywhere;
     }
 
@@ -561,28 +564,28 @@
 
     .driver-contact-grid {
         display: grid;
-        gap: 12px;
+        gap: 0.75rem;
     }
 
     .driver-contact-card {
         display: grid;
-        grid-template-columns: 42px minmax(0, 1fr);
-        gap: 13px;
+        grid-template-columns: 2.625rem minmax(0, 1fr);
+        gap: 0.8125rem;
         align-items: center;
-        padding: 14px;
-        border-radius: 20px;
+        padding: 0.875rem;
+        border-radius: 1.25rem;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.07);
     }
 
     .driver-contact-icon,
     .driver-timeline-icon {
-        width: 42px;
-        height: 42px;
+        width: 2.625rem;
+        height: 2.625rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: 16px;
+        border-radius: 1rem;
         color: var(--driver-green);
         background: rgba(var(--brand-green-rgb), 0.12);
         border: 1px solid rgba(var(--brand-green-rgb), 0.22);
@@ -592,31 +595,31 @@
     .driver-contact-title {
         color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 850;
         letter-spacing: 0.15em;
         text-transform: uppercase;
     }
 
     .driver-contact-value {
-        margin-top: 5px;
+        margin-top: 0.3125rem;
         color: var(--driver-text);
-        font-size: 14px;
+        font-size: 0.875rem;
         overflow-wrap: anywhere;
     }
 
     .driver-stat-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
+        gap: 0.875rem;
     }
 
     .driver-stat-card {
         position: relative;
         overflow: hidden;
-        min-height: 140px;
-        padding: 18px;
-        border-radius: 24px;
+        min-height: 7.75rem;
+        padding: 1.125rem;
+        border-radius: 1.3rem;
         background:
             radial-gradient(circle at 90% 16%, rgba(var(--brand-green-rgb), 0.17), transparent 36%),
             rgba(255,255,255,0.035);
@@ -625,7 +628,7 @@
     }
 
     .driver-stat-card:hover {
-        transform: translateY(-4px);
+        transform: translateY(-0.25rem);
         border-color: rgba(var(--brand-green-rgb), 0.36);
         background:
             radial-gradient(circle at 90% 16%, rgba(var(--brand-green-rgb), 0.24), transparent 40%),
@@ -633,16 +636,16 @@
     }
 
     .driver-stat-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 15px;
+        width: 2.375rem;
+        height: 2.375rem;
+        border-radius: 0.9375rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         color: var(--driver-green);
         background: rgba(var(--brand-green-rgb), 0.12);
         border: 1px solid rgba(var(--brand-green-rgb), 0.22);
-        margin-bottom: 18px;
+        margin-bottom: 1.125rem;
     }
 
     .driver-stat-value {
@@ -655,18 +658,18 @@
     }
 
     .driver-stat-label {
-        margin-top: 10px;
+        margin-top: 0.625rem;
         color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 850;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
 
     .driver-tabs-wrap {
-        padding: 10px;
-        border-radius: 28px;
+        padding: 0.625rem;
+        border-radius: 1.75rem;
         background: rgba(0,0,0,0.26);
         border: 1px solid rgba(255,255,255,0.075);
     }
@@ -674,7 +677,7 @@
     .driver-tabs {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
+        gap: 0.5rem;
     }
 
     .driver-tabs.three-tabs {
@@ -684,13 +687,13 @@
     .driver-tab {
         border: 0;
         outline: 0;
-        min-height: 46px;
+        min-height: 2.55rem;
         cursor: pointer;
-        border-radius: 20px;
-        padding: 12px 14px;
+        border-radius: 1.25rem;
+        padding: 0.75rem 0.875rem;
         color: var(--driver-muted);
         background: transparent;
-        font-size: 10px;
+        font-size: 0.625rem;
         font-weight: 900;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -705,12 +708,12 @@
     .driver-tab.active {
         color: rgba(4,10,6,0.96);
         background: linear-gradient(135deg, var(--driver-green), var(--driver-yellow));
-        box-shadow: 0 14px 32px rgba(var(--brand-green-rgb), 0.2);
+        box-shadow: 0 0.875rem 2rem rgba(var(--brand-green-rgb), 0.2);
     }
 
     .driver-tab-panel {
         display: none;
-        padding-top: 24px;
+        padding-top: 1.5rem;
     }
 
     .driver-tab-panel.active {
@@ -721,7 +724,7 @@
     @keyframes driverFadeUp {
         from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(0.625rem);
         }
         to {
             opacity: 1;
@@ -732,20 +735,20 @@
     .driver-copy {
         color: rgba(255,255,255,0.88);
         line-height: 1.9;
-        font-size: 15px;
+        font-size: 0.9375rem;
     }
 
     .driver-overview-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-        margin-top: 22px;
+        gap: 0.875rem;
+        margin-top: 1.375rem;
     }
 
     .driver-highlight-card {
-        min-height: 110px;
-        padding: 18px;
-        border-radius: 24px;
+        min-height: 6.875rem;
+        padding: 1.125rem;
+        border-radius: 1.3rem;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.07);
     }
@@ -753,17 +756,17 @@
     .driver-highlight-value {
         color: var(--driver-text);
         font-family: 'Orbitron', sans-serif;
-        font-size: 18px;
+        font-size: 1.125rem;
         font-weight: 950;
         line-height: 1.35;
         overflow-wrap: anywhere;
     }
 
     .driver-highlight-label {
-        margin-top: 10px;
+        margin-top: 0.625rem;
         color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 850;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -771,15 +774,15 @@
 
     .driver-timeline {
         display: grid;
-        gap: 14px;
+        gap: 0.875rem;
     }
 
     .driver-timeline-item {
         display: grid;
-        grid-template-columns: 42px minmax(0, 1fr);
-        gap: 14px;
-        padding: 16px;
-        border-radius: 22px;
+        grid-template-columns: 2.625rem minmax(0, 1fr);
+        gap: 0.875rem;
+        padding: 1rem;
+        border-radius: 1.375rem;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.07);
     }
@@ -788,24 +791,24 @@
         margin: 0;
         color: var(--driver-text);
         font-family: 'Orbitron', sans-serif;
-        font-size: 13px;
+        font-size: 0.8125rem;
         font-weight: 900;
         letter-spacing: 0.12em;
         text-transform: uppercase;
     }
 
     .driver-timeline-text {
-        margin-top: 8px;
+        margin-top: 0.5rem;
         color: var(--driver-muted);
-        font-size: 14px;
+        font-size: 0.875rem;
         line-height: 1.65;
     }
 
     .driver-timeline-date {
-        margin-top: 12px;
+        margin-top: 0.75rem;
         color: var(--driver-green);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -814,14 +817,14 @@
     .driver-gallery-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+        gap: 0.875rem;
     }
 
     .driver-gallery-item {
         position: relative;
-        min-height: 215px;
+        min-height: 12rem;
         overflow: hidden;
-        border-radius: 24px;
+        border-radius: 1.3rem;
         background:
             radial-gradient(circle at 26% 24%, rgba(var(--brand-green-rgb), 0.22), transparent 42%),
             rgba(255,255,255,0.035);
@@ -831,7 +834,7 @@
     .driver-gallery-item img {
         width: 100%;
         height: 100%;
-        min-height: 215px;
+        min-height: 12rem;
         object-fit: cover;
         display: block;
         filter: saturate(1.08) brightness(0.82);
@@ -846,22 +849,22 @@
 
     .driver-gallery-caption {
         position: absolute;
-        left: 13px;
-        right: 13px;
-        bottom: 13px;
-        padding: 11px 13px;
-        border-radius: 16px;
+        left: 0.8125rem;
+        right: 0.8125rem;
+        bottom: 0.8125rem;
+        padding: 0.6875rem 0.8125rem;
+        border-radius: 1rem;
         color: var(--driver-text);
         background: rgba(4,10,6,0.74);
         border: 1px solid rgba(255,255,255,0.09);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        font-size: 12px;
+        backdrop-filter: blur(1rem);
+        -webkit-backdrop-filter: blur(1rem);
+        font-size: 0.75rem;
     }
 
     .driver-empty {
-        padding: 32px;
-        border-radius: 24px;
+        padding: 2rem;
+        border-radius: 1.3rem;
         color: var(--driver-muted);
         text-align: center;
         line-height: 1.7;
@@ -871,28 +874,28 @@
 
     .driver-empty strong {
         display: block;
-        margin-bottom: 8px;
+        margin-bottom: 0.5rem;
         color: var(--driver-text);
         font-family: 'Orbitron', sans-serif;
-        font-size: 12px;
+        font-size: 0.75rem;
         letter-spacing: 0.13em;
         text-transform: uppercase;
     }
 
     .driver-settings-form {
         display: grid;
-        gap: 22px;
+        gap: 1.15rem;
     }
 
     .driver-form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 1rem;
     }
 
     .driver-form-field {
         display: grid;
-        gap: 9px;
+        gap: 0.5625rem;
     }
 
     .driver-form-field.full {
@@ -902,7 +905,7 @@
     .driver-form-label {
         color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 0.5625rem;
         font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -912,14 +915,14 @@
     .driver-textarea,
     .driver-select {
         width: 100%;
-        min-height: 48px;
-        border-radius: 17px;
+        min-height: 2.75rem;
+        border-radius: 1.0625rem;
         border: 1px solid rgba(255,255,255,0.095);
         outline: 0;
         background: rgba(0,0,0,0.32);
         color: var(--driver-text);
-        padding: 13px 15px;
-        font-size: 14px;
+        padding: 0.8125rem 0.9375rem;
+        font-size: 0.875rem;
         transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
     }
 
@@ -927,54 +930,54 @@
     .driver-textarea:focus,
     .driver-select:focus {
         border-color: rgba(var(--brand-green-rgb), 0.52);
-        box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.08);
+        box-shadow: 0 0 0 0.25rem rgba(var(--brand-green-rgb), 0.08);
         background: rgba(0,0,0,0.42);
     }
 
     .driver-textarea {
-        min-height: 150px;
+        min-height: 8.75rem;
         resize: vertical;
         line-height: 1.7;
     }
 
     .driver-form-hint {
         color: var(--driver-muted);
-        font-size: 12px;
+        font-size: 0.75rem;
         line-height: 1.55;
     }
 
     .driver-switch-list {
         display: grid;
-        gap: 12px;
+        gap: 0.75rem;
     }
 
     .driver-switch-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 18px;
-        padding: 16px;
-        border-radius: 21px;
+        gap: 1.125rem;
+        padding: 1rem;
+        border-radius: 1.3125rem;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.075);
     }
 
     .driver-switch-row strong {
         color: var(--driver-text);
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 
     .driver-switch-row p {
-        margin: 5px 0 0;
+        margin: 0.3125rem 0 0;
         color: var(--driver-muted);
-        font-size: 12px;
+        font-size: 0.75rem;
         line-height: 1.55;
     }
 
     .driver-switch {
         position: relative;
-        width: 58px;
-        height: 32px;
+        width: 3.35rem;
+        height: 1.9rem;
         flex: 0 0 auto;
     }
 
@@ -988,7 +991,7 @@
         position: absolute;
         inset: 0;
         cursor: pointer;
-        border-radius: 999px;
+        border-radius: 62.4375rem;
         background: rgba(255,255,255,0.13);
         border: 1px solid rgba(255,255,255,0.13);
         transition: 0.24s ease;
@@ -997,11 +1000,11 @@
     .driver-slider::before {
         content: "";
         position: absolute;
-        width: 24px;
-        height: 24px;
-        left: 4px;
-        top: 3px;
-        border-radius: 999px;
+        width: 1.32rem;
+        height: 1.32rem;
+        left: 0.24rem;
+        top: 0.22rem;
+        border-radius: 62.4375rem;
         background: rgba(255,255,255,0.78);
         transition: 0.24s ease;
     }
@@ -1012,36 +1015,36 @@
     }
 
     .driver-switch input:checked + .driver-slider::before {
-        transform: translateX(26px);
+        transform: translateX(1.5rem);
         background: var(--driver-green);
-        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.65);
+        box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.65);
     }
 
     .driver-form-actions {
         display: flex;
         justify-content: flex-end;
         flex-wrap: wrap;
-        gap: 12px;
-        padding-top: 4px;
+        gap: 0.75rem;
+        padding-top: 0.25rem;
     }
 
     .driver-toast {
         position: fixed;
-        right: 24px;
-        bottom: 24px;
+        right: 1.5rem;
+        bottom: 1.5rem;
         z-index: 9999;
         opacity: 0;
         pointer-events: none;
-        transform: translateY(14px);
+        transform: translateY(0.875rem);
         transition: opacity 0.25s ease, transform 0.25s ease;
-        padding: 14px 17px;
-        border-radius: 17px;
+        padding: 0.875rem 1.0625rem;
+        border-radius: 1.0625rem;
         color: var(--driver-green);
         background: rgba(4,10,6,0.94);
         border: 1px solid rgba(var(--brand-green-rgb), 0.36);
-        box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+        box-shadow: 0 1.5rem 4.375rem rgba(0,0,0,0.45);
         font-family: 'Orbitron', sans-serif;
-        font-size: 10px;
+        font-size: 0.625rem;
         font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -1059,7 +1062,7 @@
         }
 
         .driver-hero-panel {
-            max-width: 520px;
+            max-width: 32rem;
         }
 
         .driver-stat-grid {
@@ -1069,17 +1072,17 @@
 
     @media (max-width: 820px) {
         .driver-profile {
-            gap: 20px;
+            gap: 1.25rem;
         }
 
         .driver-hero {
-            border-radius: 26px;
+            border-radius: 1.625rem;
             min-height: auto;
         }
 
         .driver-hero-inner {
             min-height: auto;
-            padding: 24px;
+            padding: 1.25rem;
         }
 
         .driver-title-row {
@@ -1087,13 +1090,13 @@
         }
 
         .driver-avatar-frame {
-            width: 112px;
-            height: 112px;
-            border-radius: 28px;
+            width: 6.5rem;
+            height: 6.5rem;
+            border-radius: 1.75rem;
         }
 
         .driver-avatar {
-            border-radius: 24px;
+            border-radius: 1.3rem;
         }
 
         .driver-tabs,
@@ -1108,7 +1111,7 @@
 
         .driver-info-row {
             grid-template-columns: 1fr;
-            gap: 7px;
+            gap: 0.4375rem;
         }
 
         .driver-info-value {
@@ -1116,22 +1119,22 @@
         }
 
         .driver-section {
-            padding: 20px;
+            padding: 1.25rem;
         }
 
         .driver-name {
-            font-size: clamp(2.1rem, 12vw, 3.8rem);
+            font-size: clamp(1.85rem, 10.5vw, 3.2rem);
         }
     }
 
     @media (max-width: 520px) {
         .driver-hero-inner {
-            padding: 18px;
+            padding: 1rem;
         }
 
         .driver-card,
         .driver-glass-card {
-            border-radius: 24px;
+            border-radius: 1.3rem;
         }
 
         .driver-status,
@@ -1141,7 +1144,7 @@
         .driver-gallery-item,
         .driver-empty,
         .driver-switch-row {
-            border-radius: 20px;
+            border-radius: 1.25rem;
         }
 
         .driver-btn {
@@ -1153,11 +1156,47 @@
         }
 
         .driver-toast {
-            left: 16px;
-            right: 16px;
+            left: 1rem;
+            right: 1rem;
             text-align: center;
         }
     }
+
+    /* Base.html-Fit: die Unterseite bleibt innerhalb der base-shell und nutzt rem-Skalierung. */
+    @media (min-width: 1536px) {
+        .driver-profile {
+            gap: 1.2rem;
+        }
+
+        .driver-hero,
+        .driver-hero-inner {
+            min-height: 24rem;
+        }
+
+        .driver-layout {
+            grid-template-columns: 19rem minmax(0, 1fr);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .driver-profile {
+            gap: 1rem;
+        }
+
+        .driver-hero {
+            margin-left: -0.15rem;
+            margin-right: -0.15rem;
+        }
+
+        .driver-section-head {
+            flex-wrap: wrap;
+        }
+
+        .driver-section-line {
+            min-width: 100%;
+        }
+    }
+
 </style>
 
 <section class="driver-profile">
