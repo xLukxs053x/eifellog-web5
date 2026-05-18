@@ -1,0 +1,711 @@
+{% extends "base.html" %}
+
+{#
+    EifelLog - Geschäftsleitung Dokumentprüfung
+    Zugriff:
+    - Diese Ansicht ist für Geschäftsleitung / Geschäftsführung gedacht.
+    - Angezeigt werden Dokumente, die von der Disposition geprüft, signiert und weitergegeben wurden.
+
+    Erwartete optionale Daten:
+    - geschaeftsleitung_documents / management_review_items / dispo_forwarded_documents: Liste weitergeleiteter Dokumente
+    - management_pending_count, management_approved_count, management_returned_count
+#}
+
+{% set primary_role_display = primary_role_name|default('User', true) %}
+{% set current_user_roles = current_user.roles|default([], true) %}
+
+{% set management_role_ids = [
+    role_geschaeftsleitung_id|default('', true),
+    role_geschaeftsfuehrung_id|default('', true),
+    '1473721587122438322',
+    'Geschäftsleitung',
+    'Geschaeftsleitung',
+    'Geschäftsführung',
+    'Geschaeftsfuehrung',
+    'geschäftsleitung',
+    'geschaeftsleitung'
+] %}
+
+{% set management_access = namespace(allowed=false) %}
+
+{% if can_view_geschaeftsleitung_documents|default(false, true)
+      or can_view_management_documents|default(false, true)
+      or is_management_viewer|default(false, true) %}
+    {% set management_access.allowed = true %}
+{% endif %}
+
+{% for role_id in management_role_ids %}
+    {% if role_id and (role_id in current_user_roles or (role_id|int) in current_user_roles) %}
+        {% set management_access.allowed = true %}
+    {% endif %}
+{% endfor %}
+
+{% if primary_role_display in ['Geschäftsleitung', 'Geschäftsführung', 'Geschaeftsleitung', 'Geschaeftsfuehrung'] %}
+    {% set management_access.allowed = true %}
+{% endif %}
+
+{% if management_access.allowed %}
+    {% set safe_documents = geschaeftsleitung_documents|default(management_review_items|default(dispo_forwarded_documents|default([], true), true), true) %}
+    {% set safe_pending_count = management_pending_count|default(safe_documents|selectattr('status', 'equalto', 'management_pending')|list|length, true) %}
+    {% set safe_approved_count = management_approved_count|default(safe_documents|selectattr('status', 'equalto', 'approved')|list|length, true) %}
+    {% set safe_returned_count = management_returned_count|default(safe_documents|selectattr('status', 'equalto', 'returned_incomplete')|list|length, true) %}
+{% else %}
+    {% set safe_documents = [] %}
+    {% set safe_pending_count = 0 %}
+    {% set safe_approved_count = 0 %}
+    {% set safe_returned_count = 0 %}
+{% endif %}
+
+{% block title %}EifelLog - Geschäftsleitung{% endblock %}
+
+{% block content %}
+<style>
+    .gl-scrollbar::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+        background: rgba(255, 255, 255, 0.035);
+    }
+
+    .gl-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+        margin: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .gl-scrollbar::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(137, 190, 50, 0.78), rgba(88, 101, 242, 0.62));
+        border-radius: 999px;
+        border: 3px solid rgba(13, 15, 12, 0.92);
+        box-shadow: 0 0 14px rgba(137, 190, 50, 0.22);
+    }
+
+    .gl-input {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.35);
+        padding: 0.85rem 1rem;
+        color: white;
+        font-family: Inter, sans-serif;
+        outline: none;
+        transition: all 0.2s ease;
+    }
+
+    .gl-input:focus {
+        border-color: rgba(137, 190, 50, 0.7);
+        box-shadow: 0 0 0 1px rgba(137, 190, 50, 0.25), 0 0 18px rgba(137, 190, 50, 0.06);
+    }
+
+    .gl-input::placeholder {
+        color: rgba(255, 255, 255, 0.32);
+    }
+
+    .gl-select option {
+        background: #0d0f0c;
+        color: white;
+    }
+
+    .gl-label {
+        display: block;
+        margin-bottom: 0.45rem;
+        color: var(--muted);
+        font-family: Orbitron, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .gl-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.65rem;
+        font-family: Orbitron, sans-serif;
+        font-size: 0.55rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .gl-status-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        display: inline-block;
+        box-shadow: 0 0 12px currentColor;
+    }
+
+    .gl-document-row {
+        transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .gl-document-row:hover {
+        transform: translateY(-1px);
+        border-color: rgba(137, 190, 50, 0.30);
+        background: rgba(255, 255, 255, 0.055);
+    }
+
+    .gl-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        background:
+            radial-gradient(circle at top left, rgba(137, 190, 50, 0.16), transparent 32rem),
+            radial-gradient(circle at bottom right, rgba(88, 101, 242, 0.16), transparent 30rem),
+            rgba(3, 5, 4, 0.88);
+        backdrop-filter: blur(18px);
+    }
+
+    .gl-modal-backdrop.is-open {
+        display: flex;
+    }
+
+    .gl-modal-shell {
+        width: min(1200px, 100%);
+        max-height: 92vh;
+        overflow: hidden;
+        border-radius: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(145deg, rgba(10, 13, 10, 0.98), rgba(4, 6, 5, 0.98));
+        box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55), 0 0 50px rgba(137, 190, 50, 0.10);
+    }
+
+    .gl-modal-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+        gap: 0;
+        max-height: 92vh;
+        overflow: hidden;
+    }
+
+    .gl-paper-wrap {
+        padding: 1.25rem;
+        overflow-y: auto;
+        max-height: 92vh;
+    }
+
+    .gl-paper {
+        position: relative;
+        min-height: 790px;
+        border-radius: 1.35rem;
+        overflow: hidden;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(232, 238, 228, 0.96)),
+            repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.025) 0 1px, transparent 1px 28px);
+        color: #172015;
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+    }
+
+    .gl-paper::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(90deg, rgba(137, 190, 50, 0.13), transparent 18%),
+            radial-gradient(circle at 85% 12%, rgba(88, 101, 242, 0.13), transparent 18rem);
+    }
+
+    .gl-paper-inner {
+        position: relative;
+        padding: 2rem;
+    }
+
+    .gl-paper-box {
+        border: 1px solid rgba(23, 32, 21, 0.12);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.58);
+        padding: 0.9rem;
+    }
+
+    .gl-paper-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .gl-stamp {
+        transform: rotate(-10deg);
+        border: 3px solid rgba(31, 109, 45, 0.58);
+        color: rgba(31, 109, 45, 0.76);
+        border-radius: 0.75rem;
+        padding: 0.6rem 1rem;
+        font-family: Orbitron, sans-serif;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .gl-side-panel {
+        border-left: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.035);
+        padding: 1.25rem;
+        overflow-y: auto;
+        max-height: 92vh;
+    }
+
+    .gl-action-card {
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.24);
+        border-radius: 1.4rem;
+        padding: 1rem;
+    }
+
+    .gl-signature-line {
+        min-height: 68px;
+        border: 1px dashed rgba(23, 32, 21, 0.28);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.42);
+        display: flex;
+        align-items: end;
+        justify-content: center;
+        padding: 0.7rem;
+        font-family: cursive;
+        font-size: 1.55rem;
+        color: rgba(23, 32, 21, 0.78);
+    }
+
+    @media (max-width: 1024px) {
+        .gl-modal-grid {
+            grid-template-columns: 1fr;
+            overflow-y: auto;
+        }
+
+        .gl-side-panel {
+            border-left: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.10);
+            max-height: none;
+        }
+
+        .gl-paper-wrap {
+            max-height: none;
+        }
+    }
+</style>
+
+{% if not management_access.allowed %}
+<div class="min-h-[70vh] flex items-center justify-center relative z-10 px-4">
+    <div class="glass-card max-w-xl w-full p-8 text-center border border-[var(--danger)]/25 shadow-[0_0_60px_rgba(255,0,0,0.08)]">
+        <div class="w-16 h-16 rounded-3xl mx-auto mb-5 bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm9-4.5a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--danger)] tracking-[0.22em] uppercase">Zugriff verweigert</span>
+        <h1 class="font-orbitron text-2xl font-bold text-white mt-2">Geschäftsleitung Bereich</h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">Diese Seite ist nur für die Geschäftsleitung sichtbar.</p>
+        <a href="{{ url_for('dashboard') }}" class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Zurück zum Dashboard</a>
+    </div>
+</div>
+{% else %}
+
+<div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 mb-8 mt-6 relative z-10">
+    <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_18px_rgba(137,190,50,0.32)] bg-black/40 flex items-center justify-center">
+            <span class="font-orbitron font-black text-white">GL</span>
+        </div>
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">EifelLog Geschäftsleitung</span>
+            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex flex-wrap items-center gap-3 mt-1">
+                Dokumentprüfung
+                <span class="px-2.5 py-1 rounded bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] text-[9px] uppercase tracking-widest font-bold">Freigabeebene</span>
+            </h1>
+            <p class="text-xs text-[var(--muted)] font-inter mt-2">Weitergeleitete Dispo-Dokumente prüfen, freigeben oder exakt an die Disposition zurückgeben.</p>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ url_for('dashboard') }}" class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path></svg>
+            Dashboard
+        </a>
+        <button id="btn-refresh-gl" type="button" class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v6h6M20 20v-6h-6M20 8A8 8 0 006.343 5.657M4 16a8 8 0 0013.657 2.343"></path></svg>
+            Aktualisieren
+        </button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 relative z-10">
+    <div class="glass-card p-6 relative overflow-hidden">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2"><span class="gl-status-dot text-[var(--brand-yellow)] bg-[var(--brand-yellow)]"></span>Zur Entscheidung</h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_pending_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Von Disposition weitergegeben</p>
+    </div>
+    <div class="glass-card p-6 relative overflow-hidden">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2"><span class="gl-status-dot text-[var(--brand-green)] bg-[var(--brand-green)]"></span>Freigegeben</h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_approved_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Final bestätigt</p>
+    </div>
+    <div class="glass-card p-6 relative overflow-hidden">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2"><span class="gl-status-dot text-[var(--danger)] bg-[var(--danger)]"></span>Zurückgegeben</h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_returned_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Als nicht vollständig markiert</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-4 gap-6 relative z-10 mb-10 items-start">
+    <div class="xl:col-span-3 glass-card p-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
+            <div>
+                <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Freigabeprüfung</span>
+                <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Von der Disposition vorgelegte Dokumente</h2>
+                <p class="text-xs text-[var(--muted)] font-inter mt-2">Öffne ein Dokument und entscheide, ob der Auftrag freigegeben oder zurückgeschickt wird.</p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input id="gl-search" type="search" class="gl-input min-w-[240px]" placeholder="User, Auftrag, Dokument suchen...">
+                <select id="gl-filter" class="gl-input gl-select sm:w-[220px]">
+                    <option value="all">Alle Dokumente</option>
+                    <option value="management_pending">Zur Entscheidung</option>
+                    <option value="approved">Freigegeben</option>
+                    <option value="returned_incomplete">Zurückgegeben</option>
+                    <option value="rejected">Abgelehnt</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="space-y-4 max-h-[680px] overflow-y-auto gl-scrollbar pr-1">
+            {% if safe_documents %}
+                {% for item in safe_documents %}
+                    {% set item_status = item.status|default('management_pending', true) %}
+                    {% set item_id = item.entry_id|default(item.document_id|default(item.id|default(item._id|default('', true), true), true), true) %}
+                    {% set item_user_id = item.submitted_by_id|default(item.submitted_by_discord_id|default(item.user_id|default('', true), true), true) %}
+                    {% set item_user_name = item.submitted_by|default(item.author|default(item.username|default('Unbekannt', true), true), true) %}
+                    {% set item_title = item.title|default(item.note|default('Abschlussbeleg', true), true) %}
+                    {% set item_note = item.note|default(item.description|default('', true), true) %}
+                    {% set item_type = item.document_type|default(item.entry_type|default(item.type|default('Beleg', true), true), true) %}
+                    {% set item_file_url = item.file_url|default(item.download_url|default('', true), true) %}
+                    {% set item_signature = item.signature|default(item.signed_by|default('', true), true) %}
+                    {% set item_search = (item.reference|default('', true) ~ ' ' ~ item_user_name ~ ' ' ~ item_type ~ ' ' ~ item_title)|lower %}
+                    <div class="gl-document-row rounded-3xl bg-black/25 border border-white/10 p-5"
+                         data-search="{{ item_search|e }}"
+                         data-status="{{ item_status|e }}">
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2 mb-3">
+                                    {% if item_status == 'approved' %}
+                                        <span class="gl-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Freigegeben</span>
+                                    {% elif item_status == 'returned_incomplete' %}
+                                        <span class="gl-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Nicht vollständig</span>
+                                    {% elif item_status == 'rejected' %}
+                                        <span class="gl-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Abgelehnt</span>
+                                    {% else %}
+                                        <span class="gl-chip text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25">Zur Entscheidung</span>
+                                    {% endif %}
+                                    <span class="gl-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">{{ item_type }}</span>
+                                    {% if item_signature %}
+                                        <span class="gl-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Dispo signiert</span>
+                                    {% endif %}
+                                </div>
+                                <h3 class="font-orbitron text-lg text-white font-bold truncate">{{ item_user_name }} hat die Fahrt {{ item.reference|default('-', true) }} verbucht</h3>
+                                <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ item_title }} · Netto {{ item.amount_net|default('-', true) }} · Steuer {{ item.tax_rate|default('19', true) }}%</p>
+                            </div>
+                            <button type="button"
+                                    class="js-open-gl-document inline-flex items-center justify-center px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]"
+                                    data-document-id="{{ item_id|e }}"
+                                    data-created-at="{{ item.created_at|default('-', true)|e }}"
+                                    data-forwarded-at="{{ item.forwarded_at|default(item.dispo_forwarded_at|default('-', true), true)|e }}"
+                                    data-submitted-by="{{ item_user_name|e }}"
+                                    data-user-id="{{ item_user_id|e }}"
+                                    data-reference="{{ item.reference|default('-', true)|e }}"
+                                    data-title="{{ item_title|e }}"
+                                    data-document-type="{{ item_type|e }}"
+                                    data-amount-net="{{ item.amount_net|default('-', true)|e }}"
+                                    data-tax-rate="{{ item.tax_rate|default('19', true)|e }}"
+                                    data-tax-mode="{{ item.tax_mode|default('EifelLog intern', true)|e }}"
+                                    data-status="{{ item_status|e }}"
+                                    data-note="{{ item_note|e }}"
+                                    data-file-url="{{ item_file_url|e }}"
+                                    data-signature="{{ item_signature|e }}"
+                                    data-dispo-note="{{ item.dispo_note|default(item.review_note|default('', true), true)|e }}"
+                                    data-management-note="{{ item.management_note|default('', true)|e }}"
+                                    data-return-note="{{ item.return_note|default('', true)|e }}">
+                                Prüfen
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="rounded-3xl bg-black/25 border border-white/10 p-10 text-center">
+                    <p class="font-orbitron text-sm text-white font-bold">Keine Dokumente zur Prüfung vorhanden</p>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-2">Sobald die Disposition ein Dokument weitergibt, erscheint es hier.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <aside class="flex flex-col gap-6 xl:sticky xl:top-24 self-start">
+        <div class="glass-card p-6">
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Ablauf</span>
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1 mb-4">Geschäftsleitung Prüfung</h2>
+            <div class="space-y-3 text-sm text-[var(--muted)] font-inter leading-relaxed">
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">1.</strong> Dokument öffnen und Fahrt/User prüfen.</div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">2.</strong> Betrag, Auftrag und Dispo-Signatur ansehen.</div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">3.</strong> Freigeben oder exakt zur Disposition zurückgeben.</div>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<div id="gl-document-modal" class="gl-modal-backdrop" aria-hidden="true">
+    <div class="gl-modal-shell">
+        <div class="gl-modal-grid">
+            <div class="gl-paper-wrap gl-scrollbar">
+                <div class="gl-paper">
+                    <div class="gl-paper-inner">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5 border-b border-black/10 pb-6 mb-6">
+                            <div>
+                                <p class="font-orbitron text-[11px] uppercase tracking-[0.22em] text-[#1f6d2d] font-black">EifelLog Freigabeakte</p>
+                                <h2 class="font-orbitron text-2xl md:text-3xl font-black mt-2 text-[#172015]">Geschäftsleitung Prüfung</h2>
+                                <p class="text-sm text-[#4c584b] mt-2">Dokumentnummer: <span id="gl-paper-id" class="font-bold text-[#172015]">-</span></p>
+                            </div>
+                            <div class="gl-stamp" id="gl-paper-stamp">Zur Entscheidung</div>
+                        </div>
+
+                        <div class="rounded-2xl border border-black/10 bg-white/60 p-5 mb-6">
+                            <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold mb-2">Zusammenfassung</p>
+                            <h3 id="gl-paper-summary" class="text-xl font-black text-[#172015]">-</h3>
+                            <p id="gl-paper-note" class="text-sm text-[#4c584b] mt-3 leading-relaxed">-</p>
+                        </div>
+
+                        <div class="gl-paper-grid mb-6">
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">User</p>
+                                <p id="gl-paper-user" class="text-lg font-black mt-1">-</p>
+                                <p id="gl-paper-user-id" class="text-xs text-[#62705f] mt-1">ID: -</p>
+                            </div>
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Auftrag / Fahrt</p>
+                                <p id="gl-paper-reference" class="text-lg font-black mt-1">-</p>
+                                <p id="gl-paper-created" class="text-xs text-[#62705f] mt-1">Eingang: -</p>
+                            </div>
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Betrag</p>
+                                <p id="gl-paper-money" class="text-lg font-black mt-1">-</p>
+                                <p id="gl-paper-tax" class="text-xs text-[#62705f] mt-1">-</p>
+                            </div>
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dispo Signatur</p>
+                                <div id="gl-paper-signature" class="gl-signature-line mt-3">Nicht signiert</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dispo-Vermerk</p>
+                                <p id="gl-paper-dispo-note" class="text-sm text-[#4c584b] mt-2 leading-relaxed">-</p>
+                            </div>
+                            <div class="gl-paper-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Geschäftsleitung-Vermerk</p>
+                                <p id="gl-paper-management-note" class="text-sm text-[#4c584b] mt-2 leading-relaxed">-</p>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-black/10 bg-[#eef3ea] p-5">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dateianlage</p>
+                                    <p id="gl-paper-file-label" class="text-sm text-[#4c584b] mt-2">Keine Datei hinterlegt.</p>
+                                </div>
+                                <a id="gl-paper-file-link" href="#" target="_blank" rel="noopener" class="hidden inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#172015] text-white font-orbitron text-[10px] font-bold uppercase tracking-widest">Original öffnen</a>
+                            </div>
+                            <div id="gl-paper-preview" class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-white/70 min-h-[180px] flex items-center justify-center text-sm text-[#62705f]">Dokumentvorschau wird hier angezeigt.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gl-side-panel gl-scrollbar">
+                <div class="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                        <p class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Entscheidung</p>
+                        <h3 class="font-orbitron text-xl font-bold text-white mt-1">Geschäftsleitung Aktion</h3>
+                    </div>
+                    <button type="button" id="close-gl-modal" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="gl-action-card mb-4">
+                    <p class="font-orbitron text-[10px] text-[#7b8cff] uppercase tracking-widest font-bold mb-3">Kontrollsatz</p>
+                    <p id="gl-control-text" class="text-sm text-[var(--muted)] font-inter leading-relaxed">-</p>
+                </div>
+
+                <form action="/geschaeftsleitung/dispo-documents/approve" method="POST" class="gl-action-card mb-4">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-gl-document-id">
+                    <p class="font-orbitron text-[10px] text-[var(--brand-green)] uppercase tracking-widest font-bold mb-4">Freigabe</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="gl-label" for="gl_approval_note">Freigabevermerk</label>
+                            <textarea id="gl_approval_note" name="approval_note" rows="4" class="gl-input resize-none" placeholder="z. B. geprüft, keine Auffälligkeiten, kann final verbucht werden."></textarea>
+                        </div>
+                        <button type="submit" class="w-full btn-primary justify-center">Dokument freigeben</button>
+                    </div>
+                </form>
+
+                <form action="/geschaeftsleitung/dispo-documents/return" method="POST" class="gl-action-card">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-gl-document-id">
+                    <input type="hidden" name="return_status" value="returned_incomplete">
+                    <p class="font-orbitron text-[10px] text-[var(--danger)] uppercase tracking-widest font-bold mb-4">Zurück an Disposition</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="gl-label" for="gl_return_reason">Grund / Auffälligkeit</label>
+                            <textarea id="gl_return_reason" name="return_reason" rows="5" class="gl-input resize-none" placeholder="Exakt beschreiben, was an diesem Auftrag fehlt oder auffällt." required></textarea>
+                        </div>
+                        <label class="flex items-start gap-3 rounded-2xl bg-[var(--danger)]/10 border border-[var(--danger)]/25 p-4 text-sm text-white/85 font-inter">
+                            <input type="checkbox" name="mark_incomplete" value="1" checked class="mt-1 accent-red-500">
+                            <span>Exakten Auftrag als <strong>nicht vollständig</strong> markieren und an die Disposition zurückschicken.</span>
+                        </label>
+                        <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-3 rounded-full bg-[var(--danger)]/10 border border-[var(--danger)]/35 text-[var(--danger)] hover:bg-[var(--danger)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Zur Disposition zurück</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const refreshButton = document.getElementById('btn-refresh-gl');
+        const searchInput = document.getElementById('gl-search');
+        const statusFilter = document.getElementById('gl-filter');
+        const rows = Array.from(document.querySelectorAll('.gl-document-row'));
+        const modal = document.getElementById('gl-document-modal');
+        const closeButton = document.getElementById('close-gl-modal');
+
+        function filterRows() {
+            const query = (searchInput?.value || '').trim().toLowerCase();
+            const status = statusFilter?.value || 'all';
+            rows.forEach((row) => {
+                const matchesQuery = !query || (row.dataset.search || '').includes(query);
+                const matchesStatus = status === 'all' || row.dataset.status === status;
+                row.classList.toggle('hidden', !(matchesQuery && matchesStatus));
+            });
+        }
+
+        function setText(id, value, fallback = '-') {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value || fallback;
+        }
+
+        function safeUrl(url) {
+            const trimmed = String(url || '').trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+            return '';
+        }
+
+        function statusLabel(status) {
+            const labels = {
+                management_pending: 'Zur Entscheidung',
+                approved: 'Freigegeben',
+                returned_incomplete: 'Nicht vollständig',
+                rejected: 'Abgelehnt',
+                signed: 'Signiert',
+                verified: 'Geprüft'
+            };
+            return labels[status] || 'Zur Entscheidung';
+        }
+
+        function populatePreview(fileUrl) {
+            const preview = document.getElementById('gl-paper-preview');
+            const label = document.getElementById('gl-paper-file-label');
+            const link = document.getElementById('gl-paper-file-link');
+            const url = safeUrl(fileUrl);
+            if (!preview || !label || !link) return;
+            preview.innerHTML = '';
+            link.classList.add('hidden');
+            link.removeAttribute('href');
+            if (!url) {
+                label.textContent = 'Keine Datei hinterlegt.';
+                preview.textContent = 'Für dieses Dokument wurde keine Dateianlage gefunden.';
+                return;
+            }
+            label.textContent = 'Datei ist hinterlegt und kann geöffnet werden.';
+            link.href = url;
+            link.classList.remove('hidden');
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.endsWith('.png') || lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.webp') || lowerUrl.endsWith('.gif')) {
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = 'Dokumentvorschau';
+                image.className = 'w-full max-h-[420px] object-contain bg-white';
+                preview.appendChild(image);
+                return;
+            }
+            if (lowerUrl.endsWith('.pdf')) {
+                const iframe = document.createElement('iframe');
+                iframe.src = url;
+                iframe.title = 'PDF Vorschau';
+                iframe.className = 'w-full h-[420px] bg-white';
+                preview.appendChild(iframe);
+                return;
+            }
+            const text = document.createElement('div');
+            text.className = 'p-8 text-center';
+            text.textContent = 'Vorschau für diesen Dateityp nicht verfügbar. Bitte Original öffnen.';
+            preview.appendChild(text);
+        }
+
+        function openModal(button) {
+            if (!modal || !button) return;
+            const data = button.dataset;
+            const summary = `${data.submittedBy || 'Unbekannter User'} hat die Fahrt ${data.reference || '-'} verbucht.`;
+            setText('gl-paper-id', data.documentId);
+            setText('gl-paper-stamp', statusLabel(data.status));
+            setText('gl-paper-summary', summary);
+            setText('gl-control-text', summary + ' Bitte Betrag, Dokument und Dispo-Signatur prüfen.');
+            setText('gl-paper-note', data.note || 'Keine Notiz vorhanden.');
+            setText('gl-paper-user', data.submittedBy);
+            setText('gl-paper-user-id', `ID: ${data.userId || '-'}`);
+            setText('gl-paper-reference', data.reference);
+            setText('gl-paper-created', `Eingang: ${data.createdAt || '-'} · Weitergabe: ${data.forwardedAt || '-'}`);
+            setText('gl-paper-money', data.amountNet);
+            setText('gl-paper-tax', `${data.taxRate || '19'}% · ${data.taxMode || '-'}`);
+            setText('gl-paper-signature', data.signature || 'Nicht signiert');
+            setText('gl-paper-dispo-note', data.dispoNote || 'Kein Dispo-Vermerk vorhanden.');
+            setText('gl-paper-management-note', data.managementNote || 'Noch kein Geschäftsleitungs-Vermerk vorhanden.');
+            populatePreview(data.fileUrl);
+
+            document.querySelectorAll('.js-gl-document-id').forEach((input) => {
+                input.value = data.documentId || '';
+            });
+
+            const approvalNote = document.getElementById('gl_approval_note');
+            const returnReason = document.getElementById('gl_return_reason');
+            if (approvalNote) approvalNote.value = '';
+            if (returnReason) returnReason.value = data.returnNote || '';
+
+            modal.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            if (!modal) return;
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        if (refreshButton) refreshButton.addEventListener('click', () => window.location.reload());
+        if (searchInput) searchInput.addEventListener('input', filterRows);
+        if (statusFilter) statusFilter.addEventListener('change', filterRows);
+        document.querySelectorAll('.js-open-gl-document').forEach((button) => button.addEventListener('click', () => openModal(button)));
+        if (closeButton) closeButton.addEventListener('click', closeModal);
+        if (modal) modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+    });
+</script>
+
+{% endblock %}

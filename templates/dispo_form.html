@@ -249,12 +249,19 @@
         display: none;
         align-items: center;
         justify-content: center;
-        padding: 1.25rem;
+        padding: clamp(0.5rem, 1.2vw, 1rem);
         background:
             radial-gradient(circle at top left, rgba(137, 190, 50, 0.16), transparent 32rem),
             radial-gradient(circle at bottom right, rgba(88, 101, 242, 0.16), transparent 30rem),
             rgba(3, 5, 4, 0.88);
         backdrop-filter: blur(18px);
+        overflow: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .document-modal-backdrop,
+    .document-modal-backdrop * {
+        box-sizing: border-box;
     }
 
     .document-modal-backdrop.is-open {
@@ -262,33 +269,48 @@
     }
 
     .document-modal-shell {
-        width: min(1180px, 100%);
-        max-height: 92vh;
+        --modal-viewport-gap: clamp(0.75rem, 1.6vw, 1.5rem);
+        width: min(1210px, calc(100vw - var(--modal-viewport-gap)));
+        height: min(860px, calc(100dvh - var(--modal-viewport-gap)));
+        max-height: calc(100dvh - var(--modal-viewport-gap));
         overflow: hidden;
-        border-radius: 2rem;
+        border-radius: clamp(1.25rem, 2vw, 2rem);
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: linear-gradient(145deg, rgba(10, 13, 10, 0.98), rgba(4, 6, 5, 0.98));
         box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55), 0 0 50px rgba(137, 190, 50, 0.10);
+        display: flex;
+        flex-direction: column;
+    }
+
+    @supports not (height: 100dvh) {
+        .document-modal-shell {
+            height: min(860px, calc(100vh - var(--modal-viewport-gap)));
+            max-height: calc(100vh - var(--modal-viewport-gap));
+        }
     }
 
     .document-modal-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+        grid-template-columns: minmax(0, 1.12fr) minmax(330px, 0.78fr);
         gap: 0;
-        max-height: 92vh;
+        height: 100%;
+        min-height: 0;
         overflow: hidden;
     }
 
     .document-paper-wrap {
-        padding: 1.25rem;
+        padding: clamp(0.8rem, 1.4vw, 1.2rem);
         overflow-y: auto;
-        max-height: 92vh;
+        overflow-x: hidden;
+        height: 100%;
+        min-height: 0;
+        scrollbar-gutter: stable;
     }
 
     .document-paper {
         position: relative;
-        min-height: 760px;
-        border-radius: 1.35rem;
+        min-height: min(700px, 100%);
+        border-radius: clamp(1rem, 1.5vw, 1.35rem);
         overflow: hidden;
         background:
             linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(230, 236, 226, 0.96)),
@@ -309,7 +331,7 @@
 
     .document-paper-inner {
         position: relative;
-        padding: 2rem;
+        padding: clamp(1rem, 1.8vw, 1.65rem);
     }
 
     .document-stamp {
@@ -317,69 +339,165 @@
         border: 3px solid rgba(137, 34, 34, 0.58);
         color: rgba(137, 34, 34, 0.72);
         border-radius: 0.75rem;
-        padding: 0.6rem 1rem;
+        padding: 0.52rem 0.85rem;
         font-family: Orbitron, sans-serif;
+        font-size: clamp(0.68rem, 0.9vw, 0.82rem);
         font-weight: 900;
         letter-spacing: 0.18em;
         text-transform: uppercase;
+        white-space: nowrap;
     }
 
     .document-meta-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
+        gap: clamp(0.55rem, 1vw, 0.75rem);
     }
 
     .document-meta-box {
         border: 1px solid rgba(23, 32, 21, 0.12);
         border-radius: 1rem;
         background: rgba(255, 255, 255, 0.58);
-        padding: 0.9rem;
+        padding: clamp(0.65rem, 1vw, 0.9rem);
     }
 
     .document-side-panel {
         border-left: 1px solid rgba(255, 255, 255, 0.10);
         background: rgba(255, 255, 255, 0.035);
-        padding: 1.25rem;
+        padding: clamp(0.85rem, 1.4vw, 1.2rem);
         overflow-y: auto;
-        max-height: 92vh;
+        overflow-x: hidden;
+        height: 100%;
+        min-height: 0;
+        scrollbar-gutter: stable;
     }
 
     .document-action-card {
         border: 1px solid rgba(255, 255, 255, 0.10);
         background: rgba(0, 0, 0, 0.24);
-        border-radius: 1.4rem;
-        padding: 1rem;
+        border-radius: clamp(1rem, 1.4vw, 1.4rem);
+        padding: clamp(0.75rem, 1.2vw, 1rem);
     }
 
     .document-signature-line {
-        min-height: 68px;
+        min-height: clamp(54px, 7dvh, 68px);
         border: 1px dashed rgba(23, 32, 21, 0.28);
         border-radius: 1rem;
         background: rgba(255, 255, 255, 0.42);
         display: flex;
         align-items: end;
         justify-content: center;
-        padding: 0.7rem;
+        padding: 0.6rem;
         font-family: cursive;
-        font-size: 1.55rem;
+        font-size: clamp(1.2rem, 2vw, 1.55rem);
         color: rgba(23, 32, 21, 0.78);
     }
 
+    #modal-paper-preview {
+        min-height: clamp(130px, 22dvh, 180px);
+    }
+
+    #modal-paper-preview img {
+        max-height: clamp(220px, 42dvh, 420px);
+    }
+
+    #modal-paper-preview iframe {
+        height: clamp(250px, 48dvh, 420px);
+    }
+
+    @media (max-height: 840px) and (min-width: 1025px) {
+        .document-modal-shell {
+            width: min(1120px, calc(100vw - 1rem));
+            height: calc(100dvh - 1rem);
+            max-height: calc(100dvh - 1rem);
+        }
+
+        .document-modal-grid {
+            grid-template-columns: minmax(0, 1.08fr) minmax(315px, 0.72fr);
+        }
+
+        .document-paper-wrap,
+        .document-side-panel {
+            padding: 0.75rem;
+        }
+
+        .document-paper-inner {
+            padding: 1rem;
+        }
+
+        .document-modal-backdrop .dispo-form-input {
+            border-radius: 0.8rem;
+            padding: 0.62rem 0.78rem;
+            font-size: 0.82rem;
+        }
+
+        .document-modal-backdrop .dispo-form-label {
+            margin-bottom: 0.3rem;
+            font-size: 0.52rem;
+        }
+
+        .document-side-panel .document-action-card {
+            padding: 0.72rem;
+        }
+
+        .document-side-panel .mb-4 {
+            margin-bottom: 0.65rem;
+        }
+
+        .document-side-panel .mb-5 {
+            margin-bottom: 0.75rem;
+        }
+
+        .document-side-panel .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 0.55rem;
+        }
+    }
+
     @media (max-width: 1024px) {
+        .document-modal-backdrop {
+            align-items: stretch;
+            padding: 0.65rem;
+            overflow-y: auto;
+        }
+
+        .document-modal-shell {
+            width: 100%;
+            height: auto;
+            min-height: min-content;
+            max-height: none;
+            overflow: visible;
+        }
+
         .document-modal-grid {
             grid-template-columns: 1fr;
-            overflow-y: auto;
+            height: auto;
+            overflow: visible;
         }
 
         .document-side-panel {
             border-left: 0;
             border-top: 1px solid rgba(255, 255, 255, 0.10);
+            height: auto;
             max-height: none;
+            overflow: visible;
         }
 
         .document-paper-wrap {
+            height: auto;
             max-height: none;
+            overflow: visible;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .document-meta-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .document-stamp {
+            align-self: flex-start;
+            transform: rotate(-4deg);
+            white-space: normal;
         }
     }
 </style>
@@ -1166,7 +1284,7 @@
                 const image = document.createElement('img');
                 image.src = url;
                 image.alt = 'Dokumentvorschau';
-                image.className = 'w-full max-h-[420px] object-contain bg-white';
+                image.className = 'w-full object-contain bg-white';
                 preview.appendChild(image);
                 return;
             }
@@ -1175,7 +1293,7 @@
                 const iframe = document.createElement('iframe');
                 iframe.src = url;
                 iframe.title = 'PDF Vorschau';
-                iframe.className = 'w-full h-[420px] bg-white';
+                iframe.className = 'w-full bg-white';
                 preview.appendChild(iframe);
                 return;
             }
@@ -1229,6 +1347,9 @@
 
             documentModal.classList.add('is-open');
             documentModal.setAttribute('aria-hidden', 'false');
+            document.querySelectorAll('.document-paper-wrap, .document-side-panel').forEach((panel) => {
+                panel.scrollTop = 0;
+            });
             document.body.style.overflow = 'hidden';
         }
 
