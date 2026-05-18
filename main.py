@@ -2465,6 +2465,173 @@ def tracker_state_payload(user_doc):
     }
 
 
+
+def dashboard_number(value, fallback=0.0):
+    return parse_number(value, fallback)
+
+
+def dashboard_int(value, fallback=0):
+    return parse_int(value, fallback)
+
+
+def calculate_driver_level(total_km=0, completed_trips=0, xp_value=None):
+    if xp_value is None:
+        xp_value = round(parse_number(total_km, 0) * 2 + parse_int(completed_trips, 0) * 50)
+
+    xp = parse_int(xp_value, 0)
+    level = max(1, (xp // 1000) + 1)
+    progress = max(0, min(100, round((xp % 1000) / 10)))
+    return level, xp, progress
+
+
+def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
+    user_doc = user_doc or {}
+    entries = []
+
+    for raw_entry in get_user_job_entries(user_doc):
+        if not isinstance(raw_entry, dict):
+            continue
+
+        normalized = normalize_logbook_entry(raw_entry, user_doc)
+        created_at_raw = raw_entry.get("createdAt") or raw_entry.get("created_at") or raw_entry.get("finishedAt") or raw_entry.get("submitted_at") or raw_entry.get("timestamp")
+        date_text = "-"
+
+        if isinstance(created_at_raw, datetime):
+            date_text = created_at_raw.strftime("%d.%m.%Y")
+            sort_date = created_at_raw
+        else:
+            created_at_text = safe_str(created_at_raw)
+            sort_date = normalized.get("_sortDate") or datetime.min
+            if created_at_text:
+                try:
+                    iso_text = created_at_text.replace("Z", "+00:00")
+                    parsed_date = datetime.fromisoformat(iso_text)
+                    date_text = parsed_date.strftime("%d.%m.%Y")
+                    sort_date = parsed_date.replace(tzinfo=None)
+                except Exception:
+                    date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
+
+        entries.append({
+            "date": date_text,
+            "route": normalized.get("route") or "-",
+            "from_city": normalized.get("sourceCity") or "-",
+            "to_city": normalized.get("destinationCity") or "-",
+            "cargo": normalized.get("cargo") or "-",
+            "distance": round(parse_number(normalized.get("distanceKm"), 0), 1),
+            "earnings": round(parse_number(normalized.get("income"), 0), 2),
+            "status": normalized.get("status") or "Abgeschlossen",
+            "_sortDate": sort_date
+        })
+
+    entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
+
+    cleaned = []
+    for entry in entries[:limit]:
+        entry.pop("_sortDate", None)
+        cleaned.append(entry)
+    return cleaned
+
+
+def get_driver_current_trip_for_dashboard(user_doc):
+    user_doc = user_doc or {}
+    live = user_doc.get("tracker_live") or {}
+    current_job = user_doc.get("tracker_current_job") or current_job_from_live(live)
+
+    if not current_job:
+        return {}
+
+    source = safe_str(current_job.get("sourceCity") or live.get("sourceCity"), "-")
+    destination = safe_str(current_job.get("destinationCity") or live.get("destinationCity"), "-")
+    cargo = safe_str(current_job.get("cargo") or live.get("cargo"), "-")
+
+    if source == "-" and destination == "-" and cargo == "-":
+        return {}
+
+    progress = parse_number(live.get("routeProgressPercent"), 0)
+    if progress <= 0:
+        planned = parse_number(live.get("plannedDistanceKm") or current_job.get("distanceKm"), 0)
+        remaining = parse_number(live.get("remainingDistanceKm") or current_job.get("remainingDistanceKm"), 0)
+        if planned > 0:
+            progress = max(0, min(100, round(((planned - remaining) / planned) * 100)))
+
+    trip_distance = parse_number(live.get("tripDistanceKm") or user_doc.get("tracker_last_trip_distance_km"), 0)
+    expected_earnings = parse_number(current_job.get("income"), 0)
+    if expected_earnings <= 0:
+        expected_earnings = round(trip_distance * TOUR_RECEIPT_RATE_PER_KM, 2)
+
+    updated_at = user_doc.get("tracker_live_updated_at")
+    departure = "-"
+    if isinstance(updated_at, datetime):
+        departure = updated_at.strftime("%H:%M")
+
+    return {
+        "from_city": source,
+        "to_city": destination,
+        "departure": departure,
+        "progress": round(max(0, min(100, progress))),
+        "cargo": cargo,
+        "distance": round(trip_distance, 1),
+        "remaining_distance": round(parse_number(live.get("remainingDistanceKm"), 0), 1),
+        "expected_earnings": round(expected_earnings, 2),
+        "status": safe_str(current_job.get("status"), "Aktiv" if user_doc.get("tracker_online") else "Warte")
+    }
+
+
+def prepare_driver_dashboard_context(user_doc):
+    user_doc = user_doc or {}
+    stats = get_profile_stats(user_doc)
+    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(user_doc, limit=12)
+
+    completed_km = parse_number(stats.get("km"), 0)
+    completed_income = parse_number(stats.get("income") or stats.get("revenue"), 0)
+    completed_trips = parse_int(stats.get("deliveries"), 0)
+    if completed_trips <= 0:
+        completed_trips = len(fahrtenbuch_entries)
+
+    live = user_doc.get("tracker_live") or {}
+    live_updated_at = user_doc.get("tracker_live_updated_at")
+    live_is_fresh = isinstance(live_updated_at, datetime) and live_updated_at >= now_utc() - timedelta(minutes=5)
+    live_distance = parse_number(live.get("tripDistanceKm") or user_doc.get("tracker_last_trip_distance_km"), 0) if live_is_fresh else 0
+
+    total_km = completed_km + live_distance
+
+    balance = parse_number(
+        user_doc.get("balance")
+        or user_doc.get("konto_stand")
+        or user_doc.get("kontostand")
+        or user_doc.get("account_balance")
+        or user_doc.get("profile_balance")
+        or completed_income,
+        completed_income
+    )
+
+    stored_xp = user_doc.get("driver_xp") or user_doc.get("fahrer_xp") or user_doc.get("xp")
+    stored_level = user_doc.get("driver_level") or user_doc.get("fahrer_level") or user_doc.get("level")
+    calculated_level, xp, level_progress = calculate_driver_level(total_km, completed_trips, stored_xp)
+
+    driver_level = stored_level if stored_level not in [None, ""] else calculated_level
+
+    driver_stats = {
+        "total_km": round(total_km, 1),
+        "completed_km": round(completed_km, 1),
+        "last_trip_distance": round(parse_number(user_doc.get("tracker_last_trip_distance_km") or live.get("tripDistanceKm"), 0), 1),
+        "balance": round(balance, 2),
+        "completed_trips": completed_trips,
+        "level": driver_level,
+        "xp": xp,
+        "level_progress": level_progress,
+        "online": bool(user_doc.get("tracker_online", False) and live_is_fresh),
+        "last_update": format_datetime_for_template(live_updated_at)
+    }
+
+    return {
+        "driver_stats": driver_stats,
+        "fahrtenbuch_entries": fahrtenbuch_entries,
+        "driver_current_trip": get_driver_current_trip_for_dashboard(user_doc)
+    }
+
+
+
 # ==========================================
 # TOUR-BELEG / PDF / ABRECHNUNG
 # ==========================================
@@ -3939,8 +4106,18 @@ def dashboard():
 
     user_documents.extend(get_system_documents_for_user(user_id_str, user_doc=db_user, latest_registration=latest_registration))
     registration_context = dashboard_registration_context(db_user, latest_registration)
+    driver_dashboard_context = prepare_driver_dashboard_context(db_user)
 
-    return render_template("dashboard.html", current_user=user, needs_signature=needs_signature, primary_role_name=primary_role_name, news_items=news_items, user_documents=user_documents, **registration_context)
+    return render_template(
+        "dashboard.html",
+        current_user=user,
+        needs_signature=needs_signature,
+        primary_role_name=primary_role_name,
+        news_items=news_items,
+        user_documents=user_documents,
+        **registration_context,
+        **driver_dashboard_context
+    )
 
 
 @app.route("/servicecenter", methods=["GET"])
