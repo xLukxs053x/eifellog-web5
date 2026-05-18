@@ -11,7 +11,8 @@
     Erwartete optionale Daten:
     - dispo_form_submissions: Liste eingereichter Dokumente / Abschlussbelege
     - dispo_manual_entries: Liste manueller Schaden-/Einnahmen-Erfassungen
-    - dispo_assignable_users / dispo_users: User-Auswahlliste für Zuordnung im Dokument-Modal
+    - dispo_assignable_users / dispo_users / eifellog_users / users: User-Auswahlliste für Zuordnung im Dokument-Modal
+    - dispo_user_api_url: optionaler JSON-Endpunkt für User aus eifellog_db.user, Standard: /dispo/form/users
     - dispo_form_pending_count, dispo_form_total_documents, dispo_form_income_sum, dispo_form_damage_sum
 #}
 
@@ -55,7 +56,7 @@
     {% set safe_total_documents = dispo_form_total_documents|default(safe_submissions|length, true) %}
     {% set safe_income_sum = dispo_form_income_sum|default('0,00 €', true) %}
     {% set safe_damage_sum = dispo_form_damage_sum|default('0,00 €', true) %}
-    {% set safe_assignable_users = dispo_assignable_users|default(dispo_users|default([], true), true) %}
+    {% set safe_assignable_users = dispo_assignable_users|default(dispo_users|default(eifellog_users|default(users|default([], true), true), true), true) %}
 {% else %}
     {% set safe_submissions = [] %}
     {% set safe_manual_entries = [] %}
@@ -65,6 +66,7 @@
     {% set safe_damage_sum = '0,00 €' %}
     {% set safe_assignable_users = [] %}
 {% endif %}
+{% set safe_assignable_users_endpoint = dispo_user_api_url|default('/dispo/form/users', true) %}
 
 {% block title %}EifelLog - Dispo Formular{% endblock %}
 
@@ -1135,16 +1137,31 @@
                 <form action="/dispo/form/documents/assign-user" method="POST" class="document-action-card mb-4">
                     {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                     <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <input type="hidden" id="modal_assign_user_name" name="assigned_user_name">
                     <p class="font-orbitron text-[10px] text-[var(--brand-green)] uppercase tracking-widest font-bold mb-4">Einreicher zuordnen</p>
                     <label class="dispo-form-label" for="modal_assign_user">User auswählen</label>
-                    <select id="modal_assign_user" name="assigned_user_id" class="dispo-form-input dispo-form-select" required>
+                    <select id="modal_assign_user"
+                            name="assigned_user_id"
+                            class="dispo-form-input dispo-form-select"
+                            data-users-endpoint="{{ safe_assignable_users_endpoint|e }}"
+                            required>
                         <option value="">User auswählen</option>
                         {% for user in safe_assignable_users %}
-                            {% set option_id = user.discord_id|default(user.id|default(user.user_id|default('', true), true), true) %}
-                            {% set option_name = user.display_name|default(user.username|default(user.name|default(option_id, true), true), true) %}
-                            <option value="{{ option_id }}">{{ option_name }} · {{ option_id }}</option>
+                            {% set raw_option_id = user.discord_id|default(user.discord_user_id|default(user.user_id|default(user.id|default(user._id|default('', true), true), true), true), true) %}
+                            {% set option_id = raw_option_id|string %}
+                            {% set option_name = user.display_name|default(user.global_name|default(user.username|default(user.name|default(user.email|default(option_id, true), true), true), true), true) %}
+                            {% if option_id %}
+                                <option value="{{ option_id|e }}"
+                                        data-user-name="{{ option_name|e }}"
+                                        data-user-discord-id="{{ user.discord_id|default(user.discord_user_id|default(option_id, true), true)|e }}">
+                                    {{ option_name }} · {{ option_id }}
+                                </option>
+                            {% endif %}
                         {% endfor %}
                     </select>
+                    <p id="modal_assign_user_hint" class="text-[10px] text-white/40 font-inter mt-2">
+                        User werden aus eifellog_db.user geladen.
+                    </p>
                     <button type="submit" class="w-full mt-3 inline-flex items-center justify-center px-4 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Im System speichern</button>
                 </form>
 
@@ -1216,6 +1233,12 @@
         const documentPreview = document.getElementById('document-file-preview');
         const documentModal = document.getElementById('document-modal');
         const closeDocumentModal = document.getElementById('close-document-modal');
+        const assignSelect = document.getElementById('modal_assign_user');
+        const assignUserNameInput = document.getElementById('modal_assign_user_name');
+        const assignUserHint = document.getElementById('modal_assign_user_hint');
+        const assignUsersEndpoint = assignSelect?.dataset.usersEndpoint || '/dispo/form/users';
+        let assignUsersLoaded = false;
+        let assignUsersLoading = null;
 
         function setActiveTab(tabName) {
             tabButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.formTab === tabName));
@@ -1282,6 +1305,171 @@
                 completed: 'Abgeschlossen'
             };
             return labels[status] || 'Zur Prüfung';
+        }
+
+        function normalizeUserId(value) {
+            return String(value ?? '').trim();
+        }
+
+        function normalizeAssignableUser(user) {
+            if (!user || typeof user !== 'object') return null;
+            const id = normalizeUserId(
+                user.discord_id ??
+                user.discord_user_id ??
+                user.user_id ??
+                user.id ??
+                user._id
+            );
+            if (!id) return null;
+
+            const name = String(
+                user.display_name ??
+                user.global_name ??
+                user.username ??
+                user.name ??
+                user.email ??
+                id
+            ).trim() || id;
+
+            return {
+                id,
+                name,
+                discordId: normalizeUserId(user.discord_id ?? user.discord_user_id ?? id),
+                raw: user
+            };
+        }
+
+        function extractAssignableUsers(payload) {
+            if (Array.isArray(payload)) return payload;
+            if (!payload || typeof payload !== 'object') return [];
+            if (Array.isArray(payload.users)) return payload.users;
+            if (Array.isArray(payload.data)) return payload.data;
+            if (Array.isArray(payload.items)) return payload.items;
+            if (Array.isArray(payload.results)) return payload.results;
+            return [];
+        }
+
+        function setAssignHint(message, tone = 'muted') {
+            if (!assignUserHint) return;
+            assignUserHint.textContent = message;
+            assignUserHint.classList.toggle('text-[var(--brand-green)]', tone === 'success');
+            assignUserHint.classList.toggle('text-[var(--danger)]', tone === 'error');
+            assignUserHint.classList.toggle('text-white/40', tone === 'muted');
+        }
+
+        function ensureAssignUserOption(user, selectValue = false) {
+            if (!assignSelect) return;
+            const normalized = normalizeAssignableUser(user);
+            if (!normalized) return;
+
+            const escapedValue = normalized.id.replace(/"/g, '\\"');
+            let option = assignSelect.querySelector(`option[value="${escapedValue}"]`);
+
+            if (!option) {
+                option = document.createElement('option');
+                option.value = normalized.id;
+                assignSelect.appendChild(option);
+            }
+
+            option.dataset.userName = normalized.name;
+            option.dataset.userDiscordId = normalized.discordId;
+            option.textContent = `${normalized.name} · ${normalized.id}`;
+
+            if (selectValue) {
+                assignSelect.value = normalized.id;
+                syncAssignedUserName();
+            }
+        }
+
+        function syncAssignedUserName() {
+            if (!assignSelect || !assignUserNameInput) return;
+            const selectedOption = assignSelect.options[assignSelect.selectedIndex];
+            assignUserNameInput.value = selectedOption?.dataset.userName || selectedOption?.textContent?.split(' · ')[0]?.trim() || '';
+        }
+
+        async function loadAssignableUsers(preselectId = '', fallbackName = '') {
+            if (!assignSelect || !assignUsersEndpoint) return;
+
+            const currentOptionCount = Array.from(assignSelect.options).filter((option) => option.value).length;
+            if (assignUsersLoaded) {
+                if (preselectId) setAssignedUser(preselectId, fallbackName);
+                setAssignHint(`${currentOptionCount} User geladen.`, currentOptionCount ? 'success' : 'muted');
+                return;
+            }
+
+            if (assignUsersLoading) {
+                await assignUsersLoading;
+                if (preselectId) setAssignedUser(preselectId, fallbackName);
+                return;
+            }
+
+            setAssignHint(currentOptionCount ? `${currentOptionCount} User vorgeladen. Aktualisiere aus Datenbank...` : 'User werden aus eifellog_db.user geladen...');
+
+            assignUsersLoading = fetch(assignUsersEndpoint, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then((payload) => {
+                    const users = extractAssignableUsers(payload)
+                        .map(normalizeAssignableUser)
+                        .filter(Boolean)
+                        .sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+
+                    users.forEach((user) => ensureAssignUserOption(user));
+                    assignUsersLoaded = true;
+
+                    if (preselectId) setAssignedUser(preselectId, fallbackName);
+
+                    const loadedCount = Array.from(assignSelect.options).filter((option) => option.value).length;
+                    setAssignHint(loadedCount ? `${loadedCount} User aus eifellog_db.user geladen.` : 'Keine User in eifellog_db.user gefunden.', loadedCount ? 'success' : 'muted');
+                })
+                .catch(() => {
+                    assignUsersLoaded = false;
+                    const loadedCount = Array.from(assignSelect.options).filter((option) => option.value).length;
+                    if (preselectId) setAssignedUser(preselectId, fallbackName);
+                    setAssignHint(
+                        loadedCount
+                            ? `${loadedCount} User serverseitig geladen. JSON-Endpunkt nicht erreichbar.`
+                            : 'User konnten nicht geladen werden. Backend-Endpunkt /dispo/form/users prüfen.',
+                        loadedCount ? 'muted' : 'error'
+                    );
+                })
+                .finally(() => {
+                    assignUsersLoading = null;
+                    syncAssignedUserName();
+                });
+
+            await assignUsersLoading;
+        }
+
+        function setAssignedUser(userId, fallbackName = '') {
+            if (!assignSelect) return;
+            const normalizedId = normalizeUserId(userId);
+            if (!normalizedId) {
+                assignSelect.value = '';
+                syncAssignedUserName();
+                return;
+            }
+
+            const escapedValue = normalizedId.replace(/"/g, '\\"');
+            const existingOption = assignSelect.querySelector(`option[value="${escapedValue}"]`);
+
+            if (!existingOption) {
+                ensureAssignUserOption({
+                    id: normalizedId,
+                    username: fallbackName || normalizedId,
+                    discord_id: normalizedId
+                }, true);
+                return;
+            }
+
+            assignSelect.value = normalizedId;
+            syncAssignedUserName();
         }
 
         function populateDocumentPreview(fileUrl) {
@@ -1352,8 +1540,8 @@
                 input.value = data.documentId || '';
             });
 
-            const assignSelect = document.getElementById('modal_assign_user');
-            if (assignSelect && data.userId) assignSelect.value = data.userId;
+            setAssignedUser(data.userId, data.submittedBy);
+            loadAssignableUsers(data.userId, data.submittedBy);
 
             const editReference = document.getElementById('modal_edit_reference');
             const editTitle = document.getElementById('modal_edit_title');
@@ -1409,6 +1597,12 @@
                 }
                 documentPreview.textContent = files.length === 1 ? files[0].name : `${files.length} Dateien ausgewählt`;
             });
+        }
+
+        if (assignSelect) {
+            assignSelect.addEventListener('change', syncAssignedUserName);
+            syncAssignedUserName();
+            loadAssignableUsers();
         }
 
         document.querySelectorAll('.js-open-document').forEach((button) => {
