@@ -284,22 +284,30 @@ ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
 ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
 ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
 ROLE_BUCHHALTUNG_ID = "1473730533593845951"
+ROLE_FAHRER_ID = env_first("ROLE_FAHRER_ID", "FAHRER_ROLE_ID", default=ROLE_FAHRER or "1473721587101339681")
+ROLE_FUHRPARKMANAGEMENT_ID = env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMANAGEMENT_ROLE_ID", "FUHRPARK_ROLE_ID", default=ROLE_FUHRPARKMANAGEMENT or "")
 ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
+    ROLE_FAHRER_ID,
     ROLE_GESCHAEFTSLEITUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
     ROLE_PROJEKTLEITUNG,
+    ROLE_PROJEKTLEITUNG_ID,
     ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
+    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID,
     ROLE_FUHRPARKMANAGEMENT,
+    ROLE_FUHRPARKMANAGEMENT_ID,
     ROLE_BUCHHALTUNG,
+    ROLE_BUCHHALTUNG_ID,
     ROLE_HR_CONTROLLING,
     ROLE_HR_CONTROLLING_ID,
     ROLE_DISPOSITION,
     ROLE_DISPOSITION_ID,
     ROLE_PERSONALMANAGEMENT,
-    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID
+    ROLE_PERSONALABTEILUNG_ID
 ]
 
 PERSONALABTEILUNG_ALLOWED_ROLES = {
@@ -323,7 +331,9 @@ DISPOSITION_ALLOWED_ROLES = {
     ROLE_PROJEKTLEITUNG,
     ROLE_PROJEKTLEITUNG_ID,
     "Disposition",
+    "Disponent",
     "disposition",
+    "disponent",
     "dispo",
     "Geschäftsleitung",
     "Geschaeftsleitung",
@@ -331,6 +341,95 @@ DISPOSITION_ALLOWED_ROLES = {
     "Geschaeftsfuehrung",
     "Projektleitung",
     "projektleitung"
+}
+
+# Rollen, die die Dispo-Formularseite öffnen und Belege einreichen dürfen.
+# Der Zugriff auf /dispo/form ist bewusst breit, die Einsicht in eingereichte Dokumente bleibt getrennt.
+DISPO_FORM_ACCESS_ROLES = {
+    ROLE_FAHRER,
+    ROLE_FAHRER_ID,
+    ROLE_BUCHHALTUNG,
+    ROLE_BUCHHALTUNG_ID,
+    ROLE_HR_CONTROLLING,
+    ROLE_HR_CONTROLLING_ID,
+    ROLE_FUHRPARKMANAGEMENT,
+    ROLE_FUHRPARKMANAGEMENT_ID,
+    ROLE_PERSONALMANAGEMENT,
+    ROLE_PERSONALABTEILUNG_ID,
+    ROLE_DISPOSITION,
+    ROLE_DISPOSITION_ID,
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG,
+    ROLE_PROJEKTLEITUNG_ID,
+    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
+    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID,
+    "Fahrer",
+    "fahrer",
+    "Buchhaltung",
+    "buchhaltung",
+    "HR-Controlling",
+    "HR Controlling",
+    "hr-controlling",
+    "hr controlling",
+    "Fuhrparkmanagement",
+    "fuhrparkmanagement",
+    "Personalmanagement",
+    "Personalabteilung",
+    "personalmanagement",
+    "personalabteilung",
+    "Disposition",
+    "Disponent",
+    "disposition",
+    "disponent",
+    "dispo",
+    "Geschäftsleitung",
+    "Geschaeftsleitung",
+    "Geschäftsführung",
+    "Geschaeftsfuehrung",
+    "Projektleitung",
+    "projektleitung",
+    "Stellvertretende Projektleitung",
+    "stellvertretende projektleitung"
+}
+
+# Nur diese Rolle sieht auf /dispo/form die Disponenten-Ansicht / Sektion „Eingereichte Dokumente“.
+DISPO_SUBMITTED_DOCUMENTS_ALLOWED_ROLES = {
+    ROLE_DISPOSITION,
+    ROLE_DISPOSITION_ID,
+    "Disposition",
+    "Disponent",
+    "disposition",
+    "disponent",
+    "dispo"
+}
+
+# Diese Rollen sollen die Sektion „Eingereichte Dokumente“ ausdrücklich nicht sehen.
+DISPO_SUBMITTED_DOCUMENTS_BLOCKED_ROLES = {
+    ROLE_HR_CONTROLLING,
+    ROLE_HR_CONTROLLING_ID,
+    ROLE_FAHRER,
+    ROLE_FAHRER_ID,
+    ROLE_BUCHHALTUNG,
+    ROLE_BUCHHALTUNG_ID,
+    ROLE_PERSONALMANAGEMENT,
+    ROLE_PERSONALABTEILUNG_ID,
+    ROLE_FUHRPARKMANAGEMENT,
+    ROLE_FUHRPARKMANAGEMENT_ID,
+    "HR-Controlling",
+    "HR Controlling",
+    "hr-controlling",
+    "hr controlling",
+    "Fahrer",
+    "fahrer",
+    "Buchhaltung",
+    "buchhaltung",
+    "Personalmanagement",
+    "Personalabteilung",
+    "personalmanagement",
+    "personalabteilung",
+    "Fuhrparkmanagement",
+    "fuhrparkmanagement"
 }
 
 
@@ -368,18 +467,47 @@ def has_disposition_permission(user_roles):
     return primary_role_name in {"Disposition", "Projektleitung", "Geschäftsleitung"}
 
 
+def has_dispo_form_access(user_roles):
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_allowed_roles = set(clean_roles(DISPO_FORM_ACCESS_ROLES))
+    if clean_user_roles.intersection(clean_allowed_roles):
+        return True
+
+    # Fallback: Jeder eingeloggte Discord-Nutzer aus der App darf das Formular betreten.
+    return True
+
+
+def has_dispo_submitted_documents_permission(user_roles):
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_allowed_roles = set(clean_roles(DISPO_SUBMITTED_DOCUMENTS_ALLOWED_ROLES))
+
+    # Disposition überschreibt Basisrollen wie Fahrer, falls ein Disponent mehrere Discord-Rollen besitzt.
+    if clean_user_roles.intersection(clean_allowed_roles):
+        return True
+
+    primary_role_name = get_primary_role_name(user_roles)
+    return primary_role_name in {"Disposition"}
+
+
+def has_dispo_blocked_documents_role(user_roles):
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_blocked_roles = set(clean_roles(DISPO_SUBMITTED_DOCUMENTS_BLOCKED_ROLES))
+    return bool(clean_user_roles.intersection(clean_blocked_roles))
+
+
 def get_primary_role_name(user_roles):
     clean_user_roles = clean_roles(user_roles)
 
     if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles or str(ROLE_GESCHAEFTSFUEHRUNG_ID).strip() in clean_user_roles: return "Geschäftsleitung"
     if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Projektleitung"
     if str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Stellvertretende Projektleitung"
-    if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles: return "Personalmanagement"
+    if str(ROLE_DISPOSITION).strip() in clean_user_roles or str(ROLE_DISPOSITION_ID).strip() in clean_user_roles or "Disposition" in clean_user_roles or "Disponent" in clean_user_roles: return "Disposition"
+    if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles or str(ROLE_PERSONALABTEILUNG_ID).strip() in clean_user_roles: return "Personalmanagement"
     if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles or str(ROLE_HR_CONTROLLING_ID).strip() in clean_user_roles: return "HR-Controlling"
     if "HR-Controlling" in clean_user_roles or "HR Controlling" in clean_user_roles: return "HR-Controlling"
-    if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles: return "Buchhaltung"
-    if str(ROLE_DISPOSITION).strip() in clean_user_roles or str(ROLE_DISPOSITION_ID).strip() in clean_user_roles: return "Disposition"
-    if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles: return "Fuhrparkmanagement"
+    if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles or str(ROLE_BUCHHALTUNG_ID).strip() in clean_user_roles: return "Buchhaltung"
+    if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles or str(ROLE_FUHRPARKMANAGEMENT_ID).strip() in clean_user_roles: return "Fuhrparkmanagement"
+    if str(ROLE_FAHRER).strip() in clean_user_roles or str(ROLE_FAHRER_ID).strip() in clean_user_roles: return "Fahrer"
 
     return "Fahrer"
 
@@ -4900,7 +5028,20 @@ def require_disposition_permission():
 
     user_roles = session.get("user", {}).get("roles", [])
     if not has_disposition_permission(user_roles):
-        flash("Zugriff verweigert. Du benötigst die Rolle Disposition oder mindestens Projektleitung.", "error")
+        flash("Du wurdest zum Dispo-Formular weitergeleitet.", "info")
+        return redirect(url_for("dispo_form"))
+
+    return None
+
+
+def require_dispo_form_access():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_dispo_form_access(user_roles):
+        flash("Zugriff verweigert. Du darfst das Dispo-Formular nicht öffnen.", "error")
         return redirect(url_for("dashboard"))
 
     return None
@@ -5086,19 +5227,30 @@ def get_dispo_available_drivers(limit=100):
 
 @app.route("/dispo", methods=["GET"])
 def dispo():
-    permission_response = require_disposition_permission()
-    if permission_response:
-        return permission_response
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
 
     user = session.get("user") or {}
     user_roles = user.get("roles", [])
     primary_role_name = get_primary_role_name(user_roles)
 
+    if not has_disposition_permission(user_roles):
+        # Alle Nicht-Dispo-Rollen landen beim Klick oder Direkteingabe von /dispo direkt im Formular.
+        return redirect(url_for("dispo_form"))
+
     if isinstance(session.get("user"), dict):
         session["user"]["is_disposition"] = True
+        session["user"]["can_access_dispo_form"] = True
+        session["user"]["can_view_dispo_submitted_documents"] = has_dispo_submitted_documents_permission(user_roles)
         permissions = set(item for item in session["user"].get("permissions", []) if item)
         permissions.add("disposition.view")
         permissions.add("disposition.manage")
+        permissions.add("disposition.form")
+        if has_dispo_submitted_documents_permission(user_roles):
+            permissions.add("disposition.documents")
+        else:
+            permissions.discard("disposition.documents")
         session["user"]["permissions"] = sorted(permissions)
         session.modified = True
 
@@ -5531,36 +5683,65 @@ def get_dispo_form_stats(entries):
 @app.route("/dispo/form", methods=["GET"])
 @app.route("/dispo_form.html", methods=["GET"])
 def dispo_form():
-    permission_response = require_disposition_permission()
+    permission_response = require_dispo_form_access()
     if permission_response:
         return permission_response
 
     user = session.get("user") or {}
     user_roles = user.get("roles", [])
     primary_role_name = get_primary_role_name(user_roles)
+    can_view_dispo_submitted_documents = has_dispo_submitted_documents_permission(user_roles)
+    is_disposition_user = has_disposition_permission(user_roles)
 
     if isinstance(session.get("user"), dict):
-        session["user"]["is_disposition"] = True
+        session["user"]["is_disposition"] = is_disposition_user
+        session["user"]["can_access_dispo_form"] = True
+        session["user"]["can_view_dispo_submitted_documents"] = can_view_dispo_submitted_documents
         permissions = set(item for item in session["user"].get("permissions", []) if item)
-        permissions.add("disposition.view")
         permissions.add("disposition.form")
-        permissions.add("disposition.documents")
+        if is_disposition_user:
+            permissions.add("disposition.view")
+        else:
+            permissions.discard("disposition.view")
+            permissions.discard("disposition.manage")
+        if can_view_dispo_submitted_documents:
+            permissions.add("disposition.documents")
+        else:
+            permissions.discard("disposition.documents")
         session["user"]["permissions"] = sorted(permissions)
         session.modified = True
+        user = session.get("user") or user
 
-    entries_cursor = dispo_form_entries_collection.find(
-        {"archived": {"$ne": True}}
-    ).sort([("created_at", DESCENDING)]).limit(300)
+    if can_view_dispo_submitted_documents:
+        entries_cursor = dispo_form_entries_collection.find(
+            {"archived": {"$ne": True}}
+        ).sort([("created_at", DESCENDING)]).limit(300)
 
-    raw_entries = list(entries_cursor)
-    prepared_entries = [prepare_dispo_form_entry_for_template(entry) for entry in raw_entries]
-    manual_entries = [entry for entry in prepared_entries if entry.get("entry_source") == "manual"][:80]
-    stats = get_dispo_form_stats(raw_entries)
+        raw_entries = list(entries_cursor)
+        prepared_entries = [prepare_dispo_form_entry_for_template(entry) for entry in raw_entries]
+        manual_entries = [entry for entry in prepared_entries if entry.get("entry_source") == "manual"][:80]
+        stats = get_dispo_form_stats(raw_entries)
+    else:
+        raw_entries = []
+        prepared_entries = []
+        manual_entries = []
+        stats = {
+            "pending_count": 0,
+            "total_documents": 0,
+            "income_sum": 0.0,
+            "damage_sum": 0.0,
+        }
 
     return render_template(
         "dispo_form.html",
         current_user=user,
         primary_role_name=primary_role_name,
+        can_access_dispo_form=True,
+        can_view_dispo_submitted_documents=can_view_dispo_submitted_documents,
+        show_dispo_submitted_documents=can_view_dispo_submitted_documents,
+        show_submitted_documents=can_view_dispo_submitted_documents,
+        is_disposition_viewer=can_view_dispo_submitted_documents,
+        blocked_from_dispo_documents=has_dispo_blocked_documents_role(user_roles) and not can_view_dispo_submitted_documents,
         dispo_form_submissions=prepared_entries,
         dispo_manual_entries=manual_entries,
         dispo_form_pending_count=stats["pending_count"],
@@ -5568,12 +5749,17 @@ def dispo_form():
         dispo_form_income_sum=format_money(stats["income_sum"], "EUR"),
         dispo_form_damage_sum=format_money(stats["damage_sum"], "EUR"),
         role_disposition_id=ROLE_DISPOSITION_ID,
+        role_fahrer_id=ROLE_FAHRER_ID,
+        role_hr_controlling_id=ROLE_HR_CONTROLLING_ID,
+        role_buchhaltung_id=ROLE_BUCHHALTUNG_ID,
+        role_personalmanagement_id=ROLE_PERSONALABTEILUNG_ID,
+        role_fuhrparkmanagement_id=ROLE_FUHRPARKMANAGEMENT_ID,
     )
 
 
 @app.route("/dispo/form/manual", methods=["POST"])
 def dispo_form_manual_submit():
-    permission_response = require_disposition_permission()
+    permission_response = require_dispo_form_access()
     if permission_response:
         return permission_response
 
@@ -5638,7 +5824,7 @@ def dispo_form_manual_submit():
 
 @app.route("/dispo/form/documents/upload", methods=["POST"])
 def dispo_form_documents_upload():
-    permission_response = require_disposition_permission()
+    permission_response = require_dispo_form_access()
     if permission_response:
         return permission_response
 
@@ -5723,13 +5909,26 @@ def dispo_form_documents_upload():
 
 @app.route("/dispo/form/file/<entry_id>/<filename>", methods=["GET"])
 def dispo_form_file_download(entry_id, filename):
-    permission_response = require_disposition_permission()
+    permission_response = require_dispo_form_access()
     if permission_response:
         return permission_response
 
     entry_doc = dispo_form_entries_collection.find_one(dispo_form_entry_lookup_query(entry_id))
     if not entry_doc or entry_doc.get("archived") is True:
         abort(404)
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    submitted_by = entry_doc.get("submitted_by") or {}
+    current_discord_id = safe_str(user.get("id"))
+    entry_submitter_id = safe_str(submitted_by.get("discord_id") or entry_doc.get("submitted_by_id"))
+
+    can_open_file = (
+        has_dispo_submitted_documents_permission(user_roles)
+        or (current_discord_id and entry_submitter_id and current_discord_id == entry_submitter_id)
+    )
+    if not can_open_file:
+        abort(403)
 
     filename = secure_filename(filename)
     matched_file = None
@@ -5756,9 +5955,16 @@ def dispo_form_file_download(entry_id, filename):
 
 @app.route("/dispo/form/<entry_id>/status", methods=["POST"])
 def dispo_form_update_status(entry_id):
-    permission_response = require_disposition_permission()
+    permission_response = require_dispo_form_access()
     if permission_response:
         return permission_response
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_dispo_submitted_documents_permission(user_roles):
+        if request.is_json:
+            return jsonify({"success": False, "message": "Nur die Disposition darf den Status eingereichter Dokumente ändern."}), 403
+        flash("Nur die Disposition darf den Status eingereichter Dokumente ändern.", "error")
+        return redirect(url_for("dispo_form"))
 
     data = request.get_json(silent=True) or request.form or {}
     new_status = normalize_dispo_form_status(data.get("status"))
