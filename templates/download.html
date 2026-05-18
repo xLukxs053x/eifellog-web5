@@ -6,684 +6,262 @@
 
 {% set github_repo = "xLukxs053x/EifelLog-Tracking" %}
 
-<style>
-    .download-page {
-        position: relative;
-    }
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
+    <div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">
+            EifelLog Hub
+        </span>
+        <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white mt-1">
+            Downloads
+        </h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
+            Lade dir hier das aktuelle EifelLog Setup herunter und öffne wichtige Fahrer-Dokumente direkt im Hub.
+        </p>
+    </div>
 
-    .download-page::before {
-        content: "";
-        position: absolute;
-        inset: -90px -40px auto auto;
-        width: 320px;
-        height: 320px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(137, 190, 50, 0.16), transparent 68%);
-        filter: blur(4px);
-        pointer-events: none;
-        z-index: 0;
-    }
+    <a href="{{ url_for('dashboard') if url_for is defined else '/dashboard' }}"
+       class="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-xs font-orbitron uppercase tracking-widest text-[var(--text)]">
+        Zurück zum Dashboard
+    </a>
+</div>
 
-    .download-page::after {
-        content: "";
-        position: absolute;
-        left: -80px;
-        top: 340px;
-        width: 260px;
-        height: 260px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(88, 101, 242, 0.11), transparent 70%);
-        pointer-events: none;
-        z-index: 0;
-    }
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
 
-    .release-pill,
-    .doc-filter-btn,
-    .ghost-btn,
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background: rgba(255, 255, 255, 0.04);
-        transition: all 180ms ease;
-    }
+    <div class="xl:col-span-2 flex flex-col gap-6">
 
-    .release-pill {
-        gap: 0.45rem;
-        padding: 0.55rem 0.85rem;
-        color: var(--muted);
-        font-size: 0.65rem;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-        font-weight: 700;
-    }
+        <div class="glass-card p-6 relative overflow-hidden border-t border-[var(--brand-green)]/30">
+            <div class="absolute -right-10 -top-10 opacity-5 text-white">
+                <svg class="w-56 h-56" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm-7 2h14v2H5v-2z"/>
+                </svg>
+            </div>
 
-    .release-pill.is-live {
-        border-color: rgba(137, 190, 50, 0.35);
-        background: rgba(137, 190, 50, 0.10);
-        color: var(--brand-green);
-    }
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.08)]">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
 
-    .release-pill.is-warning {
-        border-color: rgba(245, 177, 66, 0.35);
-        background: rgba(245, 177, 66, 0.10);
-        color: var(--brand-yellow);
-    }
+                    <div class="min-w-0">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
+                            Aktuelles Setup
+                        </span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                            EifelLog Fahrer-App
+                        </h2>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                            Installiere immer die neueste Version. Der Download-Button lädt das aktuelle Setup direkt herunter.
+                        </p>
 
-    .pulse-dot {
-        width: 0.45rem;
-        height: 0.45rem;
-        border-radius: 999px;
-        background: currentColor;
-        box-shadow: 0 0 0 0 currentColor;
-        animation: eifellogPulse 1.8s infinite;
-    }
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Version</p>
+                                <p id="setup-version" class="text-sm font-orbitron font-bold text-white">Lädt...</p>
+                            </div>
 
-    @keyframes eifellogPulse {
-        0% { box-shadow: 0 0 0 0 rgba(137, 190, 50, 0.45); }
-        70% { box-shadow: 0 0 0 8px rgba(137, 190, 50, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(137, 190, 50, 0); }
-    }
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Größe</p>
+                                <p id="setup-size" class="text-sm font-orbitron font-bold text-white">Lädt...</p>
+                            </div>
 
-    .metric-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: 1.25rem;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background: rgba(0, 0, 0, 0.28);
-        padding: 1rem;
-    }
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3 col-span-2 sm:col-span-1">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Status</p>
+                                <p id="setup-status" class="text-sm font-orbitron font-bold text-[var(--brand-yellow)]">Prüfe...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    .metric-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 52%);
-        opacity: 0;
-        transition: opacity 180ms ease;
-    }
+                <div class="flex flex-col gap-3 w-full lg:w-auto">
+                    <a id="setup-download-btn"
+                       href="#"
+                       class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(137,190,50,0.08)] opacity-60 cursor-not-allowed"
+                       aria-disabled="true">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                        </svg>
+                        Setup wird gesucht...
+                    </a>
+                </div>
+            </div>
+        </div>
 
-    .metric-card:hover::before {
-        opacity: 1;
-    }
+        <div class="glass-card p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Fahrer-Dokumente
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        Dokumente werden im Modal geöffnet. Von dort kannst du sie bei Bedarf herunterladen.
+                    </p>
+                </div>
 
-    .metric-label {
-        position: relative;
-        margin-bottom: 0.35rem;
-        color: var(--muted);
-        font-size: 0.56rem;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-    }
-
-    .metric-value {
-        position: relative;
-        color: #fff;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-        font-size: 0.9rem;
-        word-break: break-word;
-    }
-
-    .status-pill {
-        width: fit-content;
-        gap: 0.4rem;
-        padding: 0.35rem 0.7rem;
-        font-size: 0.62rem;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-    }
-
-    .status-pill.ready {
-        border-color: rgba(137, 190, 50, 0.34);
-        background: rgba(137, 190, 50, 0.10);
-        color: var(--brand-green);
-    }
-
-    .status-pill.warning {
-        border-color: rgba(245, 177, 66, 0.34);
-        background: rgba(245, 177, 66, 0.10);
-        color: var(--brand-yellow);
-    }
-
-    .status-pill.error {
-        border-color: rgba(255, 90, 90, 0.34);
-        background: rgba(255, 90, 90, 0.10);
-        color: #ff7b7b;
-    }
-
-    .status-pill.muted {
-        color: var(--muted);
-    }
-
-    .ghost-btn {
-        gap: 0.5rem;
-        padding: 0.85rem 1rem;
-        color: var(--text);
-        font-size: 0.68rem;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-    }
-
-    .ghost-btn:hover {
-        transform: translateY(-1px);
-        border-color: rgba(137, 190, 50, 0.35);
-        background: rgba(137, 190, 50, 0.08);
-        color: var(--brand-green);
-    }
-
-    .doc-filter-btn {
-        padding: 0.6rem 0.85rem;
-        color: var(--muted);
-        font-size: 0.62rem;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-    }
-
-    .doc-filter-btn:hover,
-    .doc-filter-btn.active {
-        border-color: rgba(137, 190, 50, 0.38);
-        background: rgba(137, 190, 50, 0.10);
-        color: var(--brand-green);
-    }
-
-    .doc-search-input {
-        width: 100%;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background: rgba(0, 0, 0, 0.25);
-        padding: 0.85rem 1rem 0.85rem 2.65rem;
-        color: #fff;
-        outline: none;
-        transition: all 180ms ease;
-    }
-
-    .doc-search-input:focus {
-        border-color: rgba(137, 190, 50, 0.45);
-        box-shadow: 0 0 0 3px rgba(137, 190, 50, 0.08);
-    }
-
-    .doc-search-input::placeholder {
-        color: rgba(255, 255, 255, 0.35);
-    }
-
-    .doc-dynamic-card {
-        position: relative;
-        overflow: hidden;
-        width: 100%;
-        text-align: left;
-        border-radius: 1.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background: rgba(255, 255, 255, 0.04);
-        padding: 1.25rem;
-        transition: all 180ms ease;
-    }
-
-    .doc-dynamic-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(135deg, rgba(137, 190, 50, 0.10), transparent 48%);
-        opacity: 0;
-        transition: opacity 180ms ease;
-    }
-
-    .doc-dynamic-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(137, 190, 50, 0.48);
-        background: rgba(255, 255, 255, 0.065);
-    }
-
-    .doc-dynamic-card:hover::before {
-        opacity: 1;
-    }
-
-    .doc-dynamic-card.is-missing:hover {
-        border-color: rgba(245, 177, 66, 0.48);
-    }
-
-    .doc-dynamic-card.is-missing::before {
-        background: linear-gradient(135deg, rgba(245, 177, 66, 0.10), transparent 48%);
-    }
-
-    .doc-icon {
-        width: 3rem;
-        height: 3rem;
-        border-radius: 1rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-    }
-
-    .doc-icon.green {
-        color: var(--brand-green);
-        border-color: rgba(137, 190, 50, 0.26);
-        background: rgba(137, 190, 50, 0.10);
-    }
-
-    .doc-icon.yellow {
-        color: var(--brand-yellow);
-        border-color: rgba(245, 177, 66, 0.26);
-        background: rgba(245, 177, 66, 0.10);
-    }
-
-    .doc-chip {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        background: rgba(255, 255, 255, 0.045);
-        padding: 0.35rem 0.55rem;
-        color: var(--muted);
-        font-size: 0.55rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-        line-height: 1;
-    }
-
-    .doc-chip.ready {
-        border-color: rgba(137, 190, 50, 0.26);
-        background: rgba(137, 190, 50, 0.10);
-        color: var(--brand-green);
-    }
-
-    .doc-chip.warning {
-        border-color: rgba(245, 177, 66, 0.26);
-        background: rgba(245, 177, 66, 0.10);
-        color: var(--brand-yellow);
-    }
-
-    .asset-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.85rem;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background: rgba(255, 255, 255, 0.035);
-        padding: 0.85rem;
-        transition: all 180ms ease;
-    }
-
-    .asset-row:hover {
-        border-color: rgba(137, 190, 50, 0.25);
-        background: rgba(137, 190, 50, 0.055);
-    }
-
-    .asset-row-title {
-        color: #fff;
-        font-size: 0.76rem;
-        font-family: Orbitron, sans-serif;
-        font-weight: 800;
-        word-break: break-word;
-    }
-
-    .asset-row-meta {
-        color: var(--muted);
-        font-size: 0.68rem;
-        margin-top: 0.25rem;
-    }
-
-    .skeleton-line {
-        display: block;
-        min-height: 0.85rem;
-        border-radius: 999px;
-        background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.12), rgba(255,255,255,0.05));
-        background-size: 200% 100%;
-        animation: skeletonMove 1.2s linear infinite;
-    }
-
-    @keyframes skeletonMove {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-
-    .toast-item {
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background: rgba(10, 10, 10, 0.92);
-        padding: 0.9rem 1rem;
-        color: #fff;
-        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(16px);
-        transform: translateY(10px);
-        opacity: 0;
-        transition: all 180ms ease;
-    }
-
-    .toast-item.show {
-        transform: translateY(0);
-        opacity: 1;
-    }
-</style>
-
-<div class="download-page relative z-10">
-
-    <div class="flex flex-col xl:flex-row xl:items-end justify-between gap-5 mb-8 mt-6">
-        <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">
-                EifelLog Hub
-            </span>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-1">
-                <h1 class="text-2xl md:text-4xl font-orbitron font-bold text-white">
-                    Downloads
-                </h1>
-                <span id="page-live-status" class="release-pill">
-                    <span class="pulse-dot"></span>
-                    Release wird geprüft
+                <span class="inline-flex w-fit px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
+                    Dokument Center
                 </span>
             </div>
-            <p class="text-sm text-[var(--muted)] font-inter mt-3 max-w-3xl leading-relaxed">
-                Lade das aktuelle EifelLog Setup herunter, prüfe verfügbare Dokumente und sieh den Live-Status des neuesten GitHub-Releases.
-            </p>
-        </div>
 
-        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button id="refresh-release-btn" type="button" class="ghost-btn">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 006.7 4.7L4 7m16 10l-2.7 2.3A8 8 0 014 15"></path>
-                </svg>
-                Neu laden
-            </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <a href="{{ url_for('dashboard') if url_for is defined else '/dashboard' }}"
-               class="ghost-btn">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path>
-                </svg>
-                Dashboard
-            </a>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <div class="metric-card">
-            <p class="metric-label">Release</p>
-            <p id="top-release-version" class="metric-value">Lädt...</p>
-        </div>
-
-        <div class="metric-card">
-            <p class="metric-label">Assets</p>
-            <p id="top-release-assets" class="metric-value">Lädt...</p>
-        </div>
-
-        <div class="metric-card">
-            <p class="metric-label">Aktualisiert</p>
-            <p id="top-release-updated" class="metric-value">Lädt...</p>
-        </div>
-
-        <div class="metric-card">
-            <p class="metric-label">Status</p>
-            <p id="top-release-status" class="metric-value text-[var(--brand-yellow)]">Prüfe...</p>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
-
-        <div class="xl:col-span-2 flex flex-col gap-6">
-
-            <div class="glass-card p-6 md:p-7 relative overflow-hidden border-t border-[var(--brand-green)]/30">
-                <div class="absolute -right-12 -top-12 opacity-[0.06] text-white pointer-events-none">
-                    <svg class="w-64 h-64" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm-7 2h14v2H5v-2z"/>
-                    </svg>
-                </div>
-
-                <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-7">
+                <button type="button"
+                        class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group text-left"
+                        data-title="Frachtterminal.doc"
+                        data-type="DOC"
+                        data-file="Frachtterminal.doc"
+                        data-content='
+                            <p><strong>Frachtterminal</strong></p>
+                            <p>Dieses Dokument enthält wichtige Informationen für Fahrer rund um das Frachtterminal, die Nutzung der Aufträge und den Umgang mit Tourdaten.</p>
+                            <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
+                            <ul class="list-disc pl-5 mt-2 space-y-1">
+                                <li>Prüfe vor jeder Fahrt, ob deine Tour korrekt eingetragen wurde.</li>
+                                <li>Achte auf vollständige Angaben bei Fracht, Strecke und Abschluss.</li>
+                                <li>Melde Fehler oder fehlende Tourdaten direkt beim Support oder Dispatcher.</li>
+                            </ul>
+                        '>
                     <div class="flex items-start gap-4">
-                        <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.10)]">
-                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
                             </svg>
                         </div>
 
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
-                                    Aktuelles Setup
-                                </span>
-                                <span id="setup-status-pill" class="status-pill muted">Wartet</span>
-                            </div>
-
-                            <h2 class="font-orbitron font-bold text-xl md:text-2xl text-white tracking-wide mt-2">
-                                EifelLog Fahrer-App
-                            </h2>
-                            <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed max-w-2xl">
-                                Der Download wird automatisch aus dem neuesten GitHub-Release erkannt. Bevorzugt werden Setup-, Installer-, EXE-, MSI- und ZIP-Dateien.
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                Frachtterminal.doc
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Abläufe und Informationen für Fahrer.
                             </p>
 
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6">
-                                <div class="metric-card">
-                                    <p class="metric-label">Version</p>
-                                    <p id="setup-version" class="metric-value">Lädt...</p>
-                                </div>
-
-                                <div class="metric-card">
-                                    <p class="metric-label">Größe</p>
-                                    <p id="setup-size" class="metric-value">Lädt...</p>
-                                </div>
-
-                                <div class="metric-card col-span-2 md:col-span-1">
-                                    <p class="metric-label">Downloads</p>
-                                    <p id="setup-download-count" class="metric-value">Lädt...</p>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 rounded-2xl border border-white/7 bg-black/25 p-4">
-                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">
-                                    Datei
-                                </p>
-                                <p id="setup-filename" class="text-sm font-inter text-gray-300 break-words">
-                                    Release wird geprüft...
-                                </p>
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Öffnen
+                                </span>
+                                <span id="doc-frachtterminal-version" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Version: ...
+                                </span>
+                                <span id="doc-frachtterminal-size" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Größe: ...
+                                </span>
                             </div>
                         </div>
                     </div>
+                </button>
 
-                    <div class="flex flex-col gap-3 w-full lg:w-[260px]">
-                        <a id="setup-download-btn"
-                           href="#"
-                           class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(137,190,50,0.08)] opacity-60 cursor-not-allowed"
-                           aria-disabled="true">
-                            <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <button type="button"
+                        class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group text-left"
+                        data-title="nutzungsbedingunen.doc"
+                        data-type="DOC"
+                        data-file="nutzungsbedingunen.doc"
+                        data-content='
+                            <p><strong>Nutzungsbedingungen</strong></p>
+                            <p>Dieses Dokument beschreibt die grundlegenden Regeln für die Nutzung von EifelLog und den verantwortungsvollen Umgang mit dem System.</p>
+                            <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
+                            <ul class="list-disc pl-5 mt-2 space-y-1">
+                                <li>Nutze EifelLog nur für korrekte und nachvollziehbare Fahrten.</li>
+                                <li>Trage keine falschen oder manipulierten Tourdaten ein.</li>
+                                <li>Behandle interne Daten und Dokumente vertraulich.</li>
+                            </ul>
+                        '>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
                             </svg>
-                            Setup wird gesucht
-                        </a>
+                        </div>
 
-                        <a id="release-link-btn"
-                           href="https://github.com/{{ github_repo }}/releases/latest"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="ghost-btn w-full">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 .5a12 12 0 00-3.8 23.39c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.1-.75.08-.74.08-.74 1.21.09 1.85 1.25 1.85 1.25 1.08 1.84 2.82 1.31 3.51 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.94 0-1.31.47-2.38 1.24-3.22-.12-.31-.54-1.53.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.82.57A12 12 0 0012 .5z"/>
-                            </svg>
-                            Release öffnen
-                        </a>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                nutzungsbedingunen.doc
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Regeln und Bedingungen für die Nutzung.
+                            </p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Öffnen
+                                </span>
+                                <span id="doc-nutzung-version" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Version: ...
+                                </span>
+                                <span id="doc-nutzung-size" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Größe: ...
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </button>
+
             </div>
-
-            <div class="glass-card p-6 md:p-7">
-                <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6">
-                    <div>
-                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
-                            Dokument Center
-                        </span>
-                        <h2 class="font-orbitron font-bold text-lg md:text-xl text-white tracking-wide mt-1">
-                            Fahrer-Dokumente
-                        </h2>
-                        <p class="text-xs text-[var(--muted)] font-inter mt-2 max-w-2xl">
-                            Die Karten werden dynamisch gerendert. Verfügbare Release-Dateien bekommen automatisch Version, Größe und Download-Link.
-                        </p>
-                    </div>
-
-                    <div id="doc-count-pill" class="release-pill">
-                        0 Dokumente
-                    </div>
-                </div>
-
-                <div class="flex flex-col lg:flex-row gap-3 mb-5">
-                    <div class="relative flex-1">
-                        <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                        <input id="doc-search"
-                               type="search"
-                               class="doc-search-input font-inter text-sm"
-                               placeholder="Dokument suchen, z. B. Frachtterminal oder Nutzungsbedingungen">
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <button class="doc-filter-btn active" type="button" data-doc-filter="all">Alle</button>
-                        <button class="doc-filter-btn" type="button" data-doc-filter="ready">Verfügbar</button>
-                        <button class="doc-filter-btn" type="button" data-doc-filter="missing">Fehlt</button>
-                    </div>
-                </div>
-
-                <div id="documents-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="doc-dynamic-card">
-                        <span class="skeleton-line w-2/3"></span>
-                        <span class="skeleton-line w-full mt-4"></span>
-                        <span class="skeleton-line w-1/2 mt-3"></span>
-                    </div>
-                    <div class="doc-dynamic-card">
-                        <span class="skeleton-line w-2/3"></span>
-                        <span class="skeleton-line w-full mt-4"></span>
-                        <span class="skeleton-line w-1/2 mt-3"></span>
-                    </div>
-                </div>
-
-                <div id="documents-empty" class="hidden rounded-2xl border border-white/10 bg-white/[0.035] p-6 text-center mt-4">
-                    <p class="font-orbitron text-sm text-white uppercase tracking-widest">
-                        Keine Dokumente gefunden
-                    </p>
-                    <p class="text-sm text-[var(--muted)] font-inter mt-2">
-                        Passe die Suche oder den Filter an.
-                    </p>
-                </div>
-            </div>
-
         </div>
 
-        <div class="flex flex-col gap-6">
+    </div>
 
-            <div class="glass-card p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
-                    Release Snapshot
-                    <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
-                </h2>
+    <div class="flex flex-col gap-6">
 
-                <div class="space-y-3">
-                    <div class="asset-row">
-                        <div>
-                            <p class="asset-row-title">Quelle</p>
-                            <p class="asset-row-meta">Repository</p>
-                        </div>
-                        <span class="text-white font-orbitron font-bold text-xs uppercase">GitHub</span>
-                    </div>
+        <div class="glass-card p-6">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
+                Für Fahrer
+                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+            </h2>
 
-                    <div class="asset-row">
-                        <div>
-                            <p class="asset-row-title">Repository</p>
-                            <p class="asset-row-meta break-all">{{ github_repo }}</p>
-                        </div>
-                    </div>
+            <div class="space-y-4">
+                <div class="border-l-2 border-[var(--brand-green)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Vor der Fahrt
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Prüfe, ob du die aktuelle App-Version nutzt, bevor du neue Touren einträgst.
+                    </p>
+                </div>
 
-                    <div class="asset-row">
-                        <div>
-                            <p class="asset-row-title">Release</p>
-                            <p id="sidebar-release-version" class="asset-row-meta">Lädt...</p>
-                        </div>
-                    </div>
+                <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Nach der Fahrt
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Kontrolliere deine Angaben im Fahrtenbuch, damit Kilometer, Fracht und Einnahmen sauber erfasst werden.
+                    </p>
+                </div>
 
-                    <div class="asset-row">
-                        <div>
-                            <p class="asset-row-title">Publiziert</p>
-                            <p id="sidebar-release-date" class="asset-row-meta">Lädt...</p>
-                        </div>
-                    </div>
+                <div class="border-l-2 border-[#5865F2] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Support
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Bei Problemen mit Setup, Login oder Tourdaten melde dich beim Support-Team.
+                    </p>
                 </div>
             </div>
-
-            <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
-                <div class="flex items-center justify-between gap-3 mb-4">
-                    <h2 class="font-orbitron font-bold text-sm text-[var(--muted)] uppercase tracking-widest">
-                        Release Dateien
-                    </h2>
-                    <span id="asset-list-count" class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">
-                        Lädt
-                    </span>
-                </div>
-
-                <div id="asset-list" class="space-y-3">
-                    <div class="asset-row">
-                        <div class="w-full">
-                            <span class="skeleton-line w-2/3"></span>
-                            <span class="skeleton-line w-1/2 mt-3"></span>
-                        </div>
-                    </div>
-                    <div class="asset-row">
-                        <div class="w-full">
-                            <span class="skeleton-line w-2/3"></span>
-                            <span class="skeleton-line w-1/2 mt-3"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="glass-card p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">
-                    Für Fahrer
-                </h2>
-
-                <div class="space-y-4">
-                    <div class="border-l-2 border-[var(--brand-green)] pl-3">
-                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                            Vor der Fahrt
-                        </p>
-                        <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                            Prüfe, ob du die aktuelle App-Version nutzt, bevor du neue Touren einträgst.
-                        </p>
-                    </div>
-
-                    <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
-                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                            Nach der Fahrt
-                        </p>
-                        <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                            Kontrolliere deine Angaben im Fahrtenbuch, damit Kilometer, Fracht und Einnahmen sauber erfasst werden.
-                        </p>
-                    </div>
-
-                    <div class="border-l-2 border-[#5865F2] pl-3">
-                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                            Support
-                        </p>
-                        <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                            Bei Problemen mit Setup, Login oder Tourdaten melde dich beim Support-Team.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
         </div>
+
+        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
+            <h2 class="font-orbitron font-bold text-sm text-[var(--muted)] uppercase tracking-widest mb-4">
+                Download Status
+            </h2>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Quelle:</span>
+                    <span class="text-white font-orbitron font-bold text-xs uppercase">GitHub</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Release:</span>
+                    <span id="release-status-version" class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">Lädt...</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
+                    <span class="text-gray-400 font-inter">Dateien:</span>
+                    <span id="release-status-files" class="text-white font-orbitron font-bold text-xs uppercase">Lädt...</span>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -693,7 +271,7 @@
         <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex items-start gap-3 min-w-0">
-                    <div id="doc-modal-icon" class="w-11 h-11 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
+                    <div class="w-11 h-11 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -707,7 +285,7 @@
                     </div>
                 </div>
 
-                <button id="doc-modal-close" type="button" class="p-2 text-[var(--muted)] hover:text-white hover:bg-white/10 rounded-full border border-white/10 bg-white/5 transition-colors cursor-pointer shrink-0">
+                <button id="doc-modal-close" class="p-2 text-[var(--muted)] hover:text-white hover:bg-white/10 rounded-full border border-white/10 bg-white/5 transition-colors cursor-pointer shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -753,703 +331,311 @@
     </div>
 </div>
 
-<div id="toast-stack" class="fixed right-4 bottom-4 z-[250] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 pointer-events-none"></div>
-
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const repo = '{{ github_repo }}';
         const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
-        const releaseBrowserUrl = `https://github.com/${repo}/releases/latest`;
 
-        const documents = [
-            {
-                id: 'frachtterminal',
-                title: 'Frachtterminal.doc',
-                type: 'DOC',
-                file: 'Frachtterminal.doc',
-                accent: 'green',
-                description: 'Abläufe und Informationen für Fahrer rund um Terminal, Tourdaten und Abschluss.',
-                tags: ['Touren', 'Terminal', 'Fahrer'],
-                content: `
-                    <p><strong>Frachtterminal</strong></p>
-                    <p>Dieses Dokument enthält wichtige Informationen für Fahrer rund um das Frachtterminal, die Nutzung der Aufträge und den Umgang mit Tourdaten.</p>
-                    <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
-                    <ul class="list-disc pl-5 mt-2 space-y-1">
-                        <li>Prüfe vor jeder Fahrt, ob deine Tour korrekt eingetragen wurde.</li>
-                        <li>Achte auf vollständige Angaben bei Fracht, Strecke und Abschluss.</li>
-                        <li>Melde Fehler oder fehlende Tourdaten direkt beim Support oder Dispatcher.</li>
-                    </ul>
-                `
-            },
-            {
-                id: 'nutzungsbedingungen',
-                title: 'nutzungsbedingungen.doc',
-                type: 'DOC',
-                file: 'nutzungsbedingungen.doc',
-                accent: 'yellow',
-                description: 'Regeln und Bedingungen für die verantwortungsvolle Nutzung des Systems.',
-                tags: ['Regeln', 'Nutzung', 'Datenschutz'],
-                content: `
-                    <p><strong>utzungsbedingungen</strong></p>
-                    <p>Dieses Dokument beschreibt die grundlegenden Regeln für die Nutzung von EifelLog und den verantwortungsvollen Umgang mit dem System.</p>
-                    <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
-                    <ul class="list-disc pl-5 mt-2 space-y-1">
-                        <li>Nutze EifelLog nur für korrekte und nachvollziehbare Fahrten.</li>
-                        <li>Trage keine falschen oder manipulierten Tourdaten ein.</li>
-                        <li>Behandle interne Daten und Dokumente vertraulich.</li>
-                    </ul>
-                `
-            }
-        ];
+        const setupVersion = document.getElementById('setup-version');
+        const setupSize = document.getElementById('setup-size');
+        const setupStatus = document.getElementById('setup-status');
+        const setupDownloadBtn = document.getElementById('setup-download-btn');
 
-        const state = {
-            release: null,
-            assets: [],
-            setupAsset: null,
-            latestVersion: 'Latest',
-            docAssets: {},
-            activeFilter: 'all',
-            searchTerm: '',
-            loading: false
+        const releaseStatusVersion = document.getElementById('release-status-version');
+        const releaseStatusFiles = document.getElementById('release-status-files');
+
+        const docFrachtterminalVersion = document.getElementById('doc-frachtterminal-version');
+        const docFrachtterminalSize = document.getElementById('doc-frachtterminal-size');
+        const docNutzungVersion = document.getElementById('doc-nutzung-version');
+        const docNutzungSize = document.getElementById('doc-nutzung-size');
+
+        const docModal = document.getElementById('doc-modal');
+        const docModalPanel = document.getElementById('doc-modal-panel');
+        const docModalClose = document.getElementById('doc-modal-close');
+        const docModalTitle = document.getElementById('doc-modal-title');
+        const docModalType = document.getElementById('doc-modal-type');
+        const docModalVersion = document.getElementById('doc-modal-version');
+        const docModalSize = document.getElementById('doc-modal-size');
+        const docModalContent = document.getElementById('doc-modal-content');
+        const docModalDownload = document.getElementById('doc-modal-download');
+
+        const knownAssets = {
+            'Frachtterminal.doc': null,
+            'nutzungsbedingunen.doc': null
         };
 
-        const els = {
-            pageLiveStatus: document.getElementById('page-live-status'),
-            refreshReleaseBtn: document.getElementById('refresh-release-btn'),
-
-            topReleaseVersion: document.getElementById('top-release-version'),
-            topReleaseAssets: document.getElementById('top-release-assets'),
-            topReleaseUpdated: document.getElementById('top-release-updated'),
-            topReleaseStatus: document.getElementById('top-release-status'),
-
-            setupVersion: document.getElementById('setup-version'),
-            setupSize: document.getElementById('setup-size'),
-            setupDownloadCount: document.getElementById('setup-download-count'),
-            setupFilename: document.getElementById('setup-filename'),
-            setupStatusPill: document.getElementById('setup-status-pill'),
-            setupDownloadBtn: document.getElementById('setup-download-btn'),
-            releaseLinkBtn: document.getElementById('release-link-btn'),
-
-            docSearch: document.getElementById('doc-search'),
-            documentsGrid: document.getElementById('documents-grid'),
-            documentsEmpty: document.getElementById('documents-empty'),
-            docCountPill: document.getElementById('doc-count-pill'),
-            filterButtons: document.querySelectorAll('[data-doc-filter]'),
-
-            sidebarReleaseVersion: document.getElementById('sidebar-release-version'),
-            sidebarReleaseDate: document.getElementById('sidebar-release-date'),
-            assetList: document.getElementById('asset-list'),
-            assetListCount: document.getElementById('asset-list-count'),
-
-            docModal: document.getElementById('doc-modal'),
-            docModalPanel: document.getElementById('doc-modal-panel'),
-            docModalClose: document.getElementById('doc-modal-close'),
-            docModalTitle: document.getElementById('doc-modal-title'),
-            docModalType: document.getElementById('doc-modal-type'),
-            docModalVersion: document.getElementById('doc-modal-version'),
-            docModalSize: document.getElementById('doc-modal-size'),
-            docModalContent: document.getElementById('doc-modal-content'),
-            docModalDownload: document.getElementById('doc-modal-download'),
-
-            toastStack: document.getElementById('toast-stack')
-        };
+        let latestVersion = 'Latest';
 
         function formatBytes(bytes) {
-            const number = Number(bytes);
-            if (!number || Number.isNaN(number)) return '-';
+            if (!bytes || Number.isNaN(bytes)) return '-';
 
-            const units = ['B', 'KB', 'MB', 'GB'];
-            let size = number;
-            let unitIndex = 0;
+            const mb = bytes / (1024 * 1024);
 
-            while (size >= 1024 && unitIndex < units.length - 1) {
-                size = size / 1024;
-                unitIndex += 1;
+            if (mb >= 1) {
+                return `${mb.toFixed(2)} MB`;
             }
 
-            const decimals = unitIndex === 0 ? 0 : 2;
-            return `${size.toFixed(decimals)} ${units[unitIndex]}`;
-        }
-
-        function formatNumber(value) {
-            const number = Number(value);
-            if (Number.isNaN(number)) return '0';
-            return new Intl.NumberFormat('de-DE').format(number);
-        }
-
-        function formatDate(dateString) {
-            if (!dateString) return '-';
-
-            const date = new Date(dateString);
-            if (Number.isNaN(date.getTime())) return '-';
-
-            return new Intl.DateTimeFormat('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(date);
-        }
-
-        function normalize(value) {
-            return String(value || '').toLowerCase().trim();
-        }
-
-        function escapeHtml(value) {
-            return String(value || '')
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#039;');
-        }
-
-        function isDisabledLink(link) {
-            return link && link.getAttribute('aria-disabled') === 'true';
-        }
-
-        function setPill(element, text, mode = 'muted') {
-            if (!element) return;
-            element.classList.remove('ready', 'warning', 'error', 'muted');
-            element.classList.add(mode);
-            element.textContent = text;
-        }
-
-        function setPageStatus(text, mode = 'loading') {
-            if (!els.pageLiveStatus) return;
-
-            els.pageLiveStatus.classList.remove('is-live', 'is-warning');
-
-            if (mode === 'live') {
-                els.pageLiveStatus.classList.add('is-live');
-            }
-
-            if (mode === 'warning') {
-                els.pageLiveStatus.classList.add('is-warning');
-            }
-
-            els.pageLiveStatus.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(text)}`;
-        }
-
-        function showToast(message) {
-            if (!els.toastStack) return;
-
-            const toast = document.createElement('div');
-            toast.className = 'toast-item pointer-events-auto font-inter text-sm';
-            toast.textContent = message;
-
-            els.toastStack.appendChild(toast);
-
-            requestAnimationFrame(() => {
-                toast.classList.add('show');
-            });
-
-            window.setTimeout(() => {
-                toast.classList.remove('show');
-                window.setTimeout(() => toast.remove(), 220);
-            }, 2600);
-        }
-
-        function iconDocument() {
-            return `
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
-                </svg>
-            `;
-        }
-
-        function iconDownload(sizeClass = 'w-5 h-5') {
-            return `
-                <svg class="${sizeClass} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                </svg>
-            `;
-        }
-
-        function iconWarning(sizeClass = 'w-5 h-5') {
-            return `
-                <svg class="${sizeClass} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
-                </svg>
-            `;
-        }
-
-        function scoreSetupAsset(asset) {
-            const name = normalize(asset.name);
-            const extensionScore = [
-                ['.exe', 70],
-                ['.msi', 65],
-                ['.zip', 45],
-                ['.7z', 35],
-                ['.rar', 30]
-            ].reduce((score, [ext, points]) => name.endsWith(ext) ? Math.max(score, points) : score, 0);
-
-            if (!extensionScore) return 0;
-
-            const keywordScore = [
-                ['setup', 35],
-                ['installer', 35],
-                ['install', 22],
-                ['eifellog', 22],
-                ['eifel-log', 22],
-                ['tracking', 12],
-                ['fahrer', 12],
-                ['driver', 10],
-                ['app', 8]
-            ].reduce((score, [keyword, points]) => name.includes(keyword) ? score + points : score, 0);
-
-            const penalty = name.endsWith('.doc') || name.endsWith('.docx') || name.endsWith('.pdf') ? 100 : 0;
-            return extensionScore + keywordScore - penalty;
+            const kb = bytes / 1024;
+            return `${kb.toFixed(1)} KB`;
         }
 
         function findSetupAsset(assets) {
             if (!Array.isArray(assets)) return null;
 
-            return [...assets]
-                .map(asset => ({ asset, score: scoreSetupAsset(asset) }))
-                .filter(item => item.score > 0)
-                .sort((a, b) => b.score - a.score || Number(b.asset.size || 0) - Number(a.asset.size || 0))
-                .map(item => item.asset)[0] || null;
+            const setupKeywords = [
+                'setup',
+                'installer',
+                'install',
+                'eifellog',
+                'eifel-log',
+                'tracking',
+                'fahrer'
+            ];
+
+            const setupExtensions = ['.exe', '.msi', '.zip'];
+
+            return assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                const hasSetupKeyword = setupKeywords.some(keyword => name.includes(keyword));
+                const hasSetupExtension = setupExtensions.some(extension => name.endsWith(extension));
+
+                return hasSetupExtension && hasSetupKeyword;
+            }) || assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                return name.endsWith('.exe') || name.endsWith('.msi');
+            }) || assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                return name.endsWith('.zip');
+            }) || null;
         }
 
-        function findDocAsset(fileName) {
-            const target = normalize(fileName);
-
-            return state.assets.find(asset => normalize(asset.name) === target)
-                || state.assets.find(asset => normalize(asset.name).includes(target.replace('.doc', '')))
-                || null;
-        }
-
-        function setLoadingState() {
-            state.loading = true;
-            setPageStatus('Release wird geprüft', 'loading');
-
-            els.topReleaseVersion.textContent = 'Lädt...';
-            els.topReleaseAssets.textContent = 'Lädt...';
-            els.topReleaseUpdated.textContent = 'Lädt...';
-            els.topReleaseStatus.textContent = 'Prüfe...';
-            els.topReleaseStatus.className = 'metric-value text-[var(--brand-yellow)]';
-
-            els.setupVersion.textContent = 'Lädt...';
-            els.setupSize.textContent = 'Lädt...';
-            els.setupDownloadCount.textContent = 'Lädt...';
-            els.setupFilename.textContent = 'Release wird geprüft...';
-            setPill(els.setupStatusPill, 'Prüfe', 'warning');
-
-            els.assetListCount.textContent = 'Lädt';
-            els.sidebarReleaseVersion.textContent = 'Lädt...';
-            els.sidebarReleaseDate.textContent = 'Lädt...';
-
-            els.setupDownloadBtn.href = '#';
-            els.setupDownloadBtn.removeAttribute('download');
-            els.setupDownloadBtn.setAttribute('aria-disabled', 'true');
-            els.setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
-            els.setupDownloadBtn.innerHTML = `
+        function setSetupButtonLoading() {
+            setupDownloadBtn.href = '#';
+            setupDownloadBtn.removeAttribute('download');
+            setupDownloadBtn.setAttribute('aria-disabled', 'true');
+            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setupDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Setup wird gesucht
+                Setup wird gesucht...
             `;
-
-            renderAssetSkeleton();
-            renderDocuments();
         }
 
-        function setSetupReady(asset) {
-            els.setupDownloadBtn.href = asset.browser_download_url;
-            els.setupDownloadBtn.setAttribute('download', asset.name || 'EifelLog-Setup');
-            els.setupDownloadBtn.removeAttribute('aria-disabled');
-            els.setupDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
-            els.setupDownloadBtn.innerHTML = `${iconDownload()}Setup herunterladen`;
+        function setSetupButtonReady(asset) {
+            setupDownloadBtn.href = asset.browser_download_url;
+            setupDownloadBtn.setAttribute('download', asset.name || 'EifelLog-Setup');
+            setupDownloadBtn.removeAttribute('aria-disabled');
+            setupDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
 
-            setPill(els.setupStatusPill, 'Bereit', 'ready');
-        }
-
-        function setSetupUnavailable() {
-            els.setupDownloadBtn.href = '#';
-            els.setupDownloadBtn.removeAttribute('download');
-            els.setupDownloadBtn.setAttribute('aria-disabled', 'true');
-            els.setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
-            els.setupDownloadBtn.innerHTML = `${iconWarning()}Setup nicht verfügbar`;
-
-            setPill(els.setupStatusPill, 'Setup fehlt', 'warning');
-        }
-
-        function setUnavailableState(message = 'Kein Release') {
-            state.release = null;
-            state.assets = [];
-            state.setupAsset = null;
-            state.docAssets = {};
-            state.latestVersion = 'Latest';
-            state.loading = false;
-
-            setPageStatus(message, 'warning');
-
-            els.topReleaseVersion.textContent = '-';
-            els.topReleaseAssets.textContent = '0';
-            els.topReleaseUpdated.textContent = '-';
-            els.topReleaseStatus.textContent = message;
-            els.topReleaseStatus.className = 'metric-value text-[var(--brand-yellow)]';
-
-            els.setupVersion.textContent = '-';
-            els.setupSize.textContent = '-';
-            els.setupDownloadCount.textContent = '0';
-            els.setupFilename.textContent = 'Keine passende Setup-Datei gefunden.';
-            setSetupUnavailable();
-
-            els.sidebarReleaseVersion.textContent = '-';
-            els.sidebarReleaseDate.textContent = '-';
-            els.assetListCount.textContent = '0';
-            els.assetList.innerHTML = `
-                <div class="rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/10 p-4">
-                    <p class="font-orbitron text-xs text-[var(--brand-yellow)] uppercase tracking-widest">Keine Dateien</p>
-                    <p class="font-inter text-sm text-gray-300 mt-2">Das neueste GitHub-Release konnte nicht geladen werden oder enthält keine Assets.</p>
-                </div>
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                </svg>
+                Setup herunterladen
             `;
-
-            renderDocuments();
         }
 
-        function applyRelease(release) {
+        function setSetupButtonUnavailable() {
+            setupDownloadBtn.href = '#';
+            setupDownloadBtn.removeAttribute('download');
+            setupDownloadBtn.setAttribute('aria-disabled', 'true');
+            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
+                </svg>
+                Setup nicht verfügbar
+            `;
+        }
+
+        function setUnavailableState() {
+            setupVersion.textContent = '-';
+            setupSize.textContent = '-';
+            setupStatus.textContent = 'Kein Release';
+            setupStatus.classList.remove('text-[var(--brand-green)]');
+            setupStatus.classList.add('text-[var(--brand-yellow)]');
+
+            releaseStatusVersion.textContent = '-';
+            releaseStatusFiles.textContent = '0 Dateien';
+
+            setSetupButtonUnavailable();
+
+            docFrachtterminalVersion.textContent = 'Version: -';
+            docFrachtterminalSize.textContent = 'Größe: -';
+            docNutzungVersion.textContent = 'Version: -';
+            docNutzungSize.textContent = 'Größe: -';
+        }
+
+        setSetupButtonLoading();
+
+        fetch(releaseApiUrl, {
+            headers: {
+                'Accept': 'application/vnd.github+json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Kein Release gefunden');
+            }
+
+            return response.json();
+        })
+        .then(release => {
             const assets = Array.isArray(release.assets) ? release.assets : [];
-            const latestVersion = release.tag_name || release.name || 'Latest';
+            latestVersion = release.tag_name || release.name || 'Latest';
+
+            releaseStatusVersion.textContent = latestVersion;
+            releaseStatusFiles.textContent = `${assets.length} Dateien`;
+
             const setupAsset = findSetupAsset(assets);
 
-            state.release = release;
-            state.assets = assets;
-            state.setupAsset = setupAsset;
-            state.latestVersion = latestVersion;
-            state.docAssets = documents.reduce((map, doc) => {
-                map[doc.file] = findDocAsset(doc.file);
-                return map;
-            }, {});
-            state.loading = false;
-
-            setPageStatus('Release online', 'live');
-
-            els.topReleaseVersion.textContent = latestVersion;
-            els.topReleaseAssets.textContent = formatNumber(assets.length);
-            els.topReleaseUpdated.textContent = formatDate(release.published_at || release.created_at);
-            els.topReleaseStatus.textContent = setupAsset ? 'Bereit' : 'Setup fehlt';
-            els.topReleaseStatus.className = setupAsset
-                ? 'metric-value text-[var(--brand-green)]'
-                : 'metric-value text-[var(--brand-yellow)]';
-
-            els.sidebarReleaseVersion.textContent = latestVersion;
-            els.sidebarReleaseDate.textContent = formatDate(release.published_at || release.created_at);
-
-            if (release.html_url) {
-                els.releaseLinkBtn.href = release.html_url;
-            } else {
-                els.releaseLinkBtn.href = releaseBrowserUrl;
-            }
-
             if (setupAsset) {
-                els.setupVersion.textContent = latestVersion;
-                els.setupSize.textContent = formatBytes(setupAsset.size);
-                els.setupDownloadCount.textContent = formatNumber(setupAsset.download_count || 0);
-                els.setupFilename.textContent = setupAsset.name || 'EifelLog-Setup';
-                setSetupReady(setupAsset);
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = formatBytes(setupAsset.size);
+                setupStatus.textContent = 'Bereit';
+                setupStatus.classList.remove('text-[var(--brand-yellow)]');
+                setupStatus.classList.add('text-[var(--brand-green)]');
+
+                setSetupButtonReady(setupAsset);
             } else {
-                els.setupVersion.textContent = latestVersion;
-                els.setupSize.textContent = '-';
-                els.setupDownloadCount.textContent = '0';
-                els.setupFilename.textContent = 'Keine EXE-, MSI- oder ZIP-Datei mit Setup-Bezug gefunden.';
-                setSetupUnavailable();
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = '-';
+                setupStatus.textContent = 'Setup fehlt';
+                setupStatus.classList.remove('text-[var(--brand-green)]');
+                setupStatus.classList.add('text-[var(--brand-yellow)]');
+
+                setSetupButtonUnavailable();
             }
 
-            renderDocuments();
-            renderAssets();
+            assets.forEach(asset => {
+                if (asset.name === 'Frachtterminal.doc') {
+                    knownAssets['Frachtterminal.doc'] = asset;
+                    docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
+                    docFrachtterminalSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+                }
 
-            showToast('Release-Daten wurden aktualisiert.');
-        }
-
-        function renderAssetSkeleton() {
-            els.assetList.innerHTML = `
-                <div class="asset-row">
-                    <div class="w-full">
-                        <span class="skeleton-line w-2/3"></span>
-                        <span class="skeleton-line w-1/2 mt-3"></span>
-                    </div>
-                </div>
-                <div class="asset-row">
-                    <div class="w-full">
-                        <span class="skeleton-line w-2/3"></span>
-                        <span class="skeleton-line w-1/2 mt-3"></span>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderAssets() {
-            const assets = state.assets;
-            els.assetListCount.textContent = formatNumber(assets.length);
-
-            if (!assets.length) {
-                els.assetList.innerHTML = `
-                    <div class="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-                        <p class="font-orbitron text-xs text-white uppercase tracking-widest">Keine Release-Dateien</p>
-                        <p class="font-inter text-sm text-[var(--muted)] mt-2">Dieses Release enthält noch keine Assets.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            els.assetList.innerHTML = assets
-                .slice()
-                .sort((a, b) => Number(b.size || 0) - Number(a.size || 0))
-                .map(asset => {
-                    const isSetup = state.setupAsset && state.setupAsset.id === asset.id;
-                    const label = isSetup ? 'Setup' : (asset.name || '').split('.').pop()?.toUpperCase() || 'Datei';
-
-                    return `
-                        <a href="${escapeHtml(asset.browser_download_url || '#')}"
-                           class="asset-row"
-                           ${asset.browser_download_url ? 'download target="_blank" rel="noopener noreferrer"' : 'aria-disabled="true"'}
-                           title="${escapeHtml(asset.name || 'Datei herunterladen')}">
-                            <div class="min-w-0">
-                                <p class="asset-row-title">${escapeHtml(asset.name || 'Unbenannte Datei')}</p>
-                                <p class="asset-row-meta">${formatBytes(asset.size)} · ${formatNumber(asset.download_count || 0)} Downloads</p>
-                            </div>
-                            <span class="doc-chip ${isSetup ? 'ready' : ''} shrink-0">${escapeHtml(label)}</span>
-                        </a>
-                    `;
-                })
-                .join('');
-        }
-
-        function getFilteredDocuments() {
-            const search = normalize(state.searchTerm);
-
-            return documents.filter(doc => {
-                const asset = state.docAssets[doc.file];
-                const isReady = Boolean(asset && asset.browser_download_url);
-                const matchesFilter =
-                    state.activeFilter === 'all'
-                    || (state.activeFilter === 'ready' && isReady)
-                    || (state.activeFilter === 'missing' && !isReady);
-
-                const text = [
-                    doc.title,
-                    doc.description,
-                    doc.file,
-                    doc.type,
-                    ...(doc.tags || [])
-                ].map(normalize).join(' ');
-
-                const matchesSearch = !search || text.includes(search);
-
-                return matchesFilter && matchesSearch;
+                if (asset.name === 'nutzungsbedingunen.doc') {
+                    knownAssets['nutzungsbedingunen.doc'] = asset;
+                    docNutzungVersion.textContent = `Version: ${latestVersion}`;
+                    docNutzungSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+                }
             });
-        }
 
-        function renderDocuments() {
-            const filtered = getFilteredDocuments();
-            const readyCount = documents.filter(doc => state.docAssets[doc.file]?.browser_download_url).length;
-
-            els.docCountPill.textContent = `${readyCount}/${documents.length} verfügbar`;
-
-            if (!filtered.length) {
-                els.documentsGrid.innerHTML = '';
-                els.documentsEmpty.classList.remove('hidden');
-                return;
+            if (!knownAssets['Frachtterminal.doc']) {
+                docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
+                docFrachtterminalSize.textContent = 'Größe: Datei fehlt';
             }
 
-            els.documentsEmpty.classList.add('hidden');
-
-            els.documentsGrid.innerHTML = filtered.map(doc => {
-                const asset = state.docAssets[doc.file];
-                const isReady = Boolean(asset && asset.browser_download_url);
-                const version = state.release ? state.latestVersion : '-';
-                const size = asset ? formatBytes(asset.size) : 'Datei fehlt';
-                const statusClass = isReady ? 'ready' : 'warning';
-                const statusText = isReady ? 'Verfügbar' : (state.loading ? 'Prüfe' : 'Fehlt');
-
-                return `
-                    <button type="button"
-                            class="doc-dynamic-card ${isReady ? '' : 'is-missing'}"
-                            data-doc-id="${escapeHtml(doc.id)}">
-                        <div class="relative z-10 flex items-start gap-4">
-                            <div class="doc-icon ${escapeHtml(doc.accent || 'green')}">
-                                ${iconDocument()}
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="doc-chip ${statusClass}">${statusText}</span>
-                                    <span class="doc-chip">${escapeHtml(doc.type || 'DOC')}</span>
-                                </div>
-
-                                <h3 class="font-orbitron font-bold text-sm text-white mt-3 break-words">
-                                    ${escapeHtml(doc.title)}
-                                </h3>
-
-                                <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
-                                    ${escapeHtml(doc.description)}
-                                </p>
-
-                                <div class="mt-4 flex flex-wrap items-center gap-2">
-                                    <span class="doc-chip">Version: ${escapeHtml(version)}</span>
-                                    <span class="doc-chip">${escapeHtml(size)}</span>
-                                </div>
-
-                                ${(doc.tags || []).length ? `
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                        ${doc.tags.map(tag => `<span class="doc-chip">${escapeHtml(tag)}</span>`).join('')}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </button>
-                `;
-            }).join('');
-
-            els.documentsGrid.querySelectorAll('[data-doc-id]').forEach(button => {
-                button.addEventListener('click', () => {
-                    const doc = documents.find(item => item.id === button.getAttribute('data-doc-id'));
-                    if (doc) openDocModal(doc);
-                });
-            });
-        }
+            if (!knownAssets['nutzungsbedingunen.doc']) {
+                docNutzungVersion.textContent = `Version: ${latestVersion}`;
+                docNutzungSize.textContent = 'Größe: Datei fehlt';
+            }
+        })
+        .catch(error => {
+            console.warn('GitHub Release konnte nicht geladen werden:', error);
+            setUnavailableState();
+        });
 
         function lockBodyScroll() {
             document.body.classList.add('overflow-hidden');
         }
 
         function unlockBodyScroll() {
-            if (els.docModal.classList.contains('hidden')) {
+            if (docModal.classList.contains('hidden')) {
                 document.body.classList.remove('overflow-hidden');
             }
         }
 
-        function openDocModal(doc) {
-            const asset = state.docAssets[doc.file];
-            const isReady = Boolean(asset && asset.browser_download_url);
+        function openDocModal(button) {
+            const title = button.getAttribute('data-title') || 'Dokument';
+            const type = button.getAttribute('data-type') || 'DOC';
+            const file = button.getAttribute('data-file') || '';
+            const content = button.getAttribute('data-content') || '';
+            const asset = knownAssets[file];
 
-            els.docModalTitle.textContent = doc.title || 'Dokument';
-            els.docModalType.textContent = doc.type || 'DOC';
-            els.docModalVersion.textContent = state.release ? state.latestVersion : '-';
-            els.docModalSize.textContent = asset ? formatBytes(asset.size) : '-';
-            els.docModalContent.innerHTML = doc.content || '<p>Für dieses Dokument ist noch keine Vorschau hinterlegt.</p>';
+            docModalTitle.textContent = title;
+            docModalType.textContent = type;
+            docModalVersion.textContent = latestVersion || '-';
+            docModalSize.textContent = asset ? formatBytes(asset.size) : '-';
+            docModalContent.innerHTML = content;
 
-            if (isReady) {
-                els.docModalDownload.href = asset.browser_download_url;
-                els.docModalDownload.setAttribute('download', asset.name || doc.file);
-                els.docModalDownload.removeAttribute('aria-disabled');
-                els.docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
-                els.docModalDownload.innerHTML = `${iconDownload('w-4 h-4')}Dokument herunterladen`;
+            if (asset && asset.browser_download_url) {
+                docModalDownload.href = asset.browser_download_url;
+                docModalDownload.setAttribute('download', asset.name || file);
+                docModalDownload.removeAttribute('aria-disabled');
+                docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
+                docModalDownload.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                    </svg>
+                    Dokument herunterladen
+                `;
             } else {
-                els.docModalDownload.href = '#';
-                els.docModalDownload.removeAttribute('download');
-                els.docModalDownload.setAttribute('aria-disabled', 'true');
-                els.docModalDownload.classList.add('opacity-50', 'cursor-not-allowed');
-                els.docModalDownload.innerHTML = `${iconWarning('w-4 h-4')}Dokument nicht verfügbar`;
+                docModalDownload.href = '#';
+                docModalDownload.removeAttribute('download');
+                docModalDownload.setAttribute('aria-disabled', 'true');
+                docModalDownload.classList.add('opacity-50', 'cursor-not-allowed');
+                docModalDownload.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
+                    </svg>
+                    Dokument nicht verfügbar
+                `;
             }
 
             lockBodyScroll();
-            els.docModal.classList.remove('hidden');
-            els.docModal.classList.add('flex');
+            docModal.classList.remove('hidden');
+            docModal.classList.add('flex');
 
-            window.setTimeout(() => {
-                els.docModal.classList.remove('opacity-0');
-                els.docModalPanel.classList.remove('scale-95', 'translate-y-4');
+            setTimeout(() => {
+                docModal.classList.remove('opacity-0');
+                docModalPanel.classList.remove('scale-95', 'translate-y-4');
             }, 10);
         }
 
         function closeDocModal() {
-            els.docModal.classList.add('opacity-0');
-            els.docModalPanel.classList.add('scale-95', 'translate-y-4');
+            docModal.classList.add('opacity-0');
+            docModalPanel.classList.add('scale-95', 'translate-y-4');
 
-            window.setTimeout(() => {
-                els.docModal.classList.add('hidden');
-                els.docModal.classList.remove('flex');
+            setTimeout(() => {
+                docModal.classList.add('hidden');
+                docModal.classList.remove('flex');
                 unlockBodyScroll();
             }, 300);
         }
 
-        async function loadRelease({ silent = false } = {}) {
-            if (state.loading) return;
-
-            setLoadingState();
-
-            try {
-                const response = await fetch(releaseApiUrl, {
-                    headers: {
-                        Accept: 'application/vnd.github+json'
-                    },
-                    cache: 'no-store'
-                });
-
-                if (!response.ok) {
-                    throw new Error(`GitHub antwortet mit Status ${response.status}`);
-                }
-
-                const release = await response.json();
-                applyRelease(release);
-
-                if (!silent) {
-                    showToast('Neuestes Release geladen.');
-                }
-            } catch (error) {
-                console.warn('GitHub Release konnte nicht geladen werden:', error);
-                setUnavailableState('Release Fehler');
-
-                if (!silent) {
-                    showToast('Release konnte nicht geladen werden.');
-                }
-            }
-        }
-
-        els.refreshReleaseBtn.addEventListener('click', () => loadRelease());
-
-        els.docSearch.addEventListener('input', event => {
-            state.searchTerm = event.target.value;
-            renderDocuments();
+        document.querySelectorAll('.doc-modal-trigger').forEach(button => {
+            button.addEventListener('click', () => openDocModal(button));
         });
 
-        els.filterButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                state.activeFilter = button.getAttribute('data-doc-filter') || 'all';
-
-                els.filterButtons.forEach(item => item.classList.remove('active'));
-                button.classList.add('active');
-
-                renderDocuments();
-            });
-        });
-
-        els.setupDownloadBtn.addEventListener('click', event => {
-            if (isDisabledLink(els.setupDownloadBtn)) {
+        setupDownloadBtn.addEventListener('click', event => {
+            if (setupDownloadBtn.getAttribute('aria-disabled') === 'true') {
                 event.preventDefault();
-                showToast('Setup ist aktuell nicht verfügbar.');
             }
         });
 
-        els.docModalDownload.addEventListener('click', event => {
-            if (isDisabledLink(els.docModalDownload)) {
+        docModalDownload.addEventListener('click', event => {
+            if (docModalDownload.getAttribute('aria-disabled') === 'true') {
                 event.preventDefault();
-                showToast('Dieses Dokument ist aktuell nicht verfügbar.');
             }
         });
 
-        els.docModalClose.addEventListener('click', closeDocModal);
+        docModalClose.addEventListener('click', closeDocModal);
 
-        els.docModal.addEventListener('click', event => {
-            if (event.target === els.docModal) {
+        docModal.addEventListener('click', event => {
+            if (event.target === docModal) {
                 closeDocModal();
             }
         });
 
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && !els.docModal.classList.contains('hidden')) {
+            if (event.key === 'Escape' && !docModal.classList.contains('hidden')) {
                 closeDocModal();
             }
         });
-
-        renderDocuments();
-        loadRelease({ silent: true });
     });
 </script>
 
