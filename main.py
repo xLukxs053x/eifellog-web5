@@ -32,6 +32,19 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
+
+@app.context_processor
+def inject_template_helpers():
+    """Stellt Template-Helfer bereit, damit reine Flask-Templates mit csrf_token() sauber rendern."""
+    def csrf_token():
+        token = session.get("_csrf_token")
+        if not token:
+            token = secrets.token_hex(16)
+            session["_csrf_token"] = token
+        return token
+
+    return {"csrf_token": csrf_token}
+
 PROFILE_UPLOAD_FOLDER = os.path.join("static", "uploads", "profiles")
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 
@@ -343,6 +356,23 @@ DISPOSITION_ALLOWED_ROLES = {
     "projektleitung"
 }
 
+GESCHAEFTSLEITUNG_ALLOWED_ROLES = {
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG,
+    ROLE_PROJEKTLEITUNG_ID,
+    "Geschäftsleitung",
+    "Geschaeftsleitung",
+    "Geschäftsführung",
+    "Geschaeftsfuehrung",
+    "geschäftsleitung",
+    "geschaeftsleitung",
+    "geschäftsführung",
+    "geschaeftsfuehrung",
+    "Projektleitung",
+    "projektleitung"
+}
+
 # Rollen, die die Dispo-Formularseite öffnen und Belege einreichen dürfen.
 # Der Zugriff auf /dispo/form ist bewusst breit, die Einsicht in eingereichte Dokumente bleibt getrennt.
 DISPO_FORM_ACCESS_ROLES = {
@@ -465,6 +495,16 @@ def has_disposition_permission(user_roles):
 
     primary_role_name = get_primary_role_name(user_roles)
     return primary_role_name in {"Disposition", "Projektleitung", "Geschäftsleitung"}
+
+
+def has_geschaeftsleitung_permission(user_roles):
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_allowed_roles = set(clean_roles(GESCHAEFTSLEITUNG_ALLOWED_ROLES))
+    if clean_user_roles.intersection(clean_allowed_roles):
+        return True
+
+    primary_role_name = get_primary_role_name(user_roles)
+    return primary_role_name in {"Geschäftsleitung", "Geschäftsführung", "Projektleitung"}
 
 
 def has_dispo_form_access(user_roles):
@@ -5034,6 +5074,19 @@ def require_disposition_permission():
     return None
 
 
+def require_geschaeftsleitung_permission():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_geschaeftsleitung_permission(user_roles):
+        flash("Zugriff verweigert. Diese Dokumentprüfung ist nur für Geschäftsleitung/Geschäftsführung freigegeben.", "error")
+        return redirect(url_for("dashboard"))
+
+    return None
+
+
 def require_dispo_form_access():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -5225,6 +5278,9 @@ def get_dispo_available_drivers(limit=100):
     return drivers
 
 
+@app.route("/disposition.html", methods=["GET"])
+@app.route("/disposition", methods=["GET"])
+@app.route("/dispo.html", methods=["GET"])
 @app.route("/dispo", methods=["GET"])
 def dispo():
     if "user" not in session:
@@ -5512,6 +5568,10 @@ def dispo_form_entry_lookup_query(entry_id):
 
 def normalize_dispo_form_status(status):
     status = safe_str(status, "pending").lower()
+    if status in {"management_pending", "forwarded_to_management", "forwarded", "zur_entscheidung"}:
+        return "management_pending"
+    if status in {"returned_incomplete", "incomplete", "unvollstaendig", "unvollständig", "zurueckgegeben", "zurückgegeben"}:
+        return "returned_incomplete"
     if status in {"approved", "freigegeben", "accepted", "ok"}:
         return "approved"
     if status in {"rejected", "abgelehnt", "declined", "denied"}:
@@ -5614,6 +5674,116 @@ def prepare_dispo_form_entry_for_template(entry_doc):
         "file_url": url_for("dispo_form_file_download", entry_id=entry_id, filename=first_file.get("stored_filename")) if first_file.get("stored_filename") else "",
         "file_name": first_file.get("original_filename") or first_file.get("stored_filename") or "",
         "files": files,
+    }
+
+
+def normalize_management_document_status(entry_doc):
+    entry_doc = entry_doc or {}
+    management_status = safe_str(entry_doc.get("management_status")).lower()
+
+    if management_status in {"approved", "freigegeben", "accepted", "ok"}:
+        return "approved"
+    if management_status in {"returned_incomplete", "incomplete", "unvollstaendig", "unvollständig", "zurueckgegeben", "zurückgegeben"}:
+        return "returned_incomplete"
+    if management_status in {"rejected", "abgelehnt", "declined", "denied"}:
+        return "rejected"
+    if management_status in {"management_pending", "pending", "forwarded", "forwarded_to_management", "zur_entscheidung"}:
+        return "management_pending"
+
+    raw_status = safe_str(entry_doc.get("status"), "pending").lower()
+    if raw_status in {"returned_incomplete", "incomplete", "unvollstaendig", "unvollständig", "zurueckgegeben", "zurückgegeben"}:
+        return "returned_incomplete"
+    if raw_status in {"rejected", "abgelehnt", "declined", "denied"}:
+        return "rejected"
+    if raw_status in {"management_pending", "forwarded", "forwarded_to_management", "zur_entscheidung"}:
+        return "management_pending"
+
+    # Ein von der Disposition freigegebener Beleg ist für die Geschäftsleitung zuerst "zur Entscheidung".
+    if raw_status in {"approved", "freigegeben", "accepted", "ok"}:
+        return "management_pending"
+
+    return "management_pending"
+
+
+def prepare_geschaeftsleitung_document_for_template(entry_doc):
+    item = prepare_dispo_form_entry_for_template(entry_doc)
+    item["status"] = normalize_management_document_status(entry_doc)
+
+    reviewed_by = (entry_doc or {}).get("reviewed_by") or {}
+    management_reviewed_by = (entry_doc or {}).get("management_reviewed_by") or {}
+    approved_by_management = (entry_doc or {}).get("approved_by_management") or {}
+    returned_by_management = (entry_doc or {}).get("returned_by_management") or {}
+
+    forwarded_at = (
+        (entry_doc or {}).get("forwarded_at")
+        or (entry_doc or {}).get("dispo_forwarded_at")
+        or (entry_doc or {}).get("reviewed_at")
+        or (entry_doc or {}).get("updated_at")
+        or (entry_doc or {}).get("created_at")
+    )
+
+    signature = (
+        (entry_doc or {}).get("signature")
+        or (entry_doc or {}).get("dispo_signature")
+        or (entry_doc or {}).get("signed_by")
+        or reviewed_by.get("display_name")
+        or reviewed_by.get("username")
+        or "Disposition"
+    )
+
+    item.update({
+        "document_id": item.get("entry_id"),
+        "forwarded_at": format_datetime_for_template(forwarded_at) or item.get("updated_at") or item.get("created_at"),
+        "dispo_forwarded_at": format_datetime_for_template((entry_doc or {}).get("dispo_forwarded_at")) or "",
+        "signature": signature,
+        "signed_by": signature,
+        "dispo_note": safe_str((entry_doc or {}).get("dispo_note") or (entry_doc or {}).get("review_note") or (entry_doc or {}).get("description")),
+        "review_note": safe_str((entry_doc or {}).get("review_note") or (entry_doc or {}).get("dispo_note")),
+        "management_note": safe_str((entry_doc or {}).get("management_note") or (entry_doc or {}).get("approval_note")),
+        "return_note": safe_str((entry_doc or {}).get("return_note") or (entry_doc or {}).get("return_reason")),
+        "management_reviewed_by": (
+            management_reviewed_by.get("display_name")
+            or approved_by_management.get("display_name")
+            or returned_by_management.get("display_name")
+            or ""
+        ),
+    })
+
+    return item
+
+
+def get_geschaeftsleitung_documents(limit=300):
+    query = {
+        "archived": {"$ne": True},
+        "$or": [
+            {"management_status": {"$exists": True}},
+            {"forwarded_to_management": True},
+            {"status": {"$in": [
+                "approved",
+                "management_pending",
+                "forwarded_to_management",
+                "forwarded",
+                "returned_incomplete",
+                "rejected"
+            ]}},
+        ]
+    }
+
+    cursor = dispo_form_entries_collection.find(query).sort([
+        ("management_reviewed_at", DESCENDING),
+        ("reviewed_at", DESCENDING),
+        ("updated_at", DESCENDING),
+        ("created_at", DESCENDING),
+    ]).limit(limit)
+
+    return [prepare_geschaeftsleitung_document_for_template(entry) for entry in cursor]
+
+
+def count_geschaeftsleitung_documents(documents):
+    return {
+        "pending": len([item for item in documents if item.get("status") == "management_pending"]),
+        "approved": len([item for item in documents if item.get("status") == "approved"]),
+        "returned": len([item for item in documents if item.get("status") == "returned_incomplete"]),
     }
 
 
@@ -5993,6 +6163,165 @@ def dispo_form_update_status(entry_id):
 
     flash("Status wurde aktualisiert.", "success")
     return redirect(url_for("dispo_form"))
+
+
+# ==========================================
+# GESCHÄFTSLEITUNG / DOKUMENTPRÜFUNG
+# ==========================================
+
+@app.route("/management", methods=["GET"])
+@app.route("/geschaeftsfuehrung.html", methods=["GET"])
+@app.route("/geschaeftsfuehrung", methods=["GET"])
+@app.route("/geschaeftsleitung.html", methods=["GET"])
+@app.route("/geschaeftsleitung/dokumente", methods=["GET"])
+@app.route("/geschaeftsleitung", methods=["GET"])
+def geschaeftsleitung():
+    permission_response = require_geschaeftsleitung_permission()
+    if permission_response:
+        return permission_response
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    primary_role_name = get_primary_role_name(user_roles)
+
+    if isinstance(session.get("user"), dict):
+        permissions = set(item for item in session["user"].get("permissions", []) if item)
+        permissions.add("management.documents")
+        permissions.add("geschaeftsleitung.documents")
+        session["user"]["can_view_geschaeftsleitung_documents"] = True
+        session["user"]["can_view_management_documents"] = True
+        session["user"]["permissions"] = sorted(permissions)
+        session.modified = True
+        user = session.get("user") or user
+
+    documents = get_geschaeftsleitung_documents()
+    counts = count_geschaeftsleitung_documents(documents)
+
+    return render_template(
+        "geschaeftsleitung.html",
+        current_user=user,
+        primary_role_name=primary_role_name,
+        can_view_geschaeftsleitung_documents=True,
+        can_view_management_documents=True,
+        is_management_viewer=True,
+        geschaeftsleitung_documents=documents,
+        management_review_items=documents,
+        dispo_forwarded_documents=documents,
+        management_pending_count=counts["pending"],
+        management_approved_count=counts["approved"],
+        management_returned_count=counts["returned"],
+        role_geschaeftsleitung_id=ROLE_GESCHAEFTSLEITUNG,
+        role_geschaeftsfuehrung_id=ROLE_GESCHAEFTSFUEHRUNG_ID,
+    )
+
+
+@app.route("/geschaeftsleitung/dispo-documents/approve", methods=["POST"])
+def geschaeftsleitung_approve_dispo_document():
+    permission_response = require_geschaeftsleitung_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    approval_note = safe_str(request.form.get("approval_note"))[:2000]
+
+    if not document_id:
+        flash("Dokument-ID fehlt.", "error")
+        return redirect(url_for("geschaeftsleitung"))
+
+    actor = current_disposition_identity()
+    now = now_utc()
+    result = dispo_form_entries_collection.update_one(
+        {**dispo_form_entry_lookup_query(document_id), "archived": {"$ne": True}},
+        {
+            "$set": {
+                "management_status": "approved",
+                "management_note": approval_note,
+                "approval_note": approval_note,
+                "management_reviewed_by": actor,
+                "approved_by_management": actor,
+                "management_reviewed_at": now,
+                "management_approved_at": now,
+                "updated_at": now,
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("geschaeftsleitung"))
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Geschäftsleitung hat Dokument freigegeben",
+        "content": f"Dokument {document_id} wurde final freigegeben.",
+        "priority": "normal",
+        "document_id": document_id,
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+    })
+
+    flash("Dokument wurde durch die Geschäftsleitung freigegeben.", "success")
+    return redirect(url_for("geschaeftsleitung"))
+
+
+@app.route("/geschaeftsleitung/dispo-documents/return", methods=["POST"])
+def geschaeftsleitung_return_dispo_document():
+    permission_response = require_geschaeftsleitung_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    return_reason = safe_str(request.form.get("return_reason"))[:2000]
+    mark_incomplete = request.form.get("mark_incomplete") == "1"
+
+    if not document_id:
+        flash("Dokument-ID fehlt.", "error")
+        return redirect(url_for("geschaeftsleitung"))
+
+    if len(return_reason) < 2:
+        flash("Bitte gib einen Grund für die Rückgabe an.", "error")
+        return redirect(url_for("geschaeftsleitung"))
+
+    actor = current_disposition_identity()
+    now = now_utc()
+    set_fields = {
+        "management_status": "returned_incomplete",
+        "return_note": return_reason,
+        "return_reason": return_reason,
+        "management_note": return_reason,
+        "management_reviewed_by": actor,
+        "returned_by_management": actor,
+        "management_reviewed_at": now,
+        "management_returned_at": now,
+        "updated_at": now,
+    }
+
+    if mark_incomplete:
+        set_fields["status"] = "returned_incomplete"
+
+    result = dispo_form_entries_collection.update_one(
+        {**dispo_form_entry_lookup_query(document_id), "archived": {"$ne": True}},
+        {"$set": set_fields}
+    )
+
+    if result.matched_count == 0:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("geschaeftsleitung"))
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Geschäftsleitung hat Dokument zurückgegeben",
+        "content": f"Dokument {document_id} wurde zurück an die Disposition gegeben: {return_reason}",
+        "priority": "critical",
+        "document_id": document_id,
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+    })
+
+    flash("Dokument wurde als nicht vollständig markiert und an die Disposition zurückgegeben.", "success")
+    return redirect(url_for("geschaeftsleitung"))
 
 
 # ==========================================
