@@ -12,11 +12,14 @@
 {% set current_user_roles = current_user.roles|default([], true) %}
 
 {# Rolle / Rollen-ID für Disposition #}
+{# 1473721587122438321 = ROLE_PROJEKTLEITUNG #}
+{# 1473721587122438322 = ROLE_GESCHAEFTSLEITUNG #}
 {% set disposition_role_ids = [
     'Disposition',
-    '1473721587122438321', {# ROLE_PROJEKTLEITUNG #}
-    '1473721587122438322'  {# ROLE_GESCHAEFTSLEITUNG #}
+    '1473721587122438321',
+    '1473721587122438322'
 ] %}
+
 {% set disposition_access = namespace(allowed=false) %}
 {% for role_id in disposition_role_ids %}
     {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
@@ -719,6 +722,4 @@
         });
     });
 </script>
-
-{% endif %}
 {% endblock %}
