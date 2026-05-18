@@ -2094,6 +2094,245 @@ def complete_tracker_tour_from_request():
 
 
 # ==========================================
+# LOCAL TRACKER WEBHOOK -> DISCORD
+# ==========================================
+
+TRACKER_WEBHOOK_DEDUPE_TTL_SECONDS = int(env_float("TRACKER_WEBHOOK_DEDUPE_TTL_SECONDS", default=30))
+_tracker_webhook_recent_keys = {}
+
+
+def first_payload_value(payload, *keys, fallback="-"):
+    payload = payload or {}
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return fallback
+
+
+def first_payload_number(payload, *keys, fallback=0.0):
+    payload = payload or {}
+    for key in keys:
+        if key in payload and payload.get(key) is not None:
+            return parse_number(payload.get(key), fallback)
+    return fallback
+
+
+def discord_text(value, fallback="-", max_length=1024):
+    value = safe_str(value, fallback)
+    if not value:
+        value = fallback
+    value = value.replace("\x00", "").strip()
+    if len(value) > max_length:
+        value = value[: max_length - 1] + "…"
+    return value
+
+
+def discord_field(name, value, inline=True):
+    return {
+        "name": discord_text(name, "-", 256),
+        "value": discord_text(value, "-", 1024),
+        "inline": bool(inline)
+    }
+
+
+def unwrap_tracker_webhook_payload(data):
+    data = data or {}
+    if isinstance(data, dict) and isinstance(data.get("payload"), dict):
+        payload = data.get("payload") or {}
+    else:
+        payload = data
+    return payload if isinstance(payload, dict) else {}
+
+
+def tracker_webhook_dedupe_key(payload):
+    payload = payload or {}
+
+    job_id = first_payload_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
+    if job_id:
+        return f"job:{job_id}"
+
+    driver = first_payload_value(payload, "driverName", "displayName", "username", "driver", fallback="")
+    source = first_payload_value(payload, "sourceCity", "source_city", "source", "from", fallback="")
+    destination = first_payload_value(payload, "destinationCity", "destination_city", "destination", "to", fallback="")
+    cargo = first_payload_value(payload, "cargo", "freight", "cargoName", "jobCargo", fallback="")
+    truck = first_payload_value(payload, "truck", "truckName", "truckModel", fallback="")
+    distance = str(round(first_payload_number(payload, "navigationDistanceKm", "remainingDistanceKm", "tripDistanceKm", "plannedDistanceKm", fallback=0.0), 1))
+
+    raw_key = "|".join([driver, source, destination, cargo, truck, distance])
+    return "payload:" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
+
+
+def tracker_webhook_is_duplicate(payload):
+    if TRACKER_WEBHOOK_DEDUPE_TTL_SECONDS <= 0:
+        return False
+
+    now = now_utc()
+    ttl = timedelta(seconds=TRACKER_WEBHOOK_DEDUPE_TTL_SECONDS)
+    dedupe_key = tracker_webhook_dedupe_key(payload)
+
+    expired_keys = [
+        key for key, seen_at in _tracker_webhook_recent_keys.items()
+        if not isinstance(seen_at, datetime) or now - seen_at > ttl
+    ]
+    for key in expired_keys:
+        _tracker_webhook_recent_keys.pop(key, None)
+
+    last_seen = _tracker_webhook_recent_keys.get(dedupe_key)
+    if isinstance(last_seen, datetime) and now - last_seen <= ttl:
+        return True
+
+    _tracker_webhook_recent_keys[dedupe_key] = now
+    return False
+
+
+def build_tracker_webhook_discord_payload(payload):
+    payload = payload or {}
+
+    driver = first_payload_value(payload, "driverName", "displayName", "username", "driver", fallback="Unbekannter Fahrer")
+    truck = first_payload_value(payload, "truck", "truckName", "truckModel", "truck_model", fallback="-")
+    source = first_payload_value(payload, "sourceCity", "source_city", "source", "from", "jobSourceCity", fallback="-")
+    destination = first_payload_value(payload, "destinationCity", "destination_city", "destination", "to", "targetCity", "jobDestinationCity", fallback="-")
+    cargo = first_payload_value(payload, "cargo", "freight", "cargoName", "cargo_name", "jobCargo", fallback="-")
+    game = first_payload_value(payload, "game", "gameCode", "gameName", fallback="ETS2/ATS")
+    status = first_payload_value(payload, "status", "jobStatus", fallback="completed")
+
+    distance = first_payload_number(
+        payload,
+        "navigationDistanceKm", "remainingDistanceKm", "tripDistanceKm", "plannedDistanceKm",
+        "routeDistanceKm", "distanceKm",
+        fallback=0.0
+    )
+    damage = first_payload_number(payload, "damagePercent", "truckDamagePercent", "trailerDamagePercent", "damage", fallback=0.0)
+    speed = first_payload_number(payload, "speedKmh", "speed", "currentSpeedKmh", fallback=0.0)
+    rpm = first_payload_number(payload, "rpm", "engineRpm", "engineRPM", fallback=0.0)
+
+    fuel_liters = first_payload_number(payload, "fuelLiters", "fuelUsed", "fuel_liters", fallback=-1.0)
+    fuel_percent = first_payload_number(payload, "fuelPercent", "fuel_percent", "tankPercent", fallback=-1.0)
+    if fuel_liters >= 0:
+        fuel_display = f"{round(fuel_liters, 1)} L"
+    elif fuel_percent >= 0:
+        fuel_display = f"{round(fuel_percent, 1)}%"
+    else:
+        fuel_display = "-"
+
+    eta = first_payload_value(payload, "eta", "etaText", "eta_text", fallback="-")
+    job_id = first_payload_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="-")
+
+    return {
+        "username": "EifelLog Tracker",
+        "allowed_mentions": {"parse": []},
+        "embeds": [
+            {
+                "title": "🚚 Auftrag erfolgreich abgeschlossen!",
+                "description": f"Der Tracker hat einen abgeschlossenen Auftrag gemeldet. Status: `{discord_text(status, 'completed', 80)}`",
+                "color": 3447003,
+                "fields": [
+                    discord_field("👤 Fahrer", driver, True),
+                    discord_field("🚛 Fahrzeug", truck, True),
+                    discord_field("🎮 Spiel", game, True),
+
+                    discord_field("📍 Von", source, True),
+                    discord_field("🏁 Nach", destination, True),
+                    discord_field("📦 Fracht", cargo, True),
+
+                    discord_field("🛣️ Strecke", f"{round(distance, 1)} km", True),
+                    discord_field("🔧 Schaden", f"{round(damage, 1)}%", True),
+                    discord_field("⛽ Kraftstoff", fuel_display, True),
+
+                    discord_field("⚡ Speed", f"{round(speed, 1)} km/h", True),
+                    discord_field("⚙️ RPM", str(parse_int(rpm, 0)), True),
+                    discord_field("🕒 ETA", eta, True),
+
+                    discord_field("🧾 Job-ID", job_id, False)
+                ],
+                "footer": {"text": "EifelLog Telemetry Webhook"},
+                "timestamp": now_utc().isoformat() + "Z"
+            }
+        ]
+    }
+
+
+def post_json_to_discord_webhook(discord_payload):
+    webhook_url = safe_str(DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+    if not webhook_url:
+        return {"sent": False, "reason": "DISCORD_JOB_COMPLETE_WEBHOOK_URL fehlt"}
+
+    webhook_post_url = webhook_url
+    if "?" not in webhook_post_url:
+        webhook_post_url += "?wait=true"
+    elif "wait=" not in webhook_post_url:
+        webhook_post_url += "&wait=true"
+
+    try:
+        response = requests.post(webhook_post_url, json=discord_payload, timeout=15)
+    except Exception as error:
+        return {"sent": False, "error": str(error)}
+
+    if response.status_code not in range(200, 300):
+        return {
+            "sent": False,
+            "status_code": response.status_code,
+            "error": response.text[:1000]
+        }
+
+    try:
+        message = response.json()
+    except Exception:
+        message = {}
+
+    return {
+        "sent": True,
+        "status_code": response.status_code,
+        "channel_id": message.get("channel_id"),
+        "message_id": message.get("id"),
+        "raw": message
+    }
+
+
+@app.route("/webhook", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/webhook", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/discord/webhook", methods=["GET", "POST", "OPTIONS"])
+def tracker_local_webhook():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "message": "Tracker Webhook ist aktiv. Bitte per POST JSON senden.",
+            "routes": ["/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"]
+        })
+
+    data = request.get_json(silent=True) or {}
+    payload = unwrap_tracker_webhook_payload(data)
+
+    if not payload:
+        return jsonify({"success": False, "error": "Webhook Payload fehlt oder ist kein JSON-Objekt."}), 400
+
+    if tracker_webhook_is_duplicate(payload):
+        return jsonify({
+            "success": True,
+            "duplicate": True,
+            "message": "Webhook wurde als Duplikat erkannt und nicht erneut an Discord gesendet."
+        })
+
+    if isinstance(data, dict) and ("embeds" in data or "content" in data):
+        discord_payload = data
+    else:
+        discord_payload = build_tracker_webhook_discord_payload(payload)
+
+    discord_result = post_json_to_discord_webhook(discord_payload)
+
+    status_code = 200 if discord_result.get("sent") else 502
+    return jsonify({
+        "success": bool(discord_result.get("sent")),
+        "message": "Webhook empfangen und an Discord gesendet." if discord_result.get("sent") else "Webhook empfangen, Discord-Versand fehlgeschlagen.",
+        "discord": discord_result
+    }), status_code
+
+
+# ==========================================
 # ROUTES - ÖFFENTLICH
 # ==========================================
 
@@ -4399,7 +4638,8 @@ def health_check():
         "trackerRoutes": [
             "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
             "/api/tracker/state", "/api/tracker/telemetry/live",
-            "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout"
+            "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout",
+            "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
         ]
     })
 
