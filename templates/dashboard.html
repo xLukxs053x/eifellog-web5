@@ -34,6 +34,41 @@
 {% set fahrer_token_value = fahrer_token_value|default('', true) %}
 {% set fahrer_token_created_at = fahrer_token_created_at|default('Heute', true) %}
 
+{# Live-Fahrerdaten aus main.py / Datenbank.
+   Übergib bevorzugt:
+   driver_stats = {
+       'total_km': 0, 'last_trip_distance': 0, 'balance': 0,
+       'completed_trips': 0, 'level': '-', 'xp': 0, 'level_progress': 0
+   }
+   fahrtenbuch_entries = [
+       {'date': '18.05.2026', 'route': 'A → B', 'distance': 120.5,
+        'cargo': 'Fracht', 'earnings': 450.0, 'status': 'Abgeschlossen'}
+   ]
+   driver_current_trip = {
+       'from_city': 'A', 'to_city': 'B', 'departure': '18:00',
+       'progress': 40, 'cargo': 'Fracht', 'expected_earnings': 450.0
+   }
+#}
+{% set driver_stats = driver_stats|default({}, true) %}
+{% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
+{% set driver_current_trip = driver_current_trip|default(current_trip|default({}, true), true) %}
+
+{% set driver_total_km = driver_stats.total_km|default(total_driven_km|default(driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true), true), true) %}
+{% set driver_last_trip_distance = driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true) %}
+{% set driver_account_balance = driver_stats.balance|default(account_balance|default(kontostand|default(0, true), true), true) %}
+{% set driver_completed_trips = driver_stats.completed_trips|default(completed_trips|default(abgeschlossen_trips|default(0, true), true), true) %}
+{% set driver_level_name = driver_stats.level|default(driver_level|default('-', true), true) %}
+{% set driver_xp_value = driver_stats.xp|default(driver_xp|default(0, true), true) %}
+{% set driver_level_progress = driver_stats.level_progress|default(driver_level_progress|default(0, true), true) %}
+
+{% set current_trip_from = driver_current_trip.from_city|default(driver_current_trip.start|default(driver_current_trip.origin|default('-', true), true), true) %}
+{% set current_trip_to = driver_current_trip.to_city|default(driver_current_trip.destination|default(driver_current_trip.target|default('-', true), true), true) %}
+{% set current_trip_departure = driver_current_trip.departure|default(driver_current_trip.start_time|default('-', true), true) %}
+{% set current_trip_progress = driver_current_trip.progress|default(0, true) %}
+{% set current_trip_cargo = driver_current_trip.cargo|default(driver_current_trip.freight|default('-', true), true) %}
+{% set current_trip_expected_earnings = driver_current_trip.expected_earnings|default(driver_current_trip.earnings|default(0, true), true) %}
+{% set has_current_trip = driver_current_trip and (current_trip_from != '-' or current_trip_to != '-' or current_trip_cargo != '-') %}
+
 {# Navigation zur Personalabteilung nur für berechtigte Rollen #}
 {% set current_user_roles = current_user.roles|default([], true) %}
 {% set personalabteilung_nav_roles = [
@@ -274,7 +309,7 @@
     }
 
     .dashboard-responsive-shell table {
-        min-width: 600px;
+        min-width: 720px;
     }
 
     .dashboard-responsive-shell img,
@@ -389,7 +424,7 @@
         }
 
         .dashboard-responsive-shell table {
-            min-width: 540px;
+            min-width: 680px;
         }
 
         #alert-bell {
@@ -527,7 +562,13 @@
             </svg>
             Gefahrene KM
         </h3>
-        <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--brand-green)] font-normal">km</span></p>
+        <p class="text-3xl font-bold text-white mt-1">
+            {{ ('%.1f'|format(driver_total_km|float))|replace('.', ',') }}
+            <span class="text-sm text-[var(--brand-green)] font-normal">km</span>
+        </p>
+        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">
+            Letzte Fahrt: <span class="text-white/80">{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }} km</span>
+        </p>
     </div>
 
     <div class="glass-card p-6 flex flex-col justify-center">
@@ -537,7 +578,11 @@
             </svg>
             Kontostand
         </h3>
-        <p class="text-3xl font-bold text-white mt-1">0,00 <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span></p>
+        <p class="text-3xl font-bold text-white mt-1">
+            {{ ('%.2f'|format(driver_account_balance|float))|replace('.', ',') }}
+            <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span>
+        </p>
+        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Live aus deinem Fahrerprofil</p>
     </div>
 
     <div class="glass-card p-6 flex flex-col justify-center">
@@ -547,18 +592,26 @@
             </svg>
             Abgeschlossen
         </h3>
-        <p class="text-3xl font-bold text-white mt-1">0 <span class="text-sm text-[var(--muted)] font-normal">Touren</span></p>
+        <p class="text-3xl font-bold text-white mt-1">
+            {{ driver_completed_trips|int }}
+            <span class="text-sm text-[var(--muted)] font-normal">Touren</span>
+        </p>
+        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Erfolgreich beendete Fahrten</p>
     </div>
 
     <div class="glass-card p-6 flex flex-col justify-center relative overflow-hidden">
-        <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] w-0 shadow-[0_0_10px_rgba(137,190,50,0.8)]"></div>
+        <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)]" style="width: {{ driver_level_progress|int }}%;"></div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
             </svg>
             Fahrer Level
         </h3>
-        <p class="text-3xl font-bold text-white mt-1">- <span class="text-sm text-[var(--brand-green)] font-normal">0 XP</span></p>
+        <p class="text-3xl font-bold text-white mt-1">
+            {{ driver_level_name }}
+            <span class="text-sm text-[var(--brand-green)] font-normal">{{ driver_xp_value|int }} XP</span>
+        </p>
+        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Fortschritt: {{ driver_level_progress|int }}%</p>
     </div>
 </div>
 
@@ -639,36 +692,43 @@
             </div>
 
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse shadow-[0_0_8px_rgba(137,190,50,0.8)]"></span>
+                <span class="w-2 h-2 rounded-full {% if has_current_trip %}bg-[var(--brand-green)] animate-pulse shadow-[0_0_8px_rgba(137,190,50,0.8)]{% else %}bg-white/20{% endif %}"></span>
                 Aktueller Auftrag
             </h2>
 
             <div class="bg-black/30 rounded-xl p-5 border border-white/5">
+                {% if has_current_trip %}
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6">
                     <div class="flex-1 w-full">
                         <div class="flex justify-between text-xs font-orbitron text-[var(--muted)] mb-2 uppercase tracking-widest">
-                            <span>-</span>
-                            <span>-</span>
+                            <span>{{ current_trip_from }}</span>
+                            <span>{{ current_trip_to }}</span>
                         </div>
                         <div class="relative flex items-center">
                             <div class="w-3 h-3 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] z-10"></div>
                             <div class="flex-1 h-1 bg-white/10 mx-2 rounded-full overflow-hidden relative">
-                                <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-[var(--brand-green)] to-[var(--brand-yellow)] w-[0%]"></div>
+                                <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-[var(--brand-green)] to-[var(--brand-yellow)]" style="width: {{ current_trip_progress|int }}%;"></div>
                             </div>
                             <div class="w-3 h-3 rounded-full border-2 border-[var(--brand-yellow)] bg-black z-10"></div>
                         </div>
                         <div class="flex justify-between text-xs font-inter text-white mt-2">
-                            <span>Abfahrt: -</span>
-                            <span class="text-[var(--brand-yellow)]">0% Abgeschlossen</span>
+                            <span>Abfahrt: {{ current_trip_departure }}</span>
+                            <span class="text-[var(--brand-yellow)]">{{ current_trip_progress|int }}% Abgeschlossen</span>
                         </div>
                     </div>
 
                     <div class="flex-shrink-0 bg-white/5 border border-white/10 rounded-lg p-3 text-center min-w-[150px]">
                         <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Fracht</p>
-                        <p class="text-sm font-bold text-white">-</p>
-                        <p class="text-xs text-[var(--brand-green)] mt-1">- € erwartet</p>
+                        <p class="text-sm font-bold text-white">{{ current_trip_cargo }}</p>
+                        <p class="text-xs text-[var(--brand-green)] mt-1">{{ ('%.2f'|format(current_trip_expected_earnings|float))|replace('.', ',') }} € erwartet</p>
                     </div>
                 </div>
+                {% else %}
+                <div class="py-5 text-center">
+                    <p class="text-sm text-white/60 font-inter">Kein aktiver Auftrag vorhanden.</p>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">Sobald `driver_current_trip` aus main.py gesetzt wird, erscheint die laufende Tour hier automatisch.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -684,15 +744,55 @@
                         <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
                             <th class="pb-3 px-2">Datum</th>
                             <th class="pb-3 px-2">Route</th>
+                            <th class="pb-3 px-2 text-right">KM</th>
                             <th class="pb-3 px-2">Fracht</th>
                             <th class="pb-3 px-2 text-right">Einnahmen</th>
                             <th class="pb-3 px-2 text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody class="text-sm font-inter text-gray-300">
+                        {% if safe_fahrtenbuch_entries %}
+                            {% for trip in safe_fahrtenbuch_entries %}
+                                {% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
+                                {% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default('-', true), true), true) %}
+                                {% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default('-', true), true), true) %}
+                                {% set trip_route = trip.route|default(trip_from ~ ' → ' ~ trip_to, true) %}
+                                {% set trip_distance = trip.distance|default(trip.km|default(trip.last_trip_distance|default(0, true), true), true) %}
+                                {% set trip_cargo = trip.cargo|default(trip.freight|default('-', true), true) %}
+                                {% set trip_earnings = trip.earnings|default(trip.income|default(trip.revenue|default(0, true), true), true) %}
+                                {% set trip_status = trip.status|default('Abgeschlossen', true) %}
+                                {% set trip_status_lc = trip_status|lower %}
+                                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                                    <td class="py-4 px-2 whitespace-nowrap text-white/70">{{ trip_date }}</td>
+                                    <td class="py-4 px-2 text-white font-medium">{{ trip_route }}</td>
+                                    <td class="py-4 px-2 text-right text-[var(--brand-green)] font-orbitron font-bold whitespace-nowrap">
+                                        {{ ('%.1f'|format(trip_distance|float))|replace('.', ',') }} km
+                                    </td>
+                                    <td class="py-4 px-2 text-white/70">{{ trip_cargo }}</td>
+                                    <td class="py-4 px-2 text-right text-[var(--brand-yellow)] font-orbitron font-bold whitespace-nowrap">
+                                        {{ ('%.2f'|format(trip_earnings|float))|replace('.', ',') }} €
+                                    </td>
+                                    <td class="py-4 px-2 text-center">
+                                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[9px] font-orbitron uppercase tracking-widest
+                                            {% if trip_status_lc in ['abgeschlossen', 'completed', 'bezahlt', 'paid'] %}
+                                                text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25
+                                            {% elif trip_status_lc in ['offen', 'pending', 'aktiv', 'in arbeit'] %}
+                                                text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25
+                                            {% elif trip_status_lc in ['abgebrochen', 'cancelled', 'storniert'] %}
+                                                text-[var(--danger)] bg-[var(--danger)]/10 border-[var(--danger)]/25
+                                            {% else %}
+                                                text-white/70 bg-white/5 border-white/10
+                                            {% endif %}">
+                                            {{ trip_status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
                         <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                            <td colspan="5" class="py-4 px-2 text-center text-white/50">Keine Einträge vorhanden</td>
+                            <td colspan="6" class="py-4 px-2 text-center text-white/50">Keine Einträge vorhanden</td>
                         </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
