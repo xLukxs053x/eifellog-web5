@@ -8,9 +8,10 @@
 {% block content %}
 {% set p = profile if profile is defined and profile else {} %}
 {% set own_profile = is_own_profile if is_own_profile is defined else false %}
+{% set default_avatar = url_for('static', filename='eifellog.jpg') %}
 {% set profile_name = p.display_name if p.display_name is defined and p.display_name else p.username if p.username is defined and p.username else "Eifel LOG Fahrer" %}
 {% set username = p.username if p.username is defined and p.username else "driver" %}
-{% set avatar = p.avatar_url if p.avatar_url is defined and p.avatar_url else url_for('static', filename='eifellog.jpg') %}
+{% set avatar = p.avatar_url if p.avatar_url is defined and p.avatar_url else default_avatar %}
 {% set banner = p.banner_url if p.banner_url is defined and p.banner_url else "" %}
 {% set rank = p.rank if p.rank is defined and p.rank else "Driver" %}
 {% set status = p.status if p.status is defined and p.status else "Bereit für die nächste Tour." %}
@@ -29,978 +30,1717 @@
 {% set stats_data = stats if stats is defined and stats else {} %}
 {% set activity_data = activity if activity is defined and activity else [] %}
 {% set gallery_data = gallery if gallery is defined and gallery else [] %}
+{% set member_since = p.member_since if p.member_since is defined and p.member_since else "Neu" %}
+{% set last_seen = p.last_seen if p.last_seen is defined and p.last_seen else "Unbekannt" %}
+{% set filled_fields = [
+    profile_name,
+    username,
+    status,
+    bio if bio != "Dieses Profil wurde noch nicht ausgefüllt." else "",
+    location if location != "Nicht angegeben" else "",
+    favorite_truck if favorite_truck != "Nicht angegeben" else "",
+    avatar if avatar != default_avatar else "",
+    banner,
+    discord,
+    truckersmp_id,
+    steam,
+    website
+] | select | list | length %}
+{% set completion = ((filled_fields / 12) * 100) | round(0, 'floor') %}
 
 <style>
-    .font-orbitron {
+    .font-orbitron,
+    .driver-font {
         font-family: 'Orbitron', sans-serif;
     }
 
-    .profile-shell {
+    .driver-profile {
+        --driver-bg: rgba(4, 10, 6, 0.84);
+        --driver-bg-soft: rgba(255, 255, 255, 0.045);
+        --driver-border: rgba(255, 255, 255, 0.08);
+        --driver-border-strong: rgba(var(--brand-green-rgb), 0.34);
+        --driver-green: var(--brand-green, #89be32);
+        --driver-yellow: var(--brand-yellow, #dce226);
+        --driver-muted: var(--muted, rgba(255,255,255,0.62));
+        --driver-text: var(--text, #f6fff1);
+        --driver-shadow: 0 30px 100px rgba(0, 0, 0, 0.42);
         width: 100%;
         display: flex;
         flex-direction: column;
-        gap: 28px;
+        gap: 26px;
     }
 
-    .profile-grid {
-        display: grid;
-        grid-template-columns: 420px minmax(0, 1fr);
-        gap: 28px;
-        align-items: start;
+    .driver-profile *,
+    .driver-profile *::before,
+    .driver-profile *::after {
+        box-sizing: border-box;
     }
 
-    @media (max-width: 1180px) {
-        .profile-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .profile-card {
-        background: linear-gradient(135deg, rgba(20, 30, 20, 0.48) 0%, rgba(5, 10, 5, 0.86) 100%);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-top: 1px solid rgba(137, 190, 50, 0.24);
-        border-left: 1px solid rgba(137, 190, 50, 0.18);
-        border-radius: 28px;
-        backdrop-filter: blur(32px);
-        -webkit-backdrop-filter: blur(32px);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-    }
-
-    .profile-banner {
-        height: 210px;
+    .driver-hero {
         position: relative;
+        min-height: 440px;
         overflow: hidden;
+        border-radius: 34px;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: var(--driver-shadow);
         background:
-            radial-gradient(circle at 20% 20%, rgba(220, 226, 38, 0.25), transparent 35%),
-            radial-gradient(circle at 80% 30%, rgba(137, 190, 50, 0.28), transparent 35%),
-            linear-gradient(135deg, rgba(4, 10, 6, 0.95), rgba(15, 30, 12, 0.9));
+            radial-gradient(circle at 12% 18%, rgba(var(--brand-green-rgb), 0.32), transparent 28%),
+            radial-gradient(circle at 86% 14%, rgba(220, 226, 38, 0.22), transparent 30%),
+            linear-gradient(135deg, rgba(4, 10, 6, 0.94), rgba(18, 32, 15, 0.9));
     }
 
-    .profile-banner.has-image {
+    .driver-hero.has-banner {
         background-position: center;
         background-size: cover;
     }
 
-    .profile-banner::after {
+    .driver-hero::before {
         content: "";
         position: absolute;
         inset: 0;
         background:
-            linear-gradient(to bottom, rgba(4, 10, 6, 0.15), rgba(4, 10, 6, 0.92)),
+            linear-gradient(90deg, rgba(4,10,6,0.96) 0%, rgba(4,10,6,0.78) 42%, rgba(4,10,6,0.38) 100%),
+            linear-gradient(to top, rgba(4,10,6,1) 0%, rgba(4,10,6,0.2) 70%),
             repeating-linear-gradient(
                 90deg,
-                rgba(255,255,255,0.025) 0px,
-                rgba(255,255,255,0.025) 1px,
+                rgba(255,255,255,0.035) 0,
+                rgba(255,255,255,0.035) 1px,
                 transparent 1px,
-                transparent 80px
+                transparent 92px
             );
+        z-index: 1;
     }
 
-    .profile-avatar-wrap {
-        width: 132px;
-        height: 132px;
+    .driver-hero::after {
+        content: "";
+        position: absolute;
+        width: 540px;
+        height: 540px;
+        right: -180px;
+        bottom: -220px;
         border-radius: 999px;
-        padding: 4px;
-        background: linear-gradient(135deg, var(--brand-yellow), var(--brand-green));
-        box-shadow: 0 0 32px rgba(137, 190, 50, 0.35);
-        margin-top: -66px;
+        background: radial-gradient(circle, rgba(var(--brand-green-rgb), 0.26), transparent 67%);
+        filter: blur(4px);
+        z-index: 1;
+    }
+
+    .driver-hero-inner {
         position: relative;
         z-index: 2;
+        min-height: 440px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 28px;
+        align-items: end;
+        padding: 34px;
     }
 
-    .profile-avatar {
-        width: 100%;
-        height: 100%;
-        border-radius: 999px;
-        object-fit: cover;
-        border: 4px solid rgba(4, 10, 6, 0.96);
-        background: rgba(0,0,0,0.5);
+    .driver-hero-main {
+        display: grid;
+        gap: 26px;
+        max-width: 920px;
     }
 
-    .profile-status-dot {
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        background: var(--brand-green);
-        border: 3px solid rgba(4, 10, 6, 1);
-        position: absolute;
-        right: 12px;
-        bottom: 12px;
-        box-shadow: 0 0 18px rgba(137, 190, 50, 0.75);
-    }
-
-    .profile-pill {
-        display: inline-flex;
+    .driver-breadcrumb {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.045);
-        border: 1px solid rgba(255,255,255,0.08);
-        color: var(--muted);
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--driver-muted);
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        font-family: 'Orbitron', sans-serif;
-    }
-
-    .profile-pill.green {
-        color: var(--brand-green);
-        background: rgba(var(--brand-green-rgb), 0.12);
-        border-color: rgba(var(--brand-green-rgb), 0.28);
-    }
-
-    .profile-stat {
-        padding: 18px;
-        border-radius: 20px;
-        background: rgba(255,255,255,0.035);
-        border: 1px solid rgba(255,255,255,0.07);
-        transition: all 0.3s ease;
-    }
-
-    .profile-stat:hover {
-        transform: translateY(-3px);
-        border-color: rgba(var(--brand-green-rgb), 0.35);
-        background: rgba(var(--brand-green-rgb), 0.055);
-    }
-
-    .profile-stat-value {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 26px;
-        font-weight: 800;
-        color: var(--text);
-        line-height: 1;
-    }
-
-    .profile-stat-label {
-        margin-top: 8px;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
-        color: var(--muted);
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-    }
-
-    .profile-section-title {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 18px;
-    }
-
-    .profile-section-title h2 {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 14px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--text);
-    }
-
-    .profile-section-title span {
-        height: 1px;
-        flex: 1;
-        background: linear-gradient(to right, rgba(var(--brand-green-rgb), 0.45), transparent);
-    }
-
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 18px;
-        padding: 14px 0;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .info-row:last-child {
-        border-bottom: 0;
-    }
-
-    .info-label {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 10px;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: var(--muted);
+        font-weight: 800;
+    }
+
+    .driver-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--driver-green);
+        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.75);
+    }
+
+    .driver-title-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 22px;
+        align-items: center;
+    }
+
+    .driver-avatar-frame {
+        width: 132px;
+        height: 132px;
+        padding: 4px;
+        border-radius: 32px;
+        background: linear-gradient(135deg, var(--driver-yellow), var(--driver-green));
+        box-shadow:
+            0 0 0 8px rgba(4,10,6,0.54),
+            0 24px 70px rgba(0,0,0,0.42),
+            0 0 42px rgba(var(--brand-green-rgb), 0.28);
+        position: relative;
         flex: 0 0 auto;
     }
 
-    .info-value {
-        color: var(--text);
-        font-size: 14px;
-        text-align: right;
-        overflow-wrap: anywhere;
+    .driver-avatar-frame::after {
+        content: "";
+        position: absolute;
+        right: 11px;
+        bottom: 11px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--driver-green);
+        border: 3px solid rgba(4,10,6,1);
+        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.95);
     }
 
-    .profile-tabs {
+    .driver-avatar {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border-radius: 28px;
+        object-fit: cover;
+        border: 3px solid rgba(4,10,6,0.94);
+        background: rgba(0,0,0,0.35);
+    }
+
+    .driver-eyebrow {
         display: flex;
+        align-items: center;
         flex-wrap: wrap;
         gap: 10px;
-        padding: 8px;
+        margin-bottom: 14px;
+    }
+
+    .driver-name {
+        margin: 0;
+        color: var(--driver-text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.35rem, 5vw, 5.5rem);
+        line-height: 0.92;
+        font-weight: 950;
+        letter-spacing: -0.04em;
+        text-transform: uppercase;
+        text-wrap: balance;
+        text-shadow: 0 22px 60px rgba(0,0,0,0.5);
+    }
+
+    .driver-username {
+        margin-top: 13px;
+        color: rgba(255,255,255,0.72);
+        font-size: 15px;
+        letter-spacing: 0.08em;
+    }
+
+    .driver-status {
+        max-width: 780px;
+        padding: 18px 20px;
+        border-radius: 24px;
+        color: rgba(255,255,255,0.88);
+        line-height: 1.7;
+        background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+        border: 1px solid rgba(255,255,255,0.08);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+    }
+
+    .driver-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .driver-pill,
+    .driver-chip,
+    .driver-tab,
+    .driver-mini-label,
+    .driver-section-kicker,
+    .driver-btn {
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .driver-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 8px 13px;
         border-radius: 999px;
-        background: rgba(0,0,0,0.28);
+        color: var(--driver-muted);
+        background: rgba(255,255,255,0.055);
+        border: 1px solid rgba(255,255,255,0.09);
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .driver-pill.is-green {
+        color: var(--driver-green);
+        background: rgba(var(--brand-green-rgb), 0.13);
+        border-color: rgba(var(--brand-green-rgb), 0.3);
+    }
+
+    .driver-pill.is-dark {
+        color: rgba(255,255,255,0.78);
+        background: rgba(0,0,0,0.34);
+    }
+
+    .driver-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 46px;
+        padding: 13px 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        outline: 0;
+        cursor: pointer;
+        text-decoration: none;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .driver-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .driver-btn-primary {
+        background: linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.96), rgba(220, 226, 38, 0.86));
+        color: rgba(4,10,6,0.96);
+        box-shadow: 0 18px 45px rgba(var(--brand-green-rgb), 0.22);
+    }
+
+    .driver-btn-secondary {
+        background: rgba(255,255,255,0.055);
+        color: rgba(255,255,255,0.88);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    .driver-btn-secondary:hover {
+        border-color: rgba(var(--brand-green-rgb), 0.35);
+        background: rgba(var(--brand-green-rgb), 0.1);
+    }
+
+    .driver-hero-panel {
+        align-self: stretch;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 14px;
+    }
+
+    .driver-glass-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        background: linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+        backdrop-filter: blur(26px);
+        -webkit-backdrop-filter: blur(26px);
+    }
+
+    .driver-glass-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.13), transparent 36%),
+            radial-gradient(circle at 88% 12%, rgba(220,226,38,0.13), transparent 36%);
+    }
+
+    .driver-glass-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .driver-card-padding {
+        padding: 22px;
+    }
+
+    .driver-progress-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 18px;
+        margin-bottom: 14px;
+    }
+
+    .driver-progress-title {
+        color: rgba(255,255,255,0.9);
+        font-weight: 800;
+        font-size: 14px;
+    }
+
+    .driver-progress-value {
+        color: var(--driver-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 950;
+    }
+
+    .driver-progress-track {
+        height: 10px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(0,0,0,0.32);
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .driver-progress-bar {
+        height: 100%;
+        width: var(--completion);
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--driver-green), var(--driver-yellow));
+        box-shadow: 0 0 22px rgba(var(--brand-green-rgb), 0.42);
+    }
+
+    .driver-mini-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .driver-mini-card {
+        padding: 14px;
+        border-radius: 20px;
+        background: rgba(0,0,0,0.22);
         border: 1px solid rgba(255,255,255,0.07);
     }
 
-    .profile-tab {
-        border: 0;
-        outline: 0;
-        cursor: pointer;
-        border-radius: 999px;
-        padding: 12px 18px;
-        background: transparent;
-        color: var(--muted);
-        font-family: 'Orbitron', sans-serif;
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 0.16em;
+    .driver-mini-label {
+        color: var(--driver-muted);
+        font-size: 9px;
+        letter-spacing: 0.15em;
         text-transform: uppercase;
-        transition: all 0.25s ease;
+        font-weight: 850;
     }
 
-    .profile-tab.active,
-    .profile-tab:hover {
-        color: #fff;
-        background: rgba(var(--brand-green-rgb), 0.18);
-        box-shadow: inset 0 0 0 1px rgba(var(--brand-green-rgb), 0.28);
+    .driver-mini-value {
+        margin-top: 8px;
+        color: var(--driver-text);
+        font-size: 14px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
     }
 
-    .tab-panel {
-        display: none;
-    }
-
-    .tab-panel.active {
-        display: block;
-        animation: fadeIn 0.35s ease-out forwards;
-    }
-
-    .timeline {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-    }
-
-    .timeline-item {
+    .driver-layout {
         display: grid;
-        grid-template-columns: 42px 1fr;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 26px;
+        align-items: start;
+    }
+
+    .driver-sidebar,
+    .driver-main {
+        display: grid;
+        gap: 22px;
+    }
+
+    .driver-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 30px;
+        background:
+            linear-gradient(145deg, rgba(255,255,255,0.058), rgba(255,255,255,0.022)),
+            rgba(4,10,6,0.62);
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 24px 80px rgba(0,0,0,0.28);
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
+    }
+
+    .driver-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.09), transparent 34%),
+            linear-gradient(to bottom, rgba(255,255,255,0.035), transparent 30%);
+    }
+
+    .driver-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .driver-section {
+        padding: 24px;
+    }
+
+    .driver-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+
+    .driver-section-title {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        color: var(--driver-text);
+    }
+
+    .driver-section-line {
+        height: 1px;
+        flex: 1;
+        min-width: 40px;
+        background: linear-gradient(90deg, rgba(var(--brand-green-rgb), 0.48), transparent);
+    }
+
+    .driver-section-kicker {
+        color: var(--driver-muted);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .driver-info-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .driver-info-row {
+        display: grid;
+        grid-template-columns: 118px minmax(0, 1fr);
         gap: 14px;
-        padding: 16px;
+        align-items: center;
+        min-height: 54px;
+        padding: 13px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.065);
+    }
+
+    .driver-info-label {
+        color: var(--driver-muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .driver-info-value {
+        color: rgba(255,255,255,0.9);
+        text-align: right;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .driver-info-value a {
+        color: var(--driver-green);
+        text-decoration: none;
+        transition: color 0.25s ease;
+    }
+
+    .driver-info-value a:hover {
+        color: #fff;
+    }
+
+    .driver-contact-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .driver-contact-card {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 13px;
+        align-items: center;
+        padding: 14px;
         border-radius: 20px;
         background: rgba(255,255,255,0.035);
         border: 1px solid rgba(255,255,255,0.07);
     }
 
-    .timeline-icon {
+    .driver-contact-icon,
+    .driver-timeline-icon {
         width: 42px;
         height: 42px;
-        border-radius: 16px;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: var(--brand-green);
+        border-radius: 16px;
+        color: var(--driver-green);
         background: rgba(var(--brand-green-rgb), 0.12);
         border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+        flex: 0 0 auto;
     }
 
-    .gallery-grid {
+    .driver-contact-title {
+        color: var(--driver-muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+    }
+
+    .driver-contact-value {
+        margin-top: 5px;
+        color: var(--driver-text);
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .driver-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .driver-stat-card {
+        position: relative;
+        overflow: hidden;
+        min-height: 140px;
+        padding: 18px;
+        border-radius: 24px;
+        background:
+            radial-gradient(circle at 90% 16%, rgba(var(--brand-green-rgb), 0.17), transparent 36%),
+            rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.075);
+        transition: transform 0.28s ease, border-color 0.28s ease, background 0.28s ease;
+    }
+
+    .driver-stat-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(var(--brand-green-rgb), 0.36);
+        background:
+            radial-gradient(circle at 90% 16%, rgba(var(--brand-green-rgb), 0.24), transparent 40%),
+            rgba(var(--brand-green-rgb), 0.055);
+    }
+
+    .driver-stat-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--driver-green);
+        background: rgba(var(--brand-green-rgb), 0.12);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+        margin-bottom: 18px;
+    }
+
+    .driver-stat-value {
+        font-family: 'Orbitron', sans-serif;
+        color: var(--driver-text);
+        font-size: clamp(1.45rem, 2.5vw, 2rem);
+        line-height: 1;
+        font-weight: 950;
+        overflow-wrap: anywhere;
+    }
+
+    .driver-stat-label {
+        margin-top: 10px;
+        color: var(--driver-muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .driver-tabs-wrap {
+        padding: 10px;
+        border-radius: 28px;
+        background: rgba(0,0,0,0.26);
+        border: 1px solid rgba(255,255,255,0.075);
+    }
+
+    .driver-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .driver-tabs.three-tabs {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .driver-tab {
+        border: 0;
+        outline: 0;
+        min-height: 46px;
+        cursor: pointer;
+        border-radius: 20px;
+        padding: 12px 14px;
+        color: var(--driver-muted);
+        background: transparent;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        transition: color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    .driver-tab:hover {
+        color: rgba(255,255,255,0.9);
+        background: rgba(255,255,255,0.045);
+    }
+
+    .driver-tab.active {
+        color: rgba(4,10,6,0.96);
+        background: linear-gradient(135deg, var(--driver-green), var(--driver-yellow));
+        box-shadow: 0 14px 32px rgba(var(--brand-green-rgb), 0.2);
+    }
+
+    .driver-tab-panel {
+        display: none;
+        padding-top: 24px;
+    }
+
+    .driver-tab-panel.active {
+        display: block;
+        animation: driverFadeUp 0.34s ease both;
+    }
+
+    @keyframes driverFadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .driver-copy {
+        color: rgba(255,255,255,0.88);
+        line-height: 1.9;
+        font-size: 15px;
+    }
+
+    .driver-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+    }
+
+    .driver-highlight-card {
+        min-height: 110px;
+        padding: 18px;
+        border-radius: 24px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .driver-highlight-value {
+        color: var(--driver-text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 18px;
+        font-weight: 950;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .driver-highlight-label {
+        margin-top: 10px;
+        color: var(--driver-muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .driver-timeline {
+        display: grid;
+        gap: 14px;
+    }
+
+    .driver-timeline-item {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 14px;
+        padding: 16px;
+        border-radius: 22px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .driver-timeline-title {
+        margin: 0;
+        color: var(--driver-text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .driver-timeline-text {
+        margin-top: 8px;
+        color: var(--driver-muted);
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .driver-timeline-date {
+        margin-top: 12px;
+        color: var(--driver-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .driver-gallery-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
     }
 
-    @media (max-width: 760px) {
-        .gallery-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .profile-tabs {
-            border-radius: 24px;
-        }
-
-        .profile-tab {
-            width: 100%;
-        }
-    }
-
-    .gallery-item {
-        min-height: 180px;
-        border-radius: 22px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.08);
-        background:
-            radial-gradient(circle at 30% 30%, rgba(var(--brand-green-rgb), 0.18), transparent 40%),
-            rgba(255,255,255,0.035);
+    .driver-gallery-item {
         position: relative;
+        min-height: 215px;
+        overflow: hidden;
+        border-radius: 24px;
+        background:
+            radial-gradient(circle at 26% 24%, rgba(var(--brand-green-rgb), 0.22), transparent 42%),
+            rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.08);
     }
 
-    .gallery-item img {
+    .driver-gallery-item img {
         width: 100%;
         height: 100%;
-        min-height: 180px;
+        min-height: 215px;
         object-fit: cover;
         display: block;
-        filter: saturate(1.05) brightness(0.82);
+        filter: saturate(1.08) brightness(0.82);
+        transform: scale(1.01);
+        transition: transform 0.35s ease, filter 0.35s ease;
     }
 
-    .gallery-item-caption {
+    .driver-gallery-item:hover img {
+        transform: scale(1.06);
+        filter: saturate(1.15) brightness(0.95);
+    }
+
+    .driver-gallery-caption {
         position: absolute;
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        background: rgba(4,10,6,0.72);
+        left: 13px;
+        right: 13px;
+        bottom: 13px;
+        padding: 11px 13px;
+        border-radius: 16px;
+        color: var(--driver-text);
+        background: rgba(4,10,6,0.74);
+        border: 1px solid rgba(255,255,255,0.09);
         backdrop-filter: blur(16px);
-        border: 1px solid rgba(255,255,255,0.08);
+        -webkit-backdrop-filter: blur(16px);
         font-size: 12px;
-        color: var(--text);
     }
 
-    .settings-form {
+    .driver-empty {
+        padding: 32px;
+        border-radius: 24px;
+        color: var(--driver-muted);
+        text-align: center;
+        line-height: 1.7;
+        background: rgba(255,255,255,0.03);
+        border: 1px dashed rgba(255,255,255,0.14);
+    }
+
+    .driver-empty strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--driver-text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 12px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+    }
+
+    .driver-settings-form {
         display: grid;
-        gap: 18px;
+        gap: 22px;
     }
 
-    .form-grid {
+    .driver-form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 16px;
     }
 
-    @media (max-width: 760px) {
-        .form-grid {
-            grid-template-columns: 1fr;
-        }
+    .driver-form-field {
+        display: grid;
+        gap: 9px;
     }
 
-    .form-field {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .form-field.full {
+    .driver-form-field.full {
         grid-column: 1 / -1;
     }
 
-    .form-label {
+    .driver-form-label {
+        color: var(--driver-muted);
         font-family: 'Orbitron', sans-serif;
-        font-size: 10px;
-        font-weight: 800;
+        font-size: 9px;
+        font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: var(--muted);
     }
 
-    .form-input,
-    .form-textarea,
-    .form-select {
+    .driver-input,
+    .driver-textarea,
+    .driver-select {
         width: 100%;
-        border-radius: 16px;
-        border: 1px solid rgba(255,255,255,0.09);
+        min-height: 48px;
+        border-radius: 17px;
+        border: 1px solid rgba(255,255,255,0.095);
+        outline: 0;
         background: rgba(0,0,0,0.32);
-        color: var(--text);
+        color: var(--driver-text);
         padding: 13px 15px;
-        outline: none;
-        transition: all 0.25s ease;
         font-size: 14px;
+        transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
     }
 
-    .form-input:focus,
-    .form-textarea:focus,
-    .form-select:focus {
-        border-color: rgba(var(--brand-green-rgb), 0.5);
+    .driver-input:focus,
+    .driver-textarea:focus,
+    .driver-select:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.52);
         box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.08);
+        background: rgba(0,0,0,0.42);
     }
 
-    .form-textarea {
-        min-height: 140px;
+    .driver-textarea {
+        min-height: 150px;
         resize: vertical;
+        line-height: 1.7;
     }
 
-    .form-hint {
+    .driver-form-hint {
+        color: var(--driver-muted);
         font-size: 12px;
-        color: var(--muted);
-        line-height: 1.6;
+        line-height: 1.55;
     }
 
-    .switch-list {
+    .driver-switch-list {
         display: grid;
         gap: 12px;
     }
 
-    .switch-row {
+    .driver-switch-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 18px;
-        padding: 15px;
-        border-radius: 18px;
+        padding: 16px;
+        border-radius: 21px;
         background: rgba(255,255,255,0.035);
-        border: 1px solid rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.075);
     }
 
-    .switch-row strong {
-        color: var(--text);
+    .driver-switch-row strong {
+        color: var(--driver-text);
         font-size: 14px;
     }
 
-    .switch-row p {
-        color: var(--muted);
+    .driver-switch-row p {
+        margin: 5px 0 0;
+        color: var(--driver-muted);
         font-size: 12px;
-        margin-top: 4px;
+        line-height: 1.55;
     }
 
-    .switch {
+    .driver-switch {
         position: relative;
-        width: 54px;
-        height: 30px;
+        width: 58px;
+        height: 32px;
         flex: 0 0 auto;
     }
 
-    .switch input {
+    .driver-switch input {
         opacity: 0;
         width: 0;
         height: 0;
     }
 
-    .slider {
+    .driver-slider {
         position: absolute;
-        cursor: pointer;
         inset: 0;
-        background: rgba(255,255,255,0.13);
-        border: 1px solid rgba(255,255,255,0.12);
+        cursor: pointer;
         border-radius: 999px;
-        transition: 0.25s;
+        background: rgba(255,255,255,0.13);
+        border: 1px solid rgba(255,255,255,0.13);
+        transition: 0.24s ease;
     }
 
-    .slider::before {
+    .driver-slider::before {
         content: "";
         position: absolute;
-        width: 22px;
-        height: 22px;
+        width: 24px;
+        height: 24px;
         left: 4px;
         top: 3px;
-        background: rgba(255,255,255,0.75);
         border-radius: 999px;
-        transition: 0.25s;
+        background: rgba(255,255,255,0.78);
+        transition: 0.24s ease;
     }
 
-    .switch input:checked + .slider {
+    .driver-switch input:checked + .driver-slider {
         background: rgba(var(--brand-green-rgb), 0.32);
-        border-color: rgba(var(--brand-green-rgb), 0.5);
+        border-color: rgba(var(--brand-green-rgb), 0.54);
     }
 
-    .switch input:checked + .slider::before {
-        transform: translateX(24px);
-        background: var(--brand-green);
+    .driver-switch input:checked + .driver-slider::before {
+        transform: translateX(26px);
+        background: var(--driver-green);
         box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.65);
     }
 
-    .empty-state {
-        padding: 28px;
-        border-radius: 22px;
-        text-align: center;
-        background: rgba(255,255,255,0.035);
-        border: 1px dashed rgba(255,255,255,0.12);
-        color: var(--muted);
+    .driver-form-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-top: 4px;
     }
 
-    .copy-toast {
+    .driver-toast {
         position: fixed;
         right: 24px;
         bottom: 24px;
-        z-index: 999;
+        z-index: 9999;
         opacity: 0;
         pointer-events: none;
-        transform: translateY(12px);
-        transition: all 0.25s ease;
-        background: rgba(4,10,6,0.92);
-        color: var(--brand-green);
-        border: 1px solid rgba(var(--brand-green-rgb), 0.35);
-        border-radius: 16px;
-        padding: 13px 16px;
+        transform: translateY(14px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+        padding: 14px 17px;
+        border-radius: 17px;
+        color: var(--driver-green);
+        background: rgba(4,10,6,0.94);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.36);
+        box-shadow: 0 24px 70px rgba(0,0,0,0.45);
         font-family: 'Orbitron', sans-serif;
         font-size: 10px;
+        font-weight: 900;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        box-shadow: 0 24px 70px rgba(0,0,0,0.45);
     }
 
-    .copy-toast.show {
+    .driver-toast.show {
         opacity: 1;
         transform: translateY(0);
     }
+
+    @media (max-width: 1180px) {
+        .driver-hero-inner,
+        .driver-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .driver-hero-panel {
+            max-width: 520px;
+        }
+
+        .driver-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 820px) {
+        .driver-profile {
+            gap: 20px;
+        }
+
+        .driver-hero {
+            border-radius: 26px;
+            min-height: auto;
+        }
+
+        .driver-hero-inner {
+            min-height: auto;
+            padding: 24px;
+        }
+
+        .driver-title-row {
+            grid-template-columns: 1fr;
+        }
+
+        .driver-avatar-frame {
+            width: 112px;
+            height: 112px;
+            border-radius: 28px;
+        }
+
+        .driver-avatar {
+            border-radius: 24px;
+        }
+
+        .driver-tabs,
+        .driver-tabs.three-tabs,
+        .driver-stat-grid,
+        .driver-overview-grid,
+        .driver-gallery-grid,
+        .driver-form-grid,
+        .driver-mini-meta {
+            grid-template-columns: 1fr;
+        }
+
+        .driver-info-row {
+            grid-template-columns: 1fr;
+            gap: 7px;
+        }
+
+        .driver-info-value {
+            text-align: left;
+        }
+
+        .driver-section {
+            padding: 20px;
+        }
+
+        .driver-name {
+            font-size: clamp(2.1rem, 12vw, 3.8rem);
+        }
+    }
+
+    @media (max-width: 520px) {
+        .driver-hero-inner {
+            padding: 18px;
+        }
+
+        .driver-card,
+        .driver-glass-card {
+            border-radius: 24px;
+        }
+
+        .driver-status,
+        .driver-highlight-card,
+        .driver-stat-card,
+        .driver-timeline-item,
+        .driver-gallery-item,
+        .driver-empty,
+        .driver-switch-row {
+            border-radius: 20px;
+        }
+
+        .driver-btn {
+            width: 100%;
+        }
+
+        .driver-form-actions .driver-btn {
+            width: 100%;
+        }
+
+        .driver-toast {
+            left: 16px;
+            right: 16px;
+            text-align: center;
+        }
+    }
 </style>
 
-<section class="profile-shell">
+<section class="driver-profile">
 
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-        <div>
-            <div class="profile-pill green mb-4">
-                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
-                Public Driver Profile
-            </div>
-            <h1 class="font-orbitron text-3xl md:text-5xl font-black uppercase tracking-[0.12em] text-[var(--text)]">
-                {{ profile_name }}
-            </h1>
-            <p class="mt-4 max-w-3xl text-[var(--muted)] leading-relaxed">
-                Eifel LOG Fahrerprofil von {{ profile_name }}. Hier findest du alle Infos, Statistiken und Aktivitäten dieses Fahrers. Trete mit ihm in Kontakt oder teile sein Profil mit anderen Truckern!
-            </p>
-        </div>
-
-        <div class="flex flex-wrap gap-3">
-            <button type="button" onclick="copyProfileLink()" class="btn-secondary">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"></path>
-                </svg>
-                Profil teilen
-            </button>
-
-            {% if own_profile %}
-                <button type="button" data-open-tab="settings" class="btn-primary">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                    Profil einstellen
-                </button>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="profile-grid">
-
-        <aside class="profile-card">
-            <div
-                class="profile-banner {% if banner %}has-image{% endif %}"
-                {% if banner %}style="background-image: url('{{ banner }}');"{% endif %}
-            ></div>
-
-            <div class="px-7 pb-7">
-                <div class="profile-avatar-wrap">
-                    <img src="{{ avatar }}" alt="{{ profile_name }}" class="profile-avatar" id="profileAvatarPreview">
-                    <span class="profile-status-dot"></span>
+    <header
+        class="driver-hero {% if banner %}has-banner{% endif %}"
+        {% if banner %}style="background-image: url('{{ banner }}');"{% endif %}
+    >
+        <div class="driver-hero-inner">
+            <div class="driver-hero-main">
+                <div class="driver-breadcrumb">
+                    <span class="driver-dot"></span>
+                    <span>Eifel LOG</span>
+                    <span>/</span>
+                    <span>Driver Profile</span>
                 </div>
 
-                <div class="mt-5">
-                    <h2 class="font-orbitron text-2xl font-black uppercase tracking-[0.08em] text-[var(--text)]">
-                        {{ profile_name }}
-                    </h2>
-                    <p class="mt-2 text-sm text-[var(--muted)]">@{{ username }}</p>
-
-                    <div class="flex flex-wrap gap-2 mt-5">
-                        <span class="profile-pill green">{{ rank }}</span>
-                        {% if public_profile %}
-                            <span class="profile-pill">Public</span>
-                        {% else %}
-                            <span class="profile-pill">Privat</span>
-                        {% endif %}
-                    </div>
-
-                    <p class="mt-6 text-[var(--text)]/90 leading-relaxed">
-                        {{ status }}
-                    </p>
-                </div>
-
-                <div class="mt-7 pt-7 border-t border-white/10">
-                    <div class="profile-section-title">
-                        <h2>Driver Info</h2>
-                        <span></span>
+                <div class="driver-title-row">
+                    <div class="driver-avatar-frame">
+                        <img src="{{ avatar }}" alt="{{ profile_name }}" class="driver-avatar" id="profileAvatarPreview">
                     </div>
 
                     <div>
-                        <div class="info-row">
-                            <div class="info-label">Standort</div>
-                            <div class="info-value">{{ location }}</div>
+                        <div class="driver-eyebrow">
+                            <span class="driver-pill is-green">{{ rank }}</span>
+                            {% if public_profile %}
+                                <span class="driver-pill is-dark">Öffentlich</span>
+                            {% else %}
+                                <span class="driver-pill is-dark">Privat</span>
+                            {% endif %}
+                            <span class="driver-pill is-dark">On Tour</span>
                         </div>
 
-                        <div class="info-row">
-                            <div class="info-label">Lieblings-LKW</div>
-                            <div class="info-value">{{ favorite_truck }}</div>
-                        </div>
-
-                        {% if show_discord and discord %}
-                            <div class="info-row">
-                                <div class="info-label">Discord</div>
-                                <div class="info-value">{{ discord }}</div>
-                            </div>
-                        {% endif %}
-
-                        {% if truckersmp_id %}
-                            <div class="info-row">
-                                <div class="info-label">TruckersMP</div>
-                                <div class="info-value">{{ truckersmp_id }}</div>
-                            </div>
-                        {% endif %}
-
-                        {% if steam %}
-                            <div class="info-row">
-                                <div class="info-label">Steam</div>
-                                <div class="info-value">{{ steam }}</div>
-                            </div>
-                        {% endif %}
-
-                        {% if website %}
-                            <div class="info-row">
-                                <div class="info-label">Website</div>
-                                <div class="info-value">
-                                    <a href="{{ website }}" target="_blank" class="text-[var(--brand-green)] hover:text-white transition">
-                                        Öffnen
-                                    </a>
-                                </div>
-                            </div>
-                        {% endif %}
-
-                        {% if show_email and p.email is defined and p.email %}
-                            <div class="info-row">
-                                <div class="info-label">E-Mail</div>
-                                <div class="info-value">{{ p.email }}</div>
-                            </div>
-                        {% endif %}
+                        <h1 class="driver-name">{{ profile_name }}</h1>
+                        <div class="driver-username">@{{ username }}</div>
                     </div>
                 </div>
+
+                <div class="driver-status">
+                    {{ status }}
+                </div>
+
+                <div class="driver-actions">
+                    <button type="button" onclick="copyProfileLink()" class="driver-btn driver-btn-secondary">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"></path>
+                        </svg>
+                        Profil teilen
+                    </button>
+
+                    {% if website %}
+                        <a href="{{ website }}" target="_blank" rel="noopener" class="driver-btn driver-btn-secondary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8.25v9.75h9.75"></path>
+                            </svg>
+                            Website
+                        </a>
+                    {% endif %}
+
+                    {% if own_profile %}
+                        <button type="button" data-open-tab="settings" class="driver-btn driver-btn-primary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            Profil bearbeiten
+                        </button>
+                    {% endif %}
+                </div>
             </div>
+
+            <aside class="driver-hero-panel">
+                <div class="driver-glass-card driver-card-padding">
+                    <div class="driver-progress-top">
+                        <div>
+                            <div class="driver-mini-label">Profilstatus</div>
+                            <div class="driver-progress-title">Setup-Fortschritt</div>
+                        </div>
+                        <div class="driver-progress-value">{{ completion }}%</div>
+                    </div>
+
+                    <div class="driver-progress-track" aria-label="Profilfortschritt">
+                        <div class="driver-progress-bar" style="--completion: {{ completion }}%;"></div>
+                    </div>
+
+                    <div class="driver-mini-meta">
+                        <div class="driver-mini-card">
+                            <div class="driver-mini-label">Mitglied seit</div>
+                            <div class="driver-mini-value">{{ member_since }}</div>
+                        </div>
+                        <div class="driver-mini-card">
+                            <div class="driver-mini-label">Zuletzt aktiv</div>
+                            <div class="driver-mini-value">{{ last_seen }}</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </header>
+
+    <div class="driver-layout">
+        <aside class="driver-sidebar">
+            <section class="driver-card driver-section">
+                <div class="driver-section-head">
+                    <h2 class="driver-section-title">Driver Info</h2>
+                    <span class="driver-section-line"></span>
+                </div>
+
+                <div class="driver-info-list">
+                    <div class="driver-info-row">
+                        <div class="driver-info-label">Standort</div>
+                        <div class="driver-info-value">{{ location }}</div>
+                    </div>
+
+                    <div class="driver-info-row">
+                        <div class="driver-info-label">Lieblings-LKW</div>
+                        <div class="driver-info-value">{{ favorite_truck }}</div>
+                    </div>
+
+                    <div class="driver-info-row">
+                        <div class="driver-info-label">Rang</div>
+                        <div class="driver-info-value">{{ rank }}</div>
+                    </div>
+
+                    <div class="driver-info-row">
+                        <div class="driver-info-label">Profil</div>
+                        <div class="driver-info-value">
+                            {% if public_profile %}
+                                Öffentlich
+                            {% else %}
+                                Privat
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="driver-card driver-section">
+                <div class="driver-section-head">
+                    <h2 class="driver-section-title">Kontakt</h2>
+                    <span class="driver-section-line"></span>
+                </div>
+
+                <div class="driver-contact-grid">
+                    {% if show_discord and discord %}
+                        <div class="driver-contact-card">
+                            <div class="driver-contact-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h.01M7 8h.01M12 20c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7c0 1.49.532 2.871 1.438 4.006L4 21l4.226-1.69A9.096 9.096 0 0012 20z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="driver-contact-title">Discord</div>
+                                <div class="driver-contact-value">{{ discord }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if truckersmp_id %}
+                        <div class="driver-contact-card">
+                            <div class="driver-contact-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h2m-2 0h-2m4 0V8a1 1 0 011-1h2.586a1 1 0 01.707.293l2.414 2.414A1 1 0 0122 10.414V16h-3"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="driver-contact-title">TruckersMP</div>
+                                <div class="driver-contact-value">{{ truckersmp_id }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if steam %}
+                        <div class="driver-contact-card">
+                            <div class="driver-contact-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.18 3.63a1 1 0 00.95.69h3.816c.969 0 1.371 1.24.588 1.81l-3.087 2.242a1 1 0 00-.364 1.118l1.18 3.63c.3.921-.755 1.688-1.539 1.118l-3.087-2.242a1 1 0 00-1.176 0l-3.087 2.242c-.784.57-1.838-.197-1.539-1.118l1.18-3.63a1 1 0 00-.364-1.118L4.515 9.057c-.783-.57-.38-1.81.588-1.81H8.92a1 1 0 00.95-.69l1.18-3.63z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="driver-contact-title">Steam</div>
+                                <div class="driver-contact-value">{{ steam }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if website %}
+                        <div class="driver-contact-card">
+                            <div class="driver-contact-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 100 18 9 9 0 000-18z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.6 9h16.8M3.6 15h16.8M11 3a15 15 0 000 18M13 3a15 15 0 010 18"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="driver-contact-title">Website</div>
+                                <div class="driver-contact-value">
+                                    <a href="{{ website }}" target="_blank" rel="noopener">Öffnen</a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if show_email and p.email is defined and p.email %}
+                        <div class="driver-contact-card">
+                            <div class="driver-contact-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="driver-contact-title">E-Mail</div>
+                                <div class="driver-contact-value">{{ p.email }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if not (show_discord and discord) and not truckersmp_id and not steam and not website and not (show_email and p.email is defined and p.email) %}
+                        <div class="driver-empty">
+                            <strong>Keine Kontakte</strong>
+                            Dieses Profil hat noch keine öffentlichen Kontaktinfos.
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
         </aside>
 
-        <div class="flex flex-col gap-7">
-
+        <main class="driver-main">
             {% if show_stats %}
-                <div class="profile-card p-6 md:p-7">
-                    <div class="profile-section-title">
-                        <h2>Performance</h2>
-                        <span></span>
+                <section class="driver-card driver-section">
+                    <div class="driver-section-head">
+                        <h2 class="driver-section-title">Performance</h2>
+                        <span class="driver-section-line"></span>
+                        <div class="driver-section-kicker">Live Dashboard</div>
                     </div>
 
-                    <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                        <div class="profile-stat">
-                            <div class="profile-stat-value">{{ stats_data.km if stats_data.km is defined else "0" }}</div>
-                            <div class="profile-stat-label">Kilometer</div>
+                    <div class="driver-stat-grid">
+                        <div class="driver-stat-card">
+                            <div class="driver-stat-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                                </svg>
+                            </div>
+                            <div class="driver-stat-value">{{ stats_data.km if stats_data.km is defined else "0" }}</div>
+                            <div class="driver-stat-label">Kilometer</div>
                         </div>
 
-                        <div class="profile-stat">
-                            <div class="profile-stat-value">{{ stats_data.deliveries if stats_data.deliveries is defined else "0" }}</div>
-                            <div class="profile-stat-label">Lieferungen</div>
+                        <div class="driver-stat-card">
+                            <div class="driver-stat-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8 4-8-4m16 0l-8-4-8 4m16 0v10l-8 4m8-14L12 11m0 0L4 7m8 4v10"></path>
+                                </svg>
+                            </div>
+                            <div class="driver-stat-value">{{ stats_data.deliveries if stats_data.deliveries is defined else "0" }}</div>
+                            <div class="driver-stat-label">Lieferungen</div>
                         </div>
 
-                        <div class="profile-stat">
-                            <div class="profile-stat-value">{{ stats_data.convoys if stats_data.convoys is defined else "0" }}</div>
-                            <div class="profile-stat-label">Konvois</div>
+                        <div class="driver-stat-card">
+                            <div class="driver-stat-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 100-8 4 4 0 000 8zM9 10a4 4 0 100-8 4 4 0 000 8z"></path>
+                                </svg>
+                            </div>
+                            <div class="driver-stat-value">{{ stats_data.convoys if stats_data.convoys is defined else "0" }}</div>
+                            <div class="driver-stat-label">Konvois</div>
                         </div>
 
-                        <div class="profile-stat">
-                            <div class="profile-stat-value">{{ stats_data.rating if stats_data.rating is defined else "0.0" }}</div>
-                            <div class="profile-stat-label">Rating</div>
+                        <div class="driver-stat-card">
+                            <div class="driver-stat-icon">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.18 3.63a1 1 0 00.95.69h3.816c.969 0 1.371 1.24.588 1.81l-3.087 2.242a1 1 0 00-.364 1.118l1.18 3.63c.3.921-.755 1.688-1.539 1.118l-3.087-2.242a1 1 0 00-1.176 0l-3.087 2.242c-.784.57-1.838-.197-1.539-1.118l1.18-3.63a1 1 0 00-.364-1.118L4.515 9.057c-.783-.57-.38-1.81.588-1.81H8.92a1 1 0 00.95-.69l1.18-3.63z"></path>
+                                </svg>
+                            </div>
+                            <div class="driver-stat-value">{{ stats_data.rating if stats_data.rating is defined else "0.0" }}</div>
+                            <div class="driver-stat-label">Rating</div>
                         </div>
                     </div>
-                </div>
+                </section>
             {% endif %}
 
-            <div class="profile-card p-5 md:p-7">
-                <div class="profile-tabs" role="tablist">
-                    <button class="profile-tab active" type="button" data-tab="overview">Übersicht</button>
-                    <button class="profile-tab" type="button" data-tab="activity">Aktivität</button>
-                    <button class="profile-tab" type="button" data-tab="gallery">Galerie</button>
-                    {% if own_profile %}
-                        <button class="profile-tab" type="button" data-tab="settings">Einstellungen</button>
-                    {% endif %}
+            <section class="driver-card driver-section">
+                <div class="driver-tabs-wrap">
+                    <div class="driver-tabs {% if not own_profile %}three-tabs{% endif %}" role="tablist" aria-label="Profilbereiche">
+                        <button class="driver-tab active" type="button" data-tab="overview" role="tab" aria-controls="tab-overview" aria-selected="true">Übersicht</button>
+                        <button class="driver-tab" type="button" data-tab="activity" role="tab" aria-controls="tab-activity" aria-selected="false">Aktivität</button>
+                        <button class="driver-tab" type="button" data-tab="gallery" role="tab" aria-controls="tab-gallery" aria-selected="false">Galerie</button>
+                        {% if own_profile %}
+                            <button class="driver-tab" type="button" data-tab="settings" role="tab" aria-controls="tab-settings" aria-selected="false">Einstellungen</button>
+                        {% endif %}
+                    </div>
                 </div>
 
-                <div class="mt-7">
-
-                    <div class="tab-panel active" id="tab-overview">
-                        <div class="profile-section-title">
-                            <h2>Über mich</h2>
-                            <span></span>
-                        </div>
-
-                        <p class="text-[var(--text)]/90 leading-8">
-                            {{ bio }}
-                        </p>
-
-                        <div class="grid md:grid-cols-2 gap-4 mt-7">
-                            <div class="profile-stat">
-                                <div class="profile-stat-value text-lg">
-                                    {{ p.member_since if p.member_since is defined and p.member_since else "Neu" }}
-                                </div>
-                                <div class="profile-stat-label">Mitglied seit</div>
-                            </div>
-
-                            <div class="profile-stat">
-                                <div class="profile-stat-value text-lg">
-                                    {{ p.last_seen if p.last_seen is defined and p.last_seen else "Unbekannt" }}
-                                </div>
-                                <div class="profile-stat-label">Zuletzt aktiv</div>
-                            </div>
-                        </div>
+                <div class="driver-tab-panel active" id="tab-overview" role="tabpanel">
+                    <div class="driver-section-head">
+                        <h2 class="driver-section-title">Über mich</h2>
+                        <span class="driver-section-line"></span>
                     </div>
 
-                    <div class="tab-panel" id="tab-activity">
-                        <div class="profile-section-title">
-                            <h2>Letzte Aktivitäten</h2>
-                            <span></span>
+                    <p class="driver-copy">{{ bio }}</p>
+
+                    <div class="driver-overview-grid">
+                        <div class="driver-highlight-card">
+                            <div class="driver-highlight-value">{{ member_since }}</div>
+                            <div class="driver-highlight-label">Mitglied seit</div>
                         </div>
 
-                        {% if show_activity and activity_data %}
-                            <div class="timeline">
-                                {% for item in activity_data %}
-                                    <div class="timeline-item">
-                                        <div class="timeline-icon">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h2m-2 0h-2m4 0V8a1 1 0 011-1h2.586a1 1 0 01.707.293l2.414 2.414A1 1 0 0122 10.414V16h-3"></path>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-orbitron text-sm font-bold uppercase tracking-[0.12em] text-[var(--text)]">
-                                                {{ item.title if item.title is defined else "Aktivität" }}
-                                            </h3>
-                                            <p class="mt-2 text-sm text-[var(--muted)] leading-relaxed">
-                                                {{ item.description if item.description is defined else "" }}
-                                            </p>
-                                            <p class="mt-3 text-[10px] font-orbitron tracking-[0.16em] uppercase text-[var(--brand-green)]">
-                                                {{ item.date if item.date is defined else "" }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="empty-state">
-                                Noch keine öffentlichen Aktivitäten vorhanden.
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="tab-panel" id="tab-gallery">
-                        <div class="profile-section-title">
-                            <h2>Galerie</h2>
-                            <span></span>
+                        <div class="driver-highlight-card">
+                            <div class="driver-highlight-value">{{ last_seen }}</div>
+                            <div class="driver-highlight-label">Zuletzt aktiv</div>
                         </div>
 
-                        {% if gallery_data %}
-                            <div class="gallery-grid">
-                                {% for image in gallery_data %}
-                                    <div class="gallery-item">
-                                        <img src="{{ image.url if image.url is defined else image }}" alt="{{ image.title if image.title is defined else 'Profil Bild' }}">
-                                        {% if image.title is defined and image.title %}
-                                            <div class="gallery-item-caption">{{ image.title }}</div>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="empty-state">
-                                Dieses Profil hat noch keine öffentlichen Bilder hochgeladen.
-                            </div>
-                        {% endif %}
+                        <div class="driver-highlight-card">
+                            <div class="driver-highlight-value">{{ favorite_truck }}</div>
+                            <div class="driver-highlight-label">Setup / LKW</div>
+                        </div>
+
+                        <div class="driver-highlight-card">
+                            <div class="driver-highlight-value">{{ location }}</div>
+                            <div class="driver-highlight-label">Base</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="driver-tab-panel" id="tab-activity" role="tabpanel">
+                    <div class="driver-section-head">
+                        <h2 class="driver-section-title">Letzte Aktivitäten</h2>
+                        <span class="driver-section-line"></span>
                     </div>
 
-                    {% if own_profile %}
-                        <div class="tab-panel" id="tab-settings">
-                            <div class="profile-section-title">
-                                <h2>Profil einstellen</h2>
-                                <span></span>
-                            </div>
-
-                            <form class="settings-form" method="POST" action="" enctype="multipart/form-data">
-                                <input type="hidden" name="form_type" value="profile_settings">
-
-                                <div class="form-grid">
-                                    <div class="form-field">
-                                        <label class="form-label" for="display_name">Anzeigename</label>
-                                        <input class="form-input" id="display_name" name="display_name" type="text" maxlength="40" value="{{ profile_name }}" placeholder="Dein Anzeigename">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="username">Benutzername</label>
-                                        <input class="form-input" id="username" name="username" type="text" maxlength="32" value="{{ username }}" placeholder="username">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="rank">Rang</label>
-                                        <select class="form-select" id="rank" name="rank">
-                                            <option value="Driver" {% if rank == "Driver" %}selected{% endif %}>Driver</option>
-                                            <option value="Senior Driver" {% if rank == "Senior Driver" %}selected{% endif %}>Senior Driver</option>
-                                            <option value="Convoy Lead" {% if rank == "Convoy Lead" %}selected{% endif %}>Convoy Lead</option>
-                                            <option value="Dispatcher" {% if rank == "Dispatcher" %}selected{% endif %}>Dispatcher</option>
-                                            <option value="Management" {% if rank == "Management" %}selected{% endif %}>Management</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="location">Standort</label>
-                                        <input class="form-input" id="location" name="location" type="text" maxlength="60" value="{{ location if location != 'Nicht angegeben' else '' }}" placeholder="z.B. Deutschland">
-                                    </div>
-
-                                    <div class="form-field full">
-                                        <label class="form-label" for="status">Status</label>
-                                        <input class="form-input" id="status" name="status" type="text" maxlength="120" value="{{ status }}" placeholder="Kurzer Profilstatus">
-                                    </div>
-
-                                    <div class="form-field full">
-                                        <label class="form-label" for="bio">Über mich</label>
-                                        <textarea class="form-textarea" id="bio" name="bio" maxlength="900" placeholder="Schreibe etwas über dich, deine Touren und deinen Fahrstil.">{{ bio if bio != 'Dieses Profil wurde noch nicht ausgefüllt.' else '' }}</textarea>
-                                        <div class="form-hint">
-                                            <span id="bioCount">0</span>/900 Zeichen
-                                        </div>
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="favorite_truck">Lieblings-LKW</label>
-                                        <input class="form-input" id="favorite_truck" name="favorite_truck" type="text" maxlength="80" value="{{ favorite_truck if favorite_truck != 'Nicht angegeben' else '' }}" placeholder="z.B. Scania S">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="discord">Discord</label>
-                                        <input class="form-input" id="discord" name="discord" type="text" maxlength="80" value="{{ discord }}" placeholder="Name#0000 oder Username">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="truckersmp_id">TruckersMP ID</label>
-                                        <input class="form-input" id="truckersmp_id" name="truckersmp_id" type="text" maxlength="40" value="{{ truckersmp_id }}" placeholder="TruckersMP ID">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="steam">Steam</label>
-                                        <input class="form-input" id="steam" name="steam" type="text" maxlength="120" value="{{ steam }}" placeholder="Steam Profil oder Name">
-                                    </div>
-
-                                    <div class="form-field full">
-                                        <label class="form-label" for="website">Website</label>
-                                        <input class="form-input" id="website" name="website" type="url" maxlength="180" value="{{ website }}" placeholder="https://...">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="avatar_url">Avatar URL</label>
-                                        <input class="form-input" id="avatar_url" name="avatar_url" type="url" value="{{ avatar if avatar != url_for('static', filename='eifellog.jpg') else '' }}" placeholder="https://...">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="avatar_file">Avatar hochladen</label>
-                                        <input class="form-input" id="avatar_file" name="avatar_file" type="file" accept="image/*">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="banner_url">Banner URL</label>
-                                        <input class="form-input" id="banner_url" name="banner_url" type="url" value="{{ banner }}" placeholder="https://...">
-                                    </div>
-
-                                    <div class="form-field">
-                                        <label class="form-label" for="banner_file">Banner hochladen</label>
-                                        <input class="form-input" id="banner_file" name="banner_file" type="file" accept="image/*">
-                                    </div>
-                                </div>
-
-                                <div class="mt-2">
-                                    <div class="profile-section-title">
-                                        <h2>Sichtbarkeit</h2>
-                                        <span></span>
-                                    </div>
-
-                                    <div class="switch-list">
-                                        <label class="switch-row">
-                                            <div>
-                                                <strong>Profil öffentlich anzeigen</strong>
-                                                <p>Wenn aktiv, kann jeder dein Profil ohne Login öffnen.</p>
-                                            </div>
-                                            <span class="switch">
-                                                <input type="checkbox" name="public_profile" value="1" {% if public_profile %}checked{% endif %}>
-                                                <span class="slider"></span>
-                                            </span>
-                                        </label>
-
-                                        <label class="switch-row">
-                                            <div>
-                                                <strong>Statistiken anzeigen</strong>
-                                                <p>Kilometer, Lieferungen, Konvois und Rating öffentlich anzeigen.</p>
-                                            </div>
-                                            <span class="switch">
-                                                <input type="checkbox" name="show_stats" value="1" {% if show_stats %}checked{% endif %}>
-                                                <span class="slider"></span>
-                                            </span>
-                                        </label>
-
-                                        <label class="switch-row">
-                                            <div>
-                                                <strong>Aktivitäten anzeigen</strong>
-                                                <p>Letzte öffentliche Touren und Aktionen im Profil anzeigen.</p>
-                                            </div>
-                                            <span class="switch">
-                                                <input type="checkbox" name="show_activity" value="1" {% if show_activity %}checked{% endif %}>
-                                                <span class="slider"></span>
-                                            </span>
-                                        </label>
-
-                                        <label class="switch-row">
-                                            <div>
-                                                <strong>Discord anzeigen</strong>
-                                                <p>Deinen Discord-Namen öffentlich im Profil anzeigen.</p>
-                                            </div>
-                                            <span class="switch">
-                                                <input type="checkbox" name="show_discord" value="1" {% if show_discord %}checked{% endif %}>
-                                                <span class="slider"></span>
-                                            </span>
-                                        </label>
-
-                                        <label class="switch-row">
-                                            <div>
-                                                <strong>E-Mail anzeigen</strong>
-                                                <p>Nur aktivieren, wenn deine E-Mail öffentlich sichtbar sein soll.</p>
-                                            </div>
-                                            <span class="switch">
-                                                <input type="checkbox" name="show_email" value="1" {% if show_email %}checked{% endif %}>
-                                                <span class="slider"></span>
-                                            </span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="flex flex-col sm:flex-row gap-3 sm:justify-end pt-4">
-                                    <button type="reset" class="btn-secondary">
-                                        Zurücksetzen
-                                    </button>
-
-                                    <button type="submit" class="btn-primary">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    {% if show_activity and activity_data %}
+                        <div class="driver-timeline">
+                            {% for item in activity_data %}
+                                <article class="driver-timeline-item">
+                                    <div class="driver-timeline-icon">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h2m-2 0h-2m4 0V8a1 1 0 011-1h2.586a1 1 0 01.707.293l2.414 2.414A1 1 0 0122 10.414V16h-3"></path>
                                         </svg>
-                                        Einstellungen speichern
-                                    </button>
-                                </div>
-                            </form>
+                                    </div>
+                                    <div>
+                                        <h3 class="driver-timeline-title">{{ item.title if item.title is defined else "Aktivität" }}</h3>
+                                        <p class="driver-timeline-text">{{ item.description if item.description is defined else "" }}</p>
+                                        <div class="driver-timeline-date">{{ item.date if item.date is defined else "" }}</div>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="driver-empty">
+                            <strong>Keine Aktivitäten</strong>
+                            Noch keine öffentlichen Touren oder Aktionen vorhanden.
                         </div>
                     {% endif %}
-
                 </div>
-            </div>
 
-        </div>
+                <div class="driver-tab-panel" id="tab-gallery" role="tabpanel">
+                    <div class="driver-section-head">
+                        <h2 class="driver-section-title">Galerie</h2>
+                        <span class="driver-section-line"></span>
+                    </div>
+
+                    {% if gallery_data %}
+                        <div class="driver-gallery-grid">
+                            {% for image in gallery_data %}
+                                <figure class="driver-gallery-item">
+                                    <img src="{{ image.url if image.url is defined else image }}" alt="{{ image.title if image.title is defined else 'Profil Bild' }}">
+                                    {% if image.title is defined and image.title %}
+                                        <figcaption class="driver-gallery-caption">{{ image.title }}</figcaption>
+                                    {% endif %}
+                                </figure>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="driver-empty">
+                            <strong>Keine Galerie</strong>
+                            Dieses Profil hat noch keine öffentlichen Bilder hochgeladen.
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if own_profile %}
+                    <div class="driver-tab-panel" id="tab-settings" role="tabpanel">
+                        <div class="driver-section-head">
+                            <h2 class="driver-section-title">Profil bearbeiten</h2>
+                            <span class="driver-section-line"></span>
+                            <div class="driver-section-kicker">Owner Mode</div>
+                        </div>
+
+                        <form class="driver-settings-form" method="POST" action="" enctype="multipart/form-data">
+                            <input type="hidden" name="form_type" value="profile_settings">
+
+                            <div class="driver-form-grid">
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="display_name">Anzeigename</label>
+                                    <input class="driver-input" id="display_name" name="display_name" type="text" maxlength="40" value="{{ profile_name }}" placeholder="Dein Anzeigename">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="username">Benutzername</label>
+                                    <input class="driver-input" id="username" name="username" type="text" maxlength="32" value="{{ username }}" placeholder="username">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="rank">Rang</label>
+                                    <select class="driver-select" id="rank" name="rank">
+                                        <option value="Driver" {% if rank == "Driver" %}selected{% endif %}>Driver</option>
+                                        <option value="Senior Driver" {% if rank == "Senior Driver" %}selected{% endif %}>Senior Driver</option>
+                                        <option value="Convoy Lead" {% if rank == "Convoy Lead" %}selected{% endif %}>Convoy Lead</option>
+                                        <option value="Dispatcher" {% if rank == "Dispatcher" %}selected{% endif %}>Dispatcher</option>
+                                        <option value="Management" {% if rank == "Management" %}selected{% endif %}>Management</option>
+                                    </select>
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="location">Standort</label>
+                                    <input class="driver-input" id="location" name="location" type="text" maxlength="60" value="{{ location if location != 'Nicht angegeben' else '' }}" placeholder="z.B. Deutschland">
+                                </div>
+
+                                <div class="driver-form-field full">
+                                    <label class="driver-form-label" for="status">Status</label>
+                                    <input class="driver-input" id="status" name="status" type="text" maxlength="120" value="{{ status }}" placeholder="Kurzer Profilstatus">
+                                </div>
+
+                                <div class="driver-form-field full">
+                                    <label class="driver-form-label" for="bio">Über mich</label>
+                                    <textarea class="driver-textarea" id="bio" name="bio" maxlength="900" placeholder="Schreibe etwas über dich, deine Touren und deinen Fahrstil.">{{ bio if bio != 'Dieses Profil wurde noch nicht ausgefüllt.' else '' }}</textarea>
+                                    <div class="driver-form-hint">
+                                        <span id="bioCount">0</span>/900 Zeichen · Tipp: Schreib kurz, was dich als Fahrer ausmacht.
+                                    </div>
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="favorite_truck">Lieblings-LKW</label>
+                                    <input class="driver-input" id="favorite_truck" name="favorite_truck" type="text" maxlength="80" value="{{ favorite_truck if favorite_truck != 'Nicht angegeben' else '' }}" placeholder="z.B. Scania S">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="discord">Discord</label>
+                                    <input class="driver-input" id="discord" name="discord" type="text" maxlength="80" value="{{ discord }}" placeholder="Name#0000 oder Username">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="truckersmp_id">TruckersMP ID</label>
+                                    <input class="driver-input" id="truckersmp_id" name="truckersmp_id" type="text" maxlength="40" value="{{ truckersmp_id }}" placeholder="TruckersMP ID">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="steam">Steam</label>
+                                    <input class="driver-input" id="steam" name="steam" type="text" maxlength="120" value="{{ steam }}" placeholder="Steam Profil oder Name">
+                                </div>
+
+                                <div class="driver-form-field full">
+                                    <label class="driver-form-label" for="website">Website</label>
+                                    <input class="driver-input" id="website" name="website" type="url" maxlength="180" value="{{ website }}" placeholder="https://...">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="avatar_url">Avatar URL</label>
+                                    <input class="driver-input" id="avatar_url" name="avatar_url" type="url" value="{{ avatar if avatar != default_avatar else '' }}" placeholder="https://...">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="avatar_file">Avatar hochladen</label>
+                                    <input class="driver-input" id="avatar_file" name="avatar_file" type="file" accept="image/*">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="banner_url">Banner URL</label>
+                                    <input class="driver-input" id="banner_url" name="banner_url" type="url" value="{{ banner }}" placeholder="https://...">
+                                </div>
+
+                                <div class="driver-form-field">
+                                    <label class="driver-form-label" for="banner_file">Banner hochladen</label>
+                                    <input class="driver-input" id="banner_file" name="banner_file" type="file" accept="image/*">
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="driver-section-head">
+                                    <h2 class="driver-section-title">Sichtbarkeit</h2>
+                                    <span class="driver-section-line"></span>
+                                </div>
+
+                                <div class="driver-switch-list">
+                                    <label class="driver-switch-row">
+                                        <div>
+                                            <strong>Profil öffentlich anzeigen</strong>
+                                            <p>Wenn aktiv, kann jeder dein Profil ohne Login öffnen.</p>
+                                        </div>
+                                        <span class="driver-switch">
+                                            <input type="checkbox" name="public_profile" value="1" {% if public_profile %}checked{% endif %}>
+                                            <span class="driver-slider"></span>
+                                        </span>
+                                    </label>
+
+                                    <label class="driver-switch-row">
+                                        <div>
+                                            <strong>Statistiken anzeigen</strong>
+                                            <p>Kilometer, Lieferungen, Konvois und Rating öffentlich anzeigen.</p>
+                                        </div>
+                                        <span class="driver-switch">
+                                            <input type="checkbox" name="show_stats" value="1" {% if show_stats %}checked{% endif %}>
+                                            <span class="driver-slider"></span>
+                                        </span>
+                                    </label>
+
+                                    <label class="driver-switch-row">
+                                        <div>
+                                            <strong>Aktivitäten anzeigen</strong>
+                                            <p>Letzte öffentliche Touren und Aktionen im Profil anzeigen.</p>
+                                        </div>
+                                        <span class="driver-switch">
+                                            <input type="checkbox" name="show_activity" value="1" {% if show_activity %}checked{% endif %}>
+                                            <span class="driver-slider"></span>
+                                        </span>
+                                    </label>
+
+                                    <label class="driver-switch-row">
+                                        <div>
+                                            <strong>Discord anzeigen</strong>
+                                            <p>Deinen Discord-Namen öffentlich im Profil anzeigen.</p>
+                                        </div>
+                                        <span class="driver-switch">
+                                            <input type="checkbox" name="show_discord" value="1" {% if show_discord %}checked{% endif %}>
+                                            <span class="driver-slider"></span>
+                                        </span>
+                                    </label>
+
+                                    <label class="driver-switch-row">
+                                        <div>
+                                            <strong>E-Mail anzeigen</strong>
+                                            <p>Nur aktivieren, wenn deine E-Mail öffentlich sichtbar sein soll.</p>
+                                        </div>
+                                        <span class="driver-switch">
+                                            <input type="checkbox" name="show_email" value="1" {% if show_email %}checked{% endif %}>
+                                            <span class="driver-slider"></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="driver-form-actions">
+                                <button type="reset" class="driver-btn driver-btn-secondary">Zurücksetzen</button>
+                                <button type="submit" class="driver-btn driver-btn-primary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Einstellungen speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                {% endif %}
+            </section>
+        </main>
     </div>
-
 </section>
 
-<div class="copy-toast" id="copyToast">
-    Profil-Link kopiert
-</div>
+<div class="driver-toast" id="copyToast">Profil-Link kopiert</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const tabs = document.querySelectorAll('.profile-tab');
-        const panels = document.querySelectorAll('.tab-panel');
+        const tabs = document.querySelectorAll('.driver-tab');
+        const panels = document.querySelectorAll('.driver-tab-panel');
         const openButtons = document.querySelectorAll('[data-open-tab]');
         const bio = document.getElementById('bio');
         const bioCount = document.getElementById('bioCount');
         const avatarUrl = document.getElementById('avatar_url');
         const avatarFile = document.getElementById('avatar_file');
         const avatarPreview = document.getElementById('profileAvatarPreview');
+        const bannerUrl = document.getElementById('banner_url');
+        const bannerFile = document.getElementById('banner_file');
+        const hero = document.querySelector('.driver-hero');
 
         function openTab(tabName) {
             tabs.forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.tab === tabName);
+                const isActive = tab.dataset.tab === tabName;
+                tab.classList.toggle('active', isActive);
+                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
             });
 
             panels.forEach(panel => {
@@ -1015,7 +1755,7 @@
         openButtons.forEach(button => {
             button.addEventListener('click', () => {
                 openTab(button.dataset.openTab);
-                document.querySelector('.profile-tabs')?.scrollIntoView({
+                document.querySelector('.driver-tabs-wrap')?.scrollIntoView({
                     behavior: 'smooth',
                     block: 'center'
                 });
@@ -1034,8 +1774,9 @@
 
         if (avatarUrl && avatarPreview) {
             avatarUrl.addEventListener('input', () => {
-                if (avatarUrl.value.trim().length > 5) {
-                    avatarPreview.src = avatarUrl.value.trim();
+                const value = avatarUrl.value.trim();
+                if (value.length > 5) {
+                    avatarPreview.src = value;
                 }
             });
         }
@@ -1052,6 +1793,32 @@
                 reader.readAsDataURL(file);
             });
         }
+
+        function setHeroBanner(src) {
+            if (!hero || !src) return;
+            hero.classList.add('has-banner');
+            hero.style.backgroundImage = `url('${src}')`;
+        }
+
+        if (bannerUrl && hero) {
+            bannerUrl.addEventListener('input', () => {
+                const value = bannerUrl.value.trim();
+                if (value.length > 5) {
+                    setHeroBanner(value);
+                }
+            });
+        }
+
+        if (bannerFile && hero) {
+            bannerFile.addEventListener('change', () => {
+                const file = bannerFile.files && bannerFile.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = event => setHeroBanner(event.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
     });
 
     function copyProfileLink() {
@@ -1059,20 +1826,28 @@
         const link = window.location.href;
 
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(link);
+            navigator.clipboard.writeText(link).catch(() => fallbackCopy(link));
         } else {
-            const input = document.createElement('input');
-            input.value = link;
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            input.remove();
+            fallbackCopy(link);
         }
 
         if (toast) {
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2200);
+            window.clearTimeout(window.profileToastTimer);
+            window.profileToastTimer = window.setTimeout(() => toast.classList.remove('show'), 2200);
         }
+    }
+
+    function fallbackCopy(value) {
+        const input = document.createElement('input');
+        input.value = value;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
     }
 </script>
 {% endblock %}
