@@ -12,7 +12,7 @@ import requests
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort
+from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort, send_file
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from bson.objectid import ObjectId
@@ -87,6 +87,11 @@ TOUR_RECEIPT_FOLDER = env_first(
     "TOUR_RECEIPT_FOLDER",
     "RECEIPT_FOLDER",
     default=os.path.join("static", "downloads", "tour_receipts")
+)
+SERVICECENTER_FAHRERKARTE_FOLDER = env_first(
+    "SERVICECENTER_FAHRERKARTE_FOLDER",
+    "FAHRERKARTE_DOWNLOAD_FOLDER",
+    default=os.path.join("static", "downloads", "servicecenter", "fahrerkarten")
 )
 TOUR_RECEIPT_PUBLIC_BASE_URL = env_first("TOUR_RECEIPT_PUBLIC_BASE_URL", "PUBLIC_BASE_URL", default="")
 TOUR_RECEIPT_COMPANY_NAME = env_first("TOUR_RECEIPT_COMPANY_NAME", "COMPANY_NAME", default="Eifel LOG")
@@ -225,7 +230,10 @@ def ensure_indexes():
         fahrerkarte_requests_collection.create_index([("discord_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("status", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("issued_at", DESCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("card_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("pdf_relative_path", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("archived", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
@@ -677,13 +685,21 @@ def create_system_document_for_user(discord_id, title, sender, content, doc_type
 
 def prepare_system_document_for_dashboard(document):
     return {
+        "document_id": document.get("document_id") or "",
+        "request_id": document.get("request_id") or document.get("fahrerkarte_request_id") or "",
         "title": document.get("title") or "System Dokument",
         "sender": document.get("sender") or "System",
         "date": document.get("date") or format_datetime_for_template(document.get("created_at")) or "Heute",
         "content": document.get("content") or "",
+        "description": document.get("description") or "",
         "needs_signature": bool(document.get("needs_signature", False)),
         "type": document.get("type") or "system",
-        "is_alert": document.get("is_alert", False)
+        "is_alert": document.get("is_alert", False),
+        "download_url": document.get("download_url") or "",
+        "download_label": document.get("download_label") or "Download",
+        "download_filename": document.get("download_filename") or document.get("file_name") or "",
+        "file_type": document.get("file_type") or "",
+        "file_path": document.get("file_path") or document.get("pdf_relative_path") or "",
     }
 
 
@@ -903,7 +919,7 @@ def normalize_fahrerkarte_status(status):
     status = safe_str(status, "none").lower()
     if status == "open":
         return "pending"
-    if status in {"none", "pending", "claimed", "approved", "issued", "rejected", "archived"}:
+    if status in {"none", "pending", "claimed", "approved", "issued", "rejected", "postponed", "archived"}:
         return status
     return "none"
 
@@ -929,6 +945,8 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
     issued_at = "-"
     note = ""
     card_id = safe_str(user_doc.get("fahrerkarte_card_id"), "Wird nach Ausstellung erzeugt")
+    pdf_download_url = ""
+    pdf_filename = ""
 
     if latest_request:
         name = latest_request.get("display_name") or latest_request.get("full_name") or latest_request.get("name") or name
@@ -937,6 +955,9 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
         issued_at = format_datetime_for_template(latest_request.get("issued_at")) or "-"
         note = latest_request.get("note") or latest_request.get("notes") or latest_request.get("reject_reason") or ""
         card_id = latest_request.get("card_id") or card_id
+        if latest_request.get("pdf_relative_path") or latest_request.get("pdf_path"):
+            pdf_download_url = f"/servicecenter/fahrerkarte/download/{latest_request.get('request_id') or latest_request.get('_id')}"
+            pdf_filename = latest_request.get("pdf_filename") or latest_request.get("file_name") or "Fahrerkarte.pdf"
 
         claimed_by = latest_request.get("claimed_by") or {}
         approved_by = latest_request.get("approved_by") or {}
@@ -963,6 +984,8 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
         "fahrerkarte_issued_at": issued_at,
         "fahrerkarte_card_id": card_id,
         "fahrerkarte_note": note,
+        "fahrerkarte_pdf_download_url": pdf_download_url,
+        "fahrerkarte_pdf_filename": pdf_filename,
     }
 
 
@@ -977,7 +1000,7 @@ def get_servicecenter_messages_for_user(discord_id, limit=12):
             "archived": {"$ne": True},
             "hidden": {"$ne": True},
             "$or": [
-                {"type": {"$in": ["driver_card_application", "driver_card_approval", "driver_card_issued", "driver_card_rejection"]}},
+                {"type": {"$in": ["driver_card_application", "driver_card_approval", "driver_card_issued", "driver_card_rejection", "driver_card_postponed", "driver_card_pdf"]}},
                 {"title": {"$regex": "fahrerkarte|servicecenter", "$options": "i"}},
             ],
         },
@@ -1025,6 +1048,438 @@ def fahrerkarte_application_document_content(name, role, request_id, priority, r
         </div>
         <p class="mt-4"><strong>Hinweise:</strong><br>{notes}</p>
     """
+
+
+def fahrerkarte_reason_label(reason):
+    return {
+        "new_issue": "Erstausstellung",
+        "update": "Datenänderung / Aktualisierung",
+        "replacement": "Ersatzkarte",
+        "role_change": "Rollenwechsel",
+    }.get(safe_str(reason), safe_str(reason, "Nicht angegeben"))
+
+
+def fahrerkarte_priority_label(priority):
+    return {
+        "normal": "Normal",
+        "high": "Hoch",
+        "low": "Niedrig",
+    }.get(safe_str(priority), safe_str(priority, "Normal"))
+
+
+def fahrerkarte_delivery_label(delivery_method):
+    return {
+        "servicecenter": "ServiceCenter / Postfach",
+        "profile": "Im Profil hinterlegen",
+        "manual": "Manuelle Übergabe durch Personalabteilung",
+    }.get(safe_str(delivery_method), safe_str(delivery_method, "ServiceCenter"))
+
+
+def fahrerkarte_status_label(status):
+    return {
+        "pending": "Offen",
+        "open": "Offen",
+        "claimed": "Geclaimt",
+        "approved": "Genehmigt",
+        "issued": "Ausgestellt",
+        "rejected": "Abgelehnt",
+        "postponed": "Zurückgestellt",
+        "archived": "Archiviert",
+        "none": "Nicht beantragt",
+    }.get(safe_str(status).lower(), safe_str(status, "Unbekannt"))
+
+
+def servicecenter_fahrerkarte_download_url(request_id):
+    request_id = safe_str(request_id)
+    if not request_id:
+        return ""
+    return f"/servicecenter/fahrerkarte/download/{request_id}"
+
+
+def resolve_servicecenter_fahrerkarte_folder():
+    folder = SERVICECENTER_FAHRERKARTE_FOLDER
+    if not os.path.isabs(folder):
+        folder = os.path.join(BASE_DIR, folder)
+    return folder
+
+
+def resolve_fahrerkarte_pdf_path(pdf_path):
+    pdf_path = safe_str(pdf_path)
+    if not pdf_path:
+        return ""
+    if os.path.isabs(pdf_path):
+        return pdf_path
+    return os.path.join(BASE_DIR, pdf_path)
+
+
+def build_eifellog_servicecenter_pdf(title, subtitle, sections, footer_text="EifelLog ServiceCenter"):
+    page_width = 595
+    page_height = 842
+    margin_left = 42
+    y_start = 792
+    y_min = 62
+    line_height = 15
+
+    all_lines = []
+
+    def add_line(text, size=10, bold=False, gap_after=0, color=(0.08, 0.10, 0.09)):
+        all_lines.append({
+            "text": safe_str(text),
+            "size": int(size),
+            "bold": bool(bold),
+            "gap_after": int(gap_after or 0),
+            "color": color,
+        })
+
+    add_line("EIFELLOG SERVICECENTER", size=9, bold=True, gap_after=2, color=(0.16, 0.78, 0.35))
+    add_line(title, size=18, bold=True, gap_after=3, color=(1, 1, 1))
+    add_line(subtitle, size=10, bold=False, gap_after=26, color=(0.78, 0.82, 0.79))
+    add_line(f"Erstellt am {now_utc().strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, gap_after=14, color=(0.38, 0.43, 0.40))
+
+    for section_title, rows in sections:
+        add_line(section_title, size=13, bold=True, gap_after=5, color=(0.10, 0.55, 0.24))
+        for label, value in rows:
+            for wrapped in wrap_pdf_line(label, value, max_chars=92):
+                add_line(wrapped, size=10, bold=False, gap_after=1, color=(0.07, 0.08, 0.08))
+        add_line("", size=6, gap_after=8, color=(0.07, 0.08, 0.08))
+
+    pages = []
+    current = []
+    current_y = y_start
+    for line in all_lines:
+        effective_height = line_height + int(line.get("gap_after") or 0)
+        if current and current_y - effective_height < y_min:
+            pages.append(current)
+            current = []
+            current_y = y_start
+        current.append(line)
+        current_y -= effective_height
+    if current:
+        pages.append(current)
+
+    objects = []
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append(b"")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+
+    page_object_numbers = []
+
+    for page_index, page_lines in enumerate(pages, start=1):
+        y = y_start
+        stream = bytearray()
+        stream.extend(b"q\n")
+        stream.extend(b"0.97 0.98 0.97 rg 0 0 595 842 re f\n")
+        stream.extend(b"0.03 0.05 0.04 rg 0 716 595 126 re f\n")
+        stream.extend(b"0.14 0.84 0.36 rg 0 710 595 6 re f\n")
+        stream.extend(b"0.90 0.94 0.91 rg 36 56 523 636 re f\n")
+        stream.extend(b"0.14 0.84 0.36 RG 1.2 w 36 56 523 636 re S\n")
+
+        for item in page_lines:
+            text_value = item["text"]
+            size = int(item["size"])
+            font = "F2" if item["bold"] else "F1"
+            r, g, b = item.get("color") or (0, 0, 0)
+            stream.extend(b"BT\n")
+            stream.extend(f"/{font} {size} Tf\n".encode("ascii"))
+            stream.extend(f"{r:.3f} {g:.3f} {b:.3f} rg\n".encode("ascii"))
+            stream.extend(f"1 0 0 1 {margin_left} {y} Tm\n".encode("ascii"))
+            stream.extend(b"(" + pdf_text_bytes(text_value) + b") Tj\n")
+            stream.extend(b"ET\n")
+            y -= line_height + int(item.get("gap_after") or 0)
+
+        stream.extend(b"0.03 0.05 0.04 rg 0 0 595 42 re f\n")
+        stream.extend(b"BT\n/F1 8 Tf\n0.78 0.82 0.79 rg\n")
+        stream.extend(f"1 0 0 1 {margin_left} 24 Tm\n".encode("ascii"))
+        stream.extend(b"(" + pdf_text_bytes(f"{footer_text} / Seite {page_index} von {len(pages)}") + b") Tj\nET\n")
+        stream.extend(b"Q\n")
+
+        content_object_number = len(objects) + 1
+        objects.append(f"<< /Length {len(stream)} >>\nstream\n".encode("ascii") + bytes(stream) + b"\nendstream")
+        page_object_number = len(objects) + 1
+        page_object_numbers.append(page_object_number)
+        page_object = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+            f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> "
+            f"/Contents {content_object_number} 0 R >>"
+        ).encode("ascii")
+        objects.append(page_object)
+
+    kids = " ".join(f"{number} 0 R" for number in page_object_numbers)
+    objects[1] = f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_numbers)} >>".encode("ascii")
+
+    pdf = bytearray()
+    pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(pdf)
+
+
+def build_fahrerkarte_pdf_sections(request_doc, user_doc=None, actor=None):
+    user_doc = user_doc or {}
+    actor = actor or {}
+    created_at = request_doc.get("created_at")
+    issued_at = request_doc.get("issued_at") or now_utc()
+    approved_at = request_doc.get("approved_at")
+
+    sections = []
+    sections.append(("Dokument", [
+        ("Dokumenttyp", "Personalisierte Fahrerkarte"),
+        ("Antrags-ID", request_doc.get("request_id") or str(request_doc.get("_id"))),
+        ("Karten-ID", request_doc.get("card_id") or "Wird erzeugt"),
+        ("Status", fahrerkarte_status_label(request_doc.get("status") or "issued")),
+        ("Beantragt am", format_datetime_for_template(created_at) or "-"),
+        ("Genehmigt am", format_datetime_for_template(approved_at) or "-"),
+        ("Ausgestellt am", format_datetime_for_template(issued_at) or now_utc().strftime("%d.%m.%Y %H:%M")),
+    ]))
+
+    sections.append(("Fahrer", [
+        ("Name", request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or user_doc.get("display_name") or "EifelLog Fahrer"),
+        ("Username", request_doc.get("username") or user_doc.get("username") or "-"),
+        ("Discord-ID", request_doc.get("discord_id") or user_doc.get("discord_id") or "-"),
+        ("Rolle", request_doc.get("role") or request_doc.get("role_name") or get_primary_role_name(user_doc.get("roles", []))),
+        ("System-ID", request_doc.get("system_id") or request_doc.get("discord_id") or "-"),
+        ("Fahrernummer", request_doc.get("driver_number") or "Nicht angegeben"),
+    ]))
+
+    sections.append(("Beantragung", [
+        ("Priorität", fahrerkarte_priority_label(request_doc.get("priority"))),
+        ("Antragsgrund", fahrerkarte_reason_label(request_doc.get("reason"))),
+        ("Bereitstellung", fahrerkarte_delivery_label(request_doc.get("delivery_method"))),
+        ("Hinweise", request_doc.get("notes") or "Keine Hinweise angegeben."),
+    ]))
+
+    handler = actor.get("display_name") or actor.get("username")
+    if not handler:
+        issued_by = request_doc.get("issued_by") or {}
+        approved_by = request_doc.get("approved_by") or {}
+        handler = issued_by.get("display_name") or approved_by.get("display_name") or "Personalabteilung"
+
+    sections.append(("Personalabteilung", [
+        ("Sachbearbeiter", handler),
+        ("Ausstellungsvermerk", request_doc.get("issue_note") or request_doc.get("approval_note") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt."),
+        ("Tracker Upload", "Dieses PDF ist für den späteren Upload im Tracker vorgesehen."),
+    ]))
+    return sections
+
+
+def save_fahrerkarte_pdf(request_doc, user_doc=None, actor=None, force=False):
+    if not request_doc:
+        raise ValueError("Fahrerkarte-Antrag fehlt.")
+
+    existing_path = safe_str(request_doc.get("pdf_path") or request_doc.get("pdf_relative_path"))
+    if existing_path and not force:
+        resolved = resolve_fahrerkarte_pdf_path(existing_path)
+        if os.path.exists(resolved):
+            return resolved, safe_str(request_doc.get("pdf_relative_path") or existing_path), safe_str(request_doc.get("pdf_filename") or os.path.basename(resolved)), b""
+
+    issue_time = request_doc.get("issued_at") or now_utc()
+    if not isinstance(issue_time, datetime):
+        issue_time = now_utc()
+
+    month_folder = issue_time.strftime("%Y-%m")
+    target_folder = os.path.join(resolve_servicecenter_fahrerkarte_folder(), month_folder)
+    os.makedirs(target_folder, exist_ok=True)
+
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"), uuid.uuid4().hex)
+    card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_id)
+    driver_name = request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or "fahrer"
+    safe_driver = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(driver_name, "fahrer"))[:60].strip("_") or "fahrer"
+    safe_card_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", card_id)[:80]
+    filename = f"EifelLog_ServiceCenter_Fahrerkarte_{safe_card_id}_{safe_driver}_{request_id[:8]}.pdf"
+    file_path = os.path.join(target_folder, filename)
+
+    pdf_doc = dict(request_doc)
+    pdf_doc["card_id"] = card_id
+    pdf_doc["issued_at"] = issue_time
+    pdf_doc["status"] = "issued"
+
+    subtitle = f"Personalisierte Fahrerkarte / {driver_name} / {card_id}"
+    pdf_bytes = build_eifellog_servicecenter_pdf(
+        "Personalisierte Fahrerkarte",
+        subtitle,
+        build_fahrerkarte_pdf_sections(pdf_doc, user_doc=user_doc, actor=actor),
+        footer_text="EifelLog ServiceCenter - Fahrerkarte"
+    )
+
+    with open(file_path, "wb") as file:
+        file.write(pdf_bytes)
+
+    try:
+        relative_path = os.path.relpath(file_path, BASE_DIR).replace(os.sep, "/")
+    except Exception:
+        relative_path = file_path
+
+    return file_path, relative_path, filename, pdf_bytes
+
+
+def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    card_id = safe_str(request_doc.get("card_id"), "Wird erzeugt")
+    name = request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or "EifelLog Fahrer"
+    description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im EifelLog ServiceCenter bereitgestellt.")
+    return f"""
+        <p><strong>Personalisierte Fahrerkarte bereitgestellt</strong></p>
+        <p class="mt-4">{description}</p>
+        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">ServiceCenter PDF</p>
+            <p><strong>Name:</strong> {name}</p>
+            <p><strong>Karten-ID:</strong> {card_id}</p>
+            <p><strong>Antrags-ID:</strong> {request_id}</p>
+            <p class="mt-4 text-xs text-gray-400">Dieses PDF kannst du später im Tracker hochladen.</p>
+            <a href="{download_url}" class="inline-flex items-center justify-center mt-5 px-5 py-3 rounded-xl bg-[var(--brand-green)] text-black font-orbitron font-bold uppercase tracking-widest hover:opacity-90" download>
+                PDF herunterladen
+            </a>
+        </div>
+    """
+
+
+def create_fahrerkarte_pdf_dashboard_document(request_doc, actor=None, description=""):
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    if not discord_id or not request_id:
+        return None
+
+    actor = actor or current_staff_identity()
+    handler_name = actor.get("display_name") or actor.get("username") or "EifelLog ServiceCenter"
+    download_url = servicecenter_fahrerkarte_download_url(request_id)
+    pdf_filename = request_doc.get("pdf_filename") or request_doc.get("file_name") or "EifelLog_Fahrerkarte.pdf"
+    document_description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF ausgestellt und ist bereit für den Tracker-Upload.")
+
+    return create_system_document_for_user(
+        discord_id,
+        "Personalisierte Fahrerkarte PDF",
+        handler_name,
+        fahrerkarte_pdf_document_content(request_doc, download_url, document_description),
+        doc_type="driver_card_pdf",
+        needs_signature=False,
+        extra={
+            "important": True,
+            "request_id": request_id,
+            "fahrerkarte_request_id": request_id,
+            "contains_driver_card": True,
+            "download_url": download_url,
+            "download_label": "PDF herunterladen",
+            "download_filename": pdf_filename,
+            "file_name": pdf_filename,
+            "file_type": "pdf",
+            "file_path": request_doc.get("pdf_relative_path") or request_doc.get("pdf_path") or "",
+            "pdf_relative_path": request_doc.get("pdf_relative_path") or "",
+            "description": document_description,
+            "tracker_upload_ready": True,
+        },
+    )
+
+
+def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
+    item = dict(request_doc)
+    mongo_id = item.get("_id")
+    mongo_id_str = str(mongo_id) if mongo_id else ""
+    item["_id"] = mongo_id_str
+    item["id"] = safe_str(item.get("request_id") or item.get("id") or mongo_id_str)
+    item["request_id"] = safe_str(item.get("request_id") or item["id"])
+    item["name"] = item.get("display_name") or item.get("full_name") or item.get("name") or "Unbekannter User"
+    item["display_name"] = item.get("display_name") or item["name"]
+    item["username"] = item.get("username") or item.get("discord_username") or item["name"]
+    item["role"] = item.get("role") or item.get("role_name") or "Fahrer"
+    item["role_name"] = item.get("role_name") or item["role"]
+    item["status"] = normalize_fahrerkarte_status(item.get("status") or "pending")
+    item["status_label"] = fahrerkarte_status_label(item["status"])
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["requested_at"] = item["created_at"]
+    item["updated_at"] = format_datetime_for_template(item.get("updated_at")) or item["created_at"]
+    item["claimed_at"] = format_datetime_for_template(item.get("claimed_at")) or ""
+    item["approved_at"] = format_datetime_for_template(item.get("approved_at")) or ""
+    item["issued_at"] = format_datetime_for_template(item.get("issued_at")) or ""
+    item["postponed_until"] = format_datetime_for_template(item.get("postponed_until")) or ""
+    item["priority"] = item.get("priority") or "normal"
+    item["priority_label"] = fahrerkarte_priority_label(item.get("priority"))
+    item["reason"] = item.get("reason") or "Nicht angegeben"
+    item["reason_label"] = fahrerkarte_reason_label(item.get("reason"))
+    item["delivery_method"] = item.get("delivery_method") or "servicecenter"
+    item["delivery_label"] = fahrerkarte_delivery_label(item.get("delivery_method"))
+    item["notes"] = item.get("notes") or item.get("note") or ""
+    item["system_id"] = item.get("system_id") or item.get("discord_id") or "-"
+    item["driver_number"] = item.get("driver_number") or ""
+    item["card_id"] = item.get("card_id") or ""
+    item["pdf_filename"] = item.get("pdf_filename") or item.get("file_name") or ""
+    item["pdf_relative_path"] = item.get("pdf_relative_path") or item.get("pdf_path") or ""
+    item["download_url"] = servicecenter_fahrerkarte_download_url(item["request_id"]) if item["pdf_relative_path"] else ""
+    item["tracker_upload_ready"] = bool(item.get("tracker_upload_ready") or item.get("status") == "issued")
+    item["avatar_url"] = item.get("avatar_url") or ""
+
+    claimed_by = item.get("claimed_by") or {}
+    approved_by = item.get("approved_by") or {}
+    issued_by = item.get("issued_by") or {}
+    rejected_by = item.get("rejected_by") or {}
+    postponed_by = item.get("postponed_by") or {}
+    item["claimed_by_name"] = (
+        issued_by.get("display_name")
+        or approved_by.get("display_name")
+        or rejected_by.get("display_name")
+        or postponed_by.get("display_name")
+        or claimed_by.get("display_name")
+        or item.get("handler_name")
+        or "Noch nicht geclaimt"
+    )
+    item["handler_name"] = item["claimed_by_name"]
+    item["sachbearbeiter_name"] = item["claimed_by_name"]
+    item["reject_reason"] = item.get("reject_reason") or ""
+    item["postpone_reason"] = item.get("postpone_reason") or ""
+    item["issue_note"] = item.get("issue_note") or ""
+    return item
+
+
+def find_fahrerkarte_request(request_id):
+    request_id = safe_str(request_id)
+    if not request_id:
+        return None
+    return fahrerkarte_requests_collection.find_one(request_lookup_query(request_id))
+
+
+def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, extra_set=None):
+    if not user_doc and request_doc:
+        user_doc = find_user_for_request_doc(request_doc)
+    if not user_doc:
+        return
+
+    actor = actor or {}
+    handler_name = actor.get("display_name") or actor.get("username") or request_doc.get("handler_name") or "Personalabteilung"
+    now = now_utc()
+    update_fields = {
+        "personalisierte_fahrerkarte_status": status,
+        "fahrerkarte_status": status,
+        "fahrerkarte_handler": handler_name,
+        "fahrerkarte_request_id": safe_str(request_doc.get("request_id") or request_doc.get("_id")),
+        "fahrerkarte_name": request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name"),
+        "fahrerkarte_role": request_doc.get("role") or request_doc.get("role_name"),
+        "fahrerkarte_updated_at": now,
+    }
+    if request_doc.get("card_id"):
+        update_fields["fahrerkarte_card_id"] = request_doc.get("card_id")
+    if request_doc.get("issued_at"):
+        update_fields["fahrerkarte_issued_at"] = request_doc.get("issued_at")
+    if request_doc.get("pdf_relative_path"):
+        update_fields["fahrerkarte_pdf_relative_path"] = request_doc.get("pdf_relative_path")
+        update_fields["fahrerkarte_pdf_filename"] = request_doc.get("pdf_filename") or request_doc.get("file_name")
+    if extra_set:
+        update_fields.update(extra_set)
+
+    users_collection.update_one({"_id": user_doc["_id"]}, {"$set": update_fields})
 
 
 def tracker_confirmation_document_content(name, role, handler_name, tracker_code, reason=None):
@@ -3093,7 +3548,7 @@ def servicecenter():
         primary_role_name=primary_role_name,
         servicecenter_messages=servicecenter_messages,
         fahrerkarte_submit_url=url_for("servicecenter_fahrerkarte_beantragen"),
-        fahrerkarte_download_url=url_for("servicecenter_fahrerkarte"),
+        fahrerkarte_download_url=fahrerkarte_context.get("fahrerkarte_pdf_download_url") or url_for("servicecenter_fahrerkarte"),
         **fahrerkarte_context,
     )
 
@@ -3154,7 +3609,7 @@ def servicecenter_fahrerkarte_beantragen():
     existing_open = fahrerkarte_requests_collection.find_one({
         "discord_id": discord_id,
         "archived": {"$ne": True},
-        "status": {"$in": ["pending", "open", "claimed", "approved"]},
+        "status": {"$in": ["pending", "open", "claimed", "approved", "postponed"]},
     })
     if existing_open:
         flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte.", "info")
@@ -3934,6 +4389,22 @@ def personalabteilung():
         for item in buchhaltung_requests_cursor
     ]
 
+    servicecenter_fahrerkarte_cursor = fahrerkarte_requests_collection.find(
+        {"archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(250)
+    servicecenter_fahrerkarte_requests = [
+        prepare_fahrerkarte_request_for_personalabteilung(item)
+        for item in servicecenter_fahrerkarte_cursor
+    ]
+
+    servicecenter_fahrerkarte_actions = {
+        "claim": url_for("api_personalabteilung_servicecenter_fahrerkarte_claim"),
+        "approve": url_for("api_personalabteilung_servicecenter_fahrerkarte_approve"),
+        "issue": url_for("api_personalabteilung_servicecenter_fahrerkarte_issue"),
+        "reject": url_for("api_personalabteilung_servicecenter_fahrerkarte_reject"),
+        "postpone": url_for("api_personalabteilung_servicecenter_fahrerkarte_postpone"),
+    }
+
     # Tasks abrufen: Buchhaltungsanfragen laufen ab jetzt nur noch über den eigenen Tab.
     tasks_cursor = tasks_collection.find({
         "source": {"$ne": "buchhaltung"},
@@ -3955,6 +4426,10 @@ def personalabteilung():
         buchhaltung_requests=buchhaltung_requests,
         accounting_requests=buchhaltung_requests,
         accounting_department_requests=buchhaltung_requests,
+        servicecenter_fahrerkarte_requests=servicecenter_fahrerkarte_requests,
+        fahrerkarte_requests=servicecenter_fahrerkarte_requests,
+        servicecenter_requests=servicecenter_fahrerkarte_requests,
+        servicecenter_fahrerkarte_actions=servicecenter_fahrerkarte_actions,
         tasks=tasks
     )
 
@@ -4729,6 +5204,414 @@ def api_personalabteilung_send_document():
     )
     
     return jsonify({"success": True, "message": "Wichtiges Dokument ausgestellt."})
+
+
+# ==========================================
+# PERSONALABTEILUNG - SERVICECENTER FAHRERKARTE
+# ==========================================
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte", methods=["GET"])
+def api_personalabteilung_servicecenter_fahrerkarte_list():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    status = safe_str(request.args.get("status"))
+    query = {"archived": {"$ne": True}}
+    if status:
+        query["status"] = status
+
+    items_cursor = fahrerkarte_requests_collection.find(query).sort([("created_at", DESCENDING)]).limit(250)
+    items = [prepare_fahrerkarte_request_for_personalabteilung(item) for item in items_cursor]
+    return jsonify({"success": True, "requests": items, "items": items})
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/claim", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_claim():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+
+    current_status = normalize_fahrerkarte_status(request_doc.get("status") or "pending")
+    if current_status in {"issued", "rejected", "archived"}:
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag ist bereits abgeschlossen."}), 409
+
+    actor = current_staff_identity()
+    now = now_utc()
+
+    if current_status == "claimed":
+        if request_is_claimed_by_actor(request_doc, actor):
+            return jsonify({"success": True, "message": "Du hast diesen Fahrerkarte-Antrag bereits geclaimt.", "handlerName": actor.get("display_name"), "status": "claimed"})
+        claimed_by = request_doc.get("claimed_by") or {}
+        claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+        return jsonify({"success": False, "message": f"Dieser Fahrerkarte-Antrag ist bereits von {claimed_name} geclaimt."}), 409
+
+    if current_status not in {"pending", "open", "postponed", "approved"}:
+        return jsonify({"success": False, "message": f"Dieser Antrag kann im Status '{current_status}' nicht geclaimt werden."}), 409
+
+    update = {
+        "status": "claimed",
+        "claimed_by": actor,
+        "claimed_at": now,
+        "handler_name": actor.get("display_name") or actor.get("username") or "Personalabteilung",
+        "updated_at": now,
+    }
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": update})
+
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+    user_doc = find_user_for_request_doc(fresh_request)
+    update_user_fahrerkarte_state(user_doc, fresh_request, "claimed", actor)
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte-Antrag wurde geclaimt. Du kannst ihn jetzt genehmigen, ausstellen, zurückstellen oder ablehnen.",
+        "status": "claimed",
+        "handlerName": actor.get("display_name"),
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/approve", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_approve():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    note = safe_str(data.get("note") or data.get("approvalNote") or data.get("reason"), "Fahrerkarte wurde genehmigt.")[:800]
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+    if normalize_fahrerkarte_status(request_doc.get("status")) in {"issued", "rejected", "archived"}:
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag ist bereits abgeschlossen."}), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+    if not user_doc:
+        return jsonify({"success": False, "message": "Der User zur Fahrerkarte wurde nicht gefunden."}), 404
+
+    actor = current_staff_identity()
+    claim_error = require_request_claimed_by_actor(request_doc, actor)
+    if claim_error: return claim_error
+
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+
+    update = {
+        "status": "approved",
+        "approved_by": actor,
+        "approved_at": now,
+        "approval_note": note,
+        "handler_name": handler_name,
+        "updated_at": now,
+    }
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": update})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+    update_user_fahrerkarte_state(user_doc, fresh_request, "approved", actor, extra_set={"fahrerkarte_approved_at": now})
+
+    create_system_document_for_user(
+        user_doc.get("discord_id"),
+        "Fahrerkarte genehmigt",
+        handler_name,
+        f'''
+            <p><strong>Deine personalisierte Fahrerkarte wurde genehmigt.</strong></p>
+            <p class="mt-4">Die Personalabteilung hat deinen Antrag geprüft und freigegeben. Die PDF-Ausstellung erfolgt im nächsten Schritt im ServiceCenter.</p>
+            <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+                <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Bearbeitung</p>
+                <p><strong>Sachbearbeiter:</strong> {handler_name}</p>
+                <p><strong>Hinweis:</strong><br>{note}</p>
+            </div>
+        ''',
+        doc_type="driver_card_approval",
+        needs_signature=False,
+        extra={"important": True, "request_id": fresh_request.get("request_id"), "fahrerkarte_request_id": fresh_request.get("request_id"), "contains_driver_card": True},
+    )
+
+    tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "approved", "updated_at": now}})
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte-Antrag wurde genehmigt. Er kann jetzt ausgestellt werden.",
+        "status": "approved",
+        "handlerName": handler_name,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/issue", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_issue():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("description"), "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")[:1000]
+    force_pdf = bool_from_payload(data.get("force"), fallback=False)
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+
+    current_status = normalize_fahrerkarte_status(request_doc.get("status"))
+    if current_status in {"rejected", "archived"}:
+        return jsonify({"success": False, "message": "Abgelehnte oder archivierte Fahrerkarte-Anträge können nicht ausgestellt werden."}), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+    if not user_doc:
+        return jsonify({"success": False, "message": "Der User zur Fahrerkarte wurde nicht gefunden."}), 404
+
+    actor = current_staff_identity()
+    if current_status == "claimed":
+        claim_error = require_request_claimed_by_actor(request_doc, actor)
+        if claim_error: return claim_error
+    elif current_status == "approved":
+        if not request_is_claimed_by_actor(request_doc, actor):
+            claimed_by = request_doc.get("claimed_by") or {}
+            claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+            return jsonify({"success": False, "message": f"Dieser Fahrerkarte-Antrag ist bereits von {claimed_name} geclaimt. Nur der zuständige Sachbearbeiter kann ihn ausstellen."}), 403
+    else:
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag muss zuerst geclaimt und genehmigt werden."}), 409
+
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+    card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_doc.get("request_id"))
+
+    pre_update = {
+        "status": "issued",
+        "card_id": card_id,
+        "approved_by": request_doc.get("approved_by") or actor,
+        "approved_at": request_doc.get("approved_at") or now,
+        "issued_by": actor,
+        "issued_at": now,
+        "issue_note": issue_note,
+        "handler_name": handler_name,
+        "tracker_upload_ready": True,
+        "updated_at": now,
+    }
+    temp_doc = dict(request_doc)
+    temp_doc.update(pre_update)
+
+    file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(temp_doc, user_doc=user_doc, actor=actor, force=force_pdf)
+
+    final_update = dict(pre_update)
+    final_update.update({
+        "pdf_path": file_path,
+        "pdf_relative_path": relative_path,
+        "pdf_filename": filename,
+        "download_url": servicecenter_fahrerkarte_download_url(request_doc.get("request_id") or request_doc.get("_id")),
+    })
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": final_update})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    update_user_fahrerkarte_state(user_doc, fresh_request, "issued", actor, extra_set={
+        "fahrerkarte_issued_at": now,
+        "fahrerkarte_pdf_relative_path": relative_path,
+        "fahrerkarte_pdf_filename": filename,
+        "fahrerkarte_download_url": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
+    })
+
+    create_fahrerkarte_pdf_dashboard_document(fresh_request, actor=actor, description=issue_note)
+
+    tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "done", "completed_at": now, "updated_at": now}})
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte wurde ausgestellt. PDF wurde erstellt und dem User im Dashboard bereitgestellt.",
+        "status": "issued",
+        "handlerName": handler_name,
+        "cardId": card_id,
+        "downloadUrl": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
+        "pdfPath": relative_path,
+        "pdfFilename": filename,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/reject", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_reject():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    reason = safe_str(data.get("reason"), "Kein Grund angegeben.")[:800]
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+    if normalize_fahrerkarte_status(request_doc.get("status")) in {"issued", "rejected", "archived"}:
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag ist bereits abgeschlossen."}), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+    actor = current_staff_identity()
+    claim_error = require_request_claimed_by_actor(request_doc, actor)
+    if claim_error: return claim_error
+
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": {
+        "status": "rejected",
+        "rejected_by": actor,
+        "rejected_at": now,
+        "reject_reason": reason,
+        "handler_name": handler_name,
+        "updated_at": now,
+    }})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    if user_doc:
+        update_user_fahrerkarte_state(user_doc, fresh_request, "rejected", actor, extra_set={"fahrerkarte_rejected_at": now, "fahrerkarte_reject_reason": reason})
+        create_system_document_for_user(
+            user_doc.get("discord_id"),
+            "Fahrerkarte abgelehnt",
+            handler_name,
+            rejection_document_content("Fahrerkarte abgelehnt", reason, handler_name),
+            doc_type="driver_card_rejection",
+            needs_signature=False,
+            extra={"important": True, "request_id": fresh_request.get("request_id"), "fahrerkarte_request_id": fresh_request.get("request_id"), "contains_driver_card": True},
+        )
+
+    tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "rejected", "updated_at": now}})
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte-Antrag wurde abgelehnt.",
+        "status": "rejected",
+        "handlerName": handler_name,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/postpone", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_postpone():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    reason = safe_str(data.get("reason"), "Zur späteren Bearbeitung zurückgestellt.")[:800]
+    postponed_until_raw = safe_str(data.get("postponedUntil") or data.get("until") or data.get("date"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+
+    current_status = normalize_fahrerkarte_status(request_doc.get("status"))
+    if current_status in {"issued", "rejected", "archived"}:
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag ist bereits abgeschlossen."}), 409
+
+    actor = current_staff_identity()
+    if current_status == "claimed" and not request_is_claimed_by_actor(request_doc, actor):
+        claimed_by = request_doc.get("claimed_by") or {}
+        claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+        return jsonify({"success": False, "message": f"Dieser Fahrerkarte-Antrag ist bereits von {claimed_name} geclaimt."}), 403
+
+    postponed_until = None
+    if postponed_until_raw:
+        try:
+            postponed_until = datetime.fromisoformat(postponed_until_raw.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            postponed_until = None
+
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+    update = {
+        "status": "postponed",
+        "postponed_by": actor,
+        "postponed_at": now,
+        "postpone_reason": reason,
+        "claimed_by": actor,
+        "handler_name": handler_name,
+        "updated_at": now,
+    }
+    if postponed_until:
+        update["postponed_until"] = postponed_until
+
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": update})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+    user_doc = find_user_for_request_doc(fresh_request)
+
+    if user_doc:
+        update_user_fahrerkarte_state(user_doc, fresh_request, "postponed", actor, extra_set={"fahrerkarte_postpone_reason": reason, "fahrerkarte_postponed_at": now})
+        create_system_document_for_user(
+            user_doc.get("discord_id"),
+            "Fahrerkarte zurückgestellt",
+            handler_name,
+            f'''
+                <p><strong>Deine Fahrerkarte-Beantragung wurde zurückgestellt.</strong></p>
+                <p class="mt-4">Die Personalabteilung benötigt noch Zeit oder weitere Prüfung.</p>
+                <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+                    <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Wiedervorlage</p>
+                    <p><strong>Sachbearbeiter:</strong> {handler_name}</p>
+                    <p><strong>Grund:</strong><br>{reason}</p>
+                    <p><strong>Bis:</strong> {format_datetime_for_template(postponed_until) if postponed_until else 'Noch offen'}</p>
+                </div>
+            ''',
+            doc_type="driver_card_postponed",
+            needs_signature=False,
+            extra={"important": True, "request_id": fresh_request.get("request_id"), "fahrerkarte_request_id": fresh_request.get("request_id"), "contains_driver_card": True},
+        )
+
+    tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "postponed", "updated_at": now}})
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte-Antrag wurde zurückgestellt.",
+        "status": "postponed",
+        "handlerName": handler_name,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/servicecenter/fahrerkarte/download/<request_id>", methods=["GET"])
+def servicecenter_fahrerkarte_download(request_id):
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        abort(404)
+
+    session_user = session.get("user") or {}
+    session_discord_id = safe_str(session_user.get("id"))
+    user_roles = session_user.get("roles", [])
+    is_owner = session_discord_id and session_discord_id == safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    is_staff = has_personalabteilung_permission(user_roles)
+    if not is_owner and not is_staff:
+        abort(403)
+
+    pdf_path = request_doc.get("pdf_path") or request_doc.get("pdf_relative_path")
+    resolved_path = resolve_fahrerkarte_pdf_path(pdf_path)
+
+    if not resolved_path or not os.path.exists(resolved_path):
+        if normalize_fahrerkarte_status(request_doc.get("status")) == "issued":
+            user_doc = find_user_for_request_doc(request_doc)
+            file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(request_doc, user_doc=user_doc, actor=request_doc.get("issued_by") or {}, force=True)
+            fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": {"pdf_path": file_path, "pdf_relative_path": relative_path, "pdf_filename": filename, "updated_at": now_utc()}})
+            resolved_path = file_path
+            request_doc["pdf_filename"] = filename
+        else:
+            abort(404)
+
+    download_name = request_doc.get("pdf_filename") or os.path.basename(resolved_path)
+    return send_file(resolved_path, mimetype="application/pdf", as_attachment=True, download_name=download_name)
 
 @app.route("/api/personalabteilung/fahrer_registration/claim", methods=["POST"])
 def api_personalabteilung_claim_registration():
