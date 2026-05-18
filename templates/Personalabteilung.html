@@ -1219,6 +1219,39 @@
         color: #fff;
     }
 
+    .document-mode-panel {
+        border-radius: 1.15rem;
+        background: rgba(var(--el-green-rgb), 0.075);
+        border: 1px solid rgba(var(--el-green-rgb), 0.20);
+        padding: 1rem;
+        display: grid;
+        gap: 0.55rem;
+        color: var(--el-muted);
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+
+    .document-mode-panel strong {
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+    }
+
+    .document-mode-panel code {
+        color: var(--el-yellow);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.78rem;
+        overflow-wrap: anywhere;
+    }
+
+    .document-fill-btn {
+        border-color: rgba(var(--el-yellow-rgb), 0.35) !important;
+        background: rgba(var(--el-yellow-rgb), 0.08) !important;
+        color: var(--el-yellow) !important;
+    }
+
     .modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -2167,6 +2200,8 @@
                                 {% set service_created = service.created_at or service.requested_at or "-" %}
                                 {% set service_issued = service.issued_at or "-" %}
                                 {% set service_note = service.notes or service.note or service.reject_reason or "" %}
+                                {% set service_download_url = service.download_url or service.pdf_download_url or service.fahrerkarte_pdf_download_url or ("/servicecenter/fahrerkarte/download/" ~ service_id if service.pdf_relative_path or service.pdf_path else "") %}
+                                {% set service_download_filename = service.download_filename or service.pdf_filename or service.file_name or "EifelLog_Fahrerkarte.pdf" %}
 
                                 <tr
                                     data-service-row
@@ -2184,6 +2219,8 @@
                                     data-service-created="{{ service_created|e }}"
                                     data-service-issued="{{ service_issued|e }}"
                                     data-service-note="{{ service_note|e }}"
+                                    data-service-download-url="{{ service_download_url|e }}"
+                                    data-service-download-filename="{{ service_download_filename|e }}"
                                     data-search="{{ (service_name ~ ' ' ~ service_username ~ ' ' ~ service_role ~ ' ' ~ service_discord_id ~ ' ' ~ service_title ~ ' ' ~ service_card_id ~ ' ' ~ service_handler ~ ' ' ~ service_note)|lower|e }}"
                                 >
                                     <td>
@@ -2243,6 +2280,29 @@
                                                 Ansehen
                                             </button>
 
+                                            {% if service_download_url and service_status == "issued" %}
+                                                <a
+                                                    class="request-btn accept"
+                                                    href="{{ service_download_url }}"
+                                                    download="{{ service_download_filename }}"
+                                                >
+                                                    Download
+                                                </a>
+                                            {% endif %}
+
+                                            {% if service_status != "issued" %}
+                                                <button
+                                                    class="request-btn accept"
+                                                    type="button"
+                                                    data-action="issue-fahrerkarte"
+                                                    data-service-id="{{ service_id }}"
+                                                    data-driver-id="{{ service_discord_id }}"
+                                                    data-driver-name="{{ service_name|e }}"
+                                                >
+                                                    Ausstellen
+                                                </button>
+                                            {% endif %}
+
                                             {% if service_discord_id and service_discord_id != "-" %}
                                                 <button
                                                     class="request-btn"
@@ -2250,6 +2310,10 @@
                                                     data-action="send-document"
                                                     data-driver-id="{{ service_discord_id }}"
                                                     data-driver-name="{{ service_name|e }}"
+                                                    data-service-id="{{ service_id }}"
+                                                    data-document-mode="driver_card_issue"
+                                                    data-document-title="Personalisierte Fahrerkarte"
+                                                    data-document-message="Personalisierte Fahrerkarte für {{ service_name|e }} ausstellen und als PDF im ServiceCenter bereitstellen."
                                                 >
                                                     Dokument
                                                 </button>
@@ -2851,6 +2915,7 @@
         const REJECT_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/reject";
         
         const SEND_DOCUMENT_URL = "/api/personalabteilung/driver/document/send";
+        const ISSUE_FAHRERKARTE_URL = "/api/personalabteilung/driver/document/issue-fahrerkarte";
         
         // NEUER ENDPUNKT HINZUGEFÜGT
         const CREATE_TASK_URL = "/api/personalabteilung/task/create";
@@ -2886,9 +2951,15 @@
         const documentModal = document.getElementById("documentModal");
         const documentForm = document.getElementById("documentForm");
         const documentDriverId = document.getElementById("documentDriverId");
+        const documentRequestId = document.getElementById("documentRequestId");
         const documentDriverName = document.getElementById("documentDriverName");
+        const documentActionMode = document.getElementById("documentActionMode");
+        const documentFahrerkarteHint = document.getElementById("documentFahrerkarteHint");
+        const documentFillFahrerkarte = document.getElementById("documentFillFahrerkarte");
+        const documentSubmitButton = document.getElementById("documentSubmitButton");
         const documentTitle = document.getElementById("documentTitle");
         const documentMessage = document.getElementById("documentMessage");
+        let currentDocumentContext = {};
 
         const taskModal = document.getElementById("taskModal");
         const taskForm = document.getElementById("taskForm");
@@ -3440,6 +3511,7 @@
 
             if (!row || !serviceModal) return;
 
+            const requestId = row.dataset.serviceId || "";
             const name = row.dataset.serviceName || "-";
             const username = row.dataset.serviceUsername || "";
             const discordId = row.dataset.serviceDiscordId || "-";
@@ -3453,6 +3525,8 @@
             const issued = row.dataset.serviceIssued || "-";
             const title = row.dataset.serviceTitle || "Service-Antrag";
             const note = row.dataset.serviceNote || "Keine Hinweise hinterlegt.";
+            const downloadUrl = row.dataset.serviceDownloadUrl || "";
+            const downloadFilename = row.dataset.serviceDownloadFilename || "EifelLog_Fahrerkarte.pdf";
 
             serviceModalTitle.textContent = title;
             setText("serviceDetailUser", `${name}${username ? " / @" + username : ""}`);
@@ -3468,16 +3542,33 @@
             setText("serviceDetailNote", note);
 
             if (serviceModalDocumentButton) {
-                serviceModalDocumentButton.onclick = () => {
-                    closeServiceModal();
-                    openDocumentModal(
-                        discordId,
-                        name,
-                        "ServiceCenter Fahrerkarte",
-                        `Status Fahrerkarte: ${humanizeServiceStatus(status)}\nKarten-ID: ${cardId}\nHinweis: ${note}`
-                    );
-                };
-                serviceModalDocumentButton.disabled = !discordId || discordId === "-";
+                if (status === "issued" && downloadUrl) {
+                    serviceModalDocumentButton.textContent = "PDF herunterladen";
+                    serviceModalDocumentButton.className = "request-btn accept";
+                    serviceModalDocumentButton.onclick = () => downloadFromUrl(downloadUrl, downloadFilename);
+                    serviceModalDocumentButton.disabled = false;
+                } else {
+                    serviceModalDocumentButton.textContent = "Fahrerkarte ausstellen";
+                    serviceModalDocumentButton.className = "request-btn accept";
+                    serviceModalDocumentButton.onclick = () => {
+                        closeServiceModal();
+                        openDocumentModal(
+                            discordId,
+                            name,
+                            "Personalisierte Fahrerkarte",
+                            defaultFahrerkarteContent({ driverName: name, cardId, note }),
+                            {
+                                mode: "driver_card_issue",
+                                requestId,
+                                cardId,
+                                note,
+                                status,
+                                serviceTitle: title
+                            }
+                        );
+                    };
+                    serviceModalDocumentButton.disabled = !discordId || discordId === "-";
+                }
             }
 
             serviceModal.classList.add("active");
@@ -3505,6 +3596,16 @@
         
         documentModal.addEventListener("click", (event) => {
             if (event.target === documentModal) closeDocumentModal();
+        });
+
+        documentActionMode?.addEventListener("change", () => {
+            setDocumentMode(documentActionMode.value);
+        });
+
+        documentFillFahrerkarte?.addEventListener("click", () => {
+            documentTitle.value = "Personalisierte Fahrerkarte";
+            documentMessage.value = defaultFahrerkarteContent(currentDocumentContext);
+            setDocumentMode("driver_card_issue");
         });
 
         taskModal.addEventListener("click", (event) => {
@@ -3631,11 +3732,28 @@
             event.preventDefault();
 
             const driverId = documentDriverId.value;
+            const requestId = documentRequestId.value;
+            const mode = normalizeDocumentMode(documentActionMode?.value);
             const title = documentTitle.value.trim();
-            const message = documentMessage.value.trim();
+            let message = documentMessage.value.trim();
 
-            if (!driverId || !title) {
+            if (mode === "driver_card_issue" && !message) {
+                message = defaultFahrerkarteContent(currentDocumentContext);
+                documentMessage.value = message;
+            }
+
+            if (!driverId && !requestId) {
+                showToast("Fehler", "Fahrer-ID oder Service-Antrags-ID fehlt.", "error");
+                return;
+            }
+
+            if (!title) {
                 showToast("Fehler", "Bitte einen Dokumententitel angeben.", "error");
+                return;
+            }
+
+            if (mode === "direct_document" && !message) {
+                showToast("Fehler", "Bitte einen Dokumenteninhalt eintragen.", "error");
                 return;
             }
 
@@ -3643,22 +3761,62 @@
             const oldText = submitButton.textContent.trim();
 
             submitButton.disabled = true;
-            submitButton.textContent = "Sende...";
+            submitButton.textContent = mode === "driver_card_issue" ? "Stelle aus..." : "Sende...";
 
             try {
-                await postJson(SEND_DOCUMENT_URL, {
-                    driverId: driverId,
-                    title: title,
-                    message: message
-                });
+                const endpoint = mode === "driver_card_issue" ? ISSUE_FAHRERKARTE_URL : SEND_DOCUMENT_URL;
+                const payload = mode === "driver_card_issue"
+                    ? {
+                        requestId: requestId,
+                        driverId: driverId,
+                        title: title,
+                        issueNote: message,
+                        message: message,
+                        documentType: "driver_card_pdf",
+                        type: "driver_card_pdf",
+                        action: "issue_fahrerkarte",
+                        autoDownload: true
+                    }
+                    : {
+                        driverId: driverId,
+                        title: title,
+                        message: message,
+                        documentType: "direct_document",
+                        type: "direct_document"
+                    };
 
-                showToast("Dokument gesendet", "Das Dokument wurde erfolgreich an das Postfach des Fahrers übermittelt.", "success");
+                const result = await postJson(endpoint, payload);
+
+                if (mode === "driver_card_issue") {
+                    const resolvedRequestId = result.requestId || requestId;
+
+                    setServiceRowIssued(resolvedRequestId, result);
+
+                    if (result.autoDownload && result.downloadUrl) {
+                        downloadFromUrl(result.downloadUrl, result.downloadFilename || "EifelLog_Fahrerkarte.pdf");
+                    }
+
+                    showToast(
+                        "Fahrerkarte ausgestellt",
+                        result.message || "Die Fahrerkarte wurde generiert, als Dokument hinterlegt und der PDF-Download wurde gestartet.",
+                        "success",
+                        result.cardId || null
+                    );
+                } else {
+                    showToast(
+                        "Dokument gesendet",
+                        result.message || "Das Dokument wurde erfolgreich an das Postfach des Fahrers übermittelt.",
+                        "success"
+                    );
+                }
+
                 closeDocumentModal();
             } catch (error) {
-                showToast("Fehler", error.message || "Dokument konnte nicht gesendet werden.", "error");
+                showToast("Fehler", error.message || "Dokument konnte nicht verarbeitet werden.", "error");
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = oldText;
+                setDocumentMode(mode);
             }
         });
 
@@ -3728,7 +3886,51 @@
             if (action === "send-document") {
                 const driverId = button.dataset.driverId;
                 const driverName = button.dataset.driverName;
-                openDocumentModal(driverId, driverName);
+                const mode = button.dataset.documentMode || button.dataset.documentType || "direct_document";
+                const requestIdForDocument = button.dataset.serviceId || button.dataset.requestId || "";
+                const row = button.closest("[data-service-row]");
+                const cardId = row?.dataset.serviceCardId || "";
+                const note = row?.dataset.serviceNote || "";
+                const presetTitle = button.dataset.documentTitle || (normalizeDocumentMode(mode) === "driver_card_issue" ? "Personalisierte Fahrerkarte" : "");
+                const presetMessage = button.dataset.documentMessage || (
+                    normalizeDocumentMode(mode) === "driver_card_issue"
+                        ? defaultFahrerkarteContent({ driverName, cardId, note })
+                        : ""
+                );
+
+                openDocumentModal(driverId, driverName, presetTitle, presetMessage, {
+                    mode,
+                    requestId: requestIdForDocument,
+                    cardId,
+                    note
+                });
+                return;
+            }
+
+            if (action === "issue-fahrerkarte") {
+                const row = button.closest("[data-service-row]");
+                const driverId = button.dataset.driverId || row?.dataset.serviceDiscordId || "";
+                const driverName = button.dataset.driverName || row?.dataset.serviceName || "Fahrer";
+                const requestIdForDocument = button.dataset.serviceId || row?.dataset.serviceId || "";
+                const cardId = row?.dataset.serviceCardId || "";
+                const note = row?.dataset.serviceNote || "";
+                const status = row?.dataset.serviceStatus || "pending";
+                const serviceTitle = row?.dataset.serviceTitle || "Personalisierte Fahrerkarte";
+
+                openDocumentModal(
+                    driverId,
+                    driverName,
+                    "Personalisierte Fahrerkarte",
+                    defaultFahrerkarteContent({ driverName, cardId, note }),
+                    {
+                        mode: "driver_card_issue",
+                        requestId: requestIdForDocument,
+                        cardId,
+                        note,
+                        status,
+                        serviceTitle
+                    }
+                );
                 return;
             }
 
