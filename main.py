@@ -5568,9 +5568,13 @@ def dispo_form_entry_lookup_query(entry_id):
 
 def normalize_dispo_form_status(status):
     status = safe_str(status, "pending").lower()
+    if status in {"verified", "geprueft", "geprüft", "checked", "reviewed"}:
+        return "verified"
+    if status in {"signed", "signiert", "digitally_signed", "digital_signed"}:
+        return "signed"
     if status in {"management_pending", "forwarded_to_management", "forwarded", "zur_entscheidung"}:
         return "management_pending"
-    if status in {"returned_incomplete", "incomplete", "unvollstaendig", "unvollständig", "zurueckgegeben", "zurückgegeben"}:
+    if status in {"returned_incomplete", "needs_fix", "need_fix", "incomplete", "unvollstaendig", "unvollständig", "zurueckgegeben", "zurückgegeben"}:
         return "returned_incomplete"
     if status in {"approved", "freigegeben", "accepted", "ok"}:
         return "approved"
@@ -5674,6 +5678,11 @@ def prepare_dispo_form_entry_for_template(entry_doc):
         "file_url": url_for("dispo_form_file_download", entry_id=entry_id, filename=first_file.get("stored_filename")) if first_file.get("stored_filename") else "",
         "file_name": first_file.get("original_filename") or first_file.get("stored_filename") or "",
         "files": files,
+        "signature": safe_str(item.get("signature") or item.get("dispo_signature") or item.get("signature_text") or item.get("signed_by_name") or item.get("signed_by"), ""),
+        "signed_by": safe_str(item.get("signed_by_name") or item.get("signature") or item.get("signed_by"), ""),
+        "dispo_note": safe_str(item.get("dispo_note") or item.get("review_note") or item.get("review_comment"), ""),
+        "review_note": safe_str(item.get("review_note") or item.get("dispo_note") or item.get("review_comment"), ""),
+        "management_note": safe_str(item.get("management_note") or item.get("forward_note") or item.get("approval_note"), ""),
     }
 
 
@@ -5850,6 +5859,149 @@ def get_dispo_form_stats(entries):
     }
 
 
+
+def dispo_user_public_payload(user_doc):
+    user_doc = user_doc or {}
+    mongo_id = str(user_doc.get("_id")) if user_doc.get("_id") else ""
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("id") or user_doc.get("user_id") or mongo_id)
+    username = safe_str(user_doc.get("username") or user_doc.get("discord_username") or user_doc.get("name") or discord_id, discord_id)
+    display_name = safe_str(user_doc.get("display_name") or user_doc.get("global_name") or user_doc.get("nick") or username, username)
+
+    return {
+        "id": discord_id or mongo_id,
+        "_id": mongo_id,
+        "discord_id": discord_id,
+        "user_id": discord_id or mongo_id,
+        "username": username,
+        "name": display_name,
+        "display_name": display_name,
+        "roles": user_doc.get("roles", []),
+        "avatar": safe_str(user_doc.get("avatar") or user_doc.get("avatar_hash")),
+    }
+
+
+def get_eifellog_user_collections():
+    """Unterstützt beide Varianten: eifellog_db.user und eifellog_db.users."""
+    collections = []
+    seen_names = set()
+
+    for name in ("user", "users"):
+        if name in seen_names:
+            continue
+        try:
+            collections.append(db[name])
+            seen_names.add(name)
+        except Exception:
+            continue
+
+    return collections or [users_collection]
+
+
+def get_dispo_assignable_users(limit=500):
+    users = []
+    seen_keys = set()
+    query = {
+        "$and": [
+            {"archived": {"$ne": True}},
+            {"disabled": {"$ne": True}},
+            {"deleted": {"$ne": True}},
+        ]
+    }
+    projection = {
+        "discord_id": 1,
+        "id": 1,
+        "user_id": 1,
+        "username": 1,
+        "discord_username": 1,
+        "display_name": 1,
+        "global_name": 1,
+        "nick": 1,
+        "name": 1,
+        "roles": 1,
+        "avatar": 1,
+        "avatar_hash": 1,
+    }
+
+    for collection in get_eifellog_user_collections():
+        try:
+            cursor = collection.find(query, projection).sort([
+                ("display_name", ASCENDING),
+                ("username", ASCENDING),
+                ("discord_id", ASCENDING),
+            ]).limit(limit)
+        except Exception:
+            try:
+                cursor = collection.find({}, projection).limit(limit)
+            except Exception:
+                continue
+
+        for user_doc in cursor:
+            payload = dispo_user_public_payload(user_doc)
+            key = safe_str(payload.get("discord_id") or payload.get("_id") or payload.get("username")).lower()
+            if not key or key in seen_keys:
+                continue
+            seen_keys.add(key)
+            users.append(payload)
+
+    users.sort(key=lambda item: (safe_str(item.get("display_name") or item.get("username")).lower(), safe_str(item.get("discord_id"))))
+    return users[:limit]
+
+
+def find_dispo_assignable_user(user_id):
+    user_id = safe_str(user_id)
+    if not user_id:
+        return None
+
+    query_items = []
+    object_id = object_id_or_none(user_id)
+    if object_id:
+        query_items.append({"_id": object_id})
+
+    query_items.extend([
+        {"discord_id": user_id},
+        {"id": user_id},
+        {"user_id": user_id},
+        {"username": user_id},
+        {"username_lc": user_id.lower()},
+        {"display_name": {"$regex": f"^{re.escape(user_id)}$", "$options": "i"}},
+    ])
+
+    for collection in get_eifellog_user_collections():
+        try:
+            user_doc = collection.find_one({"$or": query_items})
+        except Exception:
+            user_doc = None
+        if user_doc:
+            return user_doc
+
+    return None
+
+
+def require_dispo_document_management_permission():
+    permission_response = require_dispo_form_access()
+    if permission_response:
+        return permission_response
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_dispo_submitted_documents_permission(user_roles):
+        if request.is_json:
+            return jsonify({"success": False, "message": "Nur die Disposition darf eingereichte Dokumente bearbeiten."}), 403
+        flash("Nur die Disposition darf eingereichte Dokumente bearbeiten.", "error")
+        return redirect(url_for("dispo_form"))
+
+    return None
+
+
+def load_active_dispo_form_entry(document_id):
+    document_id = safe_str(document_id)
+    if not document_id:
+        return None
+    return dispo_form_entries_collection.find_one({
+        **dispo_form_entry_lookup_query(document_id),
+        "archived": {"$ne": True},
+    })
+
+
 @app.route("/dispo/form", methods=["GET"])
 @app.route("/dispo_form.html", methods=["GET"])
 def dispo_form():
@@ -5912,6 +6064,10 @@ def dispo_form():
         show_submitted_documents=can_view_dispo_submitted_documents,
         is_disposition_viewer=can_view_dispo_submitted_documents,
         blocked_from_dispo_documents=has_dispo_blocked_documents_role(user_roles) and not can_view_dispo_submitted_documents,
+        dispo_assignable_users=get_dispo_assignable_users() if can_view_dispo_submitted_documents else [],
+        dispo_users=get_dispo_assignable_users() if can_view_dispo_submitted_documents else [],
+        eifellog_users=get_dispo_assignable_users() if can_view_dispo_submitted_documents else [],
+        users=get_dispo_assignable_users() if can_view_dispo_submitted_documents else [],
         dispo_form_submissions=prepared_entries,
         dispo_manual_entries=manual_entries,
         dispo_form_pending_count=stats["pending_count"],
@@ -6162,6 +6318,323 @@ def dispo_form_update_status(entry_id):
         return jsonify({"success": True, "status": new_status})
 
     flash("Status wurde aktualisiert.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/users", methods=["GET"])
+def dispo_form_users_api():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    users = get_dispo_assignable_users()
+    return jsonify({
+        "success": True,
+        "users": users,
+        "count": len(users),
+        "source": "eifellog_db.user/eifellog_db.users",
+    })
+
+
+@app.route("/dispo/form/documents/edit", methods=["POST"])
+def dispo_form_document_edit():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    if not document_id:
+        flash("Dokument-ID fehlt.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_doc = load_active_dispo_form_entry(document_id)
+    if not entry_doc:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    reference = safe_str(request.form.get("reference"))[:160]
+    title = safe_str(request.form.get("title"))[:180]
+    amount_net_raw = request.form.get("amount_net")
+    tax_rate_raw = request.form.get("tax_rate")
+
+    update_fields = {
+        "updated_at": now_utc(),
+        "updated_by": current_disposition_identity(),
+    }
+
+    if reference:
+        update_fields["reference"] = reference
+    if title:
+        update_fields["title"] = title
+
+    has_amount = amount_net_raw is not None and safe_str(amount_net_raw) != ""
+    has_tax_rate = tax_rate_raw is not None and safe_str(tax_rate_raw) != ""
+    if has_amount or has_tax_rate:
+        amount_source = amount_net_raw if has_amount else entry_doc.get("amount_net")
+        tax_rate_source = tax_rate_raw if has_tax_rate else entry_doc.get("tax_rate", 19)
+        tax_mode = safe_str(entry_doc.get("tax_mode"), "eifellog_internal")
+        amount_net, tax_rate, tax_amount, amount_gross = calculate_dispo_form_tax(amount_source, tax_rate_source, tax_mode)
+        update_fields.update({
+            "amount_net": amount_net,
+            "tax_rate": tax_rate,
+            "tax_amount": tax_amount,
+            "amount_gross": amount_gross,
+        })
+
+    dispo_form_entries_collection.update_one(
+        {"_id": entry_doc["_id"]},
+        {"$set": update_fields}
+    )
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Dispo-Dokument bearbeitet",
+        "content": f"Dokument {document_id} wurde durch die Disposition bearbeitet.",
+        "priority": "normal",
+        "archived": False,
+        "created_at": now_utc(),
+        "created_by": update_fields["updated_by"],
+        "dispo_form_entry_id": safe_str(entry_doc.get("entry_id") or document_id),
+    })
+
+    flash("Änderungen wurden gespeichert.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/documents/assign-user", methods=["POST"])
+def dispo_form_document_assign_user():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    assigned_user_id = safe_str(request.form.get("assigned_user_id"))
+
+    if not document_id or not assigned_user_id:
+        flash("Bitte Dokument und User auswählen.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_doc = load_active_dispo_form_entry(document_id)
+    if not entry_doc:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    user_doc = find_dispo_assignable_user(assigned_user_id)
+    if not user_doc:
+        flash("User wurde in eifellog_db.user / users nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    assigned_user = dispo_user_public_payload(user_doc)
+    actor = current_disposition_identity()
+    now = now_utc()
+
+    submitted_by = {
+        "discord_id": safe_str(assigned_user.get("discord_id") or assigned_user.get("id")),
+        "username": safe_str(assigned_user.get("username")),
+        "display_name": safe_str(assigned_user.get("display_name") or assigned_user.get("username")),
+        "roles": assigned_user.get("roles", []),
+    }
+
+    dispo_form_entries_collection.update_one(
+        {"_id": entry_doc["_id"]},
+        {
+            "$set": {
+                "submitted_by": submitted_by,
+                "submitted_by_id": submitted_by["discord_id"],
+                "submitted_by_name": submitted_by["display_name"],
+                "assigned_user": submitted_by,
+                "assigned_user_id": submitted_by["discord_id"],
+                "assigned_by": actor,
+                "assigned_at": now,
+                "updated_at": now,
+            }
+        }
+    )
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Einreicher zugeordnet",
+        "content": f"Dokument {document_id} wurde {submitted_by['display_name']} zugeordnet.",
+        "priority": "normal",
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+        "dispo_form_entry_id": safe_str(entry_doc.get("entry_id") or document_id),
+    })
+
+    flash("Einreicher wurde zugeordnet und gespeichert.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/documents/review", methods=["POST"])
+def dispo_form_document_review():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    review_status_raw = safe_str(request.form.get("review_status"), "verified")
+    review_note = safe_str(request.form.get("review_note"))[:2000]
+
+    if not document_id:
+        flash("Dokument-ID fehlt.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_doc = load_active_dispo_form_entry(document_id)
+    if not entry_doc:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    if review_status_raw == "needs_fix":
+        new_status = "returned_incomplete"
+    else:
+        new_status = normalize_dispo_form_status(review_status_raw)
+
+    actor = current_disposition_identity()
+    now = now_utc()
+    dispo_form_entries_collection.update_one(
+        {"_id": entry_doc["_id"]},
+        {
+            "$set": {
+                "status": new_status,
+                "review_status": new_status,
+                "review_note": review_note,
+                "dispo_note": review_note,
+                "reviewed_by": actor,
+                "reviewed_at": now,
+                "updated_at": now,
+            }
+        }
+    )
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Dispo-Prüfung gespeichert",
+        "content": f"Dokument {document_id} wurde mit Status {new_status} geprüft.",
+        "priority": "high" if new_status in {"returned_incomplete", "rejected"} else "normal",
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+        "dispo_form_entry_id": safe_str(entry_doc.get("entry_id") or document_id),
+    })
+
+    flash("Prüfung wurde gespeichert.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/documents/sign", methods=["POST"])
+def dispo_form_document_sign():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    signer_name = safe_str(request.form.get("signer_name"))[:160]
+    signature_text = safe_str(request.form.get("signature_text"))[:240]
+
+    if not document_id or not signer_name or not signature_text:
+        flash("Dokument-ID, Signatur-Name und Signatur müssen ausgefüllt sein.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_doc = load_active_dispo_form_entry(document_id)
+    if not entry_doc:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    actor = current_disposition_identity()
+    now = now_utc()
+    signature_record = {
+        "name": signer_name,
+        "text": signature_text,
+        "signed_by": actor,
+        "signed_at": now,
+    }
+
+    dispo_form_entries_collection.update_one(
+        {"_id": entry_doc["_id"]},
+        {
+            "$set": {
+                "status": "signed",
+                "signature": signature_text,
+                "signature_text": signature_text,
+                "signed_by_name": signer_name,
+                "signed_by": actor,
+                "signed_at": now,
+                "signature_record": signature_record,
+                "updated_at": now,
+            }
+        }
+    )
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Dispo-Dokument signiert",
+        "content": f"Dokument {document_id} wurde von {signer_name} signiert.",
+        "priority": "normal",
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+        "dispo_form_entry_id": safe_str(entry_doc.get("entry_id") or document_id),
+    })
+
+    flash("Dokument wurde digital signiert.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/documents/forward-management", methods=["POST"])
+def dispo_form_document_forward_management():
+    permission_response = require_dispo_document_management_permission()
+    if permission_response:
+        return permission_response
+
+    document_id = safe_str(request.form.get("document_id"))
+    management_note = safe_str(request.form.get("management_note"))[:2000]
+
+    if not document_id:
+        flash("Dokument-ID fehlt.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_doc = load_active_dispo_form_entry(document_id)
+    if not entry_doc:
+        flash("Dokument wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    actor = current_disposition_identity()
+    now = now_utc()
+    dispo_form_entries_collection.update_one(
+        {"_id": entry_doc["_id"]},
+        {
+            "$set": {
+                "status": "management_pending",
+                "management_status": "management_pending",
+                "forwarded_to_management": True,
+                "management_note": management_note,
+                "forward_note": management_note,
+                "forwarded_by": actor,
+                "dispo_forwarded_by": actor,
+                "forwarded_at": now,
+                "dispo_forwarded_at": now,
+                "updated_at": now,
+            }
+        }
+    )
+
+    submitted_by = entry_doc.get("submitted_by") or {}
+    reference = safe_str(entry_doc.get("reference"), "-")
+    user_name = safe_str(submitted_by.get("display_name") or submitted_by.get("username") or entry_doc.get("submitted_by_name"), "Unbekannt")
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Dokument an Geschäftsleitung weitergegeben",
+        "content": f"Dokument {document_id} von {user_name} / {reference} wartet auf Entscheidung der Geschäftsleitung.",
+        "priority": "high",
+        "archived": False,
+        "created_at": now,
+        "created_by": actor,
+        "dispo_form_entry_id": safe_str(entry_doc.get("entry_id") or document_id),
+    })
+
+    flash("Dokument wurde an die Geschäftsleitung weitergegeben.", "success")
     return redirect(url_for("dispo_form"))
 
 
