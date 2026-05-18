@@ -128,156 +128,6 @@
         background: rgba(255, 255, 255, 0.2);
     }
 
-    .service-postfach-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.85rem;
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow-y: auto;
-        padding-right: 0.35rem;
-    }
-
-    .service-postfach-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: 1.35rem;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background:
-            radial-gradient(circle at top right, rgba(137, 190, 50, 0.10), transparent 34%),
-            linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
-        padding: 1rem;
-        box-shadow: 0 18px 38px rgba(0, 0, 0, 0.20);
-    }
-
-    .service-postfach-card::before {
-        content: "";
-        position: absolute;
-        inset: 0 auto 0 0;
-        width: 3px;
-        background: linear-gradient(180deg, var(--brand-green), rgba(137, 190, 50, 0));
-        opacity: 0.85;
-    }
-
-    .service-postfach-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.85rem;
-        padding-left: 0.15rem;
-    }
-
-    .service-postfach-title {
-        min-width: 0;
-    }
-
-    .service-postfach-title p {
-        margin: 0;
-    }
-
-    .service-postfach-label {
-        font-family: Orbitron, Inter, system-ui, sans-serif;
-        font-size: 0.72rem;
-        line-height: 1.2;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #fff;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .service-postfach-source {
-        margin-top: 0.25rem !important;
-        font-family: Inter, system-ui, sans-serif;
-        font-size: 0.68rem;
-        line-height: 1.2;
-        color: rgba(255, 255, 255, 0.42);
-    }
-
-    .service-postfach-date {
-        flex: 0 0 auto;
-        white-space: nowrap;
-        border-radius: 999px;
-        border: 1px solid rgba(214, 255, 79, 0.20);
-        background: rgba(214, 255, 79, 0.08);
-        padding: 0.32rem 0.52rem;
-        color: var(--brand-yellow);
-        font-family: Orbitron, Inter, system-ui, sans-serif;
-        font-size: 0.58rem;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-
-    .service-postfach-body {
-        margin-top: 0.85rem;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(0, 0, 0, 0.20);
-        padding: 0.9rem;
-        color: rgba(255, 255, 255, 0.68);
-        font-family: Inter, system-ui, sans-serif;
-        font-size: 0.78rem;
-        line-height: 1.6;
-    }
-
-    .service-postfach-body > :first-child {
-        margin-top: 0 !important;
-    }
-
-    .service-postfach-body > :last-child {
-        margin-bottom: 0 !important;
-    }
-
-    .service-postfach-body p {
-        margin: 0;
-        color: rgba(255, 255, 255, 0.68);
-    }
-
-    .service-postfach-body p + p,
-    .service-postfach-body div + p,
-    .service-postfach-body p + div {
-        margin-top: 0.72rem;
-    }
-
-    .service-postfach-body strong {
-        color: #fff;
-        font-weight: 800;
-    }
-
-    .service-postfach-body br {
-        display: none;
-    }
-
-    .service-postfach-body .mt-4 {
-        margin-top: 0.85rem !important;
-    }
-
-    .service-postfach-body .mt-5 {
-        margin-top: 0.95rem !important;
-    }
-
-    .service-postfach-body [class*="rounded"] {
-        border-radius: 1rem;
-    }
-
-    .service-postfach-body [class*="grid"] {
-        gap: 0.55rem;
-    }
-
-    .service-postfach-empty {
-        border-radius: 1.35rem;
-        border: 1px dashed rgba(255, 255, 255, 0.12);
-        background: rgba(255, 255, 255, 0.035);
-        padding: 1rem;
-    }
-
-    .service-postfach-empty p {
-        margin: 0;
-    }
-
     #fahrerkarte-confirm-modal {
         overscroll-behavior: contain;
     }
@@ -781,41 +631,38 @@
                             </div>
                             <div class="min-w-0">
                                 <p id="preview-name" class="text-white font-bold truncate">{{ fahrerkarte_name }}</p>
-                         <div class="glass-card p-6 flex-1 flex flex-col min-h-[250px]">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
-                    <span>ServiceCenter Postfach</span>
-                    <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse shadow-[0_0_14px_rgba(137,190,50,0.85)]"></span>
-                </h2>
-
-                <div class="service-postfach-list custom-scrollbar">
-                    {% if safe_servicecenter_messages %}
-                        {% for message in safe_servicecenter_messages %}
-                            <article class="service-postfach-card">
-                                <div class="service-postfach-head">
-                                    <div class="service-postfach-title">
-                                        <p class="service-postfach-label">{{ message.title|default('ServiceCenter Meldung', true) }}</p>
-                                        <p class="service-postfach-source">ServiceCenter / Postfach</p>
-                                    </div>
-                                    <time class="service-postfach-date">{{ message.date|default('-', true) }}</time>
-                                </div>
-
-                                <div class="service-postfach-body">
-                                    {{ message.content|safe }}
-                                </div>
-                            </article>
-                        {% endfor %}
-                    {% else %}
-                        <div class="service-postfach-empty">
-                            <p class="font-orbitron text-xs text-white font-bold uppercase tracking-wider">Keine neuen Meldungen</p>
-                            <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
-                                Statusmeldungen zur Fahrerkarte erscheinen hier, sobald eine Bearbeitung erfolgt.
-                            </p>
+                                <p id="preview-role" class="text-xs text-[var(--brand-yellow)] font-inter mt-1 truncate">{{ fahrerkarte_role }}</p>
+                            </div>
                         </div>
-                    {% endif %}
+
+                        <div class="grid grid-cols-1 gap-3 text-xs font-inter">
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">System-ID</p>
+                                <p id="preview-system-id" class="text-white font-bold break-all">{{ current_user_id }}</p>
+                            </div>
+
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">Antragsgrund</p>
+                                <p id="preview-reason" class="text-white font-bold">Noch nicht ausgewählt</p>
+                            </div>
+
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">Ausstellung</p>
+                                <p id="preview-date" class="text-white font-bold">Nach Freigabe</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-div>
+            <div class="glass-card p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Ablauf</h2>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center shrink-0">
+                            <span class="font-orbitron font-bold text-sm">01</span>
+                        </div>
+                        <div>
                             <p class="font-orbitron text-sm text-white font-bold uppercase tracking-wider">Beantragen</p>
                             <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">Du reichst die Daten für die personalisierte Karte ein.</p>
                         </div>
