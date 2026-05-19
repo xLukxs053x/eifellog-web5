@@ -1963,6 +1963,75 @@
         }
     }
 
+
+    /* =========================================================
+       KOMPAKTES FINAL-UI FÜR ALLE TABS
+       Mehr Inhalt pro Bildschirm, ruhigere Abstände, coolerer Slim-Look.
+    ========================================================= */
+    :root {
+        --personal-ui-scale: 0.80;
+        --personal-shell-width: 1540px;
+        --el-radius-xl: 20px;
+        --el-radius-lg: 16px;
+        --el-radius-md: 12px;
+    }
+
+    .personal-shell { gap: 0.72rem !important; }
+    .personal-page .page-head { padding: 1rem 1.15rem !important; border-radius: 1.15rem !important; }
+    .personal-page .page-head h1 { font-size: clamp(1.85rem, 3.2vw, 3.15rem) !important; }
+    .personal-page .page-head p { max-width: 70rem !important; margin-top: 0.65rem !important; font-size: 0.80rem !important; line-height: 1.45 !important; }
+    .personal-page .page-kicker { min-height: 1.62rem !important; margin-bottom: 0.55rem !important; font-size: 0.50rem !important; }
+    .personal-page .role-access { gap: 0.5rem !important; }
+    .personal-page .access-pill { padding: 0.58rem 0.7rem !important; border-radius: 0.8rem !important; }
+    .personal-page .stats-grid { gap: 0.52rem !important; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)) !important; }
+    .personal-page .stat-card { min-height: 5.15rem !important; padding: 0.72rem !important; border-radius: 0.86rem !important; }
+    .personal-page .stat-card small { font-size: 0.48rem !important; letter-spacing: 0.12em !important; }
+    .personal-page .stat-card strong { font-size: clamp(1.15rem, 1.55vw, 1.55rem) !important; }
+    .personal-page .tabbar { grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)) !important; gap: 0.36rem !important; padding: 0.36rem !important; border-radius: 1rem !important; }
+    .personal-page .tab-btn { min-height: 2.32rem !important; padding: 0.12rem 0.56rem !important; font-size: 0.49rem !important; letter-spacing: 0.10em !important; border-radius: 0.68rem !important; }
+    .personal-page .toolbar, .personal-page .toolbar.requests, .personal-page .toolbar.accounting, .personal-page .toolbar.service-center-toolbar { padding: 0.62rem !important; gap: 0.52rem !important; }
+    .search-box, .filter-select, .modal-input, .modal-textarea, .modal-file { min-height: 2.42rem !important; padding: 0 0.72rem !important; font-size: 0.78rem !important; border-radius: 0.68rem !important; }
+    .modal-textarea { min-height: 6.2rem !important; padding: 0.72rem !important; }
+    .personal-page .table-head { padding: 0.78rem 0.95rem !important; }
+    .personal-page .table-head h2 { font-size: 0.78rem !important; }
+    .personal-page .table-head span { font-size: 0.74rem !important; }
+    .personal-page .driver-table th, .personal-page .request-table th { padding: 0.58rem 0.72rem !important; font-size: 0.49rem !important; letter-spacing: 0.12em !important; }
+    .personal-page .driver-table td, .personal-page .request-table td { padding: 0.62rem 0.72rem !important; font-size: 0.78rem !important; }
+    .personal-page .driver-avatar { width: 2.45rem !important; height: 2.45rem !important; border-radius: 0.72rem !important; }
+    .driver-meta strong { font-size: 0.82rem !important; margin-bottom: 0.14rem !important; }
+    .driver-meta span, .mono, .accounting-message-preview, .compliance-summary span { font-size: 0.72rem !important; }
+    .role-badge, .token-badge, .status-badge, .deadline-badge, .compliance-badge { min-height: 1.48rem !important; padding: 0 0.56rem !important; font-size: 0.49rem !important; letter-spacing: 0.10em !important; }
+    .aktenzeichen-mono { font-size: 0.66rem !important; padding: 0.24rem 0.42rem !important; }
+    .token-btn, .request-btn { min-height: 2.18rem !important; padding: 0 0.72rem !important; border-radius: 0.72rem !important; font-size: 0.50rem !important; letter-spacing: 0.10em !important; gap: 0.38rem !important; }
+    .personal-page .driver-card-command, .personal-page .service-highlight-card { padding: 0.78rem !important; gap: 0.72rem !important; border-radius: 1rem !important; }
+    .personal-page .driver-card-command h2, .personal-page .service-highlight-copy h2 { font-size: clamp(1.05rem, 1.55vw, 1.55rem) !important; }
+    .personal-page .driver-card-command p, .personal-page .service-highlight-copy p { margin-top: 0.45rem !important; font-size: 0.76rem !important; line-height: 1.42 !important; }
+    .personal-page .service-flow, .personal-page .driver-card-flow { gap: 0.45rem !important; }
+    .personal-page .service-flow-step { padding: 0.58rem !important; border-radius: 0.72rem !important; }
+    .personal-page .service-flow-step strong { font-size: 0.55rem !important; }
+    .personal-page .service-flow-step span { margin-top: 0.25rem !important; font-size: 0.68rem !important; line-height: 1.35 !important; }
+    .personal-page .accounting-layout { grid-template-columns: minmax(220px, 270px) minmax(0, 1fr) !important; gap: 0.85rem !important; }
+    .personal-page .accounting-sidebar { padding: 0.82rem !important; gap: 0.65rem !important; }
+    .modal-card { border-radius: 1.15rem !important; }
+    .modal-head { padding: 0.95rem 1.05rem !important; }
+    .modal-body { padding: 1rem !important; gap: 0.72rem !important; }
+    .modal-head h3 { font-size: 1.02rem !important; }
+
+    @media (min-width: 1536px) {
+        :root { --personal-ui-scale: 0.78; --personal-shell-width: 1640px; }
+    }
+
+    @media (max-width: 1180px) {
+        :root { --personal-ui-scale: 0.92; }
+        .personal-page .accounting-layout { grid-template-columns: 1fr !important; }
+    }
+
+    @media (max-width: 720px) {
+        :root { --personal-ui-scale: 1; }
+        .personal-page .tabbar { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .personal-page .tab-btn { min-height: 2.55rem !important; }
+    }
+
 </style>
 
 
@@ -2799,24 +2868,23 @@
                     <small>Fahrerkarten Daten abfragen</small>
                     <h2>PDF-Belege pro User erstellen und versenden</h2>
                     <p>
-                        Hier kann die Personalabteilung für jeden Fahrer Fahrerkarten-Daten abrufen, einen PDF-Beleg erzeugen,
-                        den Beleg direkt an den User senden und zusätzlich einen Prüfbeleg zu Lenk- und Ruhezeiten erstellen.
-                        Die eigentliche Regelprüfung und PDF-Erzeugung erfolgt serverseitig über die unten angebundenen API-Endpunkte.
+                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen laufen hier als Frontend-Vorbereitung:
+                        Notizen, Zeiträume und Fahrerbezug werden geprüft, ohne direkte Backend-Hooks oder API-Calls auszulösen.
                     </p>
                 </div>
 
                 <div class="driver-card-flow">
                     <div class="service-flow-step">
-                        <strong>01 · Daten abfragen</strong>
-                        <span>Aktualisiert Kartendaten, Karten-ID, letzten Upload und Prüfstatus aus dem Backend.</span>
+                        <strong>01 · Daten prüfen</strong>
+                        <span>Filtert und aktualisiert die Ansicht direkt im Frontend.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>02 · PDF-Beleg</strong>
-                        <span>Erstellt einen Nachweis über Fahrerkarten-Daten oder Lenk-/Ruhezeit-Prüfung.</span>
+                        <strong>02 · Beleg vorbereiten</strong>
+                        <span>Öffnet ein kompaktes Formular für Zeitraum und Hinweis.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>03 · Versand</strong>
-                        <span>Optional wird der Beleg direkt in das User-Postfach gesendet.</span>
+                        <strong>03 · Ohne Backend</strong>
+                        <span>Keine direkte API-Verbindung; Ausgabe bleibt als UI-Entwurf sichtbar.</span>
                     </div>
                 </div>
             </section>
@@ -2839,7 +2907,7 @@
                 </select>
 
                 <button class="request-btn blue" style="height: 48px; border-radius: 16px; width: 100%;" type="button" data-action="refresh-driver-card-list">
-                    Tabelle aktualisieren
+Ansicht aktualisieren
                 </button>
             </section>
 
@@ -2847,7 +2915,7 @@
                 <div class="table-head">
                     <div>
                         <h2>Fahrerkarten Datenbank</h2>
-                        <span>Aktionen: <strong>Daten abrufen · PDF erstellen · an User senden · Lenk-/Ruhezeiten prüfen</strong></span>
+                        <span>Aktionen: <strong>Ansicht prüfen · Beleg vorbereiten · Lenk-/Ruhezeiten notieren</strong></span>
                     </div>
                 </div>
 
@@ -2943,7 +3011,7 @@
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-                                                Daten abfragen
+Prüfen
                                             </button>
 
                                             <button
@@ -2953,7 +3021,7 @@
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-                                                PDF Beleg
+Beleg
                                             </button>
 
                                             <button
@@ -2963,7 +3031,7 @@
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-                                                An User senden
+Senden vorbereiten
                                             </button>
 
                                             <button
@@ -2973,7 +3041,7 @@
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-                                                Lenk/Ruhe Beleg
+Lenk/Ruhe
                                             </button>
                                         </div>
                                     </td>
@@ -3403,8 +3471,7 @@
 
             <div class="document-mode-panel" id="documentFahrerkarteHint" style="display:none;">
                 <strong>Fahrerkarte-Modus</strong>
-                <span>Erzeugt serverseitig einen PDF-Beleg zur personalisierten Fahrerkarte, hinterlegt ihn am ServiceCenter-Vorgang und kann ihn direkt herunterladen.</span>
-                <code>POST /api/personalabteilung/driver/document/issue-fahrerkarte</code>
+                <span>Bereitet die personalisierte Fahrerkarte als sauberen Dokumentenentwurf vor. Der direkte Backend-Hook wird in dieser Vorlage nicht angezeigt.</span>
             </div>
             
             <input 
@@ -3560,7 +3627,7 @@
 
             <div class="modal-info">
                 <span>Fahrer: <strong id="driverCardDriverName">-</strong></span>
-                <span id="driverCardModeHelp">Der Beleg wird als PDF serverseitig erstellt.</span>
+                <span id="driverCardModeHelp">Der Beleg wird nur im Frontend vorbereitet. Es wird kein Backend-Hook aufgerufen.</span>
             </div>
 
             <div class="modal-grid-two">
@@ -3590,12 +3657,6 @@
                 <input type="checkbox" id="driverCardAutoDownload" checked />
                 <span>PDF-Beleg nach Erstellung automatisch herunterladen.</span>
             </label>
-
-            <div class="document-mode-panel">
-                <strong>Backend-Hooks</strong>
-                <span>Fahrerkarten-Beleg: <code>/api/personalabteilung/fahrerkarte/pdf/create</code></span>
-                <span>Lenk-/Ruhezeit-Beleg: <code>/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf</code></span>
-            </div>
 
             <div class="modal-actions">
                 <button class="request-btn" type="button" data-close-modal="driverCardModal">Abbrechen</button>
@@ -3656,10 +3717,6 @@
         
         const SEND_DOCUMENT_URL = "/api/personalabteilung/driver/document/send";
         const ISSUE_FAHRERKARTE_URL = "/api/personalabteilung/driver/document/issue-fahrerkarte";
-        const QUERY_DRIVER_CARD_DATA_URL = "/api/personalabteilung/fahrerkarte/data/query";
-        const CREATE_DRIVER_CARD_PDF_URL = "/api/personalabteilung/fahrerkarte/pdf/create";
-        const SEND_DRIVER_CARD_PDF_URL = "/api/personalabteilung/fahrerkarte/pdf/send";
-        const CREATE_DRIVING_TIME_AUDIT_PDF_URL = "/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf";
         
         // NEUER ENDPUNKT HINZUGEFÜGT
         const CREATE_TASK_URL = "/api/personalabteilung/task/create";
@@ -4825,11 +4882,10 @@
             const dateFrom = driverCardDateFrom.value;
             const dateTo = driverCardDateTo.value;
             const sendToUser = Boolean(driverCardSendToUser.checked);
-            const autoDownload = Boolean(driverCardAutoDownload.checked);
             const row = currentDriverCardContext.row;
 
             if (!driverId) {
-                showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht erstellt werden.", "error");
+                showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht vorbereitet werden.", "error");
                 return;
             }
 
@@ -4838,47 +4894,22 @@
                 return;
             }
 
-            const endpoint = mode === "driving_time_compliance_pdf"
-                ? CREATE_DRIVING_TIME_AUDIT_PDF_URL
-                : (sendToUser ? SEND_DRIVER_CARD_PDF_URL : CREATE_DRIVER_CARD_PDF_URL);
+            const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+            const label = mode === "driving_time_compliance_pdf" ? "Lenk-/Ruhezeit-Beleg" : "Fahrerkarten-Beleg";
+            const result = {
+                cardId: driverCardCardId.value || currentDriverCardContext.cardId || "Frontend-Entwurf",
+                cardStatus: "draft",
+                complianceStatus: mode === "driving_time_compliance_pdf" ? "review" : (row?.dataset.driverCardCompliance || "unknown"),
+                complianceLabel: mode === "driving_time_compliance_pdf" ? "Prüfung vorbereitet" : "Beleg vorbereitet",
+                complianceSummary: `${label} lokal vorbereitet${sendToUser ? " · Versand markiert" : ""}${note ? " · Hinweis: " + note : ""}`,
+                lastQuery: now,
+                message: `${label} wurde lokal vorbereitet. Es wurde kein Backend-Hook, kein API-Call und kein PDF-Download ausgelöst.`,
+                reference: "FRONTEND-ONLY"
+            };
 
-            const oldText = driverCardSubmitButton.textContent.trim();
-            driverCardSubmitButton.disabled = true;
-            driverCardSubmitButton.textContent = sendToUser ? "Sende..." : "Erstelle...";
-
-            try {
-                const result = await postJson(endpoint, {
-                    driverId,
-                    cardId: driverCardCardId.value || currentDriverCardContext.cardId || "",
-                    documentType: mode,
-                    type: mode,
-                    dateFrom,
-                    dateTo,
-                    note,
-                    sendToUser,
-                    autoDownload
-                });
-
-                updateDriverCardRow(row, result);
-
-                if (autoDownload && result.downloadUrl) {
-                    downloadFromUrl(result.downloadUrl, result.downloadFilename || (mode === "driving_time_compliance_pdf" ? "EifelLog_Lenk_Ruhezeiten_Beleg.pdf" : "EifelLog_Fahrerkarte_Beleg.pdf"));
-                }
-
-                showToast(
-                    sendToUser ? "PDF-Beleg gesendet" : "PDF-Beleg erstellt",
-                    result.message || (sendToUser ? "Der PDF-Beleg wurde erstellt und an den User gesendet." : "Der PDF-Beleg wurde erstellt."),
-                    "success",
-                    result.reference || result.belegId || result.cardId || null
-                );
-
-                closeDriverCardModal();
-            } catch (error) {
-                showToast("Fehler", error.message || "PDF-Beleg konnte nicht erstellt werden.", "error");
-            } finally {
-                driverCardSubmitButton.disabled = false;
-                driverCardSubmitButton.textContent = oldText;
-            }
+            updateDriverCardRow(row, result);
+            showToast(sendToUser ? "Versand vorbereitet" : "Beleg vorbereitet", result.message, "success", result.reference);
+            closeDriverCardModal();
         });
 
         // LOGIK FÜR DAS SPEICHERN DER AUFGABE
@@ -4957,19 +4988,18 @@
 
             if (action === "query-driver-card-data") {
                 const row = button.closest("[data-driver-card-row]");
-                const driverId = button.dataset.driverId || row?.dataset.driverId || "";
                 const driverName = button.dataset.driverName || row?.dataset.driverCardName || "Fahrer";
 
-                if (!driverId) {
-                    showToast("Fehler", "Fahrer-ID fehlt. Fahrerkarten-Daten können nicht abgefragt werden.", "error");
-                    return;
+                if (row) {
+                    const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+                    row.dataset.driverCardLastQuery = now;
+
+                    const lastQueryText = row.querySelector("[data-driver-card-last-query-text]");
+                    if (lastQueryText) lastQueryText.textContent = now;
                 }
 
-                await runButtonAction(button, "Frage ab...", async () => {
-                    const result = await postJson(QUERY_DRIVER_CARD_DATA_URL, { driverId });
-                    updateDriverCardRow(row, result);
-                    showToast("Fahrerkarten-Daten aktualisiert", result.message || `Die Fahrerkarten-Daten für ${driverName} wurden abgefragt.`, "success", result.cardId || null);
-                });
+                showToast("Ansicht geprüft", `Die Fahrerkarten-Zeile für ${driverName} wurde lokal aktualisiert. Es wurde kein Backend-Hook aufgerufen.`, "success");
+                updateStats();
                 return;
             }
 
