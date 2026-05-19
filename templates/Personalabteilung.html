@@ -12,6 +12,8 @@
 {% if not safe_service_requests %}
     {% set safe_service_requests = fahrerkarte_requests|default(driver_card_requests|default(personalisierte_fahrerkarte_requests|default([], true), true), true) %}
 {% endif %} <!-- NEU: Service Center / Fahrerkarte-Anträge -->
+{% set safe_driver_card_data = fahrerkarten_daten|default(driver_card_data|default(fahrerkarte_data|default(tacho_card_data|default([], true), true), true), true) %}
+{% set safe_driving_time_audits = lenk_ruhezeiten_audits|default(driving_time_audits|default(tacho_audits|default([], true), true), true) %} <!-- NEU: Fahrerkarten-Daten / Lenk- und Ruhezeiten -->
 
 <style>
     :root {
@@ -1531,6 +1533,155 @@
         }
     }
 
+
+    /* =========================================================
+       FAHRERKARTEN-DATEN + LENK-/RUHEZEIT-BELEGE
+    ========================================================= */
+
+    .personal-page .driver-card-command {
+        padding: 1.35rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .personal-page .driver-card-command h2 {
+        margin: 0;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: clamp(1.45rem, 2.3vw, 2.25rem);
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+    }
+
+    .personal-page .driver-card-command p {
+        margin: 0.85rem 0 0;
+        color: var(--el-muted);
+        font-size: 0.92rem;
+        line-height: 1.62;
+        font-weight: 650;
+    }
+
+    .personal-page .driver-card-command small {
+        display: inline-flex;
+        margin-bottom: 0.65rem;
+        color: var(--el-yellow);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.62rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.17em;
+    }
+
+    .personal-page .driver-card-flow {
+        display: grid;
+        gap: 0.65rem;
+    }
+
+    .personal-page .driver-card-flow .service-flow-step {
+        min-height: auto;
+    }
+
+    .compliance-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 1.9rem;
+        border-radius: 999px;
+        padding: 0 0.8rem;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.6rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        white-space: nowrap;
+    }
+
+    .compliance-badge.ok,
+    .compliance-badge.compliant {
+        color: var(--el-success);
+        border: 1px solid rgba(var(--el-success-rgb), 0.30);
+        background: rgba(var(--el-success-rgb), 0.06);
+    }
+
+    .compliance-badge.warning,
+    .compliance-badge.review,
+    .compliance-badge.pending {
+        color: var(--el-yellow);
+        border: 1px solid rgba(var(--el-yellow-rgb), 0.30);
+        background: rgba(var(--el-yellow-rgb), 0.07);
+    }
+
+    .compliance-badge.violation,
+    .compliance-badge.failed,
+    .compliance-badge.error {
+        color: var(--el-danger);
+        border: 1px solid rgba(var(--el-danger-rgb), 0.34);
+        background: rgba(var(--el-danger-rgb), 0.075);
+    }
+
+    .compliance-summary {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 220px;
+    }
+
+    .compliance-summary strong {
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 900;
+    }
+
+    .compliance-summary span {
+        color: var(--el-muted);
+        font-size: 0.8rem;
+        line-height: 1.42;
+    }
+
+    .modal-check-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        padding: 0.85rem 0.95rem;
+        border-radius: 1rem;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        color: var(--el-muted);
+        font-size: 0.88rem;
+        line-height: 1.45;
+        cursor: pointer;
+    }
+
+    .modal-check-row input {
+        margin-top: 0.15rem;
+        accent-color: var(--el-green-soft);
+    }
+
+    .modal-grid-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    .modal-field-label {
+        display: grid;
+        gap: 0.4rem;
+        color: var(--el-muted);
+        font-size: 0.76rem;
+        font-family: "Orbitron", sans-serif;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+
+    @media (max-width: 900px) {
+        .personal-page .driver-card-command,
+        .modal-grid-two {
+            grid-template-columns: 1fr;
+        }
+    }
+
 </style>
 
 
@@ -1549,9 +1700,9 @@
                 </h1>
 
                 <p>
-                    Zentrale Bearbeitung für Fahrer-Registrierungen, Service-Center-Anträge, Token-Anfragen, interne Aufgaben und Rückfragen aus der Buchhaltung.
+                    Zentrale Bearbeitung für Fahrer-Registrierungen, Fahrerkarten-Daten, Service-Center-Anträge, Token-Anfragen, interne Aufgaben und Rückfragen aus der Buchhaltung.
                     Das neue Control-Center ist auf schnelle Prüfung, klare Zuständigkeiten und saubere Dokumentenübergabe ins System-Postfach ausgelegt.
-                    Der zusätzliche Service-Center-Tab bündelt Beantragungen zur personalisierten Fahrerkarte.
+                    Der zusätzliche Fahrerkarten-Tab erstellt PDF-Belege für Kartendaten sowie Lenk- und Ruhezeiten und kann diese direkt an den User übermitteln.
                 </p>
             </div>
 
@@ -1590,6 +1741,16 @@
             </div>
 
             <div class="glass-card stat-card">
+                <small>Fahrerkarten Checks</small>
+                <strong id="statDriverCardChecks">0</strong>
+            </div>
+
+            <div class="glass-card stat-card">
+                <small>Lenk/Ruhe Warnungen</small>
+                <strong id="statComplianceAlerts">0</strong>
+            </div>
+
+            <div class="glass-card stat-card">
                 <small>Buchhaltung offen</small>
                 <strong id="statAccountingOpen">0</strong>
             </div>
@@ -1610,6 +1771,7 @@
             <button class="tab-btn" type="button" data-tab-target="tokenRequests">Token Anfragen</button>
             <button class="tab-btn" type="button" data-tab-target="drivers">Fahrer Datenbank</button>
             <button class="tab-btn" type="button" data-tab-target="serviceCenter">Service Center</button>
+            <button class="tab-btn" type="button" data-tab-target="driverCardData">Fahrerkarten Daten</button>
             <!-- NEU: Aufgaben Pool Tab -->
             <button class="tab-btn" type="button" data-tab-target="taskPool">Aufgaben Pool</button>
             <button class="tab-btn" type="button" data-tab-target="accountingRequests">Buchhaltungs-Anfragen</button>
@@ -2072,6 +2234,16 @@
                                             >
                                                 Dokument senden
                                             </button>
+
+                                            <button
+                                                class="request-btn orange"
+                                                type="button"
+                                                data-action="open-driver-card-row"
+                                                data-driver-id="{{ driver.discord_id or driver.id }}"
+                                                data-driver-name="{{ display_name }}"
+                                            >
+                                                Fahrerkarte
+                                            </button>
                                             
                                             <button
                                                 class="token-btn"
@@ -2327,6 +2499,210 @@
                                         <div class="empty-state">
                                             <strong>Keine ServiceCenter-Anträge vorhanden</strong>
                                             Sobald im ServiceCenter eine personalisierte Fahrerkarte beantragt wird, erscheint der Vorgang hier.
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+
+
+        <!-- NEU: Fahrerkarten-Daten / Lenk- und Ruhezeiten -->
+        <div id="driverCardData" class="tab-panel">
+            <section class="glass-card driver-card-command">
+                <div>
+                    <small>Fahrerkarten Daten abfragen</small>
+                    <h2>PDF-Belege pro User erstellen und versenden</h2>
+                    <p>
+                        Hier kann die Personalabteilung für jeden Fahrer Fahrerkarten-Daten abrufen, einen PDF-Beleg erzeugen,
+                        den Beleg direkt an den User senden und zusätzlich einen Prüfbeleg zu Lenk- und Ruhezeiten erstellen.
+                        Die eigentliche Regelprüfung und PDF-Erzeugung erfolgt serverseitig über die unten angebundenen API-Endpunkte.
+                    </p>
+                </div>
+
+                <div class="driver-card-flow">
+                    <div class="service-flow-step">
+                        <strong>01 · Daten abfragen</strong>
+                        <span>Aktualisiert Kartendaten, Karten-ID, letzten Upload und Prüfstatus aus dem Backend.</span>
+                    </div>
+                    <div class="service-flow-step">
+                        <strong>02 · PDF-Beleg</strong>
+                        <span>Erstellt einen Nachweis über Fahrerkarten-Daten oder Lenk-/Ruhezeit-Prüfung.</span>
+                    </div>
+                    <div class="service-flow-step">
+                        <strong>03 · Versand</strong>
+                        <span>Optional wird der Beleg direkt in das User-Postfach gesendet.</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="glass-card toolbar">
+                <input
+                    class="search-box"
+                    id="driverCardSearch"
+                    type="search"
+                    placeholder="Fahrerkarte suchen: Name, Discord-ID, Karten-ID, Aktenzeichen..."
+                    autocomplete="off"
+                />
+
+                <select class="filter-select" id="driverCardComplianceFilter">
+                    <option value="all">Alle Prüfstatus</option>
+                    <option value="ok">Eingehalten</option>
+                    <option value="warning">Warnung / Prüfen</option>
+                    <option value="violation">Verstoß</option>
+                    <option value="unknown">Unbekannt</option>
+                </select>
+
+                <button class="request-btn blue" style="height: 48px; border-radius: 16px; width: 100%;" type="button" data-action="refresh-driver-card-list">
+                    Tabelle aktualisieren
+                </button>
+            </section>
+
+            <section class="glass-card table-card">
+                <div class="table-head">
+                    <div>
+                        <h2>Fahrerkarten Datenbank</h2>
+                        <span>Aktionen: <strong>Daten abrufen · PDF erstellen · an User senden · Lenk-/Ruhezeiten prüfen</strong></span>
+                    </div>
+                </div>
+
+                <div class="request-table-wrap">
+                    <table class="request-table wide-table">
+                        <thead>
+                            <tr>
+                                <th>Fahrer</th>
+                                <th>Aktenzeichen</th>
+                                <th>Discord-ID</th>
+                                <th>Karten-ID</th>
+                                <th>Letzte Abfrage</th>
+                                <th>Lenk-/Ruhezeiten</th>
+                                <th>Zusammenfassung</th>
+                                <th style="text-align: right;">Aktion</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="driverCardTableBody">
+                            {% for driver in safe_drivers %}
+                                {% set display_name = driver.display_name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
+                                {% set username = driver.username or driver.discord_username or "driver" %}
+                                {% set avatar_url = driver.avatar_url or "" %}
+                                {% set discord_id = driver.discord_id or driver.id or "" %}
+                                {% set aktenzeichen = driver.aktenzeichen or "Nicht vergeben" %}
+                                {% set card_id = driver.fahrerkarte_id or driver.driver_card_id or driver.card_id or driver.tacho_card_id or "Noch nicht abgefragt" %}
+                                {% set last_query = driver.fahrerkarte_last_query or driver.driver_card_last_query or driver.tacho_last_query or driver.card_last_read_at or "-" %}
+                                {% set compliance_status = driver.lenk_ruhe_status or driver.driving_time_status or driver.compliance_status or "unknown" %}
+                                {% set compliance_label = driver.lenk_ruhe_status_label or driver.driving_time_status_label or driver.compliance_status_label or "Noch nicht geprüft" %}
+                                {% set compliance_summary = driver.lenk_ruhe_summary or driver.driving_time_summary or driver.compliance_summary or "Noch kein Lenk-/Ruhezeit-Beleg erstellt." %}
+                                {% set card_status = driver.fahrerkarte_status or driver.driver_card_status or "unknown" %}
+
+                                <tr
+                                    data-driver-card-row
+                                    data-driver-id="{{ discord_id }}"
+                                    data-driver-card-name="{{ display_name|e }}"
+                                    data-driver-card-username="{{ username|e }}"
+                                    data-driver-card-discord-id="{{ discord_id }}"
+                                    data-driver-card-card-id="{{ card_id|e }}"
+                                    data-driver-card-last-query="{{ last_query|e }}"
+                                    data-driver-card-status="{{ card_status|e }}"
+                                    data-driver-card-compliance="{{ compliance_status|e }}"
+                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ discord_id ~ ' ' ~ aktenzeichen ~ ' ' ~ card_id ~ ' ' ~ compliance_label)|lower|e }}"
+                                >
+                                    <td>
+                                        <div class="driver-cell">
+                                            <div class="driver-avatar">
+                                                {% if avatar_url %}
+                                                    <img src="{{ avatar_url }}" alt="{{ display_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                    <span style="display:none;">FC</span>
+                                                {% else %}
+                                                    <span>FC</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="driver-meta">
+                                                <strong>{{ display_name }}</strong>
+                                                <span>@{{ username }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td><span class="aktenzeichen-mono">{{ aktenzeichen }}</span></td>
+                                    <td><span class="mono">{{ discord_id or "-" }}</span></td>
+                                    <td><span class="aktenzeichen-mono" data-driver-card-card-id-text>{{ card_id }}</span></td>
+                                    <td><span class="mono" data-driver-card-last-query-text>{{ last_query }}</span></td>
+
+                                    <td>
+                                        {% if compliance_status in ["ok", "compliant", "eingehalten"] %}
+                                            <span class="compliance-badge ok" data-driver-card-compliance-badge>Eingehalten</span>
+                                        {% elif compliance_status in ["violation", "failed", "verstoss", "verstoß"] %}
+                                            <span class="compliance-badge violation" data-driver-card-compliance-badge>Verstoß</span>
+                                        {% elif compliance_status in ["warning", "review", "pending", "pruefen", "prüfen"] %}
+                                            <span class="compliance-badge warning" data-driver-card-compliance-badge>Prüfen</span>
+                                        {% else %}
+                                            <span class="compliance-badge pending" data-driver-card-compliance-badge>Unbekannt</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <div class="compliance-summary">
+                                            <strong data-driver-card-compliance-label>{{ compliance_label }}</strong>
+                                            <span data-driver-card-compliance-summary>{{ compliance_summary }}</span>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="action-wrap">
+                                            <button
+                                                class="request-btn blue"
+                                                type="button"
+                                                data-action="query-driver-card-data"
+                                                data-driver-id="{{ discord_id }}"
+                                                data-driver-name="{{ display_name|e }}"
+                                            >
+                                                Daten abfragen
+                                            </button>
+
+                                            <button
+                                                class="request-btn"
+                                                type="button"
+                                                data-action="driver-card-pdf"
+                                                data-driver-id="{{ discord_id }}"
+                                                data-driver-name="{{ display_name|e }}"
+                                            >
+                                                PDF Beleg
+                                            </button>
+
+                                            <button
+                                                class="request-btn accept"
+                                                type="button"
+                                                data-action="driver-card-pdf-send"
+                                                data-driver-id="{{ discord_id }}"
+                                                data-driver-name="{{ display_name|e }}"
+                                            >
+                                                An User senden
+                                            </button>
+
+                                            <button
+                                                class="request-btn orange"
+                                                type="button"
+                                                data-action="driving-time-compliance-pdf"
+                                                data-driver-id="{{ discord_id }}"
+                                                data-driver-name="{{ display_name|e }}"
+                                            >
+                                                Lenk/Ruhe Beleg
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8">
+                                        <div class="empty-state">
+                                            <strong>Keine Fahrer für Fahrerkarten-Daten vorhanden</strong>
+                                            Sobald Fahrer in der Datenbank geladen sind, kann hier pro User ein Fahrerkarten- oder Lenk-/Ruhezeit-Beleg erzeugt werden.
                                         </div>
                                     </td>
                                 </tr>
@@ -2721,7 +3097,7 @@
         <div class="modal-head">
             <div>
                 <small>Personalabteilung</small>
-                <h3>Dokument an Fahrer übermitteln</h3>
+                <h3>Dokument / Fahrerkarte an Fahrer übermitteln</h3>
             </div>
 
             <button class="modal-close" type="button" data-close-modal="documentModal">×</button>
@@ -2729,28 +3105,44 @@
 
         <form class="modal-body" id="documentForm">
             <input type="hidden" id="documentDriverId" />
+            <input type="hidden" id="documentRequestId" />
 
             <div class="modal-info">
                 <span>Empfänger: <strong id="documentDriverName">-</strong></span>
-                <span>Übermittle Vertrags- oder Richtliniendokumente an das Postfach des Fahrers. (Keine Lohn/Abrechnungen)</span>
+                <span>Übermittle Dokumente an das Postfach des Fahrers oder stelle eine personalisierte Fahrerkarte als PDF aus.</span>
+            </div>
+
+            <label class="modal-field-label">
+                Dokumentenmodus
+                <select class="filter-select" id="documentActionMode">
+                    <option value="direct_document">Allgemeines Dokument senden</option>
+                    <option value="driver_card_issue">Personalisierte Fahrerkarte ausstellen</option>
+                </select>
+            </label>
+
+            <div class="document-mode-panel" id="documentFahrerkarteHint" style="display:none;">
+                <strong>Fahrerkarte-Modus</strong>
+                <span>Erzeugt serverseitig einen PDF-Beleg zur personalisierten Fahrerkarte, hinterlegt ihn am ServiceCenter-Vorgang und kann ihn direkt herunterladen.</span>
+                <code>POST /api/personalabteilung/driver/document/issue-fahrerkarte</code>
             </div>
             
             <input 
                 class="modal-input" 
                 type="text" 
                 id="documentTitle" 
-                placeholder="Dokumenten-Titel (z.B. Zusatzvereinbarung)" 
+                placeholder="Dokumenten-Titel (z.B. Zusatzvereinbarung oder Personalisierte Fahrerkarte)" 
                 required 
             />
 
             <textarea
                 class="modal-textarea"
                 id="documentMessage"
-                placeholder="Optionale Nachricht an den Fahrer..."
+                placeholder="Nachricht, Begründung oder Ausstellungsnotiz an den Fahrer..."
             ></textarea>
 
             <div class="modal-actions">
-                <button class="request-btn blue" type="submit">Dokument senden</button>
+                <button class="request-btn yellow document-fill-btn" type="button" id="documentFillFahrerkarte">Fahrerkarte ausfüllen</button>
+                <button class="request-btn blue" type="submit" id="documentSubmitButton">Dokument senden</button>
             </div>
         </form>
     </div>
@@ -2866,6 +3258,73 @@
 </div>
 
 
+
+
+<!-- Fahrerkarten-Daten / Lenk- und Ruhezeiten PDF Modal -->
+<div class="modal-backdrop" id="driverCardModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <small>Fahrerkarten Daten</small>
+                <h3 id="driverCardModalTitle">PDF-Beleg erstellen</h3>
+            </div>
+
+            <button class="modal-close" type="button" data-close-modal="driverCardModal">×</button>
+        </div>
+
+        <form class="modal-body" id="driverCardForm">
+            <input type="hidden" id="driverCardDriverId" />
+            <input type="hidden" id="driverCardMode" />
+            <input type="hidden" id="driverCardCardId" />
+
+            <div class="modal-info">
+                <span>Fahrer: <strong id="driverCardDriverName">-</strong></span>
+                <span id="driverCardModeHelp">Der Beleg wird als PDF serverseitig erstellt.</span>
+            </div>
+
+            <div class="modal-grid-two">
+                <label class="modal-field-label">
+                    Zeitraum von
+                    <input class="modal-input" type="date" id="driverCardDateFrom" />
+                </label>
+
+                <label class="modal-field-label">
+                    Zeitraum bis
+                    <input class="modal-input" type="date" id="driverCardDateTo" />
+                </label>
+            </div>
+
+            <textarea
+                class="modal-textarea"
+                id="driverCardNote"
+                placeholder="Interne Notiz für den Beleg, z.B. Prüfgrund oder besondere Hinweise..."
+            ></textarea>
+
+            <label class="modal-check-row">
+                <input type="checkbox" id="driverCardSendToUser" />
+                <span>PDF-Beleg nach Erstellung direkt an den User senden.</span>
+            </label>
+
+            <label class="modal-check-row">
+                <input type="checkbox" id="driverCardAutoDownload" checked />
+                <span>PDF-Beleg nach Erstellung automatisch herunterladen.</span>
+            </label>
+
+            <div class="document-mode-panel">
+                <strong>Backend-Hooks</strong>
+                <span>Fahrerkarten-Beleg: <code>/api/personalabteilung/fahrerkarte/pdf/create</code></span>
+                <span>Lenk-/Ruhezeit-Beleg: <code>/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf</code></span>
+            </div>
+
+            <div class="modal-actions">
+                <button class="request-btn" type="button" data-close-modal="driverCardModal">Abbrechen</button>
+                <button class="request-btn accept" type="submit" id="driverCardSubmitButton">PDF erstellen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <!-- Service Center Detail Modal -->
 <div class="modal-backdrop" id="serviceModal">
     <div class="modal-card">
@@ -2916,6 +3375,10 @@
         
         const SEND_DOCUMENT_URL = "/api/personalabteilung/driver/document/send";
         const ISSUE_FAHRERKARTE_URL = "/api/personalabteilung/driver/document/issue-fahrerkarte";
+        const QUERY_DRIVER_CARD_DATA_URL = "/api/personalabteilung/fahrerkarte/data/query";
+        const CREATE_DRIVER_CARD_PDF_URL = "/api/personalabteilung/fahrerkarte/pdf/create";
+        const SEND_DRIVER_CARD_PDF_URL = "/api/personalabteilung/fahrerkarte/pdf/send";
+        const CREATE_DRIVING_TIME_AUDIT_PDF_URL = "/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf";
         
         // NEUER ENDPUNKT HINZUGEFÜGT
         const CREATE_TASK_URL = "/api/personalabteilung/task/create";
@@ -2929,6 +3392,9 @@
 
         const serviceSearch = document.getElementById("serviceSearch");
         const serviceStatusFilter = document.getElementById("serviceStatusFilter");
+
+        const driverCardSearch = document.getElementById("driverCardSearch");
+        const driverCardComplianceFilter = document.getElementById("driverCardComplianceFilter");
 
         const taskSearch = document.getElementById("taskSearch");
         const taskStatusFilter = document.getElementById("taskStatusFilter");
@@ -2979,6 +3445,22 @@
         const serviceModalTitle = document.getElementById("serviceModalTitle");
         const serviceModalDocumentButton = document.getElementById("serviceModalDocumentButton");
 
+        const driverCardModal = document.getElementById("driverCardModal");
+        const driverCardForm = document.getElementById("driverCardForm");
+        const driverCardDriverId = document.getElementById("driverCardDriverId");
+        const driverCardMode = document.getElementById("driverCardMode");
+        const driverCardCardId = document.getElementById("driverCardCardId");
+        const driverCardDriverName = document.getElementById("driverCardDriverName");
+        const driverCardModalTitle = document.getElementById("driverCardModalTitle");
+        const driverCardModeHelp = document.getElementById("driverCardModeHelp");
+        const driverCardDateFrom = document.getElementById("driverCardDateFrom");
+        const driverCardDateTo = document.getElementById("driverCardDateTo");
+        const driverCardNote = document.getElementById("driverCardNote");
+        const driverCardSendToUser = document.getElementById("driverCardSendToUser");
+        const driverCardAutoDownload = document.getElementById("driverCardAutoDownload");
+        const driverCardSubmitButton = document.getElementById("driverCardSubmitButton");
+        let currentDriverCardContext = {};
+
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
         }
@@ -2993,6 +3475,10 @@
 
         function getServiceRows() {
             return Array.from(document.querySelectorAll("[data-service-row]"));
+        }
+
+        function getDriverCardRows() {
+            return Array.from(document.querySelectorAll("[data-driver-card-row]"));
         }
 
         function getTaskRows() {
@@ -3016,6 +3502,7 @@
             const requestRows = getRequestRows();
             const accountingRows = getAccountingRows();
             const serviceRows = getServiceRows();
+            const driverCardRows = getDriverCardRows();
 
             const total = rows.length;
             const withToken = rows.filter((row) => row.dataset.token === "with-token").length;
@@ -3054,11 +3541,24 @@
                 return docStatus === "missing" || docStatus === "fehlt" || category === "beleg fehlt";
             }).length;
 
+            const driverCardChecks = driverCardRows.filter((row) => {
+                const cardStatus = String(row.dataset.driverCardStatus || "").toLowerCase();
+                const lastQuery = String(row.dataset.driverCardLastQuery || "").trim();
+                return Boolean(lastQuery && lastQuery !== "-") || cardStatus === "queried" || cardStatus === "checked";
+            }).length;
+
+            const complianceAlerts = driverCardRows.filter((row) => {
+                const status = String(row.dataset.driverCardCompliance || "unknown").toLowerCase();
+                return status === "warning" || status === "review" || status === "violation" || status === "failed" || status === "verstoss" || status === "verstoß";
+            }).length;
+
             setText("statTotalDrivers", total);
             setText("statWithToken", withToken);
             setText("statOpenRequests", openRequests);
             setText("statClaimedRequests", claimedRequests);
             setText("statServiceOpen", serviceOpen);
+            setText("statDriverCardChecks", driverCardChecks);
+            setText("statComplianceAlerts", complianceAlerts);
             setText("statAccountingOpen", accountingOpen);
 
             setText("accountingSideAll", accountingRows.length);
@@ -3154,6 +3654,30 @@
                 const status = String(row.dataset.serviceStatus || "pending").toLowerCase();
                 const matchesSearch = !query || String(row.dataset.search || "").includes(query);
                 const matchesStatus = statusValue === "all" || status === statusValue;
+
+                row.style.display = matchesSearch && matchesStatus ? "" : "none";
+            });
+        }
+
+        function applyDriverCardFilters() {
+            const rows = getDriverCardRows();
+            const query = String(driverCardSearch?.value || "").trim().toLowerCase();
+            const statusValue = driverCardComplianceFilter?.value || "all";
+
+            rows.forEach((row) => {
+                const rawStatus = String(row.dataset.driverCardCompliance || "unknown").toLowerCase();
+                let normalizedStatus = "unknown";
+
+                if (rawStatus === "ok" || rawStatus === "compliant" || rawStatus === "eingehalten") {
+                    normalizedStatus = "ok";
+                } else if (rawStatus === "violation" || rawStatus === "failed" || rawStatus === "verstoss" || rawStatus === "verstoß") {
+                    normalizedStatus = "violation";
+                } else if (rawStatus === "warning" || rawStatus === "review" || rawStatus === "pending" || rawStatus === "pruefen" || rawStatus === "prüfen") {
+                    normalizedStatus = "warning";
+                }
+
+                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
+                const matchesStatus = statusValue === "all" || normalizedStatus === statusValue;
 
                 row.style.display = matchesSearch && matchesStatus ? "" : "none";
             });
@@ -3398,11 +3922,50 @@
             document.body.style.overflow = "";
         }
         
-        function openDocumentModal(driverId, driverName) {
+        function normalizeDocumentMode(mode) {
+            const value = String(mode || "direct_document").toLowerCase();
+            if (value === "driver_card_issue" || value === "fahrerkarte" || value === "driver_card_pdf") return "driver_card_issue";
+            return "direct_document";
+        }
+
+        function defaultFahrerkarteContent(context = {}) {
+            const driverName = context.driverName || context.name || "Fahrer";
+            const cardId = context.cardId || "wird automatisch erzeugt";
+            const note = context.note ? `\n\nHinweis: ${context.note}` : "";
+
+            return `Personalisierte Fahrerkarte für ${driverName}\nKarten-ID: ${cardId}\n\nBitte die Fahrerkarte als PDF-Beleg ausstellen, im ServiceCenter hinterlegen und dem User im System-Postfach bereitstellen.${note}`;
+        }
+
+        function setDocumentMode(mode) {
+            const normalizedMode = normalizeDocumentMode(mode);
+
+            if (documentActionMode) {
+                documentActionMode.value = normalizedMode;
+            }
+
+            if (documentFahrerkarteHint) {
+                documentFahrerkarteHint.style.display = normalizedMode === "driver_card_issue" ? "grid" : "none";
+            }
+
+            if (documentSubmitButton) {
+                documentSubmitButton.textContent = normalizedMode === "driver_card_issue" ? "Fahrerkarte ausstellen" : "Dokument senden";
+                documentSubmitButton.className = normalizedMode === "driver_card_issue" ? "request-btn accept" : "request-btn blue";
+            }
+        }
+
+        function openDocumentModal(driverId, driverName, presetTitle = "", presetMessage = "", context = {}) {
+            currentDocumentContext = {
+                ...(context || {}),
+                driverId: driverId || context.driverId || "",
+                driverName: driverName || context.driverName || "Fahrer"
+            };
+
             documentDriverId.value = driverId || "";
+            documentRequestId.value = context.requestId || "";
             documentDriverName.textContent = driverName || "-";
-            documentTitle.value = "";
-            documentMessage.value = "";
+            documentTitle.value = presetTitle || "";
+            documentMessage.value = presetMessage || "";
+            setDocumentMode(context.mode || "direct_document");
             
             documentModal.classList.add("active");
             document.body.style.overflow = "hidden";
@@ -3415,6 +3978,53 @@
         function closeDocumentModal() {
             documentModal.classList.remove("active");
             document.body.style.overflow = "";
+        }
+
+        function downloadFromUrl(url, filename = "EifelLog_Beleg.pdf") {
+            if (!url) return;
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function setServiceRowIssued(requestId, result = {}) {
+            if (!requestId) return;
+            const row = document.querySelector(`[data-service-row][data-service-id="${CSS.escape(String(requestId))}"]`);
+            if (!row) return;
+
+            row.dataset.serviceStatus = "issued";
+            row.dataset.serviceIssued = result.issuedAt || result.issued_at || new Date().toLocaleString("de-DE");
+            row.dataset.serviceCardId = result.cardId || result.card_id || row.dataset.serviceCardId || "Ausgestellt";
+            row.dataset.serviceDownloadUrl = result.downloadUrl || result.download_url || row.dataset.serviceDownloadUrl || "";
+            row.dataset.serviceDownloadFilename = result.downloadFilename || result.download_filename || row.dataset.serviceDownloadFilename || "EifelLog_Fahrerkarte.pdf";
+
+            const statusBadge = row.querySelector(".status-badge");
+            if (statusBadge) {
+                statusBadge.className = "status-badge approved";
+                statusBadge.textContent = "Ausgestellt";
+            }
+
+            const cardText = row.querySelector(".aktenzeichen-mono");
+            if (cardText) {
+                cardText.textContent = row.dataset.serviceCardId;
+            }
+
+            const actionWrap = row.querySelector(".action-wrap");
+            if (actionWrap && row.dataset.serviceDownloadUrl) {
+                const downloadButton = document.createElement("a");
+                downloadButton.className = "request-btn accept";
+                downloadButton.href = row.dataset.serviceDownloadUrl;
+                downloadButton.download = row.dataset.serviceDownloadFilename;
+                downloadButton.textContent = "Download";
+                actionWrap.prepend(downloadButton);
+            }
+
+            updateStats();
+            applyServiceFilters();
         }
 
         function openTaskModal() {
@@ -3580,6 +4190,102 @@
             document.body.style.overflow = "";
         }
 
+        function humanizeDriverCardCompliance(status) {
+            const value = String(status || "unknown").toLowerCase();
+
+            if (value === "ok" || value === "compliant" || value === "eingehalten") return { label: "Eingehalten", className: "compliance-badge ok", normalized: "ok" };
+            if (value === "violation" || value === "failed" || value === "verstoss" || value === "verstoß") return { label: "Verstoß", className: "compliance-badge violation", normalized: "violation" };
+            if (value === "warning" || value === "review" || value === "pending" || value === "pruefen" || value === "prüfen") return { label: "Prüfen", className: "compliance-badge warning", normalized: "warning" };
+
+            return { label: "Unbekannt", className: "compliance-badge pending", normalized: "unknown" };
+        }
+
+        function setDefaultDriverCardDates() {
+            if (!driverCardDateTo || !driverCardDateFrom) return;
+
+            const today = new Date();
+            const from = new Date(today);
+            from.setDate(today.getDate() - 28);
+
+            driverCardDateTo.value = today.toISOString().slice(0, 10);
+            driverCardDateFrom.value = from.toISOString().slice(0, 10);
+        }
+
+        function openDriverCardModal(mode, row, sendToUser = false) {
+            if (!driverCardModal || !driverCardForm || !row) return;
+
+            const driverId = row.dataset.driverId || row.dataset.driverCardDiscordId || "";
+            const driverName = row.dataset.driverCardName || "Fahrer";
+            const cardId = row.dataset.driverCardCardId || "";
+            const normalizedMode = mode === "driving_time_compliance_pdf" ? "driving_time_compliance_pdf" : "driver_card_data_pdf";
+
+            currentDriverCardContext = { row, driverId, driverName, cardId, mode: normalizedMode };
+
+            driverCardForm.reset();
+            setDefaultDriverCardDates();
+            driverCardDriverId.value = driverId;
+            driverCardMode.value = normalizedMode;
+            driverCardCardId.value = cardId;
+            driverCardDriverName.textContent = driverName;
+            driverCardSendToUser.checked = Boolean(sendToUser);
+            driverCardAutoDownload.checked = true;
+
+            if (normalizedMode === "driving_time_compliance_pdf") {
+                driverCardModalTitle.textContent = "Lenk-/Ruhezeit-Beleg erstellen";
+                driverCardModeHelp.textContent = "Erstellt einen PDF-Prüfbeleg, ob die serverseitig geprüften Lenk- und Ruhezeiten eingehalten wurden.";
+                driverCardSubmitButton.textContent = sendToUser ? "Prüfbeleg senden" : "Prüfbeleg erstellen";
+                driverCardNote.placeholder = "Hinweis zur Lenk-/Ruhezeit-Prüfung, z.B. Prüfmonat oder auffällige Tage...";
+            } else {
+                driverCardModalTitle.textContent = "Fahrerkarten-PDF-Beleg erstellen";
+                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten des Users.";
+                driverCardSubmitButton.textContent = sendToUser ? "PDF an User senden" : "PDF erstellen";
+                driverCardNote.placeholder = "Hinweis zum Fahrerkarten-Beleg, z.B. Abfragegrund oder Aktennotiz...";
+            }
+
+            driverCardModal.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+
+        function closeDriverCardModal() {
+            driverCardModal?.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+
+        function updateDriverCardRow(row, result = {}) {
+            if (!row) return;
+
+            const cardId = result.cardId || result.card_id || result.driverCardId || result.fahrerkarteId || row.dataset.driverCardCardId || "Noch nicht abgefragt";
+            const lastQuery = result.lastQuery || result.last_query || result.queriedAt || result.queried_at || new Date().toLocaleString("de-DE");
+            const complianceStatus = result.complianceStatus || result.compliance_status || result.drivingTimeStatus || result.lenkRuheStatus || row.dataset.driverCardCompliance || "unknown";
+            const complianceLabel = result.complianceLabel || result.compliance_label || result.drivingTimeLabel || result.lenkRuheLabel || humanizeDriverCardCompliance(complianceStatus).label;
+            const complianceSummary = result.complianceSummary || result.compliance_summary || result.drivingTimeSummary || result.lenkRuheSummary || "Prüfergebnis wurde aktualisiert.";
+
+            row.dataset.driverCardCardId = cardId;
+            row.dataset.driverCardLastQuery = lastQuery;
+            row.dataset.driverCardStatus = result.cardStatus || result.status || "queried";
+            row.dataset.driverCardCompliance = complianceStatus;
+            row.dataset.search = `${row.dataset.search || ""} ${cardId} ${complianceLabel} ${complianceSummary}`.toLowerCase();
+
+            const cardIdText = row.querySelector("[data-driver-card-card-id-text]");
+            const lastQueryText = row.querySelector("[data-driver-card-last-query-text]");
+            const badge = row.querySelector("[data-driver-card-compliance-badge]");
+            const label = row.querySelector("[data-driver-card-compliance-label]");
+            const summary = row.querySelector("[data-driver-card-compliance-summary]");
+            const badgeData = humanizeDriverCardCompliance(complianceStatus);
+
+            if (cardIdText) cardIdText.textContent = cardId;
+            if (lastQueryText) lastQueryText.textContent = lastQuery;
+            if (badge) {
+                badge.className = badgeData.className;
+                badge.textContent = badgeData.label;
+            }
+            if (label) label.textContent = complianceLabel;
+            if (summary) summary.textContent = complianceSummary;
+
+            updateStats();
+            applyDriverCardFilters();
+        }
+
         document.querySelectorAll("[data-close-modal]").forEach((button) => {
             button.addEventListener("click", () => {
                 if(button.dataset.closeModal === "rejectModal") closeRejectModal();
@@ -3587,6 +4293,7 @@
                 if(button.dataset.closeModal === "taskModal") closeTaskModal();
                 if(button.dataset.closeModal === "accountingModal") closeAccountingModal();
                 if(button.dataset.closeModal === "serviceModal") closeServiceModal();
+                if(button.dataset.closeModal === "driverCardModal") closeDriverCardModal();
             });
         });
 
@@ -3620,6 +4327,10 @@
             if (event.target === serviceModal) closeServiceModal();
         });
 
+        driverCardModal?.addEventListener("click", (event) => {
+            if (event.target === driverCardModal) closeDriverCardModal();
+        });
+
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 if (rejectModal.classList.contains("active")) closeRejectModal();
@@ -3627,6 +4338,7 @@
                 if (taskModal.classList.contains("active")) closeTaskModal();
                 if (accountingModal?.classList.contains("active")) closeAccountingModal();
                 if (serviceModal?.classList.contains("active")) closeServiceModal();
+                if (driverCardModal?.classList.contains("active")) closeDriverCardModal();
             }
         });
 
@@ -3645,6 +4357,9 @@
 
         if (serviceSearch) serviceSearch.addEventListener("input", applyServiceFilters);
         if (serviceStatusFilter) serviceStatusFilter.addEventListener("change", applyServiceFilters);
+
+        if (driverCardSearch) driverCardSearch.addEventListener("input", applyDriverCardFilters);
+        if (driverCardComplianceFilter) driverCardComplianceFilter.addEventListener("change", applyDriverCardFilters);
 
         if (taskSearch) taskSearch.addEventListener("input", applyTaskFilters);
         if (taskStatusFilter) taskStatusFilter.addEventListener("change", applyTaskFilters);
@@ -3820,6 +4535,71 @@
             }
         });
 
+        driverCardForm?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const driverId = driverCardDriverId.value || currentDriverCardContext.driverId || "";
+            const mode = driverCardMode.value || "driver_card_data_pdf";
+            const note = driverCardNote.value.trim();
+            const dateFrom = driverCardDateFrom.value;
+            const dateTo = driverCardDateTo.value;
+            const sendToUser = Boolean(driverCardSendToUser.checked);
+            const autoDownload = Boolean(driverCardAutoDownload.checked);
+            const row = currentDriverCardContext.row;
+
+            if (!driverId) {
+                showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht erstellt werden.", "error");
+                return;
+            }
+
+            if (dateFrom && dateTo && dateFrom > dateTo) {
+                showToast("Fehler", "Der Zeitraum ist ungültig. 'Von' darf nicht nach 'Bis' liegen.", "error");
+                return;
+            }
+
+            const endpoint = mode === "driving_time_compliance_pdf"
+                ? CREATE_DRIVING_TIME_AUDIT_PDF_URL
+                : (sendToUser ? SEND_DRIVER_CARD_PDF_URL : CREATE_DRIVER_CARD_PDF_URL);
+
+            const oldText = driverCardSubmitButton.textContent.trim();
+            driverCardSubmitButton.disabled = true;
+            driverCardSubmitButton.textContent = sendToUser ? "Sende..." : "Erstelle...";
+
+            try {
+                const result = await postJson(endpoint, {
+                    driverId,
+                    cardId: driverCardCardId.value || currentDriverCardContext.cardId || "",
+                    documentType: mode,
+                    type: mode,
+                    dateFrom,
+                    dateTo,
+                    note,
+                    sendToUser,
+                    autoDownload
+                });
+
+                updateDriverCardRow(row, result);
+
+                if (autoDownload && result.downloadUrl) {
+                    downloadFromUrl(result.downloadUrl, result.downloadFilename || (mode === "driving_time_compliance_pdf" ? "EifelLog_Lenk_Ruhezeiten_Beleg.pdf" : "EifelLog_Fahrerkarte_Beleg.pdf"));
+                }
+
+                showToast(
+                    sendToUser ? "PDF-Beleg gesendet" : "PDF-Beleg erstellt",
+                    result.message || (sendToUser ? "Der PDF-Beleg wurde erstellt und an den User gesendet." : "Der PDF-Beleg wurde erstellt."),
+                    "success",
+                    result.reference || result.belegId || result.cardId || null
+                );
+
+                closeDriverCardModal();
+            } catch (error) {
+                showToast("Fehler", error.message || "PDF-Beleg konnte nicht erstellt werden.", "error");
+            } finally {
+                driverCardSubmitButton.disabled = false;
+                driverCardSubmitButton.textContent = oldText;
+            }
+        });
+
         // LOGIK FÜR DAS SPEICHERN DER AUFGABE
         taskForm.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -3875,6 +4655,54 @@
 
             if (action === "new-task") {
                 openTaskModal();
+                return;
+            }
+
+            if (action === "refresh-driver-card-list") {
+                updateStats();
+                applyDriverCardFilters();
+                showToast("Tabelle aktualisiert", "Die Fahrerkarten-Ansicht wurde neu berechnet.", "success");
+                return;
+            }
+
+            if (action === "open-driver-card-row") {
+                activateTab("driverCardData");
+                if (driverCardSearch) {
+                    driverCardSearch.value = button.dataset.driverName || button.dataset.driverId || "";
+                    applyDriverCardFilters();
+                }
+                return;
+            }
+
+            if (action === "query-driver-card-data") {
+                const row = button.closest("[data-driver-card-row]");
+                const driverId = button.dataset.driverId || row?.dataset.driverId || "";
+                const driverName = button.dataset.driverName || row?.dataset.driverCardName || "Fahrer";
+
+                if (!driverId) {
+                    showToast("Fehler", "Fahrer-ID fehlt. Fahrerkarten-Daten können nicht abgefragt werden.", "error");
+                    return;
+                }
+
+                await runButtonAction(button, "Frage ab...", async () => {
+                    const result = await postJson(QUERY_DRIVER_CARD_DATA_URL, { driverId });
+                    updateDriverCardRow(row, result);
+                    showToast("Fahrerkarten-Daten aktualisiert", result.message || `Die Fahrerkarten-Daten für ${driverName} wurden abgefragt.`, "success", result.cardId || null);
+                });
+                return;
+            }
+
+            if (action === "driver-card-pdf" || action === "driver-card-pdf-send" || action === "driving-time-compliance-pdf") {
+                const row = button.closest("[data-driver-card-row]") || document.querySelector(`[data-driver-card-row][data-driver-id="${CSS.escape(String(button.dataset.driverId || ""))}"]`);
+
+                if (!row) {
+                    showToast("Fehler", "Der Fahrer wurde in der Fahrerkarten-Tabelle nicht gefunden.", "error");
+                    return;
+                }
+
+                const mode = action === "driving-time-compliance-pdf" ? "driving_time_compliance_pdf" : "driver_card_data_pdf";
+                const sendToUser = action === "driver-card-pdf-send";
+                openDriverCardModal(mode, row, sendToUser);
                 return;
             }
 
@@ -4139,6 +4967,7 @@
         updateStats();
         applyRequestFilters();
         applyServiceFilters();
+        applyDriverCardFilters();
         applyDriverFilters();
         applyTaskFilters();
         applyAccountingFilters();
