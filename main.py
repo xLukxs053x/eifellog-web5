@@ -59,11 +59,9 @@ ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 
 TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
 
-# Discord Webhook für Job-Abschluss-Meldungen vom Tracker
-DISCORD_JOB_COMPLETE_WEBHOOK_URL = os.getenv(
-    "DISCORD_JOB_COMPLETE_WEBHOOK_URL",
-    "https://discord.com/api/webhooks/1505648390648762498/eDP1AtdUVWWgxkEnMGNtNmLx1JbPFhd_qV16ohpj6hiVXp7rJHmS_ScIj7XiRF46-kWf"
-).strip()
+# Discord Webhook für Job-Abschluss-Meldungen vom Tracker.
+# Wichtig: Webhook-URLs bitte nur über .env setzen, nicht fest im Code speichern.
+DISCORD_JOB_COMPLETE_WEBHOOK_URL = os.getenv("DISCORD_JOB_COMPLETE_WEBHOOK_URL", "").strip()
 
 
 # ==========================================
@@ -96,13 +94,28 @@ def env_float(*names, default=0.0):
 
 
 DISCORD_BOT_TOKEN = env_first("DISCORD_BOT_TOKEN", "BOT_TOKEN", "DISCORD_TOKEN", default="")
+TOUR_CHANNEL_ID = env_first(
+    "TOUR_CHANNEL_ID",
+    "DISCORD_TOUR_CHANNEL_ID",
+    "TOUREN_CHANNEL_ID",
+    "DISCORD_TOUREN_CHANNEL_ID",
+    default="1473756766478270517"
+)
 TOUR_RECEIPT_CHANNEL_ID = env_first(
     "TOUR_RECEIPT_CHANNEL_ID",
     "DISCORD_TOUR_RECEIPT_CHANNEL_ID",
     "DISCORD_ABRECHNUNG_CHANNEL_ID",
     "ABRECHNUNG_CHANNEL_ID",
-    default="1473756766478270517"
+    default=TOUR_CHANNEL_ID
 )
+DISCORD_TOUR_WEBHOOK_URL = env_first(
+    "DISCORD_TOUR_WEBHOOK_URL",
+    "TOUR_CHANNEL_WEBHOOK_URL",
+    "DISCORD_TOUREN_WEBHOOK_URL",
+    "TOUREN_WEBHOOK_URL",
+    default=DISCORD_JOB_COMPLETE_WEBHOOK_URL
+)
+TOUR_START_DISCORD_ENABLED = env_bool("TOUR_START_DISCORD_ENABLED", "DISCORD_TOUR_START_ENABLED", default=True)
 TOUR_RECEIPT_ENABLED = env_bool("TOUR_RECEIPT_ENABLED", default=True)
 TOUR_RECEIPT_DISCORD_ENABLED = env_bool("TOUR_RECEIPT_DISCORD_ENABLED", default=True)
 TOUR_RECEIPT_FOLDER = env_first(
@@ -3878,10 +3891,13 @@ def normalize_telemetry_payload(raw):
         "truck": s("truck", "driverTruckModel", fallback="-"),
         "sourceCity": s("sourceCity", "routeOrigin", fallback="-"),
         "destinationCity": s("destinationCity", "routeDestination", "activeDestination", fallback="-"),
-        "cargo": s("cargo", "cargoName", fallback="-"),
+        "cargo": s("cargo", "cargoName", "freight", "jobCargo", fallback="-"),
+        "jobId": s("jobId", "job_id", "id", "deliveryId", "delivery_id", fallback=""),
+        "eta": s("eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-"),
         "speedKmh": n("speedKmh", "speed", fallback=0),
         "rpm": n("rpm", "engineRpm", "engineRPM", fallback=0),
-        "fuelPercent": n("fuelPercent", "fuel", fallback=0),
+        "fuelPercent": n("fuelPercent", "fuel", "tankPercent", "fuel_percent", fallback=0),
+        "fuelLiters": n("fuelLiters", "fuel_liters", "fuelUsed", fallback=-1),
         "damagePercent": n("damagePercent", "damage", fallback=0),
         "completedDistanceKm": n("completedDistanceKm", "drivenDistanceKm", "distanceKm", "routeDistanceKm", fallback=0),
         "tripDistanceKm": n("tripDistanceKm", "driverKm", fallback=0),
@@ -3906,9 +3922,15 @@ def current_job_from_live(live):
     if destination == "-" and source == "-" and cargo == "-": return None
 
     return {
+        "jobId": safe_str(live.get("jobId")),
         "sourceCity": source,
         "destinationCity": destination,
         "cargo": cargo,
+        "truck": live.get("truck") or "-",
+        "fuelPercent": parse_number(live.get("fuelPercent"), 0),
+        "fuelLiters": parse_number(live.get("fuelLiters"), -1),
+        "eta": live.get("eta") or "-",
+        "rpm": parse_number(live.get("rpm"), 0),
         "distanceKm": parse_number(live.get("plannedDistanceKm"), 0),
         "remainingDistanceKm": parse_number(live.get("remainingDistanceKm"), 0),
         "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
@@ -4298,6 +4320,75 @@ def format_liters(value):
     return f"{text} l"
 
 
+def payload_lookup_value(payload, *keys, fallback=""):
+    payload = payload or {}
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return fallback
+
+
+def format_fuel_display_from_payload(payload):
+    payload = payload or {}
+    fuel_liters = parse_number(
+        payload.get("fuelLiters")
+        or payload.get("fuel_liters")
+        or payload.get("fuelUsed"),
+        -1
+    )
+    fuel_percent = parse_number(
+        payload.get("fuelPercent")
+        or payload.get("fuel_percent")
+        or payload.get("tankPercent")
+        or payload.get("fuel"),
+        -1
+    )
+
+    if fuel_liters >= 0:
+        return format_liters(fuel_liters)
+    if fuel_percent >= 0:
+        return format_percent(fuel_percent)
+    return "-"
+
+
+def resolve_driver_card_id(user_doc=None, payload=None):
+    payload = payload or {}
+    for key in (
+        "fahrerkarteId", "fahrerkarte_id", "fahrerkarteID",
+        "driverCardId", "driver_card_id", "cardId", "card_id",
+        "tachographCardId", "tachograph_card_id"
+    ):
+        value = safe_str(payload.get(key))
+        if value:
+            return value
+
+    user_doc = user_doc or {}
+    for key in (
+        "fahrerkarte_card_id", "personalisierte_fahrerkarte_card_id",
+        "driver_card_id", "card_id", "fahrerkarte_id"
+    ):
+        value = safe_str(user_doc.get(key))
+        if value:
+            return value
+
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if discord_id:
+        try:
+            latest_request = fahrerkarte_requests_collection.find_one(
+                {"discord_id": discord_id, "archived": {"$ne": True}},
+                sort=[("created_at", DESCENDING)]
+            ) or {}
+            for key in ("card_id", "fahrerkarte_card_id", "driver_card_id"):
+                value = safe_str(latest_request.get(key))
+                if value:
+                    return value
+        except Exception as error:
+            print(f"Fahrerkarte-ID konnte nicht aufgeloest werden: {error}")
+
+    return "-"
+
+
 def pdf_safe_text(value):
     value = safe_str(value, "-")
     value = value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
@@ -4501,6 +4592,7 @@ def save_tour_receipt_pdf(receipt_doc):
         ("Username", driver.get("username")),
         ("Discord-ID", driver.get("discord_id")),
         ("Rolle", driver.get("role")),
+        ("Fahrerkarte-ID", driver.get("fahrerkarte_id")),
     ]))
 
     tour = receipt_doc.get("tour") or {}
@@ -4510,14 +4602,14 @@ def save_tour_receipt_pdf(receipt_doc):
         ("Start", tour.get("source_city")),
         ("Ziel", tour.get("destination_city")),
         ("Fracht", tour.get("cargo")),
+        ("Kraftstoff", format_fuel_display_from_payload(tour)),
+        ("ETA", tour.get("eta")),
+        ("RPM", str(parse_int(tour.get("rpm"), 0))),
         ("Geplante Distanz", format_km(tour.get("planned_distance_km"))),
         ("Gefahrene Distanz", format_km(tour.get("driven_distance_km"))),
         ("Restdistanz", format_km(tour.get("remaining_distance_km"))),
         ("Fortschritt", format_percent(tour.get("route_progress_percent"))),
         ("Schaden", format_percent(tour.get("damage_percent"))),
-        ("Tank", format_percent(tour.get("fuel_percent"))),
-        ("RPM", str(parse_int(tour.get("rpm"), 0))),
-        ("Geschwindigkeit bei Abgabe", f"{parse_int(tour.get('speed_kmh'), 0)} km/h"),
     ]))
 
     billing = receipt_doc.get("billing") or {}
@@ -4550,58 +4642,67 @@ def save_tour_receipt_pdf(receipt_doc):
     return file_path, filename, pdf_bytes
 
 
-def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
-    if not TOUR_RECEIPT_DISCORD_ENABLED:
-        return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
+def discord_payload_for_bot(payload):
+    payload = dict(payload or {})
+    # username/avatar_url sind Webhook-Felder und werden von Bot-Channel-Messages nicht akzeptiert.
+    payload.pop("username", None)
+    payload.pop("avatar_url", None)
+    return payload
 
-    driver = receipt_doc.get("driver") or {}
-    tour = receipt_doc.get("tour") or {}
-    billing = receipt_doc.get("billing") or {}
 
-    content = (
-        "✅ **Job abgeschlossen**\n"
-        "\n"
-        f"**Fahrer:** {driver.get('name') or '-'}\n"
-        f"**Job-ID:** `{receipt_doc.get('job_id')}`\n"
-        f"**Route:** {tour.get('source_city') or '-'} → {tour.get('destination_city') or '-'}\n"
-        f"**Fracht:** {tour.get('cargo') or '-'}\n"
-        f"**Spiel:** {tour.get('game') or 'ETS2/ATS'}\n"
-        f"**Gefahrene Distanz:** {format_km(tour.get('driven_distance_km'))}\n"
-        f"**Schaden:** {format_percent(tour.get('damage_percent'))}\n"
-        f"**Abrechnung:** {format_money(billing.get('total_amount'), billing.get('currency'))}\n"
-        f"**Belegnummer:** `{receipt_doc.get('receipt_number')}`\n"
-        "\n"
-        "📄 Der Tour-Beleg wurde automatisch erstellt und angehängt."
-    )
+def discord_wait_url(url):
+    url = safe_str(url)
+    if not url:
+        return ""
+    if "?" not in url:
+        return url + "?wait=true"
+    if "wait=" not in url:
+        return url + "&wait=true"
+    return url
 
-    payload = {
-        "username": "EifelLog Tracker",
-        "content": content,
-        "allowed_mentions": {"parse": []},
-        "attachments": [
-            {
-                "id": 0,
-                "filename": filename,
-                "description": f"Tour-Beleg {receipt_doc.get('receipt_number')}"
+
+def post_discord_json_to_tour_channel(discord_payload, channel_id=None, webhook_url=None):
+    channel_id = safe_str(channel_id or TOUR_CHANNEL_ID or TOUR_RECEIPT_CHANNEL_ID)
+    webhook_url = safe_str(webhook_url or DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+
+    if DISCORD_BOT_TOKEN and channel_id:
+        try:
+            response = requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"},
+                json=discord_payload_for_bot(discord_payload),
+                timeout=20
+            )
+        except Exception as error:
+            return {"sent": False, "method": "bot", "channel_id": channel_id, "error": str(error)}
+
+        if response.status_code not in range(200, 300):
+            return {
+                "sent": False,
+                "method": "bot",
+                "channel_id": channel_id,
+                "status_code": response.status_code,
+                "error": response.text[:1000]
             }
-        ]
-    }
 
-    webhook_url = safe_str(DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+        try:
+            message = response.json()
+        except Exception:
+            message = {}
+
+        return {
+            "sent": True,
+            "method": "bot",
+            "channel_id": channel_id,
+            "message_id": message.get("id"),
+            "raw": message
+        }
 
     if webhook_url:
-        webhook_post_url = webhook_url
-        if "?" not in webhook_post_url:
-            webhook_post_url += "?wait=true"
-        elif "wait=" not in webhook_post_url:
-            webhook_post_url += "&wait=true"
-
-        response = requests.post(
-            webhook_post_url,
-            data={"payload_json": json.dumps(payload, ensure_ascii=False)},
-            files={"files[0]": (filename, pdf_bytes, "application/pdf")},
-            timeout=20
-        )
+        try:
+            response = requests.post(discord_wait_url(webhook_url), json=discord_payload, timeout=20)
+        except Exception as error:
+            return {"sent": False, "method": "webhook", "error": str(error)}
 
         if response.status_code not in range(200, 300):
             return {
@@ -4619,46 +4720,143 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
         return {
             "sent": True,
             "method": "webhook",
-            "channel_id": message.get("channel_id"),
+            "channel_id": message.get("channel_id") or channel_id,
             "message_id": message.get("id"),
             "raw": message
         }
 
-    if not DISCORD_BOT_TOKEN:
-        return {"sent": False, "reason": "DISCORD_BOT_TOKEN fehlt und DISCORD_JOB_COMPLETE_WEBHOOK_URL fehlt"}
+    return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
 
-    channel_id = safe_str(TOUR_RECEIPT_CHANNEL_ID)
-    if not channel_id:
-        return {"sent": False, "reason": "TOUR_RECEIPT_CHANNEL_ID fehlt"}
 
-    response = requests.post(
-        f"https://discord.com/api/v10/channels/{channel_id}/messages",
-        headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
-        data={"payload_json": json.dumps(payload, ensure_ascii=False)},
-        files={"files[0]": (filename, pdf_bytes, "application/pdf")},
-        timeout=20
-    )
+def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=None, webhook_url=None):
+    channel_id = safe_str(channel_id or TOUR_RECEIPT_CHANNEL_ID or TOUR_CHANNEL_ID)
+    webhook_url = safe_str(webhook_url or DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+    filename, file_bytes, content_type = file_tuple
 
-    if response.status_code not in range(200, 300):
+    if DISCORD_BOT_TOKEN and channel_id:
+        try:
+            response = requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
+                data={"payload_json": json.dumps(discord_payload_for_bot(discord_payload), ensure_ascii=False)},
+                files={"files[0]": (filename, file_bytes, content_type)},
+                timeout=25
+            )
+        except Exception as error:
+            return {"sent": False, "method": "bot", "channel_id": channel_id, "error": str(error)}
+
+        if response.status_code not in range(200, 300):
+            return {
+                "sent": False,
+                "method": "bot",
+                "channel_id": channel_id,
+                "status_code": response.status_code,
+                "error": response.text[:1000]
+            }
+
+        try:
+            message = response.json()
+        except Exception:
+            message = {}
+
         return {
-            "sent": False,
+            "sent": True,
             "method": "bot",
-            "status_code": response.status_code,
-            "error": response.text[:1000]
+            "channel_id": channel_id,
+            "message_id": message.get("id"),
+            "raw": message
         }
 
-    try:
-        message = response.json()
-    except Exception:
-        message = {}
+    if webhook_url:
+        try:
+            response = requests.post(
+                discord_wait_url(webhook_url),
+                data={"payload_json": json.dumps(discord_payload, ensure_ascii=False)},
+                files={"files[0]": (filename, file_bytes, content_type)},
+                timeout=25
+            )
+        except Exception as error:
+            return {"sent": False, "method": "webhook", "error": str(error)}
 
-    return {
-        "sent": True,
-        "method": "bot",
-        "channel_id": channel_id,
-        "message_id": message.get("id"),
-        "raw": message
+        if response.status_code not in range(200, 300):
+            return {
+                "sent": False,
+                "method": "webhook",
+                "status_code": response.status_code,
+                "error": response.text[:1000]
+            }
+
+        try:
+            message = response.json()
+        except Exception:
+            message = {}
+
+        return {
+            "sent": True,
+            "method": "webhook",
+            "channel_id": message.get("channel_id") or channel_id,
+            "message_id": message.get("id"),
+            "raw": message
+        }
+
+    return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
+
+
+def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
+    if not TOUR_RECEIPT_DISCORD_ENABLED:
+        return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
+
+    driver = receipt_doc.get("driver") or {}
+    tour = receipt_doc.get("tour") or {}
+    billing = receipt_doc.get("billing") or {}
+
+    payload = {
+        "username": "EifelLog Tracker",
+        "allowed_mentions": {"parse": []},
+        "embeds": [
+            {
+                "title": "🧾 Tour-Beleg eingereicht",
+                "description": "Der Job wurde abgeschlossen. Der PDF-Beleg ist angehängt und für die Buchhaltung relevant.",
+                "color": 5763719,
+                "fields": [
+                    {"name": "👤 Fahrer", "value": safe_str(driver.get("name"), "-"), "inline": True},
+                    {"name": "🪪 Fahrerkarte-ID", "value": safe_str(driver.get("fahrerkarte_id"), "-"), "inline": True},
+                    {"name": "🧾 Job-ID", "value": f"`{safe_str(receipt_doc.get('job_id'), '-')}`", "inline": True},
+
+                    {"name": "🚛 LKW", "value": safe_str(tour.get("truck"), "-"), "inline": True},
+                    {"name": "📦 Fracht", "value": safe_str(tour.get("cargo"), "-"), "inline": True},
+                    {"name": "⛽ Kraftstoff", "value": format_fuel_display_from_payload(tour), "inline": True},
+
+                    {"name": "📍 Von", "value": safe_str(tour.get("source_city"), "-"), "inline": True},
+                    {"name": "🏁 Nach", "value": safe_str(tour.get("destination_city"), "-"), "inline": True},
+                    {"name": "⚙️ RPM", "value": str(parse_int(tour.get("rpm"), 0)), "inline": True},
+
+                    {"name": "🕒 ETA", "value": safe_str(tour.get("eta"), "-"), "inline": True},
+                    {"name": "📊 Strecke", "value": format_km(tour.get("driven_distance_km")), "inline": True},
+                    {"name": "💶 Abrechnung", "value": format_money(billing.get("total_amount"), billing.get("currency")), "inline": True},
+
+                    {"name": "📄 Belegnummer", "value": f"`{safe_str(receipt_doc.get('receipt_number'), '-')}`", "inline": True},
+                    {"name": "🏦 Buchhaltung", "value": "Ja – abrechnungsrelevant", "inline": True}
+                ],
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Touren-Channel"},
+                "timestamp": now_utc().isoformat() + "Z"
+            }
+        ],
+        "attachments": [
+            {
+                "id": 0,
+                "filename": filename,
+                "description": f"Tour-Beleg {receipt_doc.get('receipt_number')}"
+            }
+        ]
     }
+
+    return post_discord_file_to_tour_channel(
+        payload,
+        (filename, pdf_bytes, "application/pdf"),
+        channel_id=TOUR_RECEIPT_CHANNEL_ID,
+        webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
+    )
 
 def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     telemetry = telemetry or {}
@@ -4668,6 +4866,8 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         safe_str(payload.get("jobId"))
         or safe_str(payload.get("job_id"))
         or safe_str(payload.get("id"))
+        or safe_str(payload.get("deliveryId"))
+        or safe_str(payload.get("delivery_id"))
         or f"job-{submitted_at.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3)}"
     )
 
@@ -4690,9 +4890,25 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or safe_str(telemetry.get("destinationCity"))
         or "-"
     )
-    cargo = safe_str(payload.get("cargo") or telemetry.get("cargo"), "-")
+    cargo = safe_str(
+        payload.get("cargo")
+        or payload.get("freight")
+        or payload.get("cargoName")
+        or payload.get("jobCargo")
+        or telemetry.get("cargo"),
+        "-"
+    )
     game = safe_str(payload.get("game") or telemetry.get("game"), "ETS2/ATS")
-    truck = safe_str(payload.get("truck") or telemetry.get("truck"), "-")
+    truck = safe_str(
+        payload.get("truck")
+        or payload.get("truckName")
+        or payload.get("truckModel")
+        or payload.get("truck_model")
+        or telemetry.get("truck"),
+        "-"
+    )
+    eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta"), "-")
+    driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
 
     planned_distance = parse_number(
         payload.get("plannedDistanceKm")
@@ -4772,7 +4988,8 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "name": display_name,
             "username": user_doc.get("username"),
             "discord_id": user_doc.get("discord_id"),
-            "role": get_primary_role_name(user_doc.get("roles", []))
+            "role": get_primary_role_name(user_doc.get("roles", [])),
+            "fahrerkarte_id": driver_card_id
         },
         "tour": {
             "game": game,
@@ -4780,14 +4997,16 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "source_city": source_city,
             "destination_city": destination_city,
             "cargo": cargo,
+            "eta": eta,
             "planned_distance_km": planned_distance,
             "driven_distance_km": driven_distance,
             "remaining_distance_km": remaining_distance,
             "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
             "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
             "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
+            "fuel_liters": parse_number(payload.get("fuelLiters") or payload.get("fuel_liters") or telemetry.get("fuelLiters"), -1),
             "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
-            "rpm": parse_number(payload.get("rpm") or telemetry.get("rpm"), 0)
+            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0)
         },
         "billing": {
             "rate_per_km": rate_per_km,
@@ -5029,6 +5248,82 @@ def discord_field(name, value, inline=True):
     }
 
 
+def tracker_current_job_key(payload, user_doc=None):
+    payload = payload or {}
+    job_id = payload_lookup_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
+    if job_id:
+        return f"job:{job_id}"
+
+    driver_id = safe_str((user_doc or {}).get("discord_id"))
+    driver_name = payload_lookup_value(payload, "driverName", "displayName", "username", "driver", fallback=driver_id)
+    source = payload_lookup_value(payload, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback="-")
+    destination = payload_lookup_value(payload, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback="-")
+    cargo = payload_lookup_value(payload, "cargo", "freight", "cargoName", "jobCargo", fallback="-")
+    truck = payload_lookup_value(payload, "truck", "truckName", "truckModel", "truck_model", fallback="-")
+
+    raw_key = "|".join([driver_id or driver_name, source, destination, cargo, truck])
+    if raw_key.replace("|", "").replace("-", "").strip() == "":
+        return ""
+    return "tour:" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
+
+
+def build_tour_start_discord_payload(user_doc, telemetry):
+    telemetry = telemetry or {}
+    display_name = (
+        (user_doc or {}).get("display_name")
+        or (user_doc or {}).get("username")
+        or (user_doc or {}).get("discord_username")
+        or payload_lookup_value(telemetry, "driverName", "displayName", "username", "driver", fallback="EifelLog Fahrer")
+    )
+    truck = payload_lookup_value(telemetry, "truck", "truckName", "truckModel", "truck_model", fallback="-")
+    source = payload_lookup_value(telemetry, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback="-")
+    destination = payload_lookup_value(telemetry, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback="-")
+    cargo = payload_lookup_value(telemetry, "cargo", "freight", "cargoName", "jobCargo", fallback="-")
+    eta = payload_lookup_value(telemetry, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-")
+    rpm = first_payload_number(telemetry, "rpm", "engineRpm", "engineRPM", fallback=0)
+    job_id = payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="-")
+    driver_card_id = resolve_driver_card_id(user_doc, telemetry)
+
+    return {
+        "username": "EifelLog Tracker",
+        "allowed_mentions": {"parse": []},
+        "embeds": [
+            {
+                "title": "🚚 Tour gestartet",
+                "description": f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** hat eine Tour gestartet.",
+                "color": 5763719,
+                "fields": [
+                    discord_field("👤 Fahrer", display_name, True),
+                    discord_field("🪪 Fahrerkarte-ID", driver_card_id, True),
+                    discord_field("🚛 LKW", truck, True),
+
+                    discord_field("📦 Fracht", cargo, True),
+                    discord_field("⛽ Kraftstoff", format_fuel_display_from_payload(telemetry), True),
+                    discord_field("🕒 ETA", eta, True),
+
+                    discord_field("⚙️ RPM", str(parse_int(rpm, 0)), True),
+                    discord_field("📍 Von", source, True),
+                    discord_field("🏁 Nach", destination, True),
+
+                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 120)}`", False)
+                ],
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Touren-Channel"},
+                "timestamp": now_utc().isoformat() + "Z"
+            }
+        ]
+    }
+
+
+def send_tour_start_to_discord(user_doc, telemetry):
+    if not TOUR_START_DISCORD_ENABLED:
+        return {"sent": False, "reason": "TOUR_START_DISCORD_ENABLED=false"}
+    return post_discord_json_to_tour_channel(
+        build_tour_start_discord_payload(user_doc, telemetry),
+        channel_id=TOUR_CHANNEL_ID,
+        webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
+    )
+
+
 def unwrap_tracker_webhook_payload(data):
     data = data or {}
     if isinstance(data, dict) and isinstance(data.get("payload"), dict):
@@ -5104,20 +5399,12 @@ def build_tracker_webhook_discord_payload(payload):
         fallback=0.0
     )
     damage = first_payload_number(payload, "damagePercent", "truckDamagePercent", "trailerDamagePercent", "damage", fallback=0.0)
-    speed = first_payload_number(payload, "speedKmh", "speed", "currentSpeedKmh", fallback=0.0)
     rpm = first_payload_number(payload, "rpm", "engineRpm", "engineRPM", fallback=0.0)
-
-    fuel_liters = first_payload_number(payload, "fuelLiters", "fuelUsed", "fuel_liters", fallback=-1.0)
-    fuel_percent = first_payload_number(payload, "fuelPercent", "fuel_percent", "tankPercent", fallback=-1.0)
-    if fuel_liters >= 0:
-        fuel_display = f"{round(fuel_liters, 1)} L"
-    elif fuel_percent >= 0:
-        fuel_display = f"{round(fuel_percent, 1)}%"
-    else:
-        fuel_display = "-"
+    fuel_display = format_fuel_display_from_payload(payload)
 
     eta = first_payload_value(payload, "eta", "etaText", "eta_text", fallback="-")
     job_id = first_payload_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="-")
+    driver_card_id = resolve_driver_card_id(None, payload)
 
     return {
         "username": "EifelLog Tracker",
@@ -5129,8 +5416,8 @@ def build_tracker_webhook_discord_payload(payload):
                 "color": 3447003,
                 "fields": [
                     discord_field("👤 Fahrer", driver, True),
-                    discord_field("🚛 Fahrzeug", truck, True),
-                    discord_field("🎮 Spiel", game, True),
+                    discord_field("🪪 Fahrerkarte-ID", driver_card_id, True),
+                    discord_field("🚛 LKW", truck, True),
 
                     discord_field("📍 Von", source, True),
                     discord_field("🏁 Nach", destination, True),
@@ -5140,10 +5427,8 @@ def build_tracker_webhook_discord_payload(payload):
                     discord_field("🔧 Schaden", f"{round(damage, 1)}%", True),
                     discord_field("⛽ Kraftstoff", fuel_display, True),
 
-                    discord_field("⚡ Speed", f"{round(speed, 1)} km/h", True),
                     discord_field("⚙️ RPM", str(parse_int(rpm, 0)), True),
                     discord_field("🕒 ETA", eta, True),
-
                     discord_field("🧾 Job-ID", job_id, False)
                 ],
                 "footer": {"text": "EifelLog Telemetry Webhook"},
@@ -5154,41 +5439,11 @@ def build_tracker_webhook_discord_payload(payload):
 
 
 def post_json_to_discord_webhook(discord_payload):
-    webhook_url = safe_str(DISCORD_JOB_COMPLETE_WEBHOOK_URL)
-    if not webhook_url:
-        return {"sent": False, "reason": "DISCORD_JOB_COMPLETE_WEBHOOK_URL fehlt"}
-
-    webhook_post_url = webhook_url
-    if "?" not in webhook_post_url:
-        webhook_post_url += "?wait=true"
-    elif "wait=" not in webhook_post_url:
-        webhook_post_url += "&wait=true"
-
-    try:
-        response = requests.post(webhook_post_url, json=discord_payload, timeout=15)
-    except Exception as error:
-        return {"sent": False, "error": str(error)}
-
-    if response.status_code not in range(200, 300):
-        return {
-            "sent": False,
-            "status_code": response.status_code,
-            "error": response.text[:1000]
-        }
-
-    try:
-        message = response.json()
-    except Exception:
-        message = {}
-
-    return {
-        "sent": True,
-        "status_code": response.status_code,
-        "channel_id": message.get("channel_id"),
-        "message_id": message.get("id"),
-        "raw": message
-    }
-
+    return post_discord_json_to_tour_channel(
+        discord_payload,
+        channel_id=TOUR_CHANNEL_ID,
+        webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
+    )
 
 def payload_bool(payload, *keys, fallback=False):
     payload = payload or {}
@@ -5304,6 +5559,19 @@ def store_tracker_webhook_completed_job(payload):
             "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1)
         }
 
+    try:
+        file_path, filename, pdf_bytes = save_tour_receipt_pdf(receipt_doc)
+        receipt_doc["pdf"] = {
+            "file_path": file_path,
+            "file_name": filename,
+            "public_url": build_receipt_public_url(file_path),
+            "size_bytes": len(pdf_bytes),
+            "content_type": "application/pdf"
+        }
+        receipt_doc["discord"] = send_receipt_to_discord(receipt_doc, pdf_bytes, filename)
+    except Exception as error:
+        receipt_doc["discord"] = {"sent": False, "error": str(error)}
+
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
 
@@ -5318,7 +5586,9 @@ def store_tracker_webhook_completed_job(payload):
         "distanceKm": round(distance, 1),
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
         "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
-        "databaseEntryId": COMPANY_STATS_DOCUMENT_ID
+        "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+        "pdf": receipt_doc.get("pdf"),
+        "discord": receipt_doc.get("discord")
     }
 
 
@@ -5351,12 +5621,14 @@ def tracker_local_webhook():
 
     database_result = store_tracker_webhook_completed_job(payload)
 
-    if isinstance(data, dict) and ("embeds" in data or "content" in data):
-        discord_payload = data
-    else:
-        discord_payload = build_tracker_webhook_discord_payload(payload)
+    discord_result = database_result.get("discord") or {}
+    if not discord_result:
+        if isinstance(data, dict) and ("embeds" in data or "content" in data):
+            discord_payload = data
+        else:
+            discord_payload = build_tracker_webhook_discord_payload(payload)
 
-    discord_result = post_json_to_discord_webhook(discord_payload)
+        discord_result = post_json_to_discord_webhook(discord_payload)
 
     success = bool(discord_result.get("sent")) or bool(database_result.get("stored")) or bool(database_result.get("alreadyStored"))
     status_code = 200 if success else 502
@@ -5690,6 +5962,7 @@ def tracker_telemetry_live():
     telemetry = normalize_telemetry_payload(raw_telemetry)
 
     is_online = bool(telemetry.get("isConnected") or telemetry.get("gameProcessDetected") or telemetry.get("telemetryConnected"))
+    previous_job_key = safe_str(user_doc.get("tracker_current_job_key"))
 
     update_payload = {
         "tracker_live": telemetry,
@@ -5706,7 +5979,20 @@ def tracker_telemetry_live():
     }
 
     current_job = current_job_from_live(telemetry)
-    if current_job: update_payload["tracker_current_job"] = current_job
+    if current_job:
+        current_job_key = tracker_current_job_key(telemetry, user_doc)
+        update_payload["tracker_current_job"] = current_job
+        update_payload["tracker_current_job_key"] = current_job_key
+
+        if is_online and current_job_key and current_job_key != previous_job_key:
+            start_discord_result = send_tour_start_to_discord(user_doc, telemetry)
+            update_payload["tracker_tour_started_at"] = now_utc()
+            update_payload["tracker_tour_started_discord"] = start_discord_result
+            update_payload["tracker_tour_started_discord_message_id"] = start_discord_result.get("message_id")
+            update_payload["tracker_tour_started_discord_channel_id"] = start_discord_result.get("channel_id") or TOUR_CHANNEL_ID
+    else:
+        update_payload["tracker_current_job"] = None
+        update_payload["tracker_current_job_key"] = ""
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": update_payload})
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
