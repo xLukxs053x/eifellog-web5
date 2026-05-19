@@ -5087,14 +5087,14 @@ def save_tour_receipt_pdf(receipt_doc):
         ("Start", tour.get("source_city")),
         ("Ziel", tour.get("destination_city")),
         ("Fracht", tour.get("cargo")),
-        ("Kraftstoff", format_fuel_display_from_payload(tour)),
-        ("ETA", tour.get("eta")),
-        ("RPM", str(parse_int(tour.get("rpm"), 0))),
         ("Geplante Distanz", format_km(tour.get("planned_distance_km"))),
         ("Gefahrene Distanz", format_km(tour.get("driven_distance_km"))),
         ("Restdistanz", format_km(tour.get("remaining_distance_km"))),
         ("Fortschritt", format_percent(tour.get("route_progress_percent"))),
         ("Schaden", format_percent(tour.get("damage_percent"))),
+        ("Tank", format_fuel_display_from_payload(tour)),
+        ("RPM", str(parse_int(tour.get("rpm"), 0))),
+        ("Geschwindigkeit bei Abgabe", f"{parse_int(tour.get('speed_kmh'), 0)} km/h"),
     ]))
 
     billing = receipt_doc.get("billing") or {}
@@ -5287,46 +5287,42 @@ def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=No
     return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
 
 
-def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
-    if not TOUR_RECEIPT_DISCORD_ENABLED:
-        return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
-
+def build_receipt_discord_completion_text(receipt_doc):
+    """Discord-Text nach Tourabschluss im gewünschten kompakten Format."""
+    receipt_doc = receipt_doc or {}
     driver = receipt_doc.get("driver") or {}
     tour = receipt_doc.get("tour") or {}
     billing = receipt_doc.get("billing") or {}
 
+    source_city = safe_str(tour.get("source_city"), "-")
+    destination_city = safe_str(tour.get("destination_city"), "-")
+    route = f"{source_city} → {destination_city}"
+
+    return "\n".join([
+        "✅ **Job abgeschlossen**",
+        "",
+        f"**Fahrer:** {safe_str(driver.get('name'), '-')}",
+        f"**Job-ID:** `{safe_str(receipt_doc.get('job_id'), '-')}`",
+        f"**Route:** {route}",
+        f"**Fracht:** {safe_str(tour.get('cargo'), '-')}",
+        f"**Spiel:** {safe_str(tour.get('game'), 'ETS2/ATS')}",
+        f"**Gefahrene Distanz:** {format_km(tour.get('driven_distance_km'))}",
+        f"**Schaden:** {format_percent(tour.get('damage_percent'))}",
+        f"**Abrechnung:** {format_money(billing.get('total_amount'), billing.get('currency'))}",
+        f"**Belegnummer:** `{safe_str(receipt_doc.get('receipt_number'), '-')}`",
+        "",
+        "📄 Der Tour-Beleg wurde automatisch erstellt und angehängt."
+    ])
+
+
+def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
+    if not TOUR_RECEIPT_DISCORD_ENABLED:
+        return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
+
     payload = {
         "username": "EifelLog Tracker",
+        "content": build_receipt_discord_completion_text(receipt_doc),
         "allowed_mentions": {"parse": []},
-        "embeds": [
-            {
-                "title": "🧾 Tour-Beleg eingereicht",
-                "description": "Der Job wurde abgeschlossen. Der PDF-Beleg ist angehängt und für die Buchhaltung relevant.",
-                "color": 5763719,
-                "fields": [
-                    {"name": "👤 Fahrer", "value": safe_str(driver.get("name"), "-"), "inline": True},
-                    {"name": "🪪 Fahrerkarte-ID", "value": safe_str(driver.get("fahrerkarte_id"), "-"), "inline": True},
-                    {"name": "🧾 Job-ID", "value": f"`{safe_str(receipt_doc.get('job_id'), '-')}`", "inline": True},
-
-                    {"name": "🚛 LKW", "value": safe_str(tour.get("truck"), "-"), "inline": True},
-                    {"name": "📦 Fracht", "value": safe_str(tour.get("cargo"), "-"), "inline": True},
-                    {"name": "⛽ Kraftstoff", "value": format_fuel_display_from_payload(tour), "inline": True},
-
-                    {"name": "📍 Von", "value": safe_str(tour.get("source_city"), "-"), "inline": True},
-                    {"name": "🏁 Nach", "value": safe_str(tour.get("destination_city"), "-"), "inline": True},
-                    {"name": "⚙️ RPM", "value": str(parse_int(tour.get("rpm"), 0)), "inline": True},
-
-                    {"name": "🕒 ETA", "value": safe_str(tour.get("eta"), "-"), "inline": True},
-                    {"name": "📊 Strecke", "value": format_km(tour.get("driven_distance_km")), "inline": True},
-                    {"name": "💶 Abrechnung", "value": format_money(billing.get("total_amount"), billing.get("currency")), "inline": True},
-
-                    {"name": "📄 Belegnummer", "value": f"`{safe_str(receipt_doc.get('receipt_number'), '-')}`", "inline": True},
-                    {"name": "🏦 Buchhaltung", "value": "Ja – abrechnungsrelevant", "inline": True}
-                ],
-                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Touren-Channel"},
-                "timestamp": now_utc().isoformat() + "Z"
-            }
-        ],
         "attachments": [
             {
                 "id": 0,
@@ -5344,7 +5340,10 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     )
 
 def build_tour_receipt_doc(user_doc, payload, telemetry=None):
+    payload = payload or {}
     telemetry = telemetry or {}
+    merged_payload = dict(telemetry or {})
+    merged_payload.update(payload or {})
     submitted_at = now_utc()
 
     job_id = (
@@ -5363,83 +5362,59 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or safe_str(payload.get("driverName"), "EifelLog Fahrer")
     )
 
-    source_city = (
-        safe_str(payload.get("sourceCity"))
-        or safe_str(payload.get("source_city"))
-        or safe_str(telemetry.get("sourceCity"))
-        or "-"
+    source_city = payload_lookup_value(
+        merged_payload,
+        "sourceCity", "source_city", "source", "from", "routeOrigin", "jobSourceCity", "startCity", "start_city",
+        fallback="-"
     )
-    destination_city = (
-        safe_str(payload.get("destinationCity"))
-        or safe_str(payload.get("destination_city"))
-        or safe_str(telemetry.get("destinationCity"))
-        or "-"
+    destination_city = payload_lookup_value(
+        merged_payload,
+        "destinationCity", "destination_city", "destination", "to", "routeDestination", "jobDestinationCity", "targetCity", "target_city",
+        fallback="-"
     )
-    cargo = safe_str(
-        payload.get("cargo")
-        or payload.get("freight")
-        or payload.get("cargoName")
-        or payload.get("jobCargo")
-        or telemetry.get("cargo"),
-        "-"
+    cargo = payload_lookup_value(
+        merged_payload,
+        "cargo", "freight", "cargoName", "cargo_name", "jobCargo", "job_cargo",
+        fallback="-"
     )
-    game = safe_str(payload.get("game") or telemetry.get("game"), "ETS2/ATS")
-    truck = safe_str(
-        payload.get("truck")
-        or payload.get("truckName")
-        or payload.get("truckModel")
-        or payload.get("truck_model")
-        or telemetry.get("truck"),
-        "-"
+    game = payload_lookup_value(merged_payload, "game", "gameCode", "gameName", fallback="ETS2/ATS")
+    truck = payload_lookup_value(
+        merged_payload,
+        "truck", "truckName", "truckModel", "truck_model", "vehicle", "vehicleName",
+        fallback="-"
     )
-    eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta"), "-")
-    driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
+    eta = payload_lookup_value(merged_payload, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-")
+    driver_card_id = resolve_driver_card_id(user_doc, merged_payload)
 
-    planned_distance = parse_number(
-        payload.get("plannedDistanceKm")
-        or payload.get("planned_distance_km")
-        or payload.get("routeDistanceKm")
-        or payload.get("route_distance_km")
-        or payload.get("completedDistanceKm")
-        or payload.get("completed_distance_km")
-        or payload.get("distanceKm")
-        or telemetry.get("plannedDistanceKm"),
-        0
-    )
-    driven_distance = parse_number(
-        payload.get("completedDistanceKm")
-        or payload.get("completed_distance_km")
-        or payload.get("drivenDistanceKm")
-        or payload.get("driven_distance_km")
-        or payload.get("distanceKm")
-        or payload.get("distance")
-        or payload.get("routeDistanceKm")
-        or payload.get("route_distance_km")
-        or payload.get("tripDistanceKm")
-        or telemetry.get("completedDistanceKm")
-        or telemetry.get("drivenDistanceKm")
-        or telemetry.get("distanceKm")
-        or telemetry.get("tripDistanceKm"),
-        0
-    )
-    remaining_distance = parse_number(
-        payload.get("remainingDistanceKm")
-        or telemetry.get("remainingDistanceKm"),
-        0
-    )
+    planned_distance = parse_number(payload_lookup_value(
+        merged_payload,
+        "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km", "routeKm", "distancePlannedKm",
+        fallback="0"
+    ), 0)
+    driven_distance = parse_number(payload_lookup_value(
+        merged_payload,
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+        "tripDistanceKm", "distanceDrivenKm", "drivenKm", "distanceKm", "distance",
+        fallback="0"
+    ), 0)
+    remaining_distance = parse_number(payload_lookup_value(
+        merged_payload,
+        "remainingDistanceKm", "remaining_distance_km", "routeRemainingKm", "remainingKm",
+        fallback="0"
+    ), 0)
 
-    if driven_distance <= 0 and planned_distance > 0 and remaining_distance >= 0:
+    if driven_distance <= 0 and planned_distance > 0 and remaining_distance > 0:
         driven_distance = max(planned_distance - remaining_distance, 0)
 
-    rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
-    base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
+    rate_per_km = parse_number(payload_lookup_value(merged_payload, "ratePerKm", "rate_per_km", fallback=str(TOUR_RECEIPT_RATE_PER_KM)), TOUR_RECEIPT_RATE_PER_KM)
+    base_amount = parse_number(payload_lookup_value(merged_payload, "income", "baseAmount", "base_amount", fallback="0"), 0)
     if base_amount <= 0:
         base_amount = round(driven_distance * rate_per_km, 2)
 
-    bonus = parse_number(payload.get("bonus"), 0)
-    penalty = abs(parse_number(payload.get("penalty") or payload.get("deduction"), 0))
+    bonus = parse_number(payload_lookup_value(merged_payload, "bonus", fallback="0"), 0)
+    penalty = abs(parse_number(payload_lookup_value(merged_payload, "penalty", "deduction", "abzug", fallback="0"), 0))
     total_amount = round(base_amount + bonus - penalty, 2)
-    currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
+    currency = payload_lookup_value(merged_payload, "currency", fallback=TOUR_RECEIPT_CURRENCY).upper()
 
     receipt_number = generate_receipt_number(job_id, user_doc.get("discord_id"), submitted_at)
 
@@ -5486,12 +5461,12 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "planned_distance_km": planned_distance,
             "driven_distance_km": driven_distance,
             "remaining_distance_km": remaining_distance,
-            "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
-            "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
-            "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
-            "fuel_liters": parse_number(payload.get("fuelLiters") or payload.get("fuel_liters") or telemetry.get("fuelLiters"), -1),
-            "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
-            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0)
+            "route_progress_percent": parse_number(payload_lookup_value(merged_payload, "routeProgressPercent", "route_progress_percent", "progress", fallback="100"), 100),
+            "damage_percent": parse_number(payload_lookup_value(merged_payload, "damagePercent", "damage_percent", "truckDamagePercent", "trailerDamagePercent", "damage", fallback="0"), 0),
+            "fuel_percent": parse_number(payload_lookup_value(merged_payload, "fuelPercent", "fuel_percent", "tankPercent", "tank", "fuel", fallback="0"), 0),
+            "fuel_liters": parse_number(payload_lookup_value(merged_payload, "fuelLiters", "fuel_liters", "fuelUsed", fallback="-1"), -1),
+            "speed_kmh": parse_number(payload_lookup_value(merged_payload, "speedKmh", "speed_kmh", "speed", fallback="0"), 0),
+            "rpm": parse_number(payload_lookup_value(merged_payload, "rpm", "engineRpm", "engineRPM", fallback="0"), 0)
         },
         "billing": {
             "rate_per_km": rate_per_km,
@@ -5640,7 +5615,8 @@ def complete_tracker_tour_from_request():
                 "discordMessageId": existing.get("discord", {}).get("message_id"),
                 "billingRelevant": bool(existing.get("billing_relevant", True)),
                 "totalAmount": existing.get("billing", {}).get("total_amount"),
-                "currency": existing.get("billing", {}).get("currency")
+                "currency": existing.get("billing", {}).get("currency"),
+                "completionDisplay": build_receipt_discord_completion_text(existing)
             }
         })
 
@@ -5689,8 +5665,10 @@ def complete_tracker_tour_from_request():
             "discordError": discord_result.get("error") or discord_result.get("reason"),
             "totalAmount": receipt_doc.get("billing", {}).get("total_amount"),
             "currency": receipt_doc.get("billing", {}).get("currency"),
-            "submittedAt": receipt_doc.get("submitted_at").isoformat() + "Z"
+            "submittedAt": receipt_doc.get("submitted_at").isoformat() + "Z",
+            "completionDisplay": build_receipt_discord_completion_text(receipt_doc)
         },
+        "completionDisplay": build_receipt_discord_completion_text(receipt_doc),
         "state": tracker_state_payload(fresh_user)
     })
 
@@ -6096,9 +6074,9 @@ def store_tracker_webhook_completed_job(payload):
     if not tracker_webhook_payload_is_completed(payload):
         return {"stored": False, "reason": "Payload ist kein abgeschlossener Auftrag."}
 
-    distance = tracker_webhook_completed_distance(payload)
-    if distance <= 0:
-        return {"stored": False, "reason": "Keine abgeschlossene Distanz im Payload gefunden."}
+    # Auch 0,0-km-Abschlüsse erzeugen einen Tour-Beleg. Das ist wichtig, wenn der
+    # Tracker einen Auftrag sauber beendet, aber noch keine Fahrstrecke übertragen hat.
+    distance = max(tracker_webhook_completed_distance(payload), 0.0)
 
     user_doc = resolve_tracker_webhook_user(payload)
     if not user_doc:
