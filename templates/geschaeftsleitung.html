@@ -187,9 +187,27 @@
     }
 
     .gl-paper-wrap {
+        --gl-document-zoom: 0.78;
         padding: 1.25rem;
-        overflow-y: auto;
+        overflow: auto;
         max-height: 92vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
+
+    .gl-paper-zoom-stage {
+        width: min(980px, 100%);
+        margin: 0 auto;
+        zoom: var(--gl-document-zoom);
+    }
+
+    @supports not (zoom: 1) {
+        .gl-paper-zoom-stage {
+            width: calc(min(980px, 100%) / var(--gl-document-zoom));
+            transform: scale(var(--gl-document-zoom));
+            transform-origin: top center;
+        }
     }
 
     .gl-paper {
@@ -286,9 +304,26 @@
         }
 
         .gl-paper-wrap {
+            --gl-document-zoom: 0.72;
             max-height: none;
         }
     }
+
+    @media (max-width: 640px) {
+        .gl-paper-wrap {
+            --gl-document-zoom: 0.62;
+            padding: 0.85rem;
+        }
+
+        .gl-paper-inner {
+            padding: 1.35rem;
+        }
+
+        .gl-paper-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
 </style>
 
 {% if not management_access.allowed %}
@@ -457,7 +492,8 @@
     <div class="gl-modal-shell">
         <div class="gl-modal-grid">
             <div class="gl-paper-wrap gl-scrollbar">
-                <div class="gl-paper">
+                <div class="gl-paper-zoom-stage">
+                    <div class="gl-paper">
                     <div class="gl-paper-inner">
                         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5 border-b border-black/10 pb-6 mb-6">
                             <div>
@@ -517,6 +553,7 @@
                             </div>
                             <div id="gl-paper-preview" class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-white/70 min-h-[180px] flex items-center justify-center text-sm text-[#62705f]">Dokumentvorschau wird hier angezeigt.</div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
