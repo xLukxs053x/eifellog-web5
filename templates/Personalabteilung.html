@@ -2032,6 +2032,353 @@
         .personal-page .tab-btn { min-height: 2.55rem !important; }
     }
 
+
+    /* =========================================================
+       FINAL OVERRIDE: NICHT MEHR AUSEINANDERGEZOGEN
+       - entfernt den globalen 0.80/0.82 Zoom
+       - begrenzt die Bühne wieder auf eine ruhige Dashboard-Breite
+       - Tabellen bleiben scrollbar statt die komplette Seite zu strecken
+    ========================================================= */
+
+    :root {
+        --personal-ui-scale: 1 !important;
+        --personal-shell-width: 1220px !important;
+        --el-radius-xl: 24px;
+        --el-radius-lg: 18px;
+        --el-radius-md: 14px;
+    }
+
+    .base-main {
+        padding-top: clamp(5rem, 6.5vh, 6.25rem) !important;
+    }
+
+    .base-content,
+    .base-shell {
+        width: 100% !important;
+    }
+
+    .base-shell {
+        max-width: min(var(--personal-shell-width), calc(100vw - 2rem)) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    .personal-shell {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        translate: none !important;
+        transform: none !important;
+        transform-origin: initial !important;
+        zoom: 1 !important;
+        gap: 1rem !important;
+    }
+
+    @supports (zoom: 1) {
+        .personal-shell {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            translate: none !important;
+            transform: none !important;
+            zoom: 1 !important;
+        }
+    }
+
+    .personal-page {
+        padding-bottom: 4.5rem !important;
+    }
+
+    .personal-page .page-head {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) !important;
+        padding: clamp(1.25rem, 2vw, 1.75rem) !important;
+        gap: clamp(1rem, 1.6vw, 1.4rem) !important;
+        border-radius: 1.35rem !important;
+    }
+
+    .personal-page .page-head h1 {
+        font-size: clamp(2.1rem, 3.8vw, 3.65rem) !important;
+        line-height: 0.95 !important;
+    }
+
+    .personal-page .page-head p {
+        max-width: 58rem !important;
+        margin-top: 0.95rem !important;
+        font-size: 0.88rem !important;
+        line-height: 1.58 !important;
+    }
+
+    .personal-page .page-kicker {
+        min-height: 1.9rem !important;
+        margin-bottom: 0.75rem !important;
+        font-size: 0.56rem !important;
+    }
+
+    .personal-page .role-access {
+        gap: 0.65rem !important;
+    }
+
+    .personal-page .access-pill {
+        padding: 0.72rem 0.85rem !important;
+        border-radius: 0.95rem !important;
+    }
+
+    .personal-page .access-pill small,
+    .personal-page .access-pill strong {
+        font-size: 0.57rem !important;
+    }
+
+    .personal-page .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important;
+        gap: 0.75rem !important;
+    }
+
+    .personal-page .stat-card {
+        min-height: 6.2rem !important;
+        padding: 0.95rem !important;
+        border-radius: 1rem !important;
+    }
+
+    .personal-page .stat-card small {
+        font-size: 0.54rem !important;
+    }
+
+    .personal-page .stat-card strong {
+        font-size: clamp(1.35rem, 2vw, 1.85rem) !important;
+    }
+
+    .personal-page .tabbar {
+        grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)) !important;
+        gap: 0.5rem !important;
+        padding: 0.5rem !important;
+        border-radius: 1.1rem !important;
+    }
+
+    .personal-page .tab-btn {
+        min-height: 2.75rem !important;
+        padding: 0.15rem 0.75rem !important;
+        font-size: 0.55rem !important;
+        letter-spacing: 0.105em !important;
+        border-radius: 0.78rem !important;
+    }
+
+    .personal-page .toolbar,
+    .personal-page .toolbar.requests,
+    .personal-page .toolbar.accounting,
+    .personal-page .toolbar.service-center-toolbar {
+        padding: 0.8rem !important;
+        gap: 0.65rem !important;
+    }
+
+    .search-box,
+    .filter-select,
+    .modal-input,
+    .modal-textarea,
+    .modal-file {
+        min-height: 2.75rem !important;
+        padding: 0 0.85rem !important;
+        font-size: 0.84rem !important;
+        border-radius: 0.78rem !important;
+    }
+
+    .modal-textarea {
+        min-height: 7rem !important;
+        padding: 0.85rem !important;
+    }
+
+    .personal-page .table-card {
+        overflow: hidden !important;
+    }
+
+    .personal-page .driver-table-wrap,
+    .personal-page .request-table-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+    }
+
+    .personal-page .driver-table,
+    .personal-page .request-table {
+        width: 100% !important;
+        table-layout: auto !important;
+        border-collapse: collapse !important;
+    }
+
+    .personal-page .driver-table {
+        min-width: 1040px !important;
+    }
+
+    .personal-page .request-table {
+        min-width: 1120px !important;
+    }
+
+    .personal-page .request-table.wide-table,
+    .personal-page .driver-table.wide-table {
+        min-width: 1180px !important;
+    }
+
+    .personal-page .table-head {
+        padding: 0.95rem 1.15rem !important;
+    }
+
+    .personal-page .table-head h2 {
+        font-size: 0.84rem !important;
+    }
+
+    .personal-page .table-head span {
+        font-size: 0.76rem !important;
+    }
+
+    .personal-page .driver-table th,
+    .personal-page .request-table th {
+        padding: 0.68rem 0.82rem !important;
+        font-size: 0.53rem !important;
+        letter-spacing: 0.12em !important;
+    }
+
+    .personal-page .driver-table td,
+    .personal-page .request-table td {
+        padding: 0.76rem 0.82rem !important;
+        font-size: 0.82rem !important;
+    }
+
+    .personal-page .driver-cell {
+        min-width: 210px !important;
+        gap: 0.75rem !important;
+    }
+
+    .personal-page .driver-avatar {
+        width: 2.65rem !important;
+        height: 2.65rem !important;
+        border-radius: 0.78rem !important;
+    }
+
+    .driver-meta strong {
+        font-size: 0.86rem !important;
+        margin-bottom: 0.18rem !important;
+    }
+
+    .driver-meta span,
+    .mono,
+    .accounting-message-preview,
+    .compliance-summary span {
+        font-size: 0.74rem !important;
+    }
+
+    .role-badge,
+    .token-badge,
+    .status-badge,
+    .deadline-badge,
+    .compliance-badge {
+        min-height: 1.55rem !important;
+        padding: 0 0.62rem !important;
+        font-size: 0.5rem !important;
+        letter-spacing: 0.095em !important;
+    }
+
+    .aktenzeichen-mono {
+        font-size: 0.68rem !important;
+        padding: 0.26rem 0.44rem !important;
+    }
+
+    .token-btn,
+    .request-btn {
+        min-height: 2.25rem !important;
+        padding: 0 0.78rem !important;
+        border-radius: 0.74rem !important;
+        font-size: 0.51rem !important;
+        letter-spacing: 0.095em !important;
+        gap: 0.4rem !important;
+    }
+
+    .personal-page .driver-card-command,
+    .personal-page .service-highlight-card {
+        padding: 1rem !important;
+        gap: 0.9rem !important;
+        border-radius: 1.15rem !important;
+        grid-template-columns: minmax(0, 1fr) minmax(250px, 330px) !important;
+    }
+
+    .personal-page .driver-card-command h2,
+    .personal-page .service-highlight-copy h2 {
+        font-size: clamp(1.35rem, 2.05vw, 2rem) !important;
+    }
+
+    .personal-page .driver-card-command p,
+    .personal-page .service-highlight-copy p {
+        font-size: 0.85rem !important;
+        line-height: 1.52 !important;
+    }
+
+    .personal-page .service-flow-step {
+        padding: 0.82rem !important;
+        border-radius: 0.95rem !important;
+    }
+
+    .hero-bg .bg-slide {
+        object-fit: cover !important;
+        object-position: center center !important;
+        filter: saturate(1.04) brightness(0.42) contrast(1.02) !important;
+        animation-name: personalFadeZoomOut !important;
+    }
+
+    @media (min-width: 1536px) {
+        :root {
+            --personal-ui-scale: 1 !important;
+            --personal-shell-width: 1220px !important;
+        }
+
+        .base-shell {
+            max-width: min(1220px, calc(100vw - 2rem)) !important;
+        }
+    }
+
+    @media (max-width: 1180px) {
+        :root {
+            --personal-ui-scale: 1 !important;
+        }
+
+        .base-shell {
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .personal-page .page-head,
+        .personal-page .driver-card-command,
+        .personal-page .service-highlight-card {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .role-access {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .base-shell {
+            max-width: calc(100vw - 1rem) !important;
+        }
+
+        .base-main {
+            padding-top: 4.75rem !important;
+        }
+
+        .personal-page .page-head h1 {
+            font-size: clamp(1.95rem, 11vw, 2.9rem) !important;
+        }
+
+        .personal-page .role-access,
+        .detail-grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .tabbar {
+            grid-template-columns: 1fr !important;
+        }
+    }
+
 </style>
 
 
