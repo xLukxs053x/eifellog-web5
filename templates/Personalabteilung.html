@@ -3215,8 +3215,8 @@
                     <small>Fahrerkarten Daten abfragen</small>
                     <h2>PDF-Belege pro User erstellen und versenden</h2>
                     <p>
-                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen laufen hier als Frontend-Vorbereitung:
-                        Notizen, Zeiträume und Fahrerbezug werden geprüft, ohne direkte Backend-Hooks oder API-Calls auszulösen.
+                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen erzeugen den Beleg vollständig lokal im Browser:
+                        Notizen, Zeiträume und Fahrerbezug werden geprüft, danach startet ein Frontend-only PDF-Download ohne Backend-Hook oder API-Call.
                     </p>
                 </div>
 
@@ -3226,12 +3226,12 @@
                         <span>Filtert und aktualisiert die Ansicht direkt im Frontend.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>02 · Beleg vorbereiten</strong>
-                        <span>Öffnet ein kompaktes Formular für Zeitraum und Hinweis.</span>
+                        <strong>02 · PDF erzeugen</strong>
+                        <span>Öffnet ein kompaktes Formular und generiert den Beleg lokal als PDF.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>03 · Ohne Backend</strong>
-                        <span>Keine direkte API-Verbindung; Ausgabe bleibt als UI-Entwurf sichtbar.</span>
+                        <strong>03 · Frontend-only</strong>
+                        <span>Kein API-Call; der Download wird aus einem Browser-Blob ausgelöst.</span>
                     </div>
                 </div>
             </section>
@@ -3974,7 +3974,7 @@ Lenk/Ruhe
 
             <div class="modal-info">
                 <span>Fahrer: <strong id="driverCardDriverName">-</strong></span>
-                <span id="driverCardModeHelp">Der Beleg wird nur im Frontend vorbereitet. Es wird kein Backend-Hook aufgerufen.</span>
+                <span id="driverCardModeHelp">Der Beleg wird vollständig lokal im Browser als PDF erzeugt. Es wird kein Backend-Hook aufgerufen.</span>
             </div>
 
             <div class="modal-grid-two">
@@ -3997,7 +3997,7 @@ Lenk/Ruhe
 
             <label class="modal-check-row">
                 <input type="checkbox" id="driverCardSendToUser" />
-                <span>PDF-Beleg nach Erstellung direkt an den User senden.</span>
+                <span>Versandvermerk im Beleg setzen. Frontend-only: kein echter Backend-Versand.</span>
             </label>
 
             <label class="modal-check-row">
@@ -4917,12 +4917,12 @@ Lenk/Ruhe
 
             if (normalizedMode === "driving_time_compliance_pdf") {
                 driverCardModalTitle.textContent = "Lenk-/Ruhezeit-Beleg erstellen";
-                driverCardModeHelp.textContent = "Erstellt einen PDF-Prüfbeleg, ob die serverseitig geprüften Lenk- und Ruhezeiten eingehalten wurden.";
+                driverCardModeHelp.textContent = "Erstellt den Lenk-/Ruhezeit-Prüfbeleg vollständig lokal im Browser und startet optional den PDF-Download.";
                 driverCardSubmitButton.textContent = sendToUser ? "Prüfbeleg senden" : "Prüfbeleg erstellen";
                 driverCardNote.placeholder = "Hinweis zur Lenk-/Ruhezeit-Prüfung, z.B. Prüfmonat oder auffällige Tage...";
             } else {
                 driverCardModalTitle.textContent = "Fahrerkarten-PDF-Beleg erstellen";
-                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten des Users.";
+                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten vollständig lokal im Browser.";
                 driverCardSubmitButton.textContent = sendToUser ? "PDF an User senden" : "PDF erstellen";
                 driverCardNote.placeholder = "Hinweis zum Fahrerkarten-Beleg, z.B. Abfragegrund oder Aktennotiz...";
             }
@@ -5220,6 +5220,232 @@ Lenk/Ruhe
             }
         });
 
+        function normalizePdfText(value) {
+            return String(value ?? "")
+                .replace(/ß/g, "ss")
+                .replace(/ẞ/g, "SS")
+                .replace(/€/g, "EUR")
+                .normalize("NFKD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[–—]/g, "-")
+                .replace(/[„“”]/g, '"')
+                .replace(/[‚‘’]/g, "'")
+                .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ")
+                .replace(/[ \t]+/g, " ")
+                .trim();
+        }
+
+        function escapePdfLiteral(value) {
+            return normalizePdfText(value)
+                .replace(/\\/g, "\\\\")
+                .replace(/\(/g, "\\(")
+                .replace(/\)/g, "\\)");
+        }
+
+        function wrapPdfLine(value, maxLength = 86) {
+            const text = normalizePdfText(value);
+            if (!text) return [""];
+
+            const words = text.split(/\s+/);
+            const lines = [];
+            let line = "";
+
+            words.forEach((word) => {
+                if (!line) {
+                    line = word;
+                    return;
+                }
+
+                if ((line + " " + word).length <= maxLength) {
+                    line += " " + word;
+                } else {
+                    lines.push(line);
+                    line = word;
+                }
+            });
+
+            if (line) lines.push(line);
+            return lines.length ? lines : [""];
+        }
+
+        function getDriverCardCellText(row, selector, fallback = "-") {
+            const text = row?.querySelector(selector)?.textContent?.trim();
+            return text || fallback;
+        }
+
+        function formatDriverCardDate(value) {
+            if (!value) return "-";
+            const date = new Date(`${value}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        }
+
+        function safeFilenamePart(value) {
+            return normalizePdfText(value || "")
+                .replace(/[^A-Za-z0-9_-]+/g, "_")
+                .replace(/^_+|_+$/g, "")
+                .slice(0, 48) || "Beleg";
+        }
+
+        function createSimplePdfBlob(title, sourceLines = []) {
+            const pageWidth = 595.28;
+            const pageHeight = 841.89;
+            const marginX = 46;
+            const startY = 792;
+            const lineHeight = 14;
+            const maxLinesPerPage = 45;
+            const normalizedTitle = normalizePdfText(title || "EifelLog Beleg");
+            const bodyLines = [];
+
+            sourceLines.forEach((line) => {
+                if (line === "") {
+                    bodyLines.push("");
+                    return;
+                }
+                wrapPdfLine(line, 88).forEach((wrapped) => bodyLines.push(wrapped));
+            });
+
+            const chunks = [];
+            for (let i = 0; i < bodyLines.length; i += maxLinesPerPage) {
+                chunks.push(bodyLines.slice(i, i + maxLinesPerPage));
+            }
+            if (!chunks.length) chunks.push([]);
+
+            const pageIds = chunks.map((_, index) => 4 + index * 2);
+            const contentIds = chunks.map((_, index) => 5 + index * 2);
+            const fontId = 3;
+            const maxObjectId = 3 + chunks.length * 2;
+            const objects = new Array(maxObjectId + 1);
+
+            objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+            objects[2] = `<< /Type /Pages /Count ${chunks.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
+            objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+
+            chunks.forEach((lines, pageIndex) => {
+                const pageId = pageIds[pageIndex];
+                const contentId = contentIds[pageIndex];
+                const commands = [
+                    "q",
+                    "BT",
+                    "/F1 16 Tf",
+                    `${marginX} ${startY} Td`,
+                    `(${escapePdfLiteral(normalizedTitle)}) Tj`,
+                    "/F1 9 Tf",
+                    `0 -20 Td`,
+                    `(EifelLog Personalabteilung - Frontend-only PDF-Beleg) Tj`,
+                    `0 -18 Td`,
+                    "------------------------------------------------------------ Tj",
+                    `0 -${lineHeight} Td`
+                ];
+
+                lines.forEach((line) => {
+                    if (line) commands.push(`(${escapePdfLiteral(line)}) Tj`);
+                    commands.push(`0 -${lineHeight} Td`);
+                });
+
+                commands.push(
+                    `0 -8 Td`,
+                    "------------------------------------------------------------ Tj",
+                    `0 -${lineHeight} Td`,
+                    `(Seite ${pageIndex + 1} von ${chunks.length}) Tj`,
+                    "ET",
+                    "Q"
+                );
+
+                const stream = commands.join("\n");
+                objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`;
+                objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+            });
+
+            let pdf = "%PDF-1.4\n% Frontend-only EifelLog receipt\n";
+            const offsets = [0];
+
+            for (let id = 1; id <= maxObjectId; id += 1) {
+                offsets[id] = pdf.length;
+                pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+            }
+
+            const xrefOffset = pdf.length;
+            pdf += `xref\n0 ${maxObjectId + 1}\n`;
+            pdf += "0000000000 65535 f \n";
+            for (let id = 1; id <= maxObjectId; id += 1) {
+                pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+            }
+            pdf += `trailer\n<< /Size ${maxObjectId + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+            return new Blob([pdf], { type: "application/pdf" });
+        }
+
+        function buildDriverCardReceipt({ driverId, mode, note, dateFrom, dateTo, sendToUser, row }) {
+            const now = new Date();
+            const createdAt = now.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+            const isoDate = now.toISOString().slice(0, 10);
+            const isCompliance = mode === "driving_time_compliance_pdf";
+            const label = isCompliance ? "Lenk-/Ruhezeit-Beleg" : "Fahrerkarten-Beleg";
+            const driverName = currentDriverCardContext.driverName || row?.dataset.driverCardName || "Fahrer";
+            const username = row?.dataset.driverCardUsername || "-";
+            const cardId = driverCardCardId.value || currentDriverCardContext.cardId || row?.dataset.driverCardCardId || "Frontend-Beleg";
+            const aktenzeichen = getDriverCardCellText(row, "td:nth-child(2) .aktenzeichen-mono", "Nicht vergeben");
+            const lastQuery = row?.dataset.driverCardLastQuery || getDriverCardCellText(row, "[data-driver-card-last-query-text]", "-");
+            const complianceRaw = isCompliance ? "review" : (row?.dataset.driverCardCompliance || "unknown");
+            const compliance = humanizeDriverCardCompliance(complianceRaw);
+            const complianceLabel = isCompliance ? "Prüfung erstellt" : (getDriverCardCellText(row, "[data-driver-card-compliance-label]", compliance.label));
+            const complianceSummary = getDriverCardCellText(row, "[data-driver-card-compliance-summary]", "Keine Zusammenfassung hinterlegt.");
+            const sendNotice = sendToUser
+                ? "Versandvermerk: Im Beleg markiert. Frontend-only bedeutet: Es wurde keine Nachricht an den User versendet."
+                : "Versandvermerk: Kein Versand angefordert.";
+
+            const lines = [
+                `Dokument: ${label}`,
+                `Erstellt am: ${createdAt}`,
+                `Referenz: FRONTEND-ONLY-${isoDate.replace(/-/g, "")}`,
+                "",
+                "Fahrer",
+                `Name: ${driverName}`,
+                `Username: ${username}`,
+                `Discord-ID: ${driverId || "-"}`,
+                `Aktenzeichen: ${aktenzeichen}`,
+                `Karten-ID: ${cardId}`,
+                "",
+                "Zeitraum",
+                `Von: ${formatDriverCardDate(dateFrom)}`,
+                `Bis: ${formatDriverCardDate(dateTo)}`,
+                `Letzte Abfrage: ${lastQuery}`,
+                "",
+                "Lenk-/Ruhezeiten und Status",
+                `Status: ${compliance.label}`,
+                `Status-Code: ${compliance.normalized}`,
+                `Prüflabel: ${complianceLabel}`,
+                `Zusammenfassung: ${complianceSummary}`,
+                "",
+                "Hinweis",
+                note || "Kein interner Hinweis angegeben.",
+                "",
+                sendNotice,
+                "",
+                "Technischer Nachweis",
+                "Dieser PDF-Beleg wurde vollständig im Browser erzeugt.",
+                "Es wurde kein Backend-Hook, kein API-Call und kein serverseitiger PDF-Generator verwendet."
+            ];
+
+            return {
+                label,
+                title: `${label} - ${driverName}`,
+                filename: `EifelLog_${safeFilenamePart(label)}_${safeFilenamePart(driverName)}_${isoDate}.pdf`,
+                cardId,
+                complianceStatus: complianceRaw,
+                complianceLabel: isCompliance ? "Prüfung erstellt" : "Beleg erstellt",
+                lines
+            };
+        }
+
+        function openBlobInNewTab(blob) {
+            const url = URL.createObjectURL(blob);
+            const opened = window.open(url, "_blank", "noopener");
+            setTimeout(() => URL.revokeObjectURL(url), opened ? 30000 : 4000);
+            return Boolean(opened);
+        }
+
         driverCardForm?.addEventListener("submit", async (event) => {
             event.preventDefault();
 
@@ -5229,10 +5455,11 @@ Lenk/Ruhe
             const dateFrom = driverCardDateFrom.value;
             const dateTo = driverCardDateTo.value;
             const sendToUser = Boolean(driverCardSendToUser.checked);
+            const autoDownload = Boolean(driverCardAutoDownload?.checked);
             const row = currentDriverCardContext.row;
 
             if (!driverId) {
-                showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht vorbereitet werden.", "error");
+                showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht erstellt werden.", "error");
                 return;
             }
 
@@ -5241,22 +5468,51 @@ Lenk/Ruhe
                 return;
             }
 
-            const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
-            const label = mode === "driving_time_compliance_pdf" ? "Lenk-/Ruhezeit-Beleg" : "Fahrerkarten-Beleg";
-            const result = {
-                cardId: driverCardCardId.value || currentDriverCardContext.cardId || "Frontend-Entwurf",
-                cardStatus: "draft",
-                complianceStatus: mode === "driving_time_compliance_pdf" ? "review" : (row?.dataset.driverCardCompliance || "unknown"),
-                complianceLabel: mode === "driving_time_compliance_pdf" ? "Prüfung vorbereitet" : "Beleg vorbereitet",
-                complianceSummary: `${label} lokal vorbereitet${sendToUser ? " · Versand markiert" : ""}${note ? " · Hinweis: " + note : ""}`,
-                lastQuery: now,
-                message: `${label} wurde lokal vorbereitet. Es wurde kein Backend-Hook, kein API-Call und kein PDF-Download ausgelöst.`,
-                reference: "FRONTEND-ONLY"
-            };
+            const submitButton = driverCardSubmitButton || driverCardForm.querySelector("button[type='submit']");
+            const oldText = submitButton?.textContent?.trim() || "PDF erstellen";
 
-            updateDriverCardRow(row, result);
-            showToast(sendToUser ? "Versand vorbereitet" : "Beleg vorbereitet", result.message, "success", result.reference);
-            closeDriverCardModal();
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Erzeuge PDF...";
+            }
+
+            try {
+                const receipt = buildDriverCardReceipt({ driverId, mode, note, dateFrom, dateTo, sendToUser, row });
+                const pdfBlob = createSimplePdfBlob(receipt.title, receipt.lines);
+                const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+
+                if (autoDownload) {
+                    const url = URL.createObjectURL(pdfBlob);
+                    downloadFromUrl(url, receipt.filename);
+                    setTimeout(() => URL.revokeObjectURL(url), 4000);
+                } else if (!openBlobInNewTab(pdfBlob)) {
+                    const fallbackUrl = URL.createObjectURL(pdfBlob);
+                    downloadFromUrl(fallbackUrl, receipt.filename);
+                    setTimeout(() => URL.revokeObjectURL(fallbackUrl), 4000);
+                }
+
+                const result = {
+                    cardId: receipt.cardId,
+                    cardStatus: autoDownload ? "pdf_downloaded" : "pdf_previewed",
+                    complianceStatus: mode === "driving_time_compliance_pdf" ? "review" : receipt.complianceStatus,
+                    complianceLabel: receipt.complianceLabel,
+                    complianceSummary: `${receipt.label} lokal als PDF erzeugt${autoDownload ? " · Download gestartet" : " · Vorschau geöffnet"}${sendToUser ? " · Versandvermerk lokal gesetzt" : ""}${note ? " · Hinweis: " + note : ""}`,
+                    lastQuery: now,
+                    message: `${receipt.label} wurde lokal als PDF erzeugt${autoDownload ? " und der Download wurde gestartet" : " und zur Vorschau geöffnet"}. Kein Backend-Hook, kein API-Call.`,
+                    reference: receipt.filename
+                };
+
+                updateDriverCardRow(row, result);
+                showToast(sendToUser ? "PDF mit Versandvermerk erstellt" : "PDF erstellt", result.message, "success", result.reference);
+                closeDriverCardModal();
+            } catch (error) {
+                showToast("Fehler", error.message || "Der PDF-Beleg konnte nicht lokal erstellt werden.", "error");
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = oldText;
+                }
+            }
         });
 
         // LOGIK FÜR DAS SPEICHERN DER AUFGABE
