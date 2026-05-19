@@ -2379,6 +2379,121 @@
         }
     }
 
+
+    /* =========================================================
+       FINAL: BASE.HTML-SLIDESHOW RAUSGEZOOMT
+       Nutzt die Slideshow-Struktur aus base.html:
+       .hero-bg > .bg-slide.slide-1/2/3 + .hero-overlay
+       Die Bilder werden bewusst mit contain dargestellt, damit sie
+       weiter weg wirken und nicht so nah an die Kamera gecroppt werden.
+    ========================================================= */
+
+    .base-main,
+    .base-content,
+    .base-shell {
+        background: transparent !important;
+    }
+
+    .hero-bg {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: -10 !important;
+        overflow: hidden !important;
+        background: var(--bg-1, #040a06) !important;
+    }
+
+    .hero-bg .bg-slide {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        object-position: center center !important;
+        background-color: var(--bg-1, #040a06) !important;
+        filter: saturate(1.05) brightness(0.44) contrast(1.03) !important;
+        opacity: 0;
+        transform-origin: center center !important;
+        animation: personalBaseSlideZoomOut 24s infinite !important;
+        will-change: opacity, transform;
+    }
+
+    .hero-bg .slide-1 {
+        animation-delay: 0s !important;
+    }
+
+    .hero-bg .slide-2 {
+        animation-delay: 8s !important;
+    }
+
+    .hero-bg .slide-3 {
+        animation-delay: 16s !important;
+    }
+
+    .hero-overlay {
+        position: absolute !important;
+        inset: 0 !important;
+        background:
+            radial-gradient(circle at 50% 30%, rgba(10, 20, 15, 0.08) 0%, rgba(4, 10, 6, 0.62) 58%, rgba(2, 5, 3, 0.90) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.50)) !important;
+    }
+
+    @keyframes personalBaseSlideZoomOut {
+        0% {
+            opacity: 0;
+            transform: scale(0.94);
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        33% {
+            opacity: 1;
+        }
+
+        45% {
+            opacity: 0;
+            transform: scale(0.985);
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(0.985);
+        }
+    }
+
+    @media (max-width: 900px) {
+        .hero-bg .bg-slide {
+            object-fit: cover !important;
+            transform-origin: center center !important;
+        }
+
+        @keyframes personalBaseSlideZoomOut {
+            0% {
+                opacity: 0;
+                transform: scale(1.00);
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            33% {
+                opacity: 1;
+            }
+
+            45% {
+                opacity: 0;
+                transform: scale(1.025);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(1.025);
+            }
+        }
+    }
+
 </style>
 
 
