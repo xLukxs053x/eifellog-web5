@@ -182,6 +182,11 @@ dispo_notes_collection = db["dispo_notes"]
 dispo_messages_collection = db["dispo_messages"]
 dispo_form_entries_collection = db["dispo_form_entries"]
 fahrerkarte_requests_collection = db["fahrerkarte_requests"]
+fahrerkarte_beantragungen_collection = db[env_first(
+    "SERVICECENTER_COLLECTION_NAME",
+    "FAHRERKARTE_BEANTRAGUNGEN_COLLECTION",
+    default="FahrerkarteBeantragungen"
+)]
 
 
 def ensure_indexes():
@@ -270,6 +275,17 @@ def ensure_indexes():
         fahrerkarte_requests_collection.create_index([("card_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("pdf_relative_path", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        fahrerkarte_beantragungen_collection.create_index([("request_id", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("fahrerkarte_request_id", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("user_id", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("status", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("fahrerkarte_status", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("personalisierte_fahrerkarte_status", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("source_user_mongo_id", ASCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("created_at", DESCENDING)], unique=False)
+        fahrerkarte_beantragungen_collection.create_index([("updated_at", DESCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -1317,6 +1333,10 @@ def get_latest_fahrerkarte_request_for_user(discord_id):
     if not discord_id:
         return None
 
+    user_doc = users_collection.find_one({"discord_id": discord_id})
+    if user_doc:
+        sync_fahrerkarte_request_from_user_doc(user_doc)
+
     return fahrerkarte_requests_collection.find_one(
         {"discord_id": discord_id, "archived": {"$ne": True}},
         sort=[("created_at", DESCENDING)]
@@ -1338,6 +1358,333 @@ def normalize_fahrerkarte_status(status):
     if status in {"none", "pending", "claimed", "approved", "issued", "rejected", "postponed", "archived"}:
         return status
     return "none"
+
+
+FAHRERKARTE_ACTIVE_STATUSES = {"pending", "claimed", "approved", "issued", "rejected", "postponed"}
+
+
+def coerce_fahrerkarte_datetime(value, fallback=None):
+    if isinstance(value, datetime):
+        return value
+    value = safe_str(value)
+    if not value:
+        return fallback
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return fallback
+
+
+def user_doc_has_fahrerkarte_request(user_doc):
+    user_doc = user_doc or {}
+    if safe_str(user_doc.get("fahrerkarte_request_id") or user_doc.get("personalisierte_fahrerkarte_request_id")):
+        return True
+    status = normalize_fahrerkarte_status(
+        user_doc.get("personalisierte_fahrerkarte_status")
+        or user_doc.get("fahrerkarte_status")
+    )
+    return status in FAHRERKARTE_ACTIVE_STATUSES
+
+
+def build_fahrerkarte_request_from_user_doc(user_doc):
+    user_doc = user_doc or {}
+    if not user_doc_has_fahrerkarte_request(user_doc):
+        return None
+
+    now = now_utc()
+    user_mongo_id = safe_str(user_doc.get("_id"))
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if not discord_id:
+        return None
+
+    request_id = safe_str(
+        user_doc.get("fahrerkarte_request_id")
+        or user_doc.get("personalisierte_fahrerkarte_request_id")
+    )
+    if not request_id:
+        request_id = uuid.uuid4().hex
+
+    status = normalize_fahrerkarte_status(
+        user_doc.get("personalisierte_fahrerkarte_status")
+        or user_doc.get("fahrerkarte_status")
+        or "pending"
+    )
+
+    created_at = coerce_fahrerkarte_datetime(
+        user_doc.get("fahrerkarte_requested_at")
+        or user_doc.get("personalisierte_fahrerkarte_requested_at")
+        or user_doc.get("created_at"),
+        fallback=now,
+    )
+    updated_at = coerce_fahrerkarte_datetime(
+        user_doc.get("fahrerkarte_updated_at")
+        or user_doc.get("updated_at"),
+        fallback=now,
+    )
+
+    display_name = safe_str(
+        user_doc.get("fahrerkarte_name")
+        or user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username"),
+        "EifelLog Fahrer",
+    )
+    role_name = safe_str(
+        user_doc.get("fahrerkarte_role")
+        or user_doc.get("role_name")
+        or user_doc.get("rank")
+        or get_primary_role_name(user_doc.get("roles", [])),
+        "Fahrer",
+    )
+
+    request_doc = {
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "discord_username": user_doc.get("discord_username") or user_doc.get("username"),
+        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "name": display_name,
+        "full_name": display_name,
+        "display_name": display_name,
+        "role": role_name,
+        "role_name": role_name,
+        "system_id": discord_id,
+        "driver_number": user_doc.get("driver_number") or user_doc.get("fahrernummer") or "",
+        "priority": safe_str(user_doc.get("fahrerkarte_priority"), "normal"),
+        "reason": safe_str(user_doc.get("fahrerkarte_reason"), "new_issue"),
+        "delivery_method": safe_str(user_doc.get("fahrerkarte_delivery_method"), "servicecenter"),
+        "notes": safe_str(user_doc.get("fahrerkarte_note") or user_doc.get("fahrerkarte_notes"), ""),
+        "status": status,
+        "created_at": created_at,
+        "requested_at": created_at,
+        "updated_at": updated_at,
+        "source": "users_fahrerkarte_sync",
+        "source_collection": "users",
+        "source_user_mongo_id": user_mongo_id,
+        "user_mongo_id": user_mongo_id,
+        "verified_user_mongo_id": user_mongo_id,
+        "card_id": safe_str(user_doc.get("fahrerkarte_card_id") or user_doc.get("card_id")),
+        "handler_name": safe_str(user_doc.get("fahrerkarte_handler"), "Noch nicht zugewiesen"),
+        "tracker_upload_ready": bool(user_doc.get("tracker_upload_ready") or status == "issued"),
+    }
+
+    optional_map = {
+        "approved_at": "fahrerkarte_approved_at",
+        "issued_at": "fahrerkarte_issued_at",
+        "rejected_at": "fahrerkarte_rejected_at",
+        "postponed_at": "fahrerkarte_postponed_at",
+        "reject_reason": "fahrerkarte_reject_reason",
+        "postpone_reason": "fahrerkarte_postpone_reason",
+        "issue_note": "fahrerkarte_issue_note",
+        "approval_note": "fahrerkarte_approval_note",
+        "pdf_relative_path": "fahrerkarte_pdf_relative_path",
+        "pdf_filename": "fahrerkarte_pdf_filename",
+        "download_url": "fahrerkarte_download_url",
+    }
+    for target_key, user_key in optional_map.items():
+        value = user_doc.get(user_key)
+        if target_key.endswith("_at"):
+            value = coerce_fahrerkarte_datetime(value)
+        if value not in (None, ""):
+            request_doc[target_key] = value
+
+    if request_doc.get("pdf_relative_path"):
+        request_doc["pdf_path"] = request_doc.get("pdf_relative_path")
+
+    return request_doc
+
+
+def mirror_fahrerkarte_request_for_discord_plugin(request_doc, user_doc=None):
+    request_doc = request_doc or {}
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    if not request_id or not discord_id:
+        return None
+
+    user_doc = user_doc or users_collection.find_one({"discord_id": discord_id}) or {}
+    status = normalize_fahrerkarte_status(
+        request_doc.get("status")
+        or user_doc.get("personalisierte_fahrerkarte_status")
+        or user_doc.get("fahrerkarte_status")
+        or "pending"
+    )
+    user_mongo_id = safe_str(
+        request_doc.get("source_user_mongo_id")
+        or request_doc.get("user_mongo_id")
+        or user_doc.get("_id")
+    )
+    created_at = coerce_fahrerkarte_datetime(
+        request_doc.get("created_at")
+        or request_doc.get("requested_at")
+        or user_doc.get("fahrerkarte_requested_at"),
+        fallback=now_utc(),
+    )
+    updated_at = coerce_fahrerkarte_datetime(
+        request_doc.get("updated_at")
+        or user_doc.get("fahrerkarte_updated_at"),
+        fallback=now_utc(),
+    )
+
+    mirror_doc = {
+        "request_id": request_id,
+        "fahrerkarte_request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": request_doc.get("username") or user_doc.get("username") or user_doc.get("discord_username"),
+        "discord_username": request_doc.get("discord_username") or user_doc.get("discord_username") or user_doc.get("username"),
+        "display_name": request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or user_doc.get("display_name"),
+        "name": request_doc.get("name") or request_doc.get("display_name") or user_doc.get("display_name") or user_doc.get("username"),
+        "role": request_doc.get("role") or request_doc.get("role_name") or user_doc.get("fahrerkarte_role") or user_doc.get("rank"),
+        "role_name": request_doc.get("role_name") or request_doc.get("role") or user_doc.get("fahrerkarte_role") or user_doc.get("rank"),
+        "status": status,
+        "fahrerkarte_status": status,
+        "personalisierte_fahrerkarte_status": status,
+        "handler_name": request_doc.get("handler_name") or user_doc.get("fahrerkarte_handler") or "Noch nicht zugewiesen",
+        "fahrerkarte_handler": request_doc.get("handler_name") or user_doc.get("fahrerkarte_handler") or "Noch nicht zugewiesen",
+        "requested_at": created_at,
+        "fahrerkarte_requested_at": created_at,
+        "created_at": created_at,
+        "updated_at": updated_at,
+        "source": "web_main_servicecenter_sync",
+        "source_collection": "fahrerkarte_requests",
+        "source_request_mongo_id": safe_str(request_doc.get("_id")),
+        "source_user_mongo_id": user_mongo_id,
+        "verified_user_mongo_id": user_mongo_id,
+        "user_check_status": "verified" if user_mongo_id else "not_checked",
+        "card_id": request_doc.get("card_id") or user_doc.get("fahrerkarte_card_id") or "",
+        "fahrerkarte_card_id": request_doc.get("card_id") or user_doc.get("fahrerkarte_card_id") or "",
+        "note": request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or request_doc.get("reject_reason") or "",
+        "fahrerkarte_note": request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or request_doc.get("reject_reason") or "",
+        "priority": request_doc.get("priority") or "normal",
+        "reason": request_doc.get("reason") or "new_issue",
+        "delivery_method": request_doc.get("delivery_method") or "servicecenter",
+        "download_url": request_doc.get("download_url") or user_doc.get("fahrerkarte_download_url") or "",
+        "pdf_relative_path": request_doc.get("pdf_relative_path") or user_doc.get("fahrerkarte_pdf_relative_path") or "",
+        "pdf_filename": request_doc.get("pdf_filename") or user_doc.get("fahrerkarte_pdf_filename") or "",
+    }
+
+    if request_doc.get("issued_at") or user_doc.get("fahrerkarte_issued_at"):
+        mirror_doc["issued_at"] = coerce_fahrerkarte_datetime(request_doc.get("issued_at") or user_doc.get("fahrerkarte_issued_at"))
+        mirror_doc["fahrerkarte_issued_at"] = mirror_doc["issued_at"]
+
+    if request_doc.get("discord_thread_id") or request_doc.get("thread_id"):
+        mirror_doc["thread_id"] = safe_str(request_doc.get("discord_thread_id") or request_doc.get("thread_id"))
+    if request_doc.get("discord_parent_channel_id"):
+        mirror_doc["thread_parent_channel_id"] = safe_str(request_doc.get("discord_parent_channel_id"))
+    if request_doc.get("discord_parent_message_id"):
+        mirror_doc["thread_parent_message_id"] = safe_str(request_doc.get("discord_parent_message_id"))
+    if request_doc.get("discord_admin_message_id"):
+        mirror_doc["admin_message_id"] = safe_str(request_doc.get("discord_admin_message_id"))
+    if request_doc.get("discord_history_message_id"):
+        mirror_doc["history_message_id"] = safe_str(request_doc.get("discord_history_message_id"))
+
+    lookup_items = [{"request_id": request_id}, {"fahrerkarte_request_id": request_id}]
+    if user_mongo_id:
+        lookup_items.append({"source_user_mongo_id": user_mongo_id})
+    if ObjectId.is_valid(request_id):
+        lookup_items.append({"_id": ObjectId(request_id)})
+
+    fahrerkarte_beantragungen_collection.update_one(
+        {"$or": lookup_items},
+        {
+            "$set": mirror_doc,
+            "$setOnInsert": {
+                "created_at": created_at,
+                "imported_at": now_utc(),
+            },
+        },
+        upsert=True,
+    )
+    return fahrerkarte_beantragungen_collection.find_one({"request_id": request_id})
+
+
+def sync_fahrerkarte_request_from_user_doc(user_doc, force=False):
+    request_doc = build_fahrerkarte_request_from_user_doc(user_doc)
+    if not request_doc:
+        return None
+
+    request_id = safe_str(request_doc.get("request_id"))
+    user_mongo_id = safe_str(request_doc.get("source_user_mongo_id"))
+    lookup_items = [{"request_id": request_id}]
+    if user_mongo_id:
+        lookup_items.append({"source_user_mongo_id": user_mongo_id})
+        lookup_items.append({"user_mongo_id": user_mongo_id})
+    existing = fahrerkarte_requests_collection.find_one({"$or": lookup_items})
+
+    set_fields = dict(request_doc)
+    if existing and not force:
+        # Nicht leere, im ServiceCenter erzeugte Felder behalten.
+        for key in [
+            "discord_thread_id", "thread_id", "discord_channel_id", "discord_parent_channel_id",
+            "discord_parent_message_id", "discord_message_id", "discord_admin_message_id",
+            "discord_history_message_id", "discord_message_url", "discord_thread_url",
+            "pdf_path", "pdf_relative_path", "pdf_filename", "download_url",
+            "card_id", "claimed_by", "approved_by", "issued_by", "rejected_by", "postponed_by",
+            "claimed_at", "approved_at", "issued_at", "rejected_at", "postponed_at",
+        ]:
+            if existing.get(key) not in (None, "") and set_fields.get(key) in (None, ""):
+                set_fields[key] = existing.get(key)
+
+    if existing:
+        fahrerkarte_requests_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": set_fields}
+        )
+        fresh_request = fahrerkarte_requests_collection.find_one({"_id": existing["_id"]})
+    else:
+        insert_result = fahrerkarte_requests_collection.insert_one(set_fields)
+        fresh_request = fahrerkarte_requests_collection.find_one({"_id": insert_result.inserted_id})
+
+    mirror_fahrerkarte_request_for_discord_plugin(fresh_request, user_doc=user_doc)
+
+    # Falls die User-Collection nur den Status hatte, die erzeugte Request-ID sauber zurückschreiben.
+    if user_doc and request_id and safe_str(user_doc.get("fahrerkarte_request_id")) != request_id:
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {
+                "fahrerkarte_request_id": request_id,
+                "personalisierte_fahrerkarte_status": fresh_request.get("status", "pending"),
+                "fahrerkarte_status": fresh_request.get("status", "pending"),
+                "fahrerkarte_updated_at": now_utc(),
+            }}
+        )
+
+    return fresh_request
+
+
+def sync_fahrerkarte_requests_from_users(limit=500):
+    query = {
+        "$or": [
+            {"fahrerkarte_request_id": {"$exists": True, "$nin": ["", None]}},
+            {"personalisierte_fahrerkarte_status": {"$in": list(FAHRERKARTE_ACTIVE_STATUSES)}},
+            {"fahrerkarte_status": {"$in": list(FAHRERKARTE_ACTIVE_STATUSES)}},
+        ]
+    }
+    checked = 0
+    imported = 0
+    updated = 0
+    failed = 0
+
+    cursor = users_collection.find(query).sort([("updated_at", DESCENDING), ("created_at", DESCENDING)]).limit(int(limit or 500))
+    for user_doc in cursor:
+        checked += 1
+        before = None
+        request_id = safe_str(user_doc.get("fahrerkarte_request_id") or user_doc.get("personalisierte_fahrerkarte_request_id"))
+        if request_id:
+            before = fahrerkarte_requests_collection.find_one({"request_id": request_id})
+        try:
+            synced = sync_fahrerkarte_request_from_user_doc(user_doc)
+            if synced:
+                if before:
+                    updated += 1
+                else:
+                    imported += 1
+        except Exception as error:
+            failed += 1
+            print(f"Fahrerkarte-User-Sync fehlgeschlagen fuer User {user_doc.get('_id')}: {error}")
+
+    return {"checked": checked, "imported": imported, "updated": updated, "failed": failed}
 
 
 def prepare_fahrerkarte_context(user_doc, latest_request=None):
@@ -2256,6 +2603,9 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["download_url"] = servicecenter_fahrerkarte_download_url(item["request_id"]) if item["pdf_relative_path"] else ""
     item["tracker_upload_ready"] = bool(item.get("tracker_upload_ready") or item.get("status") == "issued")
     item["avatar_url"] = item.get("avatar_url") or ""
+    item["source_user_mongo_id"] = item.get("source_user_mongo_id") or item.get("user_mongo_id") or ""
+    item["user_mongo_id"] = item["source_user_mongo_id"]
+    item["source_collection"] = item.get("source_collection") or item.get("source") or "fahrerkarte_requests"
 
     claimed_by = item.get("claimed_by") or {}
     approved_by = item.get("approved_by") or {}
@@ -2298,7 +2648,39 @@ def find_fahrerkarte_request(request_id):
     request_id = safe_str(request_id)
     if not request_id:
         return None
-    return fahrerkarte_requests_collection.find_one(request_lookup_query(request_id))
+
+    request_doc = fahrerkarte_requests_collection.find_one(request_lookup_query(request_id))
+    if request_doc:
+        mirror_fahrerkarte_request_for_discord_plugin(request_doc)
+        return request_doc
+
+    user_lookup_items = [
+        {"fahrerkarte_request_id": request_id},
+        {"personalisierte_fahrerkarte_request_id": request_id},
+        {"discord_id": request_id},
+        {"user_id": request_id},
+    ]
+    object_id = object_id_or_none(request_id)
+    if object_id:
+        user_lookup_items.append({"_id": object_id})
+
+    user_doc = users_collection.find_one({"$or": user_lookup_items})
+    if user_doc and user_doc_has_fahrerkarte_request(user_doc):
+        return sync_fahrerkarte_request_from_user_doc(user_doc)
+
+    mirror_doc = fahrerkarte_beantragungen_collection.find_one({
+        "$or": [
+            {"request_id": request_id},
+            {"fahrerkarte_request_id": request_id},
+            {"source_user_mongo_id": request_id},
+        ]
+    })
+    if mirror_doc:
+        mirror_request_id = safe_str(mirror_doc.get("request_id") or mirror_doc.get("fahrerkarte_request_id"))
+        if mirror_request_id and mirror_request_id != request_id:
+            return find_fahrerkarte_request(mirror_request_id)
+
+    return None
 
 
 def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, extra_set=None):
@@ -2331,6 +2713,7 @@ def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, ext
 
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": update_fields})
+    mirror_fahrerkarte_request_for_discord_plugin(request_doc, user_doc=user_doc)
 
 
 # ==========================================
@@ -2548,6 +2931,8 @@ def servicecenter_discord_request_embed(request_doc, event="updated", actor=None
         {"name": "🏷️ Rolle", "value": discord_truncate(role_name), "inline": True},
         {"name": "📌 Status", "value": discord_truncate(fahrerkarte_status_label(status)), "inline": True},
         {"name": "🆔 Antrag-ID", "value": discord_truncate(f"`{request_id}`"), "inline": False},
+        {"name": "🗄️ User-DB-ID", "value": discord_truncate(f"`{safe_str(request_doc.get('source_user_mongo_id') or request_doc.get('user_mongo_id') or '-')}`"), "inline": True},
+        {"name": "📚 Quelle", "value": discord_truncate(safe_str(request_doc.get("source_collection") or request_doc.get("source") or "fahrerkarte_requests")), "inline": True},
         {"name": "⚡ Priorität", "value": discord_truncate(fahrerkarte_priority_label(request_doc.get("priority"))), "inline": True},
         {"name": "📝 Grund", "value": discord_truncate(fahrerkarte_reason_label(request_doc.get("reason"))), "inline": True},
         {"name": "📦 Bereitstellung", "value": discord_truncate(fahrerkarte_delivery_label(request_doc.get("delivery_method"))), "inline": True},
@@ -2764,6 +3149,8 @@ def servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated",
     if not request_id:
         return {"ok": False, "error": "Request-ID fehlt."}
 
+    mirror_fahrerkarte_request_for_discord_plugin(request_doc)
+
     thread_info = ensure_servicecenter_discord_thread(request_doc, event=event)
     if not thread_info.get("ok"):
         fahrerkarte_requests_collection.update_one(
@@ -2844,6 +3231,9 @@ def servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated",
             "discord_sync_error": safe_str(admin_msg)[:1800],
             "discord_synced_at": now_utc(),
         }})
+
+    final_request = fahrerkarte_requests_collection.find_one(request_lookup_query(request_id)) or fresh_request
+    mirror_fahrerkarte_request_for_discord_plugin(final_request)
 
     return {
         "ok": bool(admin_ok),
@@ -5409,6 +5799,9 @@ def servicecenter_fahrerkarte_beantragen():
         flash("Bitte bestätige, dass deine Angaben korrekt sind.", "error")
         return redirect(url_for("servicecenter"))
 
+    # Wichtig: Falls der Antrag bereits nur im users-Dokument steht, zuerst vollständig in die Request-Collection spiegeln.
+    sync_fahrerkarte_request_from_user_doc(db_user)
+
     existing_open = fahrerkarte_requests_collection.find_one({
         "discord_id": discord_id,
         "archived": {"$ne": True},
@@ -5449,6 +5842,7 @@ def servicecenter_fahrerkarte_beantragen():
 
     insert_result = fahrerkarte_requests_collection.insert_one(request_doc)
     request_doc["_id"] = insert_result.inserted_id
+    mirror_fahrerkarte_request_for_discord_plugin(request_doc, user_doc=db_user)
 
     users_collection.update_one(
         {"discord_id": discord_id},
@@ -7495,6 +7889,8 @@ def personalabteilung():
         for item in buchhaltung_requests_cursor
     ]
 
+    sync_fahrerkarte_requests_from_users(limit=500)
+
     servicecenter_fahrerkarte_cursor = fahrerkarte_requests_collection.find(
         {"archived": {"$ne": True}}
     ).sort([("created_at", DESCENDING)]).limit(250)
@@ -8425,6 +8821,8 @@ def api_personalabteilung_issue_driver_fahrerkarte():
 def api_personalabteilung_servicecenter_fahrerkarte_list():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
+
+    sync_fahrerkarte_requests_from_users(limit=500)
 
     status = safe_str(request.args.get("status"))
     query = {"archived": {"$ne": True}}
