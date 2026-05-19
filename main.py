@@ -2,7 +2,6 @@ import eventlet
 eventlet.monkey_patch()
 
 import os
-import base64
 import re
 import json
 import uuid
@@ -6504,122 +6503,47 @@ def tracker_driver_card():
 
 
 @app.route("/api/tracker/driver-card/upload", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-cards/upload", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/upload-pdf", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/pdf", methods=["POST", "OPTIONS"])
 def tracker_driver_card_upload():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    json_payload = request.get_json(silent=True) or {}
     form_payload = request.form or {}
-
-    auth_payload = {}
-    if isinstance(json_payload, dict):
-        auth_payload.update(json_payload)
-    try:
-        auth_payload.update(form_payload.to_dict(flat=True))
-    except Exception:
-        auth_payload.update(form_payload or {})
-
-    user_doc, client_token, error_response = tracker_auth_user_from_payload(auth_payload)
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(form_payload)
     if error_response:
         return error_response
 
-    upload = None
-    for field_name in (
-        "file",
-        "pdf",
-        "driverCardPdf",
-        "driver_card_pdf",
-        "driverCard",
-        "driver_card",
-        "fahrerkarte",
-        "fahrerkartePdf",
-        "document",
-    ):
-        candidate = request.files.get(field_name)
-        if candidate and candidate.filename:
-            upload = candidate
-            break
-
-    original_filename = ""
-    pdf_bytes = None
-
-    if upload and upload.filename:
-        original_filename = secure_filename(upload.filename) or "fahrerkarte.pdf"
-    else:
-        base64_value = ""
-        for payload_key in (
-            "fileBase64",
-            "pdfBase64",
-            "driverCardPdfBase64",
-            "driver_card_pdf_base64",
-            "fahrerkartePdfBase64",
-            "fahrerkarte_pdf_base64",
-            "data",
-        ):
-            base64_value = safe_str(json_payload.get(payload_key) if isinstance(json_payload, dict) else "")
-            if base64_value:
-                break
-
-        if base64_value:
-            if base64_value.lower().startswith("data:") and "," in base64_value:
-                base64_value = base64_value.split(",", 1)[1]
-            try:
-                pdf_bytes = base64.b64decode(base64_value, validate=False)
-            except Exception:
-                return jsonify({"success": False, "error": "Fahrerkarte-PDF konnte nicht aus Base64 gelesen werden."}), 400
-
-            original_filename = secure_filename(
-                safe_str(
-                    json_payload.get("fileName")
-                    or json_payload.get("filename")
-                    or json_payload.get("originalFilename")
-                    or json_payload.get("name")
-                    or "fahrerkarte.pdf"
-                )
-            ) or "fahrerkarte.pdf"
-
-    if not upload and not pdf_bytes:
+    upload = request.files.get("file") or request.files.get("pdf") or request.files.get("driverCardPdf")
+    if not upload or not upload.filename:
         return jsonify({"success": False, "error": "Keine PDF-Datei erhalten."}), 400
 
-    if not original_filename.lower().endswith(".pdf"):
-        original_filename = f"{original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename}.pdf"
-
-    if not tracker_allowed_driver_card_file(original_filename):
+    if not tracker_allowed_driver_card_file(upload.filename):
         return jsonify({"success": False, "error": "Nur PDF-Dateien sind als Fahrerkarte erlaubt."}), 400
 
     os.makedirs(TRACKER_DRIVER_CARD_UPLOAD_FOLDER, exist_ok=True)
 
+    original_filename = secure_filename(upload.filename) or "fahrerkarte.pdf"
     extension = original_filename.rsplit(".", 1)[1].lower()
     discord_id = safe_str(user_doc.get("discord_id"))
     unique_filename = f"{discord_id or 'driver'}_{now_utc().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:10]}.{extension}"
     relative_path = tracker_driver_card_upload_relative_path(unique_filename)
     absolute_path = os.path.join(BASE_DIR, relative_path)
     os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-
-    if upload and upload.filename:
-        upload.save(absolute_path)
-    else:
-        with open(absolute_path, "wb") as file:
-            file.write(pdf_bytes)
+    upload.save(absolute_path)
 
     latest_request = tracker_latest_issued_fahrerkarte_request(user_doc)
-    uploaded_at = now_utc()
     extra = {
         "fileName": unique_filename,
         "originalFilename": original_filename,
         "fileRelativePath": relative_path,
         "downloadUrl": tracker_public_file_url(relative_path),
-        "uploadedAt": uploaded_at,
+        "uploadedAt": now_utc(),
         "status": "Aktiv",
     }
     card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="tracker_pdf_upload", extra=extra)
 
     tracker_driver_cards_collection.update_many(
         {"discord_id": discord_id, "archived": {"$ne": True}},
-        {"$set": {"archived": True, "archived_at": uploaded_at, "active": False}}
+        {"$set": {"archived": True, "archived_at": now_utc(), "active": False}}
     )
     tracker_driver_cards_collection.update_one(
         {"discord_id": discord_id, "card_id": card_doc["card_id"], "file_relative_path": relative_path},
@@ -6636,7 +6560,7 @@ def tracker_driver_card_upload():
             "fahrerkarte_pdf_relative_path": relative_path,
             "fahrerkarte_pdf_filename": unique_filename,
             "fahrerkarte_download_url": card_doc.get("download_url"),
-            "tracker_driver_card_uploaded_at": uploaded_at,
+            "tracker_driver_card_uploaded_at": now_utc(),
             "tracker_driver_card_active": True,
         }}
     )
