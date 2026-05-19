@@ -1,8 +1,34 @@
 [
   {
-    "version": "v1.1.0",
+    "version": "v1.2.0",
     "tag": "Update",
     "is_latest": true,
+    "date": "19. Mai 2026, 02:00 Uhr",
+    "added": [
+      "Dispo-Formular erweitert: Eingereichte Dokumente können nun direkt in der Disponenten-Ansicht geöffnet, geprüft und weiterverarbeitet werden.",
+      "Einreicher-Zuordnung hinzugefügt: User können im Dokument-Modal korrekt aus der Datenbank geladen und einem Beleg zugeordnet werden.",
+      "User-Auswahl für Disposition angebunden: Die User-Liste wird aus der EifelLog-Datenbank bereitgestellt.",
+      "Neue Backend-Routen für Dispo-Dokumentaktionen hinzugefügt: Bearbeiten, Einreicher zuordnen, Prüfen, Signieren und Weitergabe an die Geschäftsleitung.",
+      "JSON-Endpoint für Dispo-User hinzugefügt, damit die User-Auswahl dynamisch im Frontend geladen werden kann.",
+      "Digitaler Signatur-Workflow für eingereichte Dispo-Dokumente hinzugefügt.",
+      "Weitergabe-Workflow an die Geschäftsleitung für geprüfte Dokumente hinzugefügt."
+    ],
+    "changed": [
+      "Dispo-Dokumentstatus erweitert und vereinheitlicht, damit Zustände wie geprüft, signiert, bei Geschäftsleitung und unvollständig korrekt verarbeitet werden.",
+      "Dispo-Dokumentprüfung wurde robuster an die bestehende Datenbank-Collection angebunden."
+    ],
+    "fixed": [
+      "Fehlerhafte Not-Found-Routen im Dispo-Dokumentmodal behoben.",
+      "Fehlende Backend-Endpunkte für /dispo/form/documents/assign-user, /dispo/form/documents/sign, /dispo/form/documents/edit und /dispo/form/documents/forward-management ergänzt.",
+      "Fehlende Route für die Dokumentprüfung ergänzt.",
+      "Problem behoben, dass die User-Auswahl im Feld Einreicher zuordnen nicht korrekt aus der Datenbank geladen wurde.",
+      "Statuswerte wie verified, signed, management_pending und returned_incomplete fallen nicht mehr fälschlicherweise auf pending zurück."
+    ]
+  },
+  {
+    "version": "v1.1.0",
+    "tag": "Update",
+    "is_latest": false,
     "date": "16. Mai 2026",
     "added": [
       "Rollenspezifische Dashboards implementiert: Jede Position im Unternehmen verfügt nun über ein eigenes, fest zugewiesenes Dashboard."
