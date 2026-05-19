@@ -9,14 +9,23 @@ import hmac
 import hashlib
 import secrets
 import requests
+from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort, send_file
+from flask import Flask, render_template, render_template_string, redirect, request, session, url_for, flash, jsonify, abort, send_file
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from bson.objectid import ObjectId
 from werkzeug.utils import secure_filename
+
+try:
+    from PIL import Image, ImageOps
+    PIL_AVAILABLE = True
+except Exception:
+    Image = None
+    ImageOps = None
+    PIL_AVAILABLE = False
 
 
 # ==========================================
@@ -319,11 +328,11 @@ ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROL
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
 # ==========================================
-# SERVICECENTER / DISCORD-SYNC
+# SERVICECENTER / WEB-ONLY FAHRERKARTE
 # ==========================================
-# Zielchannel fuer Fahrerkarte-Beantragungen.
-# Kann in der .env mit SERVICECENTER_DISCORD_CHANNEL_ID ueberschrieben werden.
-SERVICECENTER_DISCORD_ENABLED = env_bool("SERVICECENTER_DISCORD_ENABLED", default=True)
+# Die Fahrerkarte-Bearbeitung laeuft vollstaendig im Web-ServiceCenter.
+# Es werden keine Discord-Threads, Discord-Plugin-Mirrors oder Discord-PDF-Fallbacks mehr benoetigt.
+SERVICECENTER_DISCORD_ENABLED = False
 SERVICECENTER_DISCORD_CHANNEL_ID = env_first(
     "SERVICECENTER_DISCORD_CHANNEL_ID",
     "SERVICECENTER_CHANNEL_ID",
@@ -1876,6 +1885,158 @@ def resolve_fahrerkarte_pdf_path(pdf_path):
     return os.path.join(BASE_DIR, pdf_path)
 
 
+
+def resolve_local_avatar_path(source):
+    source = safe_str(source)
+    if not source:
+        return ""
+
+    if source.startswith("file://"):
+        source = source[7:]
+
+    if source.startswith("/static/"):
+        return os.path.join(BASE_DIR, source.lstrip("/"))
+    if source.startswith("static/"):
+        return os.path.join(BASE_DIR, source)
+
+    try:
+        host_prefix = request.host_url.rstrip("/") if request else ""
+    except Exception:
+        host_prefix = ""
+
+    if host_prefix and source.startswith(host_prefix):
+        rel_path = source[len(host_prefix):].lstrip("/")
+        if rel_path.startswith("static/"):
+            return os.path.join(BASE_DIR, rel_path)
+
+    if os.path.isabs(source) and os.path.exists(source):
+        return source
+    possible = os.path.join(BASE_DIR, source.lstrip("/"))
+    if os.path.exists(possible):
+        return possible
+    return ""
+
+
+def load_fahrerkarte_avatar_jpeg(request_doc, user_doc=None, size=180):
+    """Laedt den User-Avatar und wandelt ihn als JPEG fuer das PDF-XObject um.
+    Wenn kein Avatar erreichbar ist, wird im PDF ein neutraler Platzhalter verwendet.
+    """
+    if not PIL_AVAILABLE:
+        return None
+
+    user_doc = user_doc or {}
+    sources = [
+        request_doc.get("avatar_url") if request_doc else "",
+        user_doc.get("avatar_url"),
+        get_discord_avatar_url(user_doc) if user_doc else "",
+    ]
+
+    for source in sources:
+        source = safe_str(source)
+        if not source:
+            continue
+        raw = None
+        local_path = resolve_local_avatar_path(source)
+        try:
+            if local_path and os.path.exists(local_path):
+                with open(local_path, "rb") as image_file:
+                    raw = image_file.read()
+            elif source.startswith("http://") or source.startswith("https://"):
+                response = requests.get(source, timeout=5)
+                if response.ok and response.content:
+                    raw = response.content
+        except Exception as error:
+            print(f"Fahrerkarte-Avatar konnte nicht geladen werden ({source}): {error}")
+            raw = None
+
+        if not raw:
+            continue
+
+        try:
+            image = Image.open(BytesIO(raw))
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            image = ImageOps.fit(image, (int(size), int(size)), method=Image.LANCZOS, centering=(0.5, 0.5))
+            output = BytesIO()
+            image.save(output, format="JPEG", quality=88, optimize=True)
+            return {"name": "Avatar1", "width": int(size), "height": int(size), "data": output.getvalue()}
+        except Exception as error:
+            print(f"Fahrerkarte-Avatar konnte nicht verarbeitet werden ({source}): {error}")
+    return None
+
+
+def pdf_stream_image(stream, image_name, x, y, width, height):
+    image_name = safe_str(image_name)
+    if not image_name:
+        return
+    stream.extend(
+        f"q\n{float(width):.2f} 0 0 {float(height):.2f} {float(x):.2f} {float(y):.2f} cm\n/{image_name} Do\nQ\n".encode("ascii")
+    )
+
+
+def normalize_signature_value(value):
+    return re.sub(r"[^a-z0-9]+", "", safe_str(value).lower())
+
+
+def create_fahrerkarte_signature_payload(request_doc, actor, signature_name, signed_at=None):
+    signed_at = signed_at or now_utc()
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    actor_id = safe_str(actor.get("discord_id") or actor.get("id") or actor.get("username"))
+    payload = f"{request_id}|{discord_id}|{actor_id}|{safe_str(signature_name)}|{signed_at.isoformat()}"
+    key = str(app.secret_key).encode("utf-8", errors="ignore")
+    signature_hash = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest().upper()
+    return {
+        "digital_signature": {
+            "name": safe_str(signature_name),
+            "signed_at": signed_at,
+            "actor": actor,
+            "hash": signature_hash,
+            "method": "web_servicecenter_staff_signature",
+            "valid": True,
+        },
+        "signature_name": safe_str(signature_name),
+        "signature_hash": signature_hash,
+        "signature_valid": True,
+        "signature_method": "web_servicecenter_staff_signature",
+        "signed_by": actor,
+        "signed_at": signed_at,
+    }
+
+
+def validate_fahrerkarte_issue_signature(data, actor, request_doc):
+    data = data or {}
+    actor = actor or {}
+    signature_name = safe_str(
+        data.get("signature")
+        or data.get("signedBy")
+        or data.get("signatureName")
+        or data.get("sachbearbeiterSignature")
+        or data.get("digitalSignature")
+    )
+    confirmed = bool_from_payload(
+        data.get("signatureConfirmed")
+        or data.get("confirmSignature")
+        or data.get("signed")
+        or data.get("signature_confirmed"),
+        fallback=False,
+    )
+
+    if len(signature_name) < 3:
+        return False, "Digitale Signatur fehlt. Bitte den eigenen Sachbearbeiter-Namen eintragen."
+    if not confirmed:
+        return False, "Bitte die digitale Signatur aktiv bestätigen."
+
+    allowed_names = {
+        normalize_signature_value(actor.get("display_name")),
+        normalize_signature_value(actor.get("username")),
+    }
+    given_name = normalize_signature_value(signature_name)
+    if given_name not in {name for name in allowed_names if name}:
+        return False, "Die Signatur muss exakt dem eingeloggten Sachbearbeiter entsprechen."
+
+    return True, create_fahrerkarte_signature_payload(request_doc, actor, signature_name)
+
+
 def build_eifellog_servicecenter_pdf(title, subtitle, sections, footer_text="EifelLog ServiceCenter"):
     page_width = 595
     page_height = 842
@@ -2031,19 +2192,48 @@ def pdf_stream_text(stream, x, y, text, size=10, bold=False, color=(0, 0, 0), ma
     return cursor_y
 
 
-def build_pdf_single_page(stream, page_width=595, page_height=842):
+def build_pdf_single_page(stream, page_width=595, page_height=842, images=None):
+    images = images or []
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
-        f"<< /Type /Pages /Kids [6 0 R] /Count 1 >>".encode("ascii"),
+        b"",  # Pages object wird gesetzt, sobald die Page-Objektnummer bekannt ist.
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
     ]
+
     content = bytes(stream)
+    content_obj_num = len(objects) + 1
     objects.append(f"<< /Length {len(content)} >>\nstream\n".encode("ascii") + content + b"\nendstream")
-    objects.append(
+
+    xobject_entries = []
+    for index, image in enumerate(images, start=1):
+        image_name = safe_str(image.get("name") or f"Im{index}")
+        image_data = image.get("data") or b""
+        image_width = int(image.get("width") or 1)
+        image_height = int(image.get("height") or 1)
+        if not image_name or not image_data:
+            continue
+        object_number = len(objects) + 1
+        xobject_entries.append(f"/{image_name} {object_number} 0 R")
+        objects.append(
+            (
+                f"<< /Type /XObject /Subtype /Image /Width {image_width} /Height {image_height} "
+                f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(image_data)} >>\nstream\n"
+            ).encode("ascii") + image_data + b"\nendstream"
+        )
+
+    page_obj_num = len(objects) + 1
+    xobject_resource = ""
+    if xobject_entries:
+        xobject_resource = " /XObject << " + " ".join(xobject_entries) + " >>"
+
+    page_obj = (
         f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
-        f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>".encode("ascii")
-    )
+        f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobject_resource} >> "
+        f"/Contents {content_obj_num} 0 R >>"
+    ).encode("ascii")
+    objects.append(page_obj)
+    objects[1] = f"<< /Type /Pages /Kids [{page_obj_num} 0 R] /Count 1 >>".encode("ascii")
 
     pdf = bytearray()
     pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
@@ -2094,9 +2284,6 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     discord_id = safe_str(request_doc.get("discord_id") or user_doc.get("discord_id") or "-")
     driver_number = safe_str(request_doc.get("driver_number") or user_doc.get("driver_number") or "Nicht angegeben")
     system_id = safe_str(request_doc.get("system_id") or discord_id or "-")
-    reason_label = fahrerkarte_reason_label(request_doc.get("reason"))
-    priority_label = fahrerkarte_priority_label(request_doc.get("priority"))
-    delivery_label = fahrerkarte_delivery_label(request_doc.get("delivery_method"))
     issued_at = request_doc.get("issued_at") or now_utc()
     if not isinstance(issued_at, datetime):
         issued_at = now_utc()
@@ -2108,93 +2295,107 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
         or (request_doc.get("approved_by") or {}).get("display_name")
         or "Personalabteilung"
     )
+    digital_signature = request_doc.get("digital_signature") or {}
+    signature_name = safe_str(request_doc.get("signature_name") or digital_signature.get("name") or handler)
+    signature_hash = safe_str(request_doc.get("signature_hash") or digital_signature.get("hash"))
+    if not signature_hash:
+        signature_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}|{signature_name}".encode("utf-8")).hexdigest().upper()
+    short_signature_hash = signature_hash[:32]
     note = safe_str(request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")
+
+    avatar_image = load_fahrerkarte_avatar_jpeg(request_doc, user_doc=user_doc, size=180)
+    pdf_images = [avatar_image] if avatar_image else []
 
     stream = bytearray()
     stream.extend(b"q\n")
 
-    # Hintergrund
-    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.015, 0.025, 0.020))
-    pdf_stream_rect(stream, 0, 0, 595, 842, stroke_rgb=(0.110, 0.750, 0.280), line_width=2.5)
-    pdf_stream_rect(stream, 0, 776, 595, 66, fill_rgb=(0.020, 0.055, 0.035))
-    pdf_stream_rect(stream, 0, 770, 595, 6, fill_rgb=(0.160, 0.850, 0.340))
-    pdf_stream_text(stream, 42, 805, "EIFELLOG SERVICECENTER", size=10, bold=True, color=(0.160, 0.850, 0.340))
-    pdf_stream_text(stream, 42, 785, "Personalisierte Fahrerkarte", size=21, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 390, 805, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.750, 0.820, 0.760))
+    # Seite bewusst als interne ServiceCenter-Karte, nicht als amtliches Dokument.
+    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.940, 0.965, 0.980))
+    pdf_stream_rect(stream, 0, 790, 595, 52, fill_rgb=(0.120, 0.250, 0.460))
+    pdf_stream_text(stream, 42, 814, "EIFELLOG SERVICECENTER", size=10, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 42, 796, "Digitale Fahrerkarte / Web-Ausstellung", size=18, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 390, 812, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.890, 0.940, 1.000))
 
-    # Kartenkörper
-    card_x, card_y, card_w, card_h = 48, 464, 499, 236
-    pdf_stream_rect(stream, card_x + 7, card_y - 9, card_w, card_h, fill_rgb=(0.000, 0.000, 0.000))
-    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(0.030, 0.045, 0.038), stroke_rgb=(0.160, 0.850, 0.340), line_width=1.4)
-    pdf_stream_rect(stream, card_x, card_y + card_h - 42, card_w, 42, fill_rgb=(0.120, 0.650, 0.270))
-    pdf_stream_text(stream, card_x + 18, card_y + card_h - 27, "FAHRERKARTE", size=16, bold=True, color=(0.000, 0.000, 0.000))
-    pdf_stream_text(stream, card_x + 170, card_y + card_h - 24, "EifelLog Virtual Logistics", size=10, bold=True, color=(0.000, 0.000, 0.000))
-    pdf_stream_rect(stream, card_x + card_w - 96, card_y + card_h - 31, 72, 18, fill_rgb=(0.000, 0.000, 0.000), stroke_rgb=(0.000, 0.000, 0.000), line_width=1)
-    pdf_stream_text(stream, card_x + card_w - 86, card_y + card_h - 26, "AKTIV", size=9, bold=True, color=(0.160, 0.850, 0.340))
+    # Kartenkörper nach hellblauem Fahrerkarte-Layout, klar als interne EifelLog-Karte markiert.
+    card_x, card_y, card_w, card_h = 34, 493, 527, 262
+    pdf_stream_rect(stream, card_x + 5, card_y - 7, card_w, card_h, fill_rgb=(0.640, 0.720, 0.780))
+    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(0.820, 0.910, 0.965), stroke_rgb=(0.260, 0.410, 0.620), line_width=1.5)
+    pdf_stream_rect(stream, card_x, card_y + card_h - 38, card_w, 38, fill_rgb=(0.650, 0.780, 0.900))
+    pdf_stream_rect(stream, card_x + 10, card_y + card_h - 34, 54, 30, fill_rgb=(0.060, 0.190, 0.510), stroke_rgb=(1, 1, 1), line_width=0.8)
+    pdf_stream_text(stream, card_x + 20, card_y + card_h - 23, "EL", size=13, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, card_x + 78, card_y + card_h - 18, "FAHRERKARTE", size=17, bold=True, color=(0.090, 0.180, 0.330))
+    pdf_stream_text(stream, card_x + 250, card_y + card_h - 15, "EifelLog Web-ServiceCenter", size=9, bold=True, color=(0.090, 0.180, 0.330))
+    pdf_stream_text(stream, card_x + 395, card_y + card_h - 29, "KEIN AMTLICHES DOKUMENT", size=8, bold=True, color=(0.580, 0.060, 0.060))
 
-    # Avatar-Platzhalter
-    avatar_x, avatar_y = card_x + 22, card_y + 78
-    pdf_stream_rect(stream, avatar_x, avatar_y, 92, 98, fill_rgb=(0.075, 0.095, 0.085), stroke_rgb=(0.180, 0.850, 0.360), line_width=1)
-    pdf_stream_rect(stream, avatar_x + 18, avatar_y + 54, 56, 30, fill_rgb=(0.160, 0.850, 0.340))
-    pdf_stream_text(stream, avatar_x + 28, avatar_y + 65, "EL", size=18, bold=True, color=(0.000, 0.000, 0.000))
-    pdf_stream_text(stream, avatar_x + 14, avatar_y + 30, "DRIVER", size=10, bold=True, color=(0.780, 0.860, 0.800))
-    pdf_stream_text(stream, avatar_x + 10, avatar_y + 13, "IDENTITY", size=8, bold=False, color=(0.550, 0.630, 0.570))
+    # Avatar des Users
+    avatar_x, avatar_y, avatar_w, avatar_h = card_x + 24, card_y + 69, 108, 126
+    pdf_stream_rect(stream, avatar_x - 2, avatar_y - 2, avatar_w + 4, avatar_h + 4, fill_rgb=(0.920, 0.955, 0.980), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.8)
+    if avatar_image:
+        pdf_stream_image(stream, "Avatar1", avatar_x, avatar_y + 9, avatar_w, avatar_w)
+    else:
+        pdf_stream_rect(stream, avatar_x, avatar_y + 9, avatar_w, avatar_w, fill_rgb=(0.730, 0.820, 0.880), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+        initials = "".join([part[:1] for part in name.split()[:2]]).upper() or "EL"
+        pdf_stream_text(stream, avatar_x + 31, avatar_y + 65, initials[:3], size=24, bold=True, color=(0.120, 0.250, 0.460))
+    pdf_stream_text(stream, avatar_x + 14, avatar_y + 7, "USER AVATAR", size=7, bold=True, color=(0.190, 0.300, 0.430))
 
-    # Hauptdaten
-    data_x = card_x + 134
-    pdf_stream_text(stream, data_x, card_y + 169, name[:42], size=19, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, data_x, card_y + 146, role[:54], size=11, bold=True, color=(0.160, 0.850, 0.340))
-    pdf_stream_line(stream, data_x, card_y + 134, card_x + card_w - 26, card_y + 134, stroke_rgb=(0.160, 0.850, 0.340), line_width=0.8)
+    # Datenfelder im Stil der Referenz, aber mit internen Feldern.
+    data_x = card_x + 154
+    line_y = card_y + 184
+    pdf_stream_text(stream, data_x, line_y, f"1. {name[:46]}", size=15, bold=True, color=(0.050, 0.080, 0.120), max_chars=58)
+    pdf_stream_text(stream, data_x, line_y - 26, f"2. {role[:50]}", size=11, bold=True, color=(0.050, 0.080, 0.120), max_chars=62)
+    pdf_stream_text(stream, data_x, line_y - 49, f"3. {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
+    pdf_stream_text(stream, data_x + 138, line_y - 49, f"4a {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
+    pdf_stream_text(stream, data_x + 272, line_y - 49, f"4b {valid_until.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
+    pdf_stream_text(stream, data_x, line_y - 72, "4c EifelLog ServiceCenter", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=60)
+    pdf_stream_text(stream, data_x, line_y - 95, f"5a {system_id}", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 118, f"5b {card_id}", size=10, bold=True, color=(0.050, 0.080, 0.120), max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 141, f"User: {username}  |  Fahrer-Nr.: {driver_number}", size=8, bold=False, color=(0.220, 0.310, 0.420), max_chars=76)
 
-    pdf_stream_text(stream, data_x, card_y + 112, f"Karten-ID: {card_id}", size=10, bold=True, color=(0.900, 0.960, 0.910), max_chars=52)
-    pdf_stream_text(stream, data_x, card_y + 94, f"Username: {username}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
-    pdf_stream_text(stream, data_x, card_y + 78, f"Discord-ID: {discord_id}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
-    pdf_stream_text(stream, data_x, card_y + 62, f"Fahrernummer: {driver_number}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
-    pdf_stream_text(stream, data_x, card_y + 44, f"Gültig bis: {valid_until.strftime('%d.%m.%Y')}", size=9, bold=True, color=(1, 1, 1), max_chars=60)
-
-    # QR-artiger Prüfblock
-    qr_x, qr_y, cell = card_x + card_w - 103, card_y + 74, 5
-    pdf_stream_rect(stream, qr_x - 8, qr_y - 8, 84, 84, fill_rgb=(0.930, 0.965, 0.930))
-    digest = hashlib.sha256(card_id.encode("utf-8")).digest()
+    # Interner Checkcode
+    qr_x, qr_y, cell = card_x + card_w - 90, card_y + 55, 4
+    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, 68, 68, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+    digest = hashlib.sha256(f"{card_id}|{request_id}".encode("utf-8")).digest()
     for row in range(14):
         for col in range(14):
             byte = digest[(row * 14 + col) % len(digest)]
             should_fill = ((byte >> (col % 8)) & 1) or row in {0, 13} or col in {0, 13}
             if should_fill:
-                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=(0.020, 0.045, 0.030))
-    pdf_stream_text(stream, qr_x - 3, qr_y - 22, "CHECKCODE", size=7, bold=True, color=(0.160, 0.850, 0.340))
+                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=(0.040, 0.080, 0.150))
+    pdf_stream_text(stream, qr_x - 1, qr_y - 20, "CHECKCODE", size=7, bold=True, color=(0.090, 0.180, 0.330))
 
-    # Ausstellungsleiste
-    pdf_stream_rect(stream, card_x + 20, card_y + 22, card_w - 40, 30, fill_rgb=(0.015, 0.022, 0.018), stroke_rgb=(0.120, 0.520, 0.240), line_width=0.7)
-    pdf_stream_text(stream, card_x + 32, card_y + 34, f"Ausgestellt durch: {handler}", size=8, bold=False, color=(0.750, 0.820, 0.760), max_chars=82)
-    pdf_stream_text(stream, card_x + 32, card_y + 23, "Dieses Dokument ist automatisch generiert und für den ServiceCenter-Download bestimmt.", size=7, bold=False, color=(0.560, 0.620, 0.580), max_chars=92)
+    # Signaturzeile auf Karte
+    pdf_stream_line(stream, card_x + 155, card_y + 23, card_x + 375, card_y + 23, stroke_rgb=(0.090, 0.180, 0.330), line_width=0.6)
+    pdf_stream_text(stream, card_x + 155, card_y + 9, f"Signiert: {signature_name[:36]}", size=8, bold=False, color=(0.050, 0.080, 0.120), max_chars=54)
+    pdf_stream_text(stream, card_x + 405, card_y + 9, "INTERN / WEB", size=8, bold=True, color=(0.580, 0.060, 0.060))
 
-    # Detailbereiche
-    box_y = 246
-    pdf_stream_rect(stream, 48, box_y, 499, 182, fill_rgb=(0.965, 0.980, 0.965), stroke_rgb=(0.160, 0.850, 0.340), line_width=1)
-    pdf_stream_text(stream, 66, box_y + 154, "Dokumentdaten", size=13, bold=True, color=(0.020, 0.070, 0.035))
-    pdf_stream_text(stream, 66, box_y + 130, f"Antrags-ID: {request_id}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
-    pdf_stream_text(stream, 66, box_y + 114, f"System-ID: {system_id}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
-    pdf_stream_text(stream, 66, box_y + 98, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
-    pdf_stream_text(stream, 66, box_y + 82, f"Priorität: {priority_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
-    pdf_stream_text(stream, 66, box_y + 66, f"Antragsgrund: {reason_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
-    pdf_stream_text(stream, 66, box_y + 50, f"Bereitstellung: {delivery_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    # Detailbereiche unterhalb der Karte
+    box_y = 250
+    pdf_stream_rect(stream, 48, box_y, 499, 188, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=1)
+    pdf_stream_text(stream, 66, box_y + 158, "Postfach & Download", size=13, bold=True, color=(0.090, 0.180, 0.330))
+    pdf_stream_text(stream, 66, box_y + 133, f"Antrags-ID: {request_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 116, f"Karten-ID: {card_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 99, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 82, "Bereitstellung: Postfach im ServiceCenter + PDF-Download", size=9, bold=True, color=(0.090, 0.180, 0.330), max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 58, f"Hinweis: {note}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=62)
 
-    pdf_stream_text(stream, 315, box_y + 154, "Hinweis", size=13, bold=True, color=(0.020, 0.070, 0.035))
-    pdf_stream_text(stream, 315, box_y + 130, note, size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=36)
+    pdf_stream_text(stream, 315, box_y + 158, "Digitale Signatur", size=13, bold=True, color=(0.090, 0.180, 0.330))
+    pdf_stream_text(stream, 315, box_y + 133, f"Sachbearbeiter: {handler}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 116, f"Signatur: {signature_name}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 99, f"Zeitpunkt: {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 82, f"Hash: {short_signature_hash}", size=8, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 58, "Verifikation: Web-ServiceCenter / MongoDB-Antrag", size=8, bold=True, color=(0.090, 0.180, 0.330), max_chars=42)
 
-    # Signatur
-    pdf_stream_rect(stream, 48, 116, 499, 90, fill_rgb=(0.030, 0.045, 0.038), stroke_rgb=(0.160, 0.850, 0.340), line_width=0.9)
-    pdf_stream_text(stream, 66, 178, "Digitale Ausstellung", size=12, bold=True, color=(0.160, 0.850, 0.340))
-    pdf_stream_text(stream, 66, 156, f"{handler} / {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=10, bold=False, color=(1, 1, 1), max_chars=80)
+    pdf_stream_rect(stream, 48, 116, 499, 88, fill_rgb=(0.120, 0.250, 0.460), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.9)
+    pdf_stream_text(stream, 66, 175, "Interne Fahrerkarte", size=12, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 66, 154, "Dieses Dokument ist eine interne EifelLog-ServiceCenter-Karte und ersetzt keine amtliche Fahrerkarte.", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=92)
     verify_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}".encode("utf-8")).hexdigest()[:24].upper()
-    pdf_stream_text(stream, 66, 137, f"Prüfhash: {verify_hash}", size=8, bold=False, color=(0.760, 0.820, 0.780), max_chars=80)
-    pdf_stream_text(stream, 66, 121, "Download: ServiceCenter / Dokumente / Fahrerkarte", size=8, bold=True, color=(0.160, 0.850, 0.340), max_chars=80)
+    pdf_stream_text(stream, 66, 136, f"Pruefhash: {verify_hash}", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=80)
+    pdf_stream_text(stream, 66, 120, "Download: ServiceCenter / Postfach / Fahrerkarte", size=8, bold=True, color=(1, 1, 1), max_chars=80)
 
-    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - automatisch generierte personalisierte Fahrerkarte", size=8, bold=False, color=(0.740, 0.800, 0.760))
-    pdf_stream_text(stream, 42, 48, "Bei Missbrauch oder falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=(0.540, 0.600, 0.560))
+    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - webbasierte Fahrerkarte-Ausstellung", size=8, bold=False, color=(0.220, 0.310, 0.420))
+    pdf_stream_text(stream, 42, 48, "Bei falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=(0.220, 0.310, 0.420))
     stream.extend(b"Q\n")
-    return build_pdf_single_page(stream)
+    return build_pdf_single_page(stream, images=pdf_images)
 
 
 def build_fahrerkarte_pdf_sections(request_doc, user_doc=None, actor=None):
@@ -2627,6 +2828,12 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["reject_reason"] = item.get("reject_reason") or ""
     item["postpone_reason"] = item.get("postpone_reason") or ""
     item["issue_note"] = item.get("issue_note") or ""
+    digital_signature = item.get("digital_signature") or {}
+    item["signature_required"] = item["status"] in {"approved", "claimed"}
+    item["issue_requires_signature"] = True
+    item["signature_name"] = item.get("signature_name") or digital_signature.get("name") or ""
+    item["signature_hash"] = item.get("signature_hash") or digital_signature.get("hash") or ""
+    item["signature_valid"] = bool(item.get("signature_valid") or digital_signature.get("valid"))
 
     # Frontend-Hilfe für die Spalte/Button "Dokument":
     # - vor Ausstellung: Button "AUSSTELLEN" kann die Issue-Route aufrufen
@@ -3300,6 +3507,38 @@ def servicecenter_discord_send_pdf_fallback(request_doc, file_path, actor=None, 
         }})
 
     return {"ok": ok, "result": result, "status": status_code}
+
+
+
+# ==========================================
+# WEB-ONLY OVERRIDES FUER SERVICECENTER-FAHRERKARTEN
+# ==========================================
+# Die folgenden Namen bleiben aus Kompatibilitaetsgruenden bestehen, fuehren aber keinerlei
+# Discord-API-Requests mehr aus. Alte Templates/JS koennen dadurch weiter laufen, die Bearbeitung
+# findet trotzdem nur im Web-ServiceCenter statt.
+
+def mirror_fahrerkarte_request_for_discord_plugin(request_doc, user_doc=None):
+    return request_doc
+
+
+def servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated", actor=None):
+    if request_doc:
+        request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+        if request_id:
+            fahrerkarte_requests_collection.update_one(
+                request_lookup_query(request_id),
+                {"$set": {
+                    "web_sync_status": "web_only",
+                    "web_synced_at": now_utc(),
+                    "discord_sync_status": "disabled_web_only",
+                    "discord_sync_error": "Discord-Plugin entfernt: ServiceCenter Fahrerkarte laeuft vollstaendig ueber Web.",
+                }}
+            )
+    return {"ok": True, "web_only": True, "skipped_discord": True, "event": safe_str(event)}
+
+
+def servicecenter_discord_send_pdf_fallback(request_doc, file_path, actor=None, reason="PDF-Fallback"):
+    return {"ok": True, "web_only": True, "skipped_discord": True}
 
 
 def tracker_confirmation_document_content(name, role, handler_name, tracker_code, reason=None):
@@ -5809,8 +6048,7 @@ def servicecenter_fahrerkarte_beantragen():
         "status": {"$in": ["pending", "open", "claimed", "approved", "postponed"]},
     })
     if existing_open:
-        servicecenter_discord_sync_fahrerkarte_request(existing_open, event="existing")
-        flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte. Sie wurde erneut mit dem Discord-ServiceCenter synchronisiert.", "info")
+        flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte. Sie liegt im Web-ServiceCenter der Personalabteilung bereit.", "info")
         return redirect(url_for("servicecenter"))
 
     now = now_utc()
@@ -5887,12 +6125,8 @@ def servicecenter_fahrerkarte_beantragen():
         "request_id": request_id,
     })
 
-    discord_sync = servicecenter_discord_sync_fahrerkarte_request(request_doc, event="created")
-    if discord_sync.get("ok"):
-        flash("Deine personalisierte Fahrerkarte wurde beantragt und direkt im Discord-ServiceCenter erstellt.", "success")
-    else:
-        print(f"ServiceCenter Discord-Sync fehlgeschlagen: {discord_sync.get('error') or discord_sync}")
-        flash("Deine personalisierte Fahrerkarte wurde beantragt. Discord konnte nicht automatisch synchronisiert werden; die Personalabteilung sieht den Antrag trotzdem im System.", "warning")
+    servicecenter_discord_sync_fahrerkarte_request(request_doc, event="created")
+    flash("Deine personalisierte Fahrerkarte wurde beantragt. Die Personalabteilung kann sie jetzt im Web-ServiceCenter claimen, signieren und ausstellen.", "success")
     return redirect(url_for("servicecenter"))
 
 
@@ -7901,12 +8135,13 @@ def personalabteilung():
     ]
 
     servicecenter_fahrerkarte_actions = {
+        "list": url_for("api_personalabteilung_servicecenter_fahrerkarte_list"),
         "claim": url_for("api_personalabteilung_servicecenter_fahrerkarte_claim"),
         "approve": url_for("api_personalabteilung_servicecenter_fahrerkarte_approve"),
         "issue": url_for("api_personalabteilung_servicecenter_fahrerkarte_issue"),
         "reject": url_for("api_personalabteilung_servicecenter_fahrerkarte_reject"),
         "postpone": url_for("api_personalabteilung_servicecenter_fahrerkarte_postpone"),
-        "discordSync": url_for("api_personalabteilung_servicecenter_fahrerkarte_discord_sync"),
+        "webPage": url_for("personalabteilung_servicecenter_fahrerkarte_web"),
     }
 
     # Tasks abrufen: Buchhaltungsanfragen laufen ab jetzt nur noch über den eigenen Tab.
@@ -7934,9 +8169,187 @@ def personalabteilung():
         fahrerkarte_requests=servicecenter_fahrerkarte_requests,
         servicecenter_requests=servicecenter_fahrerkarte_requests,
         servicecenter_fahrerkarte_actions=servicecenter_fahrerkarte_actions,
+        servicecenter_fahrerkarte_web_url=url_for("personalabteilung_servicecenter_fahrerkarte_web"),
         tasks=tasks
     )
 
+
+FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceCenter Fahrerkarte</title>
+  <style>
+    :root { --blue:#17345f; --line:#9bb5cf; --bg:#eef5fb; --green:#27d263; --red:#b3261e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, Arial, sans-serif; background:linear-gradient(135deg,#eef5fb,#d9e9f6); color:#112; }
+    header { background:#17345f; color:white; padding:24px 32px; display:flex; justify-content:space-between; gap:16px; align-items:center; }
+    header h1 { margin:0; font-size:24px; letter-spacing:.08em; text-transform:uppercase; }
+    header p { margin:6px 0 0; color:#d8e8f7; }
+    main { max-width:1220px; margin:0 auto; padding:28px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:22px; }
+    button, select, input, textarea { border-radius:12px; border:1px solid #a8bfd7; padding:11px 13px; font:inherit; }
+    button { cursor:pointer; background:#17345f; color:white; font-weight:800; text-transform:uppercase; letter-spacing:.06em; border-color:#17345f; }
+    button.secondary { background:white; color:#17345f; }
+    button.success { background:#146c2e; border-color:#146c2e; }
+    button.danger { background:#9f1d17; border-color:#9f1d17; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:18px; }
+    .case { background:rgba(255,255,255,.92); border:1px solid #b5c9dd; border-radius:22px; overflow:hidden; box-shadow:0 18px 38px rgba(23,52,95,.12); }
+    .card { margin:16px; border-radius:18px; border:1px solid #668bb2; background:#dcecf8; overflow:hidden; position:relative; }
+    .card-head { height:44px; background:#bcd5eb; display:flex; align-items:center; gap:12px; padding:0 14px; color:#17345f; font-weight:900; letter-spacing:.08em; }
+    .eu { width:54px; height:30px; background:#17345f; color:white; display:grid; place-items:center; border-radius:4px; font-weight:900; }
+    .not-official { margin-left:auto; color:#a32017; font-size:10px; }
+    .card-body { display:grid; grid-template-columns:112px 1fr; gap:16px; padding:16px; }
+    .avatar { width:108px; height:126px; border:1px solid #668bb2; background:white; object-fit:cover; }
+    .fields p { margin:0 0 9px; font-size:13px; }
+    .fields strong { font-size:18px; }
+    .meta { padding:0 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; color:#26394c; }
+    .status { display:inline-flex; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:900; background:#e9f9ee; color:#146c2e; border:1px solid #9edbb0; }
+    .actions { border-top:1px solid #dde8f1; padding:16px; display:grid; gap:10px; }
+    .signature { display:grid; gap:8px; background:#f5f9fc; border:1px dashed #9bb5cf; padding:12px; border-radius:16px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; }
+    .msg { margin:0 0 14px; min-height:20px; font-weight:700; }
+    .small { font-size:12px; color:#475b70; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>ServiceCenter Fahrerkarte</h1>
+    <p>Web-only: claimen, genehmigen, signieren, ausstellen und PDF im User-Postfach bereitstellen.</p>
+  </div>
+  <a href="{{ personal_url }}" style="color:white;font-weight:800">Zur Personalabteilung</a>
+</header>
+<main>
+  <div class="toolbar">
+    <select id="status">
+      <option value="">Alle Status</option>
+      <option value="pending">Offen</option>
+      <option value="claimed">Geclaimt</option>
+      <option value="approved">Genehmigt</option>
+      <option value="issued">Ausgestellt</option>
+      <option value="postponed">Zurückgestellt</option>
+      <option value="rejected">Abgelehnt</option>
+    </select>
+    <button onclick="loadCases()">Aktualisieren</button>
+    <span class="small">Sachbearbeiter-Signatur: exakt dein eingeloggter Anzeigename/Username.</span>
+  </div>
+  <p id="msg" class="msg"></p>
+  <section id="cases" class="grid"></section>
+</main>
+<script>
+const actions = {{ actions_json | safe }};
+const staffName = {{ staff_name_json | safe }};
+const casesEl = document.getElementById('cases');
+const msgEl = document.getElementById('msg');
+function setMsg(text, error=false){ msgEl.textContent = text || ''; msgEl.style.color = error ? '#9f1d17' : '#146c2e'; }
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+async function api(url, payload){
+  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload || {})});
+  const data = await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
+  if(!res.ok || data.success === false) throw new Error(data.message || 'Aktion fehlgeschlagen');
+  return data;
+}
+async function loadCases(){
+  const status = document.getElementById('status').value;
+  const url = actions.list + (status ? ('?status=' + encodeURIComponent(status)) : '');
+  const res = await fetch(url);
+  const data = await res.json();
+  const items = data.requests || data.items || [];
+  casesEl.innerHTML = items.map(renderCase).join('') || '<p>Keine Fahrerkarte-Anträge gefunden.</p>';
+  setMsg(items.length + ' Antrag/Anträge geladen.');
+}
+function renderCase(item){
+  const id = esc(item.request_id || item.id);
+  const avatar = esc(item.avatar_url || '/static/eifellog.jpg');
+  const canClaim = ['pending','open','postponed','approved'].includes(item.status);
+  const canApprove = item.status === 'claimed';
+  const canIssue = ['claimed','approved'].includes(item.status);
+  const download = item.download_url ? `<a href="${esc(item.download_url)}" download><button class="success" type="button">PDF herunterladen</button></a>` : '';
+  return `
+  <article class="case" id="case-${id}">
+    <div class="card">
+      <div class="card-head"><span class="eu">EL</span><span>FAHRERKARTE</span><span class="not-official">KEIN AMTLICHES DOKUMENT</span></div>
+      <div class="card-body">
+        <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='/static/eifellog.jpg'">
+        <div class="fields">
+          <p><strong>${esc(item.display_name || item.name)}</strong></p>
+          <p>2. ${esc(item.role || item.role_name)}</p>
+          <p>3. Beantragt: ${esc(item.created_at || item.requested_at)}</p>
+          <p>4a Status: <span class="status">${esc(item.status_label || item.status)}</span></p>
+          <p>5a System-ID: ${esc(item.system_id)}</p>
+          <p>5b Karten-ID: ${esc(item.card_id || 'Wird bei Ausstellung erzeugt')}</p>
+        </div>
+      </div>
+      <div class="meta"><span>Grund: ${esc(item.reason_label)}</span><span>Sachbearbeiter: ${esc(item.sachbearbeiter_name)}</span></div>
+    </div>
+    <div class="actions">
+      <div class="row">
+        <button ${canClaim?'':'disabled'} onclick="claimCase('${id}')">Claim</button>
+        <button class="secondary" ${canApprove?'':'disabled'} onclick="approveCase('${id}')">Genehmigen</button>
+        ${download}
+      </div>
+      <div class="signature">
+        <label>Digitale Signatur des Sachbearbeiters</label>
+        <input id="sig-${id}" value="${esc(staffName)}" placeholder="${esc(staffName)}">
+        <textarea id="note-${id}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde im EifelLog Web-ServiceCenter ausgestellt.</textarea>
+        <label class="small"><input id="confirm-${id}" type="checkbox"> Ich bestätige die korrekte Web-Signatur und Ausstellung.</label>
+        <button class="success" ${canIssue?'':'disabled'} onclick="issueCase('${id}')">Signieren & ausstellen</button>
+      </div>
+      <div class="row">
+        <button class="danger" onclick="rejectCase('${id}')">Ablehnen</button>
+        <button class="secondary" onclick="postponeCase('${id}')">Zurückstellen</button>
+      </div>
+    </div>
+  </article>`;
+}
+async function claimCase(id){ try{ const d=await api(actions.claim,{requestId:id}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
+async function approveCase(id){ try{ const note=prompt('Genehmigungsvermerk','Fahrerkarte geprüft und genehmigt.')||''; const d=await api(actions.approve,{requestId:id,note}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
+async function issueCase(id){
+  try{
+    const signature = document.getElementById('sig-'+id).value;
+    const issueNote = document.getElementById('note-'+id).value;
+    const signatureConfirmed = document.getElementById('confirm-'+id).checked;
+    const d = await api(actions.issue,{requestId:id,signature,signatureConfirmed,issueNote,force:true});
+    setMsg(d.message);
+    if(d.downloadUrl) window.open(d.downloadUrl,'_blank');
+    await loadCases();
+  }catch(e){ setMsg(e.message,true); }
+}
+async function rejectCase(id){ try{ const reason=prompt('Ablehnungsgrund','')||'Kein Grund angegeben.'; const d=await api(actions.reject,{requestId:id,reason}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
+async function postponeCase(id){ try{ const reason=prompt('Grund für Zurückstellung','Zur späteren Bearbeitung zurückgestellt.')||''; const d=await api(actions.postpone,{requestId:id,reason}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
+loadCases();
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/personalabteilung/servicecenter/fahrerkarte", methods=["GET"])
+@app.route("/servicecenter/admin/fahrerkarte", methods=["GET"])
+def personalabteilung_servicecenter_fahrerkarte_web():
+    permission_response = require_personalabteilung_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_staff_identity()
+    actions = {
+        "list": url_for("api_personalabteilung_servicecenter_fahrerkarte_list"),
+        "claim": url_for("api_personalabteilung_servicecenter_fahrerkarte_claim"),
+        "approve": url_for("api_personalabteilung_servicecenter_fahrerkarte_approve"),
+        "issue": url_for("api_personalabteilung_servicecenter_fahrerkarte_issue"),
+        "reject": url_for("api_personalabteilung_servicecenter_fahrerkarte_reject"),
+        "postpone": url_for("api_personalabteilung_servicecenter_fahrerkarte_postpone"),
+    }
+    return render_template_string(
+        FAHRERKARTE_WEB_ADMIN_TEMPLATE,
+        actions_json=json.dumps(actions),
+        staff_name_json=json.dumps(actor.get("display_name") or actor.get("username") or "Personalabteilung"),
+        personal_url=url_for("personalabteilung"),
+    )
 
 
 # ==========================================
@@ -8993,7 +9406,12 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
             claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
             return jsonify({"success": False, "message": f"Dieser Fahrerkarte-Antrag ist bereits von {claimed_name} geclaimt. Nur der zuständige Sachbearbeiter kann ihn ausstellen."}), 403
     else:
-        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag muss zuerst geclaimt und genehmigt werden."}), 409
+        return jsonify({"success": False, "message": "Dieser Fahrerkarte-Antrag muss zuerst geclaimt werden."}), 409
+
+    signature_ok, signature_result = validate_fahrerkarte_issue_signature(data, actor, request_doc)
+    if not signature_ok:
+        return jsonify({"success": False, "message": signature_result}), 400
+    signature_data = signature_result
 
     now = now_utc()
     handler_name = actor.get("display_name") or "Personalabteilung"
@@ -9011,6 +9429,8 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
         "tracker_upload_ready": True,
         "updated_at": now,
     }
+    pre_update.update(signature_data)
+
     temp_doc = dict(request_doc)
     temp_doc.update(pre_update)
 
@@ -9212,11 +9632,11 @@ def api_personalabteilung_servicecenter_fahrerkarte_discord_sync():
     result = servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated", actor=current_staff_identity())
     fresh_request = find_fahrerkarte_request(request_id) or request_doc
     return jsonify({
-        "success": bool(result.get("ok")),
-        "message": "Discord-Sync ausgeführt." if result.get("ok") else "Discord-Sync fehlgeschlagen.",
+        "success": True,
+        "message": "Web-only ServiceCenter geprüft. Discord-Sync ist deaktiviert und wird nicht mehr verwendet.",
         "result": result,
         "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
-    }), (200 if result.get("ok") else 502)
+    })
 
 
 @app.route("/servicecenter/fahrerkarte/download/<request_id>", methods=["GET"])
