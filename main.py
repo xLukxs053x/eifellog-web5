@@ -5572,6 +5572,11 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
                 "tracker_last_trip_distance_km": distance,
                 "tracker_online": False,
                 "tracker_current_job": None,
+                "tracker_current_job_key": "",
+                "tracker_active_tour_start_embed_sent": False,
+                "tracker_active_tour_start_embed_sent_key": "",
+                "tracker_active_tour_start_embed_reset_at": now,
+                "tracker_active_tour_start_embed_reset_reason": "tour_completed",
                 "tracker_last_receipt_id": receipt_doc.get("receipt_id"),
                 "tracker_last_receipt_number": receipt_doc.get("receipt_number"),
                 "tracker_last_job_completed_at": now
@@ -5806,6 +5811,91 @@ def send_tour_start_to_discord(user_doc, telemetry):
         build_tour_start_discord_payload(user_doc, telemetry),
         channel_id=TOUR_CHANNEL_ID,
         webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
+    )
+
+
+def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=None):
+    """
+    Sendet den Discord-Embed "Tour gestartet" genau einmal pro aktiver Tour.
+
+    Der Live-Tracker schickt während der Fahrt fortlaufend Telemetrie. Deshalb darf der
+    Discord-Versand nicht direkt an jede Änderung des berechneten Tour-Keys gekoppelt sein.
+    Dieses Flag bleibt während der aktiven Tour gesetzt und wird erst zurückgesetzt, wenn
+    keine Tour mehr aktiv ist oder die Tour abgegeben wurde.
+    """
+    user_doc = user_doc or {}
+    telemetry = telemetry or {}
+    current_job_key = safe_str(current_job_key or tracker_current_job_key(telemetry, user_doc))
+
+    if not current_job_key:
+        return {"sent": False, "skipped": True, "reason": "Kein aktiver Tour-Key vorhanden."}
+
+    if not user_doc.get("_id"):
+        return {"sent": False, "skipped": True, "reason": "User-Dokument ohne Mongo-ID."}
+
+    now = now_utc()
+    claim_result = users_collection.update_one(
+        {
+            "_id": user_doc["_id"],
+            "$or": [
+                {"tracker_active_tour_start_embed_sent": {"$ne": True}},
+                {"tracker_active_tour_start_embed_sent": {"$exists": False}},
+            ],
+        },
+        {
+            "$set": {
+                "tracker_active_tour_start_embed_sent": True,
+                "tracker_active_tour_start_embed_sent_key": current_job_key,
+                "tracker_active_tour_start_embed_claimed_at": now,
+            }
+        },
+    )
+
+    if getattr(claim_result, "matched_count", 0) == 0:
+        return {
+            "sent": False,
+            "skipped": True,
+            "already_sent": True,
+            "reason": "Tour-Start-Embed wurde für die aktive Tour bereits gesendet.",
+            "job_key": current_job_key,
+        }
+
+    discord_result = send_tour_start_to_discord(user_doc, telemetry)
+    discord_result = discord_result or {"sent": False, "reason": "Kein Discord-Ergebnis erhalten."}
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_tour_started_at": now,
+                "tracker_tour_started_discord": discord_result,
+                "tracker_tour_started_discord_message_id": discord_result.get("message_id"),
+                "tracker_tour_started_discord_channel_id": discord_result.get("channel_id") or TOUR_CHANNEL_ID,
+                "tracker_active_tour_start_embed_sent_at": now,
+                "tracker_active_tour_start_embed_sent_result": discord_result,
+            }
+        },
+    )
+
+    return discord_result
+
+
+def reset_active_tour_start_embed_state(user_doc, reason="tour_inactive"):
+    """Gibt den einmaligen Tour-Start-Embed wieder für die nächste Tour frei."""
+    user_doc = user_doc or {}
+    if not user_doc.get("_id"):
+        return
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_active_tour_start_embed_sent": False,
+                "tracker_active_tour_start_embed_sent_key": "",
+                "tracker_active_tour_start_embed_reset_at": now_utc(),
+                "tracker_active_tour_start_embed_reset_reason": safe_str(reason, "tour_inactive"),
+            }
+        },
     )
 
 
@@ -6469,8 +6559,8 @@ def tracker_telemetry_live():
         update_payload["tracker_current_job"] = current_job
         update_payload["tracker_current_job_key"] = current_job_key
 
-        if is_online and current_job_key and current_job_key != previous_job_key:
-            start_discord_result = send_tour_start_to_discord(user_doc, telemetry)
+        if is_online and current_job_key and not bool(user_doc.get("tracker_active_tour_start_embed_sent")):
+            start_discord_result = send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=current_job_key)
             update_payload["tracker_tour_started_at"] = now_utc()
             update_payload["tracker_tour_started_discord"] = start_discord_result
             update_payload["tracker_tour_started_discord_message_id"] = start_discord_result.get("message_id")
@@ -6478,6 +6568,10 @@ def tracker_telemetry_live():
     else:
         update_payload["tracker_current_job"] = None
         update_payload["tracker_current_job_key"] = ""
+        update_payload["tracker_active_tour_start_embed_sent"] = False
+        update_payload["tracker_active_tour_start_embed_sent_key"] = ""
+        update_payload["tracker_active_tour_start_embed_reset_at"] = now_utc()
+        update_payload["tracker_active_tour_start_embed_reset_reason"] = "live_no_current_job"
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": update_payload})
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
@@ -6711,9 +6805,15 @@ def tracker_jobs_start():
             "tracker_live_updated_at": now,
             "tracker_online": bool(telemetry.get("isConnected") or telemetry.get("gameProcessDetected") or telemetry.get("telemetryConnected")),
         })
+    start_discord_result = {"sent": False, "skipped": True, "reason": "Keine aktive Tour-Telemetrie beim Job-Start."}
     if current_job:
+        current_job_key = tracker_current_job_key(telemetry, user_doc)
         set_payload["tracker_current_job"] = current_job
-        set_payload["tracker_current_job_key"] = tracker_current_job_key(telemetry, user_doc)
+        set_payload["tracker_current_job_key"] = current_job_key
+        start_discord_result = send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=current_job_key)
+        set_payload["tracker_tour_started_discord"] = start_discord_result
+        set_payload["tracker_tour_started_discord_message_id"] = start_discord_result.get("message_id")
+        set_payload["tracker_tour_started_discord_channel_id"] = start_discord_result.get("channel_id") or TOUR_CHANNEL_ID
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": set_payload})
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
@@ -6729,6 +6829,7 @@ def tracker_jobs_start():
         "eligibility": eligibility,
         "workSession": work_session,
         "driverCard": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=fresh_user),
+        "tourStartDiscord": start_discord_result,
     })
     return jsonify(response_payload)
 
