@@ -922,12 +922,41 @@ def receipt_counts_as_completed(receipt_doc):
     )
 
 
+def coerce_receipt_datetime(value, fallback=None):
+    if isinstance(value, datetime):
+        return value
+    value = safe_str(value)
+    if not value:
+        return fallback
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return fallback
+
+
+def month_shift(base_date, month_delta):
+    base_date = base_date or now_utc()
+    month_index = (base_date.month - 1) + month_delta
+    year = base_date.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    return datetime(year, month, 1)
+
+
+def build_empty_company_month_series(month_count=6):
+    today = now_utc()
+    month_starts = [month_shift(today, offset) for offset in range(-(month_count - 1), 1)]
+    month_keys = [month.strftime("%Y-%m") for month in month_starts]
+    month_labels = [month.strftime("%m/%Y") for month in month_starts]
+    return month_keys, month_labels, [0.0 for _ in month_keys], [0.0 for _ in month_keys]
+
+
 def build_company_stats_doc_from_receipts():
     all_time_km = 0.0
     all_time_income = 0.0
     jobs_all_time = 0
     deliveries_all_time = 0
     latest_receipt_at = None
+    month_keys, month_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
 
     query = {"archived": {"$ne": True}}
     for receipt_doc in tour_receipts_collection.find(query):
@@ -942,13 +971,22 @@ def build_company_stats_doc_from_receipts():
         jobs_all_time += 1
         deliveries_all_time += 1
 
-        submitted_at = receipt_doc.get("submitted_at") or receipt_doc.get("created_at")
-        if isinstance(submitted_at, datetime) and (latest_receipt_at is None or submitted_at > latest_receipt_at):
-            latest_receipt_at = submitted_at
+        submitted_at = coerce_receipt_datetime(receipt_doc.get("submitted_at") or receipt_doc.get("created_at"))
+        if isinstance(submitted_at, datetime):
+            if latest_receipt_at is None or submitted_at > latest_receipt_at:
+                latest_receipt_at = submitted_at
+
+            month_key = submitted_at.strftime("%Y-%m")
+            if month_key in month_keys:
+                index = month_keys.index(month_key)
+                monthly_kilometers[index] += distance
+                income_series[index] += income
 
     now = now_utc()
     all_time_km = round(all_time_km, 1)
     all_time_income = round(all_time_income, 2)
+    monthly_kilometers = [round(value, 1) for value in monthly_kilometers]
+    income_series = [round(value, 2) for value in income_series]
 
     return {
         "_id": COMPANY_STATS_DOCUMENT_ID,
@@ -959,6 +997,12 @@ def build_company_stats_doc_from_receipts():
         "companyIncome": all_time_income,
         "jobs_all_time": jobs_all_time,
         "deliveries_all_time": deliveries_all_time,
+        "monthly_kilometers": monthly_kilometers,
+        "monthlyKilometers": monthly_kilometers,
+        "income_series": income_series,
+        "incomeSeries": income_series,
+        "monthly_labels": month_labels,
+        "monthlyLabels": month_labels,
         "latest_receipt_at": latest_receipt_at,
         "updated_at": now,
         "source": "tour_receipts",
@@ -982,11 +1026,18 @@ def get_company_all_time_stats():
     if not stats_doc or not stats_doc.get("all_time_initialized"):
         stats_doc = refresh_company_all_time_stats_from_receipts()
 
+    month_keys, month_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
     return stats_doc or {
         "all_time_km": 0.0,
         "all_time_income": 0.0,
         "jobs_all_time": 0,
-        "deliveries_all_time": 0
+        "deliveries_all_time": 0,
+        "monthly_kilometers": monthly_kilometers,
+        "monthlyKilometers": monthly_kilometers,
+        "income_series": income_series,
+        "incomeSeries": income_series,
+        "monthly_labels": month_labels,
+        "monthlyLabels": month_labels
     }
 
 
@@ -4550,16 +4601,25 @@ def build_company_stats_payload():
             deliveries += parse_int(stats.get("deliveries"), 0)
             jobs_all_time += parse_int(stats.get("jobs"), parse_int(stats.get("deliveries"), 0))
 
-    monthly_kilometers = [0, 0, 0, 0, 0, 0]
-    income_series = [0, 0, 0, 0, 0, 0]
+    monthly_kilometers = list(persistent_stats.get("monthly_kilometers") or persistent_stats.get("monthlyKilometers") or [])
+    income_series = list(persistent_stats.get("income_series") or persistent_stats.get("incomeSeries") or [])
+    monthly_labels = list(persistent_stats.get("monthly_labels") or persistent_stats.get("monthlyLabels") or [])
 
-    for user_doc in users:
-        job_entries = get_user_job_entries(user_doc)
-        for job in job_entries:
-            distance = positive_number(job.get("distanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
-            income = positive_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
-            monthly_kilometers[-1] += distance
-            income_series[-1] += income
+    if len(monthly_kilometers) != 6 or len(income_series) != 6:
+        month_keys, monthly_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
+        for user_doc in users:
+            job_entries = get_user_job_entries(user_doc)
+            for job in job_entries:
+                distance = positive_number(job.get("distanceKm") or job.get("completedDistanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
+                income = positive_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
+                created_at = coerce_receipt_datetime(job.get("createdAt") or job.get("created_at") or job.get("submittedAt") or job.get("submitted_at"), fallback=now_utc())
+                month_key = created_at.strftime("%Y-%m") if isinstance(created_at, datetime) else month_keys[-1]
+                if month_key in month_keys:
+                    index = month_keys.index(month_key)
+                else:
+                    index = -1
+                monthly_kilometers[index] += distance
+                income_series[index] += income
 
     active_driver_count = len(get_active_drivers())
 
@@ -4578,8 +4638,9 @@ def build_company_stats_payload():
         "deliveries": deliveries,
         "totalDeliveries": deliveries,
         "activeDrivers": active_driver_count,
-        "monthlyKilometers": [round(value, 1) for value in monthly_kilometers],
-        "incomeSeries": [round(value, 2) for value in income_series],
+        "monthlyKilometers": [round(parse_number(value, 0), 1) for value in monthly_kilometers],
+        "incomeSeries": [round(parse_number(value, 0), 2) for value in income_series],
+        "monthlyLabels": monthly_labels,
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "updatedAt": datetime_to_iso(persistent_stats.get("updated_at"))
     }
