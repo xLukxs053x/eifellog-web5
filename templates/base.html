@@ -94,6 +94,14 @@
             overflow: hidden;
         }
 
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .font-inter {
+            font-family: 'Inter', sans-serif;
+        }
+
         /* === HINTERGRUND SLIDESHOW === */
         .hero-bg {
             position: fixed;
@@ -308,6 +316,284 @@
             justify-content: center !important;
         }
 
+        /* === FOOTER === */
+        .site-footer {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            margin-top: auto;
+            overflow: hidden;
+            border-top: 1px solid rgba(137, 190, 50, 0.18);
+            background:
+                radial-gradient(circle at 18% 0%, rgba(var(--brand-green-rgb), 0.16), transparent 34%),
+                radial-gradient(circle at 82% 20%, rgba(220, 226, 38, 0.10), transparent 30%),
+                linear-gradient(180deg, rgba(8, 20, 12, 0.70), rgba(3, 8, 5, 0.96));
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .site-footer::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, transparent, rgba(var(--brand-green-rgb), 0.20), transparent),
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: 100% 1px, 100% 34px;
+            opacity: 0.65;
+        }
+
+        .footer-inner {
+            position: relative;
+            padding-top: 3.5rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.75fr) minmax(180px, 0.75fr) minmax(260px, 1fr);
+            gap: 1.2rem;
+            align-items: stretch;
+        }
+
+        .footer-panel {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.075);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+            box-shadow: 0 22px 70px rgba(0, 0, 0, 0.35);
+        }
+
+        .footer-brand-panel {
+            padding: 1.35rem;
+            border-top-color: rgba(var(--brand-green-rgb), 0.25);
+            border-left-color: rgba(var(--brand-green-rgb), 0.18);
+        }
+
+        .footer-brand-panel::after {
+            content: "";
+            position: absolute;
+            right: -3rem;
+            bottom: -3rem;
+            width: 10rem;
+            height: 10rem;
+            border-radius: 999px;
+            background: rgba(var(--brand-green-rgb), 0.11);
+            filter: blur(12px);
+        }
+
+        .footer-logo {
+            width: 3.25rem;
+            height: 3.25rem;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.65);
+            box-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.28);
+        }
+
+        .footer-eyebrow {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--brand-yellow);
+        }
+
+        .footer-title {
+            margin-top: 0.22rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        .footer-text {
+            position: relative;
+            z-index: 1;
+            margin-top: 1rem;
+            max-width: 33rem;
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.75;
+        }
+
+        .footer-status-row {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin-top: 1.15rem;
+        }
+
+        .footer-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-height: 2rem;
+            padding: 0.45rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.22);
+            color: var(--muted);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .footer-chip-dot {
+            width: 0.45rem;
+            height: 0.45rem;
+            border-radius: 999px;
+            background: var(--brand-green);
+            box-shadow: 0 0 15px rgba(var(--brand-green-rgb), 0.75);
+        }
+
+        .footer-column {
+            padding: 1.15rem;
+        }
+
+        .footer-column-title {
+            margin-bottom: 0.9rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .footer-link-list {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .footer-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.62rem 0.7rem;
+            border-radius: 13px;
+            color: var(--muted);
+            font-size: 0.86rem;
+            text-decoration: none;
+            transition: all 0.28s ease;
+        }
+
+        .footer-link span {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+        }
+
+        .footer-link svg {
+            width: 0.9rem;
+            height: 0.9rem;
+            opacity: 0;
+            transform: translateX(-4px);
+            transition: all 0.28s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--text);
+            background: rgba(var(--brand-green-rgb), 0.10);
+            box-shadow: inset 0 0 0 1px rgba(var(--brand-green-rgb), 0.16);
+        }
+
+        .footer-link:hover svg {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .footer-cta-panel {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 100%;
+            background:
+                linear-gradient(145deg, rgba(var(--brand-green-rgb), 0.12), rgba(255, 255, 255, 0.018)),
+                rgba(0, 0, 0, 0.18);
+        }
+
+        .footer-cta-kicker {
+            display: inline-flex;
+            width: fit-content;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.85rem;
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .footer-cta-title {
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            line-height: 1.55;
+        }
+
+        .footer-cta-text {
+            margin-top: 0.75rem;
+            margin-bottom: 1.15rem;
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.65;
+        }
+
+        .footer-bottom {
+            margin-top: 1.25rem;
+            padding-top: 1.1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.075);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            color: var(--muted);
+        }
+
+        .footer-bottom-text {
+            font-size: 0.74rem;
+            line-height: 1.6;
+        }
+
+        .footer-bottom-links {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-bottom-link {
+            color: var(--muted);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: color 0.25s ease;
+        }
+
+        .footer-bottom-link:hover {
+            color: var(--brand-green);
+        }
+
         /* Bei sehr breiten Monitoren etwas kompakter und mittiger */
         @media (min-width: 1536px) {
             .base-main {
@@ -322,6 +608,15 @@
         @media (max-width: 1024px) {
             .base-main {
                 padding-top: 7rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .footer-brand-panel,
+            .footer-cta-panel {
+                grid-column: span 2;
             }
         }
 
@@ -340,6 +635,33 @@
             .btn-secondary,
             .btn-danger {
                 width: 100%;
+            }
+
+            .footer-inner {
+                padding-top: 2.2rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-brand-panel,
+            .footer-cta-panel {
+                grid-column: auto;
+            }
+
+            .footer-bottom {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .footer-status-row {
+                flex-direction: column;
+            }
+
+            .footer-chip {
+                width: 100%;
+                justify-content: center;
             }
         }
 
@@ -418,7 +740,12 @@
         // === SICHERHEITSSYSTEM FUNKTIONEN ===
         function initSecuritySystem() {
             const modal = document.getElementById('security-modal');
+
+            if (!modal) return;
+
             const modalCard = modal.querySelector('.glass-card');
+
+            if (!modalCard) return;
 
             // Modal einblenden
             window.showSecurityAlert = function(e) {
@@ -509,7 +836,7 @@
                     <a href="/" class="nav-link">Home</a>
                     <a href="/about" class="nav-link">Über uns</a>
                     <a href="/fuhrpark" class="nav-link">Fuhrpark</a>
-                     <a href="/changelog" class="nav-link">News</a>
+                    <a href="/changelog" class="nav-link">News</a>
                 </div>
 
                 <!-- Desktop Buttons -->
@@ -555,6 +882,7 @@
                 <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
                 <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
                 <a href="/fuhrpark" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+                <a href="/changelog" class="nav-link text-center w-full bg-white/5 border border-white/5">News</a>
 
                 <div class="h-px w-full bg-white/10 my-2"></div>
 
@@ -602,27 +930,144 @@
     </main>
 
     <!-- Footer -->
-    <footer class="relative z-10 border-t border-[var(--line)] py-7 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
-        <div class="w-full max-w-[var(--site-max-width)] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
-                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
-                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
-                    Eifel LOG
-                </p>
+    <footer class="site-footer">
+        <div class="base-shell footer-inner">
+            <div class="footer-grid">
+
+                <!-- Brand / Mission -->
+                <section class="footer-panel footer-brand-panel" aria-label="Eifel LOG Übersicht">
+                    <div class="flex items-center gap-4 relative z-[1]">
+                        <div class="footer-logo">
+                            <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-full h-full object-cover">
+                        </div>
+
+                        <div>
+                            <p class="footer-eyebrow">Virtuelle Spedition</p>
+                            <h2 class="footer-title">Eifel LOG</h2>
+                        </div>
+                    </div>
+
+                    <p class="footer-text">
+                        Präzise Touren, starke Fahrer und ein klares Ziel: Wir bringen deine Fracht sicher, organisiert und mit Stil ans Ziel.
+                    </p>
+
+                    <div class="footer-status-row" aria-label="Systemstatus">
+                        <span class="footer-chip">
+                            <span class="footer-chip-dot animate-pulse"></span>
+                            System online
+                        </span>
+                        <span class="footer-chip">Network Node aktiv</span>
+                        <span class="footer-chip">Eifel LOG 2026</span>
+                    </div>
+                </section>
+
+                <!-- Navigation -->
+                <section class="footer-panel footer-column" aria-label="Footer Navigation">
+                    <h3 class="footer-column-title">Navigation</h3>
+
+                    <div class="footer-link-list">
+                        <a href="/" class="footer-link">
+                            <span>Home</span>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+
+                        <a href="/about" class="footer-link">
+                            <span>Über uns</span>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+
+                        <a href="/fuhrpark" class="footer-link">
+                            <span>Fuhrpark</span>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+
+                        <a href="/changelog" class="footer-link">
+                            <span>News</span>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Fahrerbereich -->
+                <section class="footer-panel footer-column" aria-label="Fahrerbereich">
+                    <h3 class="footer-column-title">Bereich</h3>
+
+                    <div class="footer-link-list">
+                        {% if session.get('user') %}
+                            <a href="/dashboard" class="footer-link">
+                                <span>Dashboard</span>
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+
+                            <a href="/logout" class="footer-link">
+                                <span>Logout</span>
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                        {% else %}
+                            <a href="/hub" class="footer-link">
+                                <span>Driver Hub</span>
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                        {% endif %}
+
+                        <a href="/impressum" class="footer-link">
+                            <span>Impressum</span>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- CTA -->
+                <section class="footer-panel footer-cta-panel" aria-label="Footer Aktion">
+                    <div>
+                        <p class="footer-cta-kicker">
+                            <span class="footer-chip-dot animate-pulse"></span>
+                            Bereit für die nächste Tour?
+                        </p>
+
+                        <h3 class="footer-cta-title">
+                            Starte deine Route im Eifel LOG Network.
+                        </h3>
+
+                        <p class="footer-cta-text">
+                            Behalte deine Einsätze im Blick und bleib mit der Spedition verbunden.
+                        </p>
+                    </div>
+
+                    {% if session.get('user') %}
+                        <a href="/dashboard" class="btn-primary w-full justify-center">Zum Dashboard</a>
+                    {% else %}
+                        <a href="/hub" class="btn-primary w-full justify-center">Driver Hub öffnen</a>
+                    {% endif %}
+                </section>
             </div>
 
-            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
-                Wir bringen deine Fracht sicher ans Ziel.
-            </p>
-
-            <div class="flex flex-col items-center md:items-end gap-1">
-                <p class="text-[10px] font-inter text-[var(--muted)]">
-                    &copy; 2026 Eifel LOG. All systems nominal.
+            <div class="footer-bottom">
+                <p class="footer-bottom-text">
+                    &copy; 2026 Eifel LOG. All systems nominal. Entwickelt für eine starke virtuelle Spedition.
                 </p>
 
-                <a href="/impressum" class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest hover:text-[var(--brand-green)] transition-colors">
-                    Impressum
-                </a>
+                <div class="footer-bottom-links">
+                    <a href="/impressum" class="footer-bottom-link">Impressum</a>
+                    <a href="/changelog" class="footer-bottom-link">News</a>
+                    <span class="footer-bottom-link">Status: Online</span>
+                </div>
             </div>
         </div>
     </footer>
