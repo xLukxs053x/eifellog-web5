@@ -8805,7 +8805,7 @@ def downloads():
 def fuhrpark():
     return render_template("fuhrpark.html")
 
-@app.route("/Impressum")
+@app.route("/impressum")
 def impressum():
     return render_template("impressum.html")
 
