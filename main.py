@@ -7568,16 +7568,30 @@ def tracker_feierabend():
 
 @app.route("/")
 def home():
-    description = ("Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander.")
-    return render_template("index.html", description=description)
+    title = "Eifel LOG - Virtuelle Spedition"
+
+    description = (
+        "Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. "
+        "Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine "
+        "Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander."
+    )
+
+    return render_template(
+        "index.html",
+        title=title,
+        description=description
+    )
 
 @app.route("/about")
 def about():
+    title = "Über Eifel LOG - Virtuelle Spedition"
     description = ("Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.")
     return render_template("about.html", description=description)
 
-@app.route("/changelog")
+@@app.route("/changelog")
 def changelog():
+    title = "Changelog - Eifel LOG"
+
     description = (
         "Hier findest du die neuesten Änderungen, Verbesserungen und geplanten "
         "Features für Eifel LOG. Wir arbeiten ständig daran, das beste Erlebnis "
@@ -7634,11 +7648,11 @@ def changelog():
 
     return render_template(
         "changelog.html",
+        title=title,
         description=description,
         changelog=changelog_data,
         roadmap=roadmap_data,
     )
-
 
 
 
