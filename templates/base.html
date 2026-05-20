@@ -3,7 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Eifel LOG - Virtuelle Spedition{% endblock %}</title>
+    
+    <title>{% block title %}{{ title|default('Eifel LOG - Virtuelle Spedition', true) }}{% endblock %}</title>
+
+    <!-- SEO / Discord / Social Preview -->
+    <meta name="description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta name="theme-color" content="#89be32">
+
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="de_DE">
+    <meta property="og:site_name" content="Eifel LOG">
+    <meta property="og:title" content="{{ title|default('Eifel LOG', true)|e }}">
+    <meta property="og:description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
+    <meta property="og:image:secure_url" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:alt" content="Eifel LOG Logo">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ title|default('Eifel LOG', true)|e }}">
+    <meta name="twitter:description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta name="twitter:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
 
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
@@ -110,7 +131,6 @@
             height: 100%;
             object-fit: cover;
             object-position: center;
-            /* Helligkeit wieder etwas dunkler gesetzt */
             filter: saturate(1.05) brightness(0.50);
             opacity: 0;
             animation: fadeZoom 24s infinite;
@@ -157,7 +177,6 @@
             position: absolute;
             inset: 0;
             background:
-                /* Abdunklung wieder leicht verstärkt */
                 radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
                 linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
         }
@@ -418,11 +437,17 @@
         // === SICHERHEITSSYSTEM FUNKTIONEN ===
         function initSecuritySystem() {
             const modal = document.getElementById('security-modal');
+
+            if (!modal) return;
+
             const modalCard = modal.querySelector('.glass-card');
+
+            if (!modalCard) return;
 
             // Modal einblenden
             window.showSecurityAlert = function(e) {
-                if(e) e.preventDefault();
+                if (e) e.preventDefault();
+
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
                 
@@ -465,9 +490,20 @@
                 // Strg + Shift + C (Chrome Element Inspector)
                 // Strg + U (Seitenquelltext anzeigen)
                 if (e.ctrlKey) {
-                    if (e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
+                    if (
+                        e.shiftKey &&
+                        (
+                            e.key === 'I' || e.key === 'i' ||
+                            e.key === 'J' || e.key === 'j' ||
+                            e.key === 'C' || e.key === 'c' ||
+                            e.keyCode === 73 ||
+                            e.keyCode === 74 ||
+                            e.keyCode === 67
+                        )
+                    ) {
                         showSecurityAlert(e);
                     }
+
                     if (e.key === 'U' || e.key === 'u' || e.keyCode === 85) {
                         showSecurityAlert(e);
                     }
@@ -481,9 +517,9 @@
 
     <!-- Hintergrund Slideshow -->
     <div class="hero-bg" aria-hidden="true">
-        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="EifelLOG Truck 1">
-        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="EifelLOG Truck 2">
-        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="EifelLOG Truck 3">
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
         <div class="hero-overlay"></div>
     </div>
 
@@ -509,7 +545,7 @@
                     <a href="/" class="nav-link">Home</a>
                     <a href="/about" class="nav-link">Über uns</a>
                     <a href="/fuhrpark" class="nav-link">Fuhrpark</a>
-                     <a href="/changelog" class="nav-link">News</a>
+                    <a href="/changelog" class="nav-link">News</a>
                 </div>
 
                 <!-- Desktop Buttons -->
@@ -555,6 +591,7 @@
                 <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
                 <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
                 <a href="/fuhrpark" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+                <a href="/changelog" class="nav-link text-center w-full bg-white/5 border border-white/5">News</a>
 
                 <div class="h-px w-full bg-white/10 my-2"></div>
 
