@@ -4,7 +4,7 @@
 
 {% block content %}
 <style>
-    /* * EIFEL LOG - HR CONTROLLING V2.2 (Modal-Fixed & Clean)
+    /* * EIFEL LOG - HR CONTROLLING V2.3 (Modal-Centered & Clean)
      * High-Tech Logistics Dark Theme 
      */
 
@@ -569,19 +569,20 @@
         top: -1px;
     }
 
-    /* Modal - Completely revised for absolute center and "cool" glassy look */
+    /* Modal - Fix for absolute centering */
     .hr-modal {
         position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 99999; /* Boosted z-index */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 99999;
         display: none;
         align-items: center;
         justify-content: center;
-        padding: 1.5rem;
-        background: rgba(5, 8, 6, 0.85); /* Darker backdrop */
-        backdrop-filter: blur(15px); /* Stronger blur */
+        padding: 1rem; /* Verhindert Anstoßen an kleinen Bildschirmen */
+        background: rgba(5, 8, 6, 0.85); 
+        backdrop-filter: blur(15px); 
         -webkit-backdrop-filter: blur(15px);
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -593,12 +594,14 @@
     }
 
     .hr-modal-card {
+        position: relative;
+        margin: auto; /* Zwingt die Karte absolut in die Mitte, auch wenn Flex streikt */
         width: 100%;
         max-width: 650px;
         max-height: 90vh;
         overflow-y: auto;
         background: linear-gradient(180deg, #0f1511 0%, #080b09 100%);
-        border: 1px solid rgba(var(--brand-green-rgb), 0.4); /* Green glowing border */
+        border: 1px solid rgba(var(--brand-green-rgb), 0.4);
         border-radius: 24px;
         box-shadow: 0 0 50px rgba(var(--brand-green-rgb), 0.1), 0 30px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
         transform: scale(0.9) translateY(20px);
@@ -1036,7 +1039,7 @@
             const hrState = { config: { ...hrDefaultConfig }, employees: [], processPlan: [], checklist: [], backendOnline: false, localFallback: true, lastSync: null, sourceName: 'Lokaler Browser-Speicher' };
 
             document.addEventListener('DOMContentLoaded', () => { 
-                // GEÄNDERT: Schiebt das Modal auf die höchste Ebene im Body, um sich aus dem "Transform-Gefängnis" zu befreien
+                // Das Modal wird auf Root-Ebene (Body) verschoben, um es sicher vom restlichen CSS-Kontext zu trennen.
                 document.body.appendChild(document.getElementById('employee-modal'));
                 
                 hrLoadSystemSettings(); 
