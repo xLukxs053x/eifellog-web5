@@ -657,6 +657,295 @@
         font-size: 0.9rem;
     }
 
+
+
+    /* Google-Sheets-ähnlicher Tabellen-Builder */
+    .hr-sheet-app {
+        width: 100%;
+        overflow: hidden;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: #f8fafc;
+        color: #202124;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+    }
+
+    .hr-sheet-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.85rem 1rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .hr-sheet-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .hr-sheet-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #ffffff;
+        background: #0f9d58;
+        box-shadow: 0 8px 18px rgba(15, 157, 88, 0.25);
+    }
+
+    .hr-sheet-title-input {
+        width: min(380px, 55vw);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+        color: #202124;
+        background: transparent;
+        font-size: 1rem;
+        font-weight: 700;
+        outline: none;
+        transition: border 0.2s, background 0.2s;
+    }
+
+    .hr-sheet-title-input:focus {
+        border-color: #1a73e8;
+        background: #f8fbff;
+    }
+
+    .hr-sheet-subnav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        color: #5f6368;
+        font-size: 0.78rem;
+    }
+
+    .hr-sheet-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1rem;
+        background: #f1f3f4;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .hr-sheet-tool-button {
+        min-height: 32px;
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #3c4043;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s, border 0.2s, transform 0.2s;
+    }
+
+    .hr-sheet-tool-button:hover {
+        background: #e8f0fe;
+        border-color: #1a73e8;
+        transform: translateY(-1px);
+    }
+
+    .hr-sheet-tool-button.primary {
+        background: #1a73e8;
+        border-color: #1a73e8;
+        color: #ffffff;
+    }
+
+    .hr-sheet-tool-button.green {
+        background: #0f9d58;
+        border-color: #0f9d58;
+        color: #ffffff;
+    }
+
+    .hr-sheet-formula-row {
+        display: grid;
+        grid-template-columns: 86px 36px minmax(0, 1fr);
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.55rem 1rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .hr-sheet-name-box,
+    .hr-sheet-formula-input {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #dadce0;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #202124;
+        font-size: 0.85rem;
+        outline: none;
+    }
+
+    .hr-sheet-name-box {
+        text-align: center;
+        font-weight: 700;
+    }
+
+    .hr-sheet-formula-label {
+        color: #5f6368;
+        font-family: Georgia, serif;
+        font-size: 1.2rem;
+        font-style: italic;
+        text-align: center;
+    }
+
+    .hr-sheet-formula-input {
+        padding: 0 0.75rem;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .hr-sheet-grid-wrap {
+        width: 100%;
+        max-height: 620px;
+        overflow: auto;
+        background: #ffffff;
+    }
+
+    .hr-sheet-grid-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+    .hr-sheet-grid-wrap::-webkit-scrollbar-track { background: #f1f3f4; }
+    .hr-sheet-grid-wrap::-webkit-scrollbar-thumb { background: #c7cdd1; border-radius: 999px; }
+    .hr-sheet-grid-wrap::-webkit-scrollbar-thumb:hover { background: #9aa0a6; }
+
+    .hr-sheet-table {
+        border-collapse: collapse;
+        table-layout: fixed;
+        width: max-content;
+        min-width: 100%;
+        color: #202124;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+    }
+
+    .hr-sheet-table th,
+    .hr-sheet-table td {
+        border: 1px solid #e0e0e0;
+    }
+
+    .hr-sheet-corner,
+    .hr-sheet-column-header,
+    .hr-sheet-row-header {
+        position: sticky;
+        background: #f8f9fa;
+        color: #5f6368;
+        font-weight: 600;
+        text-align: center;
+        user-select: none;
+        z-index: 2;
+    }
+
+    .hr-sheet-corner {
+        top: 0;
+        left: 0;
+        width: 46px;
+        min-width: 46px;
+        height: 28px;
+        z-index: 5;
+    }
+
+    .hr-sheet-column-header {
+        top: 0;
+        min-width: 118px;
+        width: 118px;
+        height: 28px;
+        z-index: 4;
+    }
+
+    .hr-sheet-row-header {
+        left: 0;
+        min-width: 46px;
+        width: 46px;
+        height: 28px;
+        z-index: 3;
+    }
+
+    .hr-sheet-cell {
+        min-width: 118px;
+        width: 118px;
+        height: 28px;
+        padding: 4px 6px;
+        background: #ffffff;
+        color: #202124;
+        vertical-align: middle;
+        white-space: pre;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        outline: none;
+        cursor: cell;
+    }
+
+    .hr-sheet-cell:hover {
+        background: #f8fbff;
+    }
+
+    .hr-sheet-cell.selected {
+        position: relative;
+        background: #ffffff;
+        box-shadow: inset 0 0 0 2px #1a73e8;
+        z-index: 1;
+    }
+
+    .hr-sheet-cell.calculated {
+        color: #0f9d58;
+        font-weight: 700;
+    }
+
+    .hr-sheet-footer {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 1rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e0e0e0;
+        color: #3c4043;
+    }
+
+    .hr-sheet-add-tab {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 50%;
+        color: #5f6368;
+        background: transparent;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    .hr-sheet-add-tab:hover {
+        background: #e8eaed;
+    }
+
+    .hr-sheet-tab {
+        padding: 0.45rem 1rem;
+        border-radius: 10px 10px 0 0;
+        color: #0b57d0;
+        background: #ffffff;
+        border-bottom: 3px solid #0b57d0;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .hr-sheet-hint {
+        color: #5f6368;
+        font-size: 0.78rem;
+        margin-left: auto;
+    }
+
     @media (max-width: 1024px) {
         .hr-hero-content {
             flex-direction: column;
@@ -874,6 +1163,83 @@
             </article>
         </section>
 
+
+        <section class="hr-panel hr-span-12" aria-label="Tabellen Builder">
+            <div class="hr-panel-inner">
+                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-[var(--hr-border-light)] pb-4 mb-5">
+                    <div>
+                        <h2 class="hr-panel-title">Tabellen-Builder</h2>
+                        <p class="hr-panel-copy">
+                            Erstelle direkt im HR-Panel eine Google-Sheets-ähnliche Tabelle, fülle Zellen aus,
+                            nutze einfache Formeln und exportiere die Tabelle als CSV-Datei.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3 w-full xl:w-auto">
+                        <button type="button" class="btn-primary" onclick="hrSheetLoadEmployees()">
+                            HR-Daten übernehmen
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="hrSheetExportCsv()">
+                            CSV exportieren
+                        </button>
+                    </div>
+                </div>
+
+                <div class="hr-sheet-app" id="hr-sheet-builder">
+                    <div class="hr-sheet-topbar">
+                        <div class="hr-sheet-title-wrap">
+                            <div class="hr-sheet-icon" aria-hidden="true">
+                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 2H15L20 7V22H6C4.9 22 4 21.1 4 20V4C4 2.9 4.9 2 6 2Z" fill="currentColor" opacity="0.92"></path>
+                                    <path d="M14 2V8H20" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"></path>
+                                    <path d="M8 12H16M8 15H16M8 18H13" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <input id="sheet-title-input" class="hr-sheet-title-input" type="text" value="Unbenannte Tabelle" oninput="hrSheetRename(this.value)">
+                                <div class="hr-sheet-subnav" aria-hidden="true">
+                                    <span>Datei</span>
+                                    <span>Bearbeiten</span>
+                                    <span>Ansicht</span>
+                                    <span>Einfügen</span>
+                                    <span>Format</span>
+                                    <span>Daten</span>
+                                    <span>Tools</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <span class="hr-status-pill online">Editor bereit</span>
+                    </div>
+
+                    <div class="hr-sheet-toolbar" aria-label="Tabellen Werkzeugleiste">
+                        <button type="button" class="hr-sheet-tool-button primary" onclick="hrSheetNewSheet()">Neue Tabelle</button>
+                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddRow()">+ Zeile</button>
+                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddColumn()">+ Spalte</button>
+                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetApplyHrTemplate()">HR-Vorlage</button>
+                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetClearSelected()">Zelle leeren</button>
+                        <button type="button" class="hr-sheet-tool-button green" onclick="hrSheetSaveDraft(true)">Entwurf speichern</button>
+                    </div>
+
+                    <div class="hr-sheet-formula-row">
+                        <input id="sheet-name-box" class="hr-sheet-name-box" type="text" value="A1" readonly aria-label="Aktive Zelle">
+                        <span class="hr-sheet-formula-label">fx</span>
+                        <input id="sheet-formula-input" class="hr-sheet-formula-input" type="text" placeholder="Wert oder Formel eingeben, z. B. =SUM(A1:A5)" oninput="hrSheetUpdateActiveFromFormula(this.value)">
+                    </div>
+
+                    <div class="hr-sheet-grid-wrap" id="sheet-grid-wrap">
+                        <table id="sheet-builder-table" class="hr-sheet-table" aria-label="Editierbare Tabelle"></table>
+                    </div>
+
+                    <div class="hr-sheet-footer">
+                        <button type="button" class="hr-sheet-add-tab" onclick="hrSheetNewSheet()" aria-label="Neues Tabellenblatt">+</button>
+                        <span id="sheet-tab-label" class="hr-sheet-tab">Tabellenblatt1</span>
+                        <span class="hr-sheet-hint">Tipp: Enter springt nach unten, Tab nach rechts. Formeln: SUM, AVG, MIN, MAX, COUNT.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="hr-panel hr-span-12" aria-label="Personalakten Tabelle">
             <div class="hr-panel-inner">
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 border-b border-[var(--hr-border-light)] pb-4">
@@ -1044,6 +1410,7 @@
                 if (modal) document.body.appendChild(modal);
 
                 hrBindForms();
+                hrInitSheetBuilder();
                 hrRefreshAll();
             });
 
@@ -1482,6 +1849,543 @@
 
                 hrRenderAll();
             }
+
+
+
+            /* Tabellen-Builder: Google-Sheets-ähnlicher Mini-Editor */
+            const HR_SHEET_STORAGE_KEY = 'eifel_log_hr_sheet_builder_v1';
+
+            const hrSheetState = {
+                rows: 35,
+                cols: 17,
+                sheetName: 'Tabellenblatt1',
+                fileName: 'Unbenannte Tabelle',
+                selected: { row: 1, col: 1 },
+                data: {}
+            };
+
+            function hrInitSheetBuilder() {
+                hrSheetLoadDraft();
+                hrSheetRender();
+                hrSheetBindEvents();
+                hrSheetUpdateNameBox();
+            }
+
+            function hrSheetBindEvents() {
+                const table = document.getElementById('sheet-builder-table');
+
+                if (!table || table.dataset.bound === 'true') return;
+
+                table.dataset.bound = 'true';
+
+                table.addEventListener('focusin', event => {
+                    const cell = event.target.closest('.hr-sheet-cell');
+
+                    if (!cell) return;
+
+                    hrSheetSelectCell(Number(cell.dataset.row), Number(cell.dataset.col), cell, true);
+                });
+
+                table.addEventListener('input', event => {
+                    const cell = event.target.closest('.hr-sheet-cell');
+
+                    if (!cell) return;
+
+                    const value = cell.textContent.replace(/\r?\n/g, ' ');
+                    hrSheetSetValue(Number(cell.dataset.row), Number(cell.dataset.col), value, false);
+                    hrSheetUpdateNameBox(value);
+                    hrSheetRefreshComputedCells(cell);
+                });
+
+                table.addEventListener('focusout', event => {
+                    const cell = event.target.closest('.hr-sheet-cell');
+
+                    if (!cell) return;
+
+                    const row = Number(cell.dataset.row);
+                    const col = Number(cell.dataset.col);
+                    const raw = hrSheetGetRaw(row, col);
+
+                    cell.textContent = hrSheetDisplayValue(raw, new Set([hrSheetCellKey(row, col)]));
+                    cell.classList.toggle('calculated', String(raw).trim().startsWith('='));
+                });
+
+                table.addEventListener('keydown', event => {
+                    const cell = event.target.closest('.hr-sheet-cell');
+
+                    if (!cell) return;
+
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        hrSheetMoveSelection(1, 0);
+                    }
+
+                    if (event.key === 'Tab') {
+                        event.preventDefault();
+                        hrSheetMoveSelection(0, event.shiftKey ? -1 : 1);
+                    }
+
+                    if (event.key === 'Delete') {
+                        event.preventDefault();
+                        hrSheetClearSelected();
+                    }
+                });
+            }
+
+            function hrSheetRender() {
+                const table = document.getElementById('sheet-builder-table');
+                const titleInput = document.getElementById('sheet-title-input');
+                const tabLabel = document.getElementById('sheet-tab-label');
+
+                if (!table) return;
+
+                if (titleInput) titleInput.value = hrSheetState.fileName || 'Unbenannte Tabelle';
+                if (tabLabel) tabLabel.textContent = hrSheetState.sheetName || 'Tabellenblatt1';
+
+                let html = '<thead><tr><th class="hr-sheet-corner"></th>';
+
+                for (let col = 1; col <= hrSheetState.cols; col += 1) {
+                    html += `<th class="hr-sheet-column-header">${hrSheetColumnName(col)}</th>`;
+                }
+
+                html += '</tr></thead><tbody>';
+
+                for (let row = 1; row <= hrSheetState.rows; row += 1) {
+                    html += `<tr><th class="hr-sheet-row-header">${row}</th>`;
+
+                    for (let col = 1; col <= hrSheetState.cols; col += 1) {
+                        const raw = hrSheetGetRaw(row, col);
+                        const key = hrSheetCellKey(row, col);
+                        const selected = hrSheetState.selected.row === row && hrSheetState.selected.col === col;
+                        const display = hrSheetDisplayValue(raw, new Set([key]));
+                        const calculated = String(raw).trim().startsWith('=');
+
+                        html += `<td class="hr-sheet-cell${selected ? ' selected' : ''}${calculated ? ' calculated' : ''}" contenteditable="true" spellcheck="false" data-row="${row}" data-col="${col}" data-cell="${hrSheetAddress(row, col)}">${hrEscape(display)}</td>`;
+                    }
+
+                    html += '</tr>';
+                }
+
+                html += '</tbody>';
+                table.innerHTML = html;
+                hrSheetUpdateNameBox();
+            }
+
+            function hrSheetSelectCell(row, col, cellElement = null, showRawValue = false) {
+                hrSheetState.selected = {
+                    row: Math.max(1, Math.min(hrSheetState.rows, row)),
+                    col: Math.max(1, Math.min(hrSheetState.cols, col))
+                };
+
+                document.querySelectorAll('.hr-sheet-cell.selected').forEach(cell => cell.classList.remove('selected'));
+
+                const cell = cellElement || hrSheetGetCellElement(hrSheetState.selected.row, hrSheetState.selected.col);
+
+                if (cell) {
+                    cell.classList.add('selected');
+
+                    if (showRawValue) {
+                        cell.textContent = hrSheetGetRaw(hrSheetState.selected.row, hrSheetState.selected.col);
+                        window.setTimeout(() => hrSheetPlaceCaretAtEnd(cell), 0);
+                    }
+                }
+
+                hrSheetUpdateNameBox();
+            }
+
+            function hrSheetUpdateNameBox(explicitValue = null) {
+                const nameBox = document.getElementById('sheet-name-box');
+                const formulaInput = document.getElementById('sheet-formula-input');
+                const row = hrSheetState.selected.row;
+                const col = hrSheetState.selected.col;
+                const raw = explicitValue !== null ? explicitValue : hrSheetGetRaw(row, col);
+
+                if (nameBox) nameBox.value = hrSheetAddress(row, col);
+                if (formulaInput && document.activeElement !== formulaInput) formulaInput.value = raw;
+            }
+
+            function hrSheetUpdateActiveFromFormula(value) {
+                const { row, col } = hrSheetState.selected;
+                const cell = hrSheetGetCellElement(row, col);
+
+                hrSheetSetValue(row, col, value, false);
+
+                if (cell && document.activeElement !== cell) {
+                    cell.textContent = value;
+                    cell.classList.toggle('calculated', String(value).trim().startsWith('='));
+                }
+
+                hrSheetRefreshComputedCells(cell);
+            }
+
+            function hrSheetSetValue(row, col, value, persist = true) {
+                const key = hrSheetCellKey(row, col);
+                const normalized = String(value || '').replace(/\r?\n/g, ' ');
+
+                if (normalized.length) {
+                    hrSheetState.data[key] = normalized;
+                } else {
+                    delete hrSheetState.data[key];
+                }
+
+                if (persist) hrSheetSaveDraft(false);
+            }
+
+            function hrSheetGetRaw(row, col) {
+                return hrSheetState.data[hrSheetCellKey(row, col)] || '';
+            }
+
+            function hrSheetRefreshComputedCells(excludeCell = null) {
+                document.querySelectorAll('.hr-sheet-cell').forEach(cell => {
+                    if (excludeCell && cell === excludeCell) return;
+                    if (document.activeElement === cell) return;
+
+                    const row = Number(cell.dataset.row);
+                    const col = Number(cell.dataset.col);
+                    const raw = hrSheetGetRaw(row, col);
+
+                    cell.textContent = hrSheetDisplayValue(raw, new Set([hrSheetCellKey(row, col)]));
+                    cell.classList.toggle('calculated', String(raw).trim().startsWith('='));
+                });
+
+                hrSheetSaveDraft(false);
+            }
+
+            function hrSheetDisplayValue(raw, visited = new Set()) {
+                const value = String(raw || '').trim();
+
+                if (!value.startsWith('=')) return raw || '';
+
+                const result = hrSheetEvaluateFormula(value.slice(1), visited);
+
+                return result === null ? '#FEHLER' : String(result);
+            }
+
+            function hrSheetEvaluateFormula(expression, visited = new Set()) {
+                let prepared = String(expression || '').trim();
+
+                if (!prepared) return '';
+
+                prepared = prepared.replace(/(SUM|AVG|MIN|MAX|COUNT)\(([A-Z]+\d+):([A-Z]+\d+)\)/gi, (match, fn, startRef, endRef) => {
+                    const values = hrSheetRangeValues(startRef, endRef, visited).filter(value => Number.isFinite(value));
+
+                    if (fn.toUpperCase() === 'COUNT') return String(values.length);
+                    if (!values.length) return '0';
+                    if (fn.toUpperCase() === 'SUM') return String(values.reduce((sum, value) => sum + value, 0));
+                    if (fn.toUpperCase() === 'AVG') return String(values.reduce((sum, value) => sum + value, 0) / values.length);
+                    if (fn.toUpperCase() === 'MIN') return String(Math.min(...values));
+                    if (fn.toUpperCase() === 'MAX') return String(Math.max(...values));
+
+                    return '0';
+                });
+
+                prepared = prepared.replace(/\b([A-Z]+)(\d+)\b/g, (match, colLetters, rowNumber) => {
+                    const row = Number(rowNumber);
+                    const col = hrSheetColumnIndex(colLetters);
+                    const key = hrSheetCellKey(row, col);
+
+                    if (visited.has(key)) return '0';
+
+                    visited.add(key);
+
+                    const raw = hrSheetGetRaw(row, col);
+                    const display = String(raw).trim().startsWith('=')
+                        ? hrSheetEvaluateFormula(String(raw).trim().slice(1), visited)
+                        : raw;
+                    const numeric = Number(String(display).replace(',', '.'));
+
+                    visited.delete(key);
+
+                    return Number.isFinite(numeric) ? String(numeric) : '0';
+                });
+
+                if (!/^[0-9+\-*/().,\s]+$/.test(prepared)) return null;
+
+                try {
+                    const result = Function(`"use strict"; return (${prepared.replace(/,/g, '.')});`)();
+
+                    return Number.isFinite(Number(result)) ? Math.round(Number(result) * 1000000) / 1000000 : result;
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            function hrSheetRangeValues(startRef, endRef, visited = new Set()) {
+                const start = hrSheetParseAddress(startRef);
+                const end = hrSheetParseAddress(endRef);
+
+                if (!start || !end) return [];
+
+                const rowMin = Math.min(start.row, end.row);
+                const rowMax = Math.max(start.row, end.row);
+                const colMin = Math.min(start.col, end.col);
+                const colMax = Math.max(start.col, end.col);
+                const values = [];
+
+                for (let row = rowMin; row <= rowMax; row += 1) {
+                    for (let col = colMin; col <= colMax; col += 1) {
+                        const key = hrSheetCellKey(row, col);
+
+                        if (visited.has(key)) continue;
+
+                        visited.add(key);
+
+                        const raw = hrSheetGetRaw(row, col);
+                        const display = String(raw).trim().startsWith('=')
+                            ? hrSheetEvaluateFormula(String(raw).trim().slice(1), visited)
+                            : raw;
+                        const number = Number(String(display).replace(',', '.'));
+
+                        if (Number.isFinite(number)) values.push(number);
+
+                        visited.delete(key);
+                    }
+                }
+
+                return values;
+            }
+
+            function hrSheetMoveSelection(rowDelta, colDelta) {
+                let nextRow = hrSheetState.selected.row + rowDelta;
+                let nextCol = hrSheetState.selected.col + colDelta;
+
+                if (nextRow > hrSheetState.rows) {
+                    hrSheetAddRow(false);
+                }
+
+                if (nextCol > hrSheetState.cols) {
+                    hrSheetAddColumn(false);
+                }
+
+                nextRow = Math.max(1, Math.min(hrSheetState.rows, nextRow));
+                nextCol = Math.max(1, Math.min(hrSheetState.cols, nextCol));
+
+                hrSheetSelectCell(nextRow, nextCol);
+
+                const cell = hrSheetGetCellElement(nextRow, nextCol);
+
+                if (cell) cell.focus();
+            }
+
+            function hrSheetAddRow(showMessage = true) {
+                hrSheetState.rows = Math.min(200, hrSheetState.rows + 1);
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+
+                if (showMessage) hrShowAlert('Zeile wurde hinzugefügt.', 'success');
+            }
+
+            function hrSheetAddColumn(showMessage = true) {
+                hrSheetState.cols = Math.min(52, hrSheetState.cols + 1);
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+
+                if (showMessage) hrShowAlert('Spalte wurde hinzugefügt.', 'success');
+            }
+
+            function hrSheetClearSelected() {
+                const { row, col } = hrSheetState.selected;
+                const cell = hrSheetGetCellElement(row, col);
+
+                hrSheetSetValue(row, col, '', true);
+
+                if (cell) {
+                    cell.textContent = '';
+                    cell.classList.remove('calculated');
+                    cell.focus();
+                }
+
+                hrSheetUpdateNameBox('');
+                hrSheetRefreshComputedCells(cell);
+            }
+
+            function hrSheetApplyHrTemplate() {
+                const headers = ['Name', 'E-Mail', 'Rolle', 'Status', 'Prozess', 'Startdatum', 'Fortschritt', 'Notiz'];
+
+                hrSheetState.cols = Math.max(hrSheetState.cols, headers.length);
+                hrSheetState.rows = Math.max(hrSheetState.rows, 35);
+                hrSheetState.sheetName = 'HR Tabelle';
+                hrSheetState.fileName = 'HR Tabelle';
+
+                headers.forEach((header, index) => {
+                    hrSheetState.data[hrSheetCellKey(1, index + 1)] = header;
+                });
+
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+                hrShowAlert('HR-Vorlage wurde in die Tabelle eingefügt.', 'success');
+            }
+
+            function hrSheetLoadEmployees() {
+                const employees = hrState.employees || [];
+                const headers = ['Name', 'E-Mail', 'Rolle', 'Status', 'Prozess', 'Startdatum', 'Fortschritt', 'Notiz'];
+
+                hrSheetState.cols = Math.max(hrSheetState.cols, headers.length);
+                hrSheetState.rows = Math.max(35, employees.length + 2);
+                hrSheetState.sheetName = 'Personalakten';
+                hrSheetState.fileName = 'Personalakten Tabelle';
+                hrSheetState.data = {};
+
+                headers.forEach((header, index) => {
+                    hrSheetState.data[hrSheetCellKey(1, index + 1)] = header;
+                });
+
+                employees.forEach((employee, rowIndex) => {
+                    const row = rowIndex + 2;
+                    const values = [
+                        employee.name || '',
+                        employee.email || '',
+                        employee.role || '',
+                        employee.status || '',
+                        employee.process || '',
+                        hrFormatDate(employee.startDate),
+                        `${hrClampProgress(employee.progress)}%`,
+                        employee.notes || ''
+                    ];
+
+                    values.forEach((value, colIndex) => {
+                        if (value !== '') hrSheetState.data[hrSheetCellKey(row, colIndex + 1)] = value;
+                    });
+                });
+
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+                hrShowAlert('Personalakten wurden in den Tabellen-Builder übernommen.', 'success');
+            }
+
+            function hrSheetNewSheet() {
+                const shouldClear = window.confirm('Neue leere Tabelle erstellen? Der aktuelle Entwurf wird ersetzt.');
+
+                if (!shouldClear) return;
+
+                hrSheetState.rows = 35;
+                hrSheetState.cols = 17;
+                hrSheetState.sheetName = 'Tabellenblatt1';
+                hrSheetState.fileName = 'Unbenannte Tabelle';
+                hrSheetState.selected = { row: 1, col: 1 };
+                hrSheetState.data = {};
+
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+                hrShowAlert('Neue Tabelle wurde erstellt.', 'success');
+            }
+
+            function hrSheetRename(value) {
+                hrSheetState.fileName = String(value || '').trim() || 'Unbenannte Tabelle';
+                hrSheetSaveDraft(false);
+            }
+
+            function hrSheetSaveDraft(showMessage = false) {
+                try {
+                    window.localStorage.setItem(HR_SHEET_STORAGE_KEY, JSON.stringify(hrSheetState));
+
+                    if (showMessage) hrShowAlert('Tabellenentwurf wurde lokal gespeichert.', 'success');
+                } catch (error) {
+                    if (showMessage) hrShowAlert('Tabellenentwurf konnte nicht lokal gespeichert werden.', 'warning');
+                }
+            }
+
+            function hrSheetLoadDraft() {
+                try {
+                    const saved = JSON.parse(window.localStorage.getItem(HR_SHEET_STORAGE_KEY) || 'null');
+
+                    if (!saved || typeof saved !== 'object') return;
+
+                    hrSheetState.rows = Number(saved.rows) || 35;
+                    hrSheetState.cols = Number(saved.cols) || 17;
+                    hrSheetState.sheetName = saved.sheetName || 'Tabellenblatt1';
+                    hrSheetState.fileName = saved.fileName || 'Unbenannte Tabelle';
+                    hrSheetState.selected = saved.selected || { row: 1, col: 1 };
+                    hrSheetState.data = saved.data || {};
+                } catch (error) {
+                    // Defekten lokalen Entwurf ignorieren.
+                }
+            }
+
+            function hrSheetExportCsv() {
+                const rows = [];
+
+                for (let row = 1; row <= hrSheetState.rows; row += 1) {
+                    const values = [];
+
+                    for (let col = 1; col <= hrSheetState.cols; col += 1) {
+                        const raw = hrSheetGetRaw(row, col);
+                        const value = hrSheetDisplayValue(raw, new Set([hrSheetCellKey(row, col)]));
+
+                        values.push(`"${String(value).replace(/"/g, '""')}"`);
+                    }
+
+                    rows.push(values.join(';'));
+                }
+
+                const csv = `\uFEFF${rows.join('\n')}`;
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const safeName = (hrSheetState.fileName || 'tabelle').toLowerCase().replace(/[^a-z0-9äöüß-]+/gi, '-').replace(/^-|-$/g, '') || 'tabelle';
+
+                link.href = url;
+                link.download = `${safeName}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+
+                hrShowAlert('CSV-Datei wurde exportiert.', 'success');
+            }
+
+            function hrSheetGetCellElement(row, col) {
+                return document.querySelector(`.hr-sheet-cell[data-row="${row}"][data-col="${col}"]`);
+            }
+
+            function hrSheetAddress(row, col) {
+                return `${hrSheetColumnName(col)}${row}`;
+            }
+
+            function hrSheetCellKey(row, col) {
+                return `${row}:${col}`;
+            }
+
+            function hrSheetParseAddress(address) {
+                const match = String(address || '').trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+
+                if (!match) return null;
+
+                return {
+                    col: hrSheetColumnIndex(match[1]),
+                    row: Number(match[2])
+                };
+            }
+
+            function hrSheetColumnName(index) {
+                let name = '';
+                let number = Number(index);
+
+                while (number > 0) {
+                    const remainder = (number - 1) % 26;
+                    name = String.fromCharCode(65 + remainder) + name;
+                    number = Math.floor((number - 1) / 26);
+                }
+
+                return name || 'A';
+            }
+
+            function hrSheetColumnIndex(name) {
+                return String(name || '').toUpperCase().split('').reduce((total, char) => {
+                    return total * 26 + char.charCodeAt(0) - 64;
+                }, 0);
+            }
+
+            function hrSheetPlaceCaretAtEnd(element) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+
+                range.selectNodeContents(element);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+
 
             function hrShowAlert(message, type = 'success') {
                 const alert = document.getElementById('hr-alert');
