@@ -4,8 +4,9 @@
 
 {% block content %}
 <style>
-    /* * EIFEL LOG - HR CONTROLLING V2.3 (Modal-Centered & Clean)
-     * High-Tech Logistics Dark Theme 
+    /*
+     * EIFEL LOG - HR CONTROLLING DB VERSION
+     * Datenquelle: Backend + Datenbank
      */
 
     :root {
@@ -16,15 +17,22 @@
         --hr-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Animations */
     @keyframes fadeUp {
         0% { opacity: 0; transform: translateY(20px); }
         100% { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes hrPulse {
-        0%, 100% { opacity: 0.6; transform: scale(0.9); box-shadow: 0 0 10px rgba(var(--brand-green-rgb), 0.4); }
-        50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 20px rgba(var(--brand-green-rgb), 0.8); }
+        0%, 100% {
+            opacity: 0.6;
+            transform: scale(0.9);
+            box-shadow: 0 0 10px rgba(var(--brand-green-rgb), 0.4);
+        }
+        50% {
+            opacity: 1;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(var(--brand-green-rgb), 0.8);
+        }
     }
 
     @keyframes gradientShift {
@@ -33,7 +41,6 @@
         100% { background-position: 0% 50%; }
     }
 
-    /* Base Layout FIX: Force Vertical Stacking to prevent crushing */
     .hr-shell-wrapper {
         display: flex !important;
         flex-direction: column !important;
@@ -44,7 +51,6 @@
         animation: fadeUp 0.6s ease-out forwards;
     }
 
-    /* Hero Section */
     .hr-hero {
         width: 100% !important;
         position: relative;
@@ -53,7 +59,7 @@
         padding: 2.5rem;
         box-sizing: border-box !important;
         border: 1px solid var(--hr-border-light);
-        background: 
+        background:
             radial-gradient(circle at 10% 20%, rgba(var(--brand-green-rgb), 0.15), transparent 40%),
             radial-gradient(circle at 90% 80%, rgba(220, 226, 38, 0.08), transparent 40%),
             linear-gradient(145deg, #0a0f0c, #050806);
@@ -64,8 +70,9 @@
         content: "";
         position: absolute;
         inset: 0;
-        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
         background-size: 30px 30px;
         opacity: 0.4;
         pointer-events: none;
@@ -134,7 +141,6 @@
         flex-wrap: wrap;
     }
 
-    /* Grid System FIX: Enforce 12 columns and prevent shrinking */
     .hr-grid {
         display: grid !important;
         grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
@@ -151,7 +157,6 @@
     .hr-span-8 { grid-column: span 8; min-width: 0; }
     .hr-span-12 { grid-column: span 12; min-width: 0; }
 
-    /* Panels & Cards */
     .hr-panel {
         width: 100% !important;
         box-sizing: border-box !important;
@@ -161,7 +166,7 @@
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid var(--hr-border-light);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         transition: var(--hr-transition);
         animation: fadeUp 0.6s ease-out backwards;
     }
@@ -169,10 +174,12 @@
     .hr-panel:hover {
         transform: translateY(-3px);
         border-color: var(--hr-border-hover);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08), var(--hr-glow);
+        box-shadow:
+            0 12px 40px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            var(--hr-glow);
     }
 
-    /* Staggered Animations */
     .hr-grid:nth-child(2) .hr-panel:nth-child(1) { animation-delay: 0.1s; }
     .hr-grid:nth-child(2) .hr-panel:nth-child(2) { animation-delay: 0.2s; }
     .hr-grid:nth-child(2) .hr-panel:nth-child(3) { animation-delay: 0.3s; }
@@ -213,7 +220,6 @@
         line-height: 1.6;
     }
 
-    /* Metrics */
     .hr-metric-card {
         min-height: 11rem;
     }
@@ -234,7 +240,7 @@
         font-size: 2.75rem;
         font-weight: 900;
         letter-spacing: 0.05em;
-        text-shadow: 0 0 20px rgba(255,255,255,0.1);
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
     }
 
     .hr-metric-trend {
@@ -247,8 +253,8 @@
         gap: 0.4rem;
     }
 
-    /* Status Pills & Badges */
-    .hr-status-pill, .hr-badge {
+    .hr-status-pill,
+    .hr-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -260,93 +266,51 @@
         letter-spacing: 0.15em;
         text-transform: uppercase;
         white-space: nowrap;
-        background: rgba(255,255,255,0.05);
+        background: rgba(255, 255, 255, 0.05);
         border: 1px solid var(--hr-border-light);
         color: var(--muted);
     }
 
-    .hr-status-pill.online, .hr-badge.active, .hr-badge.done {
+    .hr-status-pill.online,
+    .hr-badge.active,
+    .hr-badge.done {
         color: var(--brand-green);
         background: rgba(var(--brand-green-rgb), 0.1);
         border-color: rgba(var(--brand-green-rgb), 0.3);
         box-shadow: var(--hr-glow);
     }
 
-    .hr-status-pill.warning, .hr-badge.onboarding, .hr-badge.pending {
+    .hr-status-pill.warning,
+    .hr-badge.onboarding,
+    .hr-badge.pending {
         color: var(--warning, #fbbf24);
         background: rgba(251, 191, 36, 0.1);
         border-color: rgba(251, 191, 36, 0.3);
     }
 
-    .hr-status-pill.danger, .hr-badge.offboarding, .hr-badge.blocked {
+    .hr-status-pill.danger,
+    .hr-badge.offboarding,
+    .hr-badge.blocked {
         color: var(--danger, #f87171);
         background: rgba(248, 113, 113, 0.1);
         border-color: rgba(248, 113, 113, 0.3);
     }
 
-    /* Tabs */
-    .hr-mode-tabs {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        background: rgba(0,0,0,0.2);
-        padding: 0.5rem;
-        border-radius: 16px;
-        border: 1px solid var(--hr-border-light);
-    }
-
-    .hr-mode-tab {
-        padding: 1rem;
-        border-radius: 12px;
-        border: 1px solid transparent;
-        background: transparent;
-        color: var(--muted);
-        text-align: left;
-        cursor: pointer;
-        transition: var(--hr-transition);
-        font-family: 'Orbitron', sans-serif;
-        font-weight: 800;
-        font-size: 0.75rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-    }
-
-    .hr-mode-tab span {
-        display: block;
-        margin-top: 0.5rem;
-        font-family: 'Inter', sans-serif;
-        text-transform: none;
-        letter-spacing: 0;
-        font-weight: 500;
-        font-size: 0.8rem;
-        color: rgba(156, 163, 175, 0.7);
-    }
-
-    .hr-mode-tab:hover {
-        background: rgba(255,255,255,0.03);
-    }
-
-    .hr-mode-tab.active {
-        background: rgba(var(--brand-green-rgb), 0.08);
-        border-color: rgba(var(--brand-green-rgb), 0.4);
-        color: var(--brand-green);
-        box-shadow: inset 0 0 20px rgba(var(--brand-green-rgb), 0.1);
-    }
-
-    .hr-mode-tab.active span {
-        color: rgba(255,255,255,0.8);
-    }
-
-    /* Forms */
     .hr-form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1.25rem;
     }
 
-    .hr-field { display: flex; flex-direction: column; gap: 0.5rem; }
-    .hr-field.full { grid-column: 1 / -1; }
+    .hr-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .hr-field.full {
+        grid-column: 1 / -1;
+    }
 
     .hr-small-label {
         color: var(--muted);
@@ -357,7 +321,9 @@
         text-transform: uppercase;
     }
 
-    .hr-input, .hr-select, .hr-textarea {
+    .hr-input,
+    .hr-select,
+    .hr-textarea {
         width: 100%;
         box-sizing: border-box;
         padding: 0.85rem 1rem;
@@ -371,21 +337,31 @@
         outline: none;
     }
 
-    .hr-textarea { min-height: 80px; resize: vertical; }
-    
-    .hr-input::placeholder, .hr-textarea::placeholder {
-        color: rgba(255,255,255,0.2);
+    .hr-textarea {
+        min-height: 80px;
+        resize: vertical;
     }
 
-    .hr-input:focus, .hr-select:focus, .hr-textarea:focus {
+    .hr-input::placeholder,
+    .hr-textarea::placeholder {
+        color: rgba(255, 255, 255, 0.2);
+    }
+
+    .hr-input:focus,
+    .hr-select:focus,
+    .hr-textarea:focus {
         border-color: var(--brand-green);
-        background: rgba(0,0,0,0.6);
-        box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.2), inset 0 0 10px rgba(var(--brand-green-rgb), 0.1);
+        background: rgba(0, 0, 0, 0.6);
+        box-shadow:
+            0 0 0 3px rgba(var(--brand-green-rgb), 0.2),
+            inset 0 0 10px rgba(var(--brand-green-rgb), 0.1);
     }
 
-    .hr-select option { background: #0f1712; color: #fff; }
+    .hr-select option {
+        background: #0f1712;
+        color: #ffffff;
+    }
 
-    /* Tables FIX: Prevent blowout */
     .hr-table-wrap {
         width: 100% !important;
         max-width: 100% !important;
@@ -396,9 +372,8 @@
         margin-top: 1rem;
     }
 
-    /* Custom Scrollbar for Table */
     .hr-table-wrap::-webkit-scrollbar { height: 8px; }
-    .hr-table-wrap::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 8px; }
+    .hr-table-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 8px; }
     .hr-table-wrap::-webkit-scrollbar-thumb { background: rgba(137, 190, 50, 0.3); border-radius: 8px; }
     .hr-table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(137, 190, 50, 0.6); }
 
@@ -434,9 +409,11 @@
     .hr-table tbody tr:hover td {
         background: rgba(var(--brand-green-rgb), 0.05);
     }
-    .hr-table tbody tr:last-child td { border-bottom: none; }
 
-    /* Person Info in Table */
+    .hr-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
     .hr-person {
         display: flex;
         align-items: center;
@@ -456,21 +433,28 @@
         font-family: 'Orbitron', sans-serif;
         font-weight: 800;
         font-size: 0.9rem;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
         flex-shrink: 0;
     }
 
-    .hr-person-name { font-weight: 700; color: #fff; }
-    .hr-person-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+    .hr-person-name {
+        font-weight: 700;
+        color: #ffffff;
+    }
 
-    /* Progress Bars */
+    .hr-person-meta {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.2rem;
+    }
+
     .hr-progress {
         width: 100%;
         height: 8px;
-        background: rgba(0,0,0,0.4);
+        background: rgba(0, 0, 0, 0.4);
         border-radius: 999px;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.05);
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .hr-progress-bar {
@@ -483,23 +467,25 @@
         animation: gradientShift 3s ease infinite;
     }
 
-    /* Process List */
-    .hr-process-list { display: grid; gap: 1rem; }
-    
+    .hr-process-list {
+        display: grid;
+        gap: 1rem;
+    }
+
     .hr-process-item {
         display: flex;
         align-items: center;
         gap: 1.25rem;
         padding: 1.25rem;
-        background: rgba(0,0,0,0.2);
+        background: rgba(0, 0, 0, 0.2);
         border: 1px solid var(--hr-border-light);
         border-radius: 16px;
         transition: var(--hr-transition);
     }
 
     .hr-process-item:hover {
-        background: rgba(255,255,255,0.02);
-        border-color: rgba(255,255,255,0.1);
+        background: rgba(255, 255, 255, 0.02);
+        border-color: rgba(255, 255, 255, 0.1);
     }
 
     .hr-process-index {
@@ -518,17 +504,28 @@
         flex-shrink: 0;
     }
 
-    .hr-process-content { flex: 1; }
-    .hr-process-title { color: #fff; font-weight: 700; font-size: 0.95rem; }
-    .hr-process-meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+    .hr-process-content {
+        flex: 1;
+    }
 
-    /* Checklists */
+    .hr-process-title {
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+
+    .hr-process-meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
     .hr-check-row {
         display: flex;
         align-items: flex-start;
         gap: 1rem;
         padding: 1rem;
-        background: rgba(0,0,0,0.2);
+        background: rgba(0, 0, 0, 0.2);
         border: 1px solid var(--hr-border-light);
         border-radius: 12px;
         cursor: pointer;
@@ -536,7 +533,7 @@
     }
 
     .hr-check-row:hover {
-        background: rgba(255,255,255,0.03);
+        background: rgba(255, 255, 255, 0.03);
     }
 
     .hr-check-row input[type="checkbox"] {
@@ -562,14 +559,13 @@
     .hr-check-row input[type="checkbox"]:checked::after {
         content: "✓";
         position: absolute;
-        color: #000;
+        color: #000000;
         font-weight: 900;
         font-size: 14px;
         left: 3px;
         top: -1px;
     }
 
-    /* Modal - Fix for absolute centering */
     .hr-modal {
         position: fixed;
         top: 0;
@@ -580,9 +576,9 @@
         display: none;
         align-items: center;
         justify-content: center;
-        padding: 1rem; /* Verhindert Anstoßen an kleinen Bildschirmen */
-        background: rgba(5, 8, 6, 0.85); 
-        backdrop-filter: blur(15px); 
+        padding: 1rem;
+        background: rgba(5, 8, 6, 0.85);
+        backdrop-filter: blur(15px);
         -webkit-backdrop-filter: blur(15px);
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -595,7 +591,7 @@
 
     .hr-modal-card {
         position: relative;
-        margin: auto; /* Zwingt die Karte absolut in die Mitte, auch wenn Flex streikt */
+        margin: auto;
         width: 100%;
         max-width: 650px;
         max-height: 90vh;
@@ -603,7 +599,10 @@
         background: linear-gradient(180deg, #0f1511 0%, #080b09 100%);
         border: 1px solid rgba(var(--brand-green-rgb), 0.4);
         border-radius: 24px;
-        box-shadow: 0 0 50px rgba(var(--brand-green-rgb), 0.1), 0 30px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+        box-shadow:
+            0 0 50px rgba(var(--brand-green-rgb), 0.1),
+            0 30px 60px rgba(0, 0, 0, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
         transform: scale(0.9) translateY(20px);
         transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
@@ -612,24 +611,11 @@
         transform: scale(1) translateY(0);
     }
 
-    /* Custom Scrollbar for Modal to keep it sleek */
     .hr-modal-card::-webkit-scrollbar { width: 6px; }
     .hr-modal-card::-webkit-scrollbar-track { background: transparent; }
     .hr-modal-card::-webkit-scrollbar-thumb { background: rgba(var(--brand-green-rgb), 0.3); border-radius: 6px; }
     .hr-modal-card::-webkit-scrollbar-thumb:hover { background: rgba(var(--brand-green-rgb), 0.6); }
 
-    /* Code Block Styling */
-    .hr-code {
-        background: rgba(0,0,0,0.4);
-        border: 1px solid rgba(255,255,255,0.1);
-        padding: 0.2rem 0.4rem;
-        border-radius: 6px;
-        color: var(--brand-green);
-        font-family: 'Fira Code', monospace;
-        font-size: 0.8rem;
-    }
-
-    /* Alerts */
     .hr-alert {
         display: none;
         padding: 1rem 1.5rem;
@@ -639,22 +625,67 @@
         width: 100%;
         box-sizing: border-box;
     }
-    .hr-alert.show { display: block; }
-    .hr-alert.success { background: rgba(var(--brand-green-rgb), 0.15); border: 1px solid rgba(var(--brand-green-rgb), 0.4); color: var(--brand-green); }
-    .hr-alert.warning { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: var(--warning, #fbbf24); }
-    .hr-alert.error { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.4); color: var(--danger, #f87171); }
 
-    /* Responsive Overrides */
+    .hr-alert.show {
+        display: block;
+    }
+
+    .hr-alert.success {
+        background: rgba(var(--brand-green-rgb), 0.15);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.4);
+        color: var(--brand-green);
+    }
+
+    .hr-alert.warning {
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.4);
+        color: var(--warning, #fbbf24);
+    }
+
+    .hr-alert.error {
+        background: rgba(248, 113, 113, 0.15);
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        color: var(--danger, #f87171);
+    }
+
+    .hr-empty-state {
+        padding: 1.25rem;
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        color: var(--muted);
+        background: rgba(0, 0, 0, 0.18);
+        font-size: 0.9rem;
+    }
+
     @media (max-width: 1024px) {
-        .hr-hero-content { flex-direction: column; align-items: flex-start; }
-        .hr-hero-actions { width: 100%; }
-        .hr-span-3, .hr-span-4, .hr-span-5, .hr-span-6, .hr-span-7, .hr-span-8 { grid-column: span 12; }
+        .hr-hero-content {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .hr-hero-actions {
+            width: 100%;
+        }
+
+        .hr-span-3,
+        .hr-span-4,
+        .hr-span-5,
+        .hr-span-6,
+        .hr-span-7,
+        .hr-span-8 {
+            grid-column: span 12;
+        }
     }
 
     @media (max-width: 640px) {
-        .hr-form-grid { grid-template-columns: 1fr; }
-        .hr-mode-tabs { grid-template-columns: 1fr; }
-        .hr-process-item { flex-direction: column; align-items: flex-start; }
+        .hr-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .hr-process-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
     }
 </style>
 
@@ -665,7 +696,7 @@
                 <div>
                     <p class="hr-kicker">
                         <span class="hr-pulse"></span>
-                        HR Control Center / Dual Data Mode
+                        HR Control Center / Database Mode
                     </p>
 
                     <h1 class="hr-title">
@@ -673,17 +704,23 @@
                     </h1>
 
                     <p class="hr-subtitle">
-                        Zentrale Oberfläche für Personalakten, Onboarding, Offboarding und Checklisten. Arbeite nativ über dein Backend, lokal im Browser oder kopple das System sicher an Google Sheets.
+                        Zentrale Oberfläche für Personalakten, Onboarding, Offboarding und Checklisten.
+                        Alle Daten werden ausschließlich über das Backend aus der Datenbank geladen und dort gespeichert.
                     </p>
                 </div>
 
                 <div class="hr-hero-actions">
                     <button type="button" class="btn-secondary hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-shadow" onclick="hrRefreshAll()">
-                        <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
                         Aktualisieren
                     </button>
+
                     <button type="button" class="btn-primary hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow" onclick="hrOpenEmployeeModal()">
-                        <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
                         Personalakte anlegen
                     </button>
                 </div>
@@ -697,7 +734,7 @@
                 <div class="hr-panel-inner">
                     <p class="hr-metric-label">Personalakten</p>
                     <div id="metric-total" class="hr-metric-value">0</div>
-                    <p id="metric-source" class="hr-metric-trend">Lädt...</p>
+                    <p id="metric-source" class="hr-metric-trend">Datenbank</p>
                 </div>
             </article>
 
@@ -721,7 +758,7 @@
                 <div class="hr-panel-inner">
                     <div class="flex items-start justify-between gap-3">
                         <p class="hr-metric-label">Systemstatus</p>
-                        <span id="system-status-pill" class="hr-status-pill warning">Lokal</span>
+                        <span id="system-status-pill" class="hr-status-pill warning">Prüfung</span>
                     </div>
                     <div id="metric-checklist" class="hr-metric-value">0%</div>
                     <p id="system-last-sync" class="hr-metric-trend">Noch nicht synchronisiert</p>
@@ -729,56 +766,43 @@
             </article>
         </section>
 
-        <section class="hr-grid" aria-label="Datenquelle und Schnellanlage">
+        <section class="hr-grid" aria-label="Datenbankstatus und Schnellanlage">
             <article class="hr-panel hr-span-6">
                 <div class="hr-panel-inner">
                     <div class="hr-panel-header">
                         <div>
-                            <h2 class="hr-panel-title">System-Konfiguration</h2>
+                            <h2 class="hr-panel-title">Datenbank-Verbindung</h2>
                             <p class="hr-panel-copy">
-                                Wähle die Datenbasis für dieses Modul.
+                                Dieses Modul arbeitet ausschließlich mit dem Backend und speichert keine HR-Daten im Browser.
                             </p>
                         </div>
-                        <span id="connector-mode" class="hr-status-pill warning">Lokal</span>
+                        <span id="connector-mode" class="hr-status-pill warning">Backend</span>
                     </div>
 
-                    <div class="hr-mode-tabs" role="tablist">
-                        <button id="mode-google" type="button" class="hr-mode-tab" onclick="hrSetSystemMode('google_sheets')">
-                            Google Sheets
-                            <span>Tabellen via Backend verknüpft.</span>
-                        </button>
-                        <button id="mode-own" type="button" class="hr-mode-tab" onclick="hrSetSystemMode('own_system')">
-                            Eigenes System
-                            <span>Eigene DB/API & lokaler Fallback.</span>
-                        </button>
-                    </div>
+                    <div class="grid gap-4">
+                        <div class="p-4 rounded-xl bg-black/30 border border-white/5">
+                            <p class="hr-small-label">API Basis</p>
+                            <p class="mt-2 text-white font-mono text-sm">/api/hr-controlling</p>
+                        </div>
 
-                    <div class="hr-form-grid">
-                        <label class="hr-field full" data-google-only>
-                            <span class="hr-small-label">Spreadsheet ID</span>
-                            <input id="sheet-id" class="hr-input" type="text" placeholder="1AbC... (aus der URL)">
-                        </label>
-                        <label class="hr-field" data-google-only>
-                            <span class="hr-small-label">Tab Personalakten</span>
-                            <input id="sheet-personal-tab" class="hr-input" type="text" value="Personalakten">
-                        </label>
-                        <label class="hr-field" data-google-only>
-                            <span class="hr-small-label">Tab Checklisten</span>
-                            <input id="sheet-checklist-tab" class="hr-input" type="text" value="Checklisten">
-                        </label>
-                        <label class="hr-field full">
-                            <span class="hr-small-label">Backend Endpoint Basis</span>
-                            <input id="sheet-api-base" class="hr-input" type="text" value="/api/hr-controlling" placeholder="/api/hr-controlling">
-                        </label>
-                    </div>
+                        <div class="p-4 rounded-xl bg-black/30 border border-white/5">
+                            <p class="hr-small-label">Datenquelle</p>
+                            <p id="database-source-label" class="mt-2 text-white text-sm">Backend-Datenbank</p>
+                        </div>
 
-                    <div id="system-hint" class="mt-4 p-4 rounded-xl bg-black/30 border border-white/5 text-[var(--muted)] text-sm">
-                        Aktueller Modus wird geladen...
+                        <div class="p-4 rounded-xl bg-black/30 border border-white/5">
+                            <p class="hr-small-label">Letzte Antwort</p>
+                            <p id="database-health-label" class="mt-2 text-[var(--muted)] text-sm">Noch nicht geprüft.</p>
+                        </div>
                     </div>
 
                     <div class="flex flex-col sm:flex-row gap-3 mt-6">
-                        <button type="button" class="btn-primary hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow" onclick="hrSaveSystemSettings()">Speichern</button>
-                        <button type="button" class="btn-secondary" onclick="hrTestSystemConnection()">Verbindung testen</button>
+                        <button type="button" class="btn-primary hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow" onclick="hrTestSystemConnection()">
+                            Verbindung testen
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="hrRefreshAll()">
+                            Daten neu laden
+                        </button>
                     </div>
                 </div>
             </article>
@@ -789,7 +813,7 @@
                         <div>
                             <h2 class="hr-panel-title">Schnellanlage</h2>
                             <p class="hr-panel-copy">
-                                Erstelle schnell eine neue Personalakte.
+                                Neue Personalakten werden direkt über das Backend in der Datenbank gespeichert.
                             </p>
                         </div>
                         <span class="hr-status-pill online shadow-[0_0_15px_rgba(137,190,50,0.2)]">Bereit</span>
@@ -800,18 +824,22 @@
                             <span class="hr-small-label">Name</span>
                             <input name="name" class="hr-input" type="text" placeholder="Max Mustermann" required>
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">E-Mail</span>
                             <input name="email" class="hr-input" type="email" placeholder="fahrer@eifellog.de">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Rolle</span>
                             <input name="role" class="hr-input" type="text" placeholder="Fahrer / Disponent">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Datum</span>
                             <input name="startDate" class="hr-input" type="date">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Status</span>
                             <select name="status" class="hr-select">
@@ -821,6 +849,7 @@
                                 <option value="Inaktiv">Inaktiv</option>
                             </select>
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Prozess</span>
                             <select name="process" class="hr-select">
@@ -829,12 +858,16 @@
                                 <option value="Personalakte">Personalakte</option>
                             </select>
                         </label>
+
                         <label class="hr-field full">
                             <span class="hr-small-label">Notiz</span>
                             <textarea name="notes" class="hr-textarea" placeholder="Interne Hinweise..."></textarea>
                         </label>
+
                         <div class="hr-field full mt-2">
-                            <button type="submit" class="btn-primary w-full hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow">Akte speichern</button>
+                            <button type="submit" class="btn-primary w-full hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow">
+                                Akte speichern
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -846,10 +879,12 @@
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 border-b border-[var(--hr-border-light)] pb-4">
                     <div>
                         <h2 class="hr-panel-title">Personalakten</h2>
-                        <p class="hr-panel-copy">Übersicht des Teams. Live synchronisiert oder als lokaler Fallback.</p>
+                        <p class="hr-panel-copy">Übersicht des Teams. Datenquelle ist ausschließlich die Backend-Datenbank.</p>
                     </div>
+
                     <div class="flex flex-wrap gap-3 w-full lg:w-auto">
                         <input id="hr-search" class="hr-input w-full lg:w-64" type="search" placeholder="Suchen..." oninput="hrRenderEmployees()">
+
                         <select id="hr-status-filter" class="hr-select w-full lg:w-40" onchange="hrRenderEmployees()">
                             <option value="all">Alle Status</option>
                             <option value="Aktiv">Aktiv</option>
@@ -857,7 +892,6 @@
                             <option value="Offboarding">Offboarding</option>
                             <option value="Inaktiv">Inaktiv</option>
                         </select>
-                        <button type="button" class="btn-secondary" onclick="hrExportLocalJson()">JSON Export</button>
                     </div>
                 </div>
 
@@ -890,10 +924,11 @@
                     <div class="hr-panel-header">
                         <div>
                             <h2 class="hr-panel-title">Prozessplan</h2>
-                            <p class="hr-panel-copy">Definierte Schritte für das On-/Offboarding.</p>
+                            <p class="hr-panel-copy">Definierte Schritte für das On-/Offboarding aus der Datenbank.</p>
                         </div>
-                        <span id="process-source-pill" class="hr-status-pill warning">Template</span>
+                        <span id="process-source-pill" class="hr-status-pill warning">Backend</span>
                     </div>
+
                     <div id="process-list" class="hr-process-list"></div>
                 </div>
             </article>
@@ -903,66 +938,18 @@
                     <div class="hr-panel-header">
                         <div>
                             <h2 class="hr-panel-title">Checkliste</h2>
-                            <p class="hr-panel-copy">Klickbare Tasks für den aktiven Prozess.</p>
+                            <p class="hr-panel-copy">Tasks für den aktiven Prozess. Änderungen werden in der Datenbank gespeichert.</p>
                         </div>
                         <span id="checklist-progress-pill" class="hr-status-pill online">0%</span>
                     </div>
+
                     <div class="hr-progress mb-6">
                         <div id="checklist-progress-bar" class="hr-progress-bar"></div>
                     </div>
+
                     <div id="checklist-list" class="grid gap-3"></div>
                 </div>
             </article>
-        </section>
-
-        <section class="hr-panel hr-span-12" aria-label="Backend API Vertrag">
-            <div class="hr-panel-inner">
-                <div class="hr-panel-header border-none pb-0 mb-4">
-                    <div>
-                        <h2 class="hr-panel-title">Backend-Vertrag (API)</h2>
-                        <p class="hr-panel-copy">Ewartete Routen für die Server-Kommunikation. Security by Design: Keine Secrets im Frontend.</p>
-                    </div>
-                </div>
-
-                <div class="hr-table-wrap mt-0">
-                    <table class="hr-table">
-                        <thead>
-                            <tr>
-                                <th>Method</th>
-                                <th>Endpoint</th>
-                                <th>Payload / Response</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><span class="hr-badge active">GET</span></td>
-                                <td><span class="hr-code">/system/status</span></td>
-                                <td><span class="text-xs text-[var(--muted)]">{ connected, mode, lastSync }</span></td>
-                            </tr>
-                            <tr>
-                                <td><span class="hr-badge active">GET</span></td>
-                                <td><span class="hr-code">/personalakten</span></td>
-                                <td><span class="text-xs text-[var(--muted)]">{ employees: [...] }</span></td>
-                            </tr>
-                            <tr>
-                                <td><span class="hr-badge onboarding">POST</span></td>
-                                <td><span class="hr-code">/personalakten</span></td>
-                                <td><span class="text-xs text-[var(--muted)]">{ success, employee }</span></td>
-                            </tr>
-                            <tr>
-                                <td><span class="hr-badge active">GET</span></td>
-                                <td><span class="hr-code">/checkliste</span></td>
-                                <td><span class="text-xs text-[var(--muted)]">{ processPlan: [...], checklist: [...] }</span></td>
-                            </tr>
-                            <tr>
-                                <td><span class="hr-badge onboarding">POST</span></td>
-                                <td><span class="hr-code">/checkliste</span></td>
-                                <td><span class="text-xs text-[var(--muted)]">{ success, checklistItem }</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
         </section>
 
         <div id="employee-modal" class="hr-modal" aria-hidden="true">
@@ -970,30 +957,38 @@
                 <div class="flex items-center justify-between p-6 border-b border-[var(--hr-border-light)]">
                     <div>
                         <h2 class="hr-panel-title text-brand-green">Akte bearbeiten</h2>
-                        <p class="text-[var(--muted)] text-sm mt-1">Änderungen werden live synchronisiert.</p>
+                        <p class="text-[var(--muted)] text-sm mt-1">Änderungen werden über das Backend in der Datenbank gespeichert.</p>
                     </div>
-                    <button type="button" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 hover:shadow-[0_0_15px_rgba(248,113,113,0.3)] transition-all" onclick="hrCloseEmployeeModal()">✕</button>
+
+                    <button type="button" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 hover:shadow-[0_0_15px_rgba(248,113,113,0.3)] transition-all" onclick="hrCloseEmployeeModal()">
+                        ✕
+                    </button>
                 </div>
 
                 <div class="p-6">
                     <form id="employee-modal-form" class="hr-form-grid">
                         <input type="hidden" name="id">
+
                         <label class="hr-field">
                             <span class="hr-small-label">Name</span>
                             <input name="name" class="hr-input" type="text" required>
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">E-Mail</span>
                             <input name="email" class="hr-input" type="email">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Rolle</span>
                             <input name="role" class="hr-input" type="text">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Datum</span>
                             <input name="startDate" class="hr-input" type="date">
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Status</span>
                             <select name="status" class="hr-select">
@@ -1003,6 +998,7 @@
                                 <option value="Inaktiv">Inaktiv</option>
                             </select>
                         </label>
+
                         <label class="hr-field">
                             <span class="hr-small-label">Prozess</span>
                             <select name="process" class="hr-select">
@@ -1011,13 +1007,20 @@
                                 <option value="Personalakte">Personalakte</option>
                             </select>
                         </label>
+
                         <label class="hr-field full">
                             <span class="hr-small-label">Notiz</span>
                             <textarea name="notes" class="hr-textarea"></textarea>
                         </label>
+
                         <div class="hr-field full flex gap-3 mt-4">
-                            <button type="submit" class="btn-primary flex-1 hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow">Speichern</button>
-                            <button type="button" class="btn-secondary flex-1" onclick="hrCloseEmployeeModal()">Abbrechen</button>
+                            <button type="submit" class="btn-primary flex-1 hover:shadow-[0_0_20px_rgba(137,190,50,0.4)] transition-shadow">
+                                Speichern
+                            </button>
+
+                            <button type="button" class="btn-secondary flex-1" onclick="hrCloseEmployeeModal()">
+                                Abbrechen
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -1025,278 +1028,558 @@
         </div>
 
         <script>
-            // Unverändertes Javascript für Kernfunktionen
-            const HR_CONFIG_KEY = 'eifellog_hr_system_config_v2';
-            const HR_LOCAL_DB_KEY = 'eifellog_hr_local_database_v2';
+            const HR_API_BASE = '/api/hr-controlling';
 
-            // GEÄNDERT: Alle Demo-Daten sind jetzt standardmäßig leer!
-            const hrDemoEmployees = [];
-            const hrDemoProcessPlan = [];
-            const hrDemoChecklist = [];
+            const hrState = {
+                employees: [],
+                processPlan: [],
+                checklist: [],
+                backendOnline: false,
+                lastSync: null,
+                sourceName: 'Backend-Datenbank'
+            };
 
-            const hrDefaultConfig = { mode: 'own_system', spreadsheetId: '', personalTab: 'Personalakten', checklistTab: 'Checklisten', apiBase: '/api/hr-controlling' };
+            document.addEventListener('DOMContentLoaded', () => {
+                const modal = document.getElementById('employee-modal');
+                if (modal) document.body.appendChild(modal);
 
-            const hrState = { config: { ...hrDefaultConfig }, employees: [], processPlan: [], checklist: [], backendOnline: false, localFallback: true, lastSync: null, sourceName: 'Lokaler Browser-Speicher' };
-
-            document.addEventListener('DOMContentLoaded', () => { 
-                // Das Modal wird auf Root-Ebene (Body) verschoben, um es sicher vom restlichen CSS-Kontext zu trennen.
-                document.body.appendChild(document.getElementById('employee-modal'));
-                
-                hrLoadSystemSettings(); 
-                hrBindForms(); 
-                hrRefreshAll(); 
+                hrBindForms();
+                hrRefreshAll();
             });
 
-            function hrGetApiBase() { return (document.getElementById('sheet-api-base')?.value || '/api/hr-controlling').replace(/\/$/, ''); }
-
-            function hrReadCurrentConfig() {
+            function hrGetRequestHeaders() {
                 return {
-                    mode: hrState.config.mode || 'own_system',
-                    spreadsheetId: document.getElementById('sheet-id')?.value.trim() || '',
-                    personalTab: document.getElementById('sheet-personal-tab')?.value.trim() || 'Personalakten',
-                    checklistTab: document.getElementById('sheet-checklist-tab')?.value.trim() || 'Checklisten',
-                    apiBase: hrGetApiBase()
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 };
             }
 
-            function hrLoadSystemSettings() {
-                try {
-                    const saved = JSON.parse(localStorage.getItem(HR_CONFIG_KEY) || '{}');
-                    hrState.config = { ...hrDefaultConfig, ...saved };
-                } catch (e) { hrState.config = { ...hrDefaultConfig }; }
-
-                document.getElementById('sheet-id').value = hrState.config.spreadsheetId || '';
-                document.getElementById('sheet-personal-tab').value = hrState.config.personalTab || 'Personalakten';
-                document.getElementById('sheet-checklist-tab').value = hrState.config.checklistTab || 'Checklisten';
-                document.getElementById('sheet-api-base').value = hrState.config.apiBase || '/api/hr-controlling';
-                hrApplyModeUi();
-            }
-
-            function hrSaveSystemSettings(showMessage = true) {
-                hrState.config = hrReadCurrentConfig();
-                localStorage.setItem(HR_CONFIG_KEY, JSON.stringify(hrState.config));
-                hrApplyModeUi();
-                if (showMessage) hrShowAlert(`Gesp. Modus: ${hrState.config.mode === 'google_sheets' ? 'Google Sheets' : 'Eigenes System'}`, 'success');
-            }
-
-            function hrSetSystemMode(mode) {
-                hrState.config.mode = mode === 'google_sheets' ? 'google_sheets' : 'own_system';
-                hrSaveSystemSettings(false);
-                hrRefreshAll();
-            }
-
-            function hrApplyModeUi() {
-                const isGoogle = hrState.config.mode === 'google_sheets';
-                document.getElementById('mode-google')?.classList.toggle('active', isGoogle);
-                document.getElementById('mode-own')?.classList.toggle('active', !isGoogle);
-                document.querySelectorAll('[data-google-only]').forEach(el => el.style.display = isGoogle ? 'grid' : 'none');
-                const hint = document.getElementById('system-hint');
-                if (hint) hint.innerHTML = isGoogle ? 'Google-Sheets-Modus: Frontend sendet Spreadsheet-ID. Echte Verbindung via Backend.' : 'Eigenes-System-Modus: Nutzt eigenes Backend oder lokalen Fallback.';
-                hrUpdateStatusUi();
-            }
-
-            function hrShowAlert(msg, type = 'success') {
-                const alert = document.getElementById('hr-alert');
-                if (!alert) return;
-                alert.textContent = msg;
-                alert.className = `hr-alert show ${type}`;
-                clearTimeout(window.__hrAlertTimeout);
-                window.__hrAlertTimeout = setTimeout(() => alert.className = 'hr-alert', 5000);
-            }
-
-            function hrGetRequestHeaders() {
-                const c = hrReadCurrentConfig();
-                return { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-HR-System-Mode': c.mode, 'X-HR-Spreadsheet-Id': c.spreadsheetId, 'X-HR-Personal-Tab': c.personalTab, 'X-HR-Checklist-Tab': c.checklistTab };
-            }
-
             async function hrFetchJson(path, options = {}) {
-                const res = await fetch(`${hrGetApiBase()}${path}`, { headers: hrGetRequestHeaders(), ...options });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
+                const response = await fetch(`${HR_API_BASE}${path}`, {
+                    credentials: 'same-origin',
+                    headers: hrGetRequestHeaders(),
+                    ...options
+                });
+
+                let data = null;
+
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    data = null;
+                }
+
+                if (!response.ok) {
+                    const message = data?.message || data?.error || `HTTP ${response.status}`;
+                    throw new Error(message);
+                }
+
+                return data || {};
             }
 
             async function hrRefreshAll() {
-                hrSaveSystemSettings(false);
-                await Promise.allSettled([ hrLoadEmployees(), hrLoadChecklist(), hrTestSystemConnection(false) ]);
+                hrSetLoadingState(true);
+
+                const results = await Promise.allSettled([
+                    hrLoadEmployees(),
+                    hrLoadChecklist(),
+                    hrTestSystemConnection(false)
+                ]);
+
+                const hasError = results.some(result => result.status === 'rejected');
+
+                if (hasError) {
+                    hrState.backendOnline = false;
+                    hrShowAlert('Backend-Daten konnten nicht vollständig geladen werden.', 'error');
+                }
+
                 hrRenderAll();
+                hrSetLoadingState(false);
             }
 
             async function hrLoadEmployees() {
-                try {
-                    const data = await hrFetchJson('/personalakten');
-                    hrState.employees = Array.isArray(data.employees) ? data.employees : [];
-                    hrState.backendOnline = true; hrState.localFallback = false; hrState.sourceName = data.sourceName || hrGetModeName();
-                } catch (e) {
-                    const db = hrLoadLocalDatabase();
-                    hrState.employees = db.employees; hrState.localFallback = true; hrState.backendOnline = false; hrState.sourceName = 'Lokaler Fallback';
-                }
+                const data = await hrFetchJson('/personalakten');
+
+                hrState.employees = Array.isArray(data.employees) ? data.employees : [];
+                hrState.backendOnline = true;
+                hrState.sourceName = data.sourceName || 'Backend-Datenbank';
+                hrState.lastSync = data.lastSync || new Date().toISOString();
             }
 
             async function hrLoadChecklist() {
-                try {
-                    const data = await hrFetchJson('/checkliste');
-                    hrState.processPlan = Array.isArray(data.processPlan) ? data.processPlan : [];
-                    hrState.checklist = Array.isArray(data.checklist) ? data.checklist : [];
-                    hrState.backendOnline = true; hrState.localFallback = false;
-                } catch (e) {
-                    const db = hrLoadLocalDatabase();
-                    hrState.processPlan = db.processPlan; hrState.checklist = db.checklist; hrState.localFallback = true; hrState.backendOnline = false;
-                }
+                const data = await hrFetchJson('/checkliste');
+
+                hrState.processPlan = Array.isArray(data.processPlan) ? data.processPlan : [];
+                hrState.checklist = Array.isArray(data.checklist) ? data.checklist : [];
+                hrState.backendOnline = true;
+                hrState.sourceName = data.sourceName || hrState.sourceName || 'Backend-Datenbank';
+                hrState.lastSync = data.lastSync || hrState.lastSync || new Date().toISOString();
             }
 
             async function hrTestSystemConnection(showMessage = true) {
                 try {
                     const data = await hrFetchJson('/system/status');
-                    hrState.backendOnline = Boolean(data.connected); hrState.localFallback = !data.connected; hrState.lastSync = data.lastSync || new Date().toISOString(); hrState.sourceName = data.sourceName || hrGetModeName();
-                    if (showMessage) hrShowAlert(data.connected ? `${hrGetModeName()} verbunden.` : `API da, aber nicht verbunden.`, data.connected ? 'success' : 'warning');
-                } catch (e) {
-                    hrState.backendOnline = false; hrState.localFallback = true; hrState.sourceName = 'Lokal';
-                    if (showMessage) hrShowAlert('Kein Backend. Lokaler Fallback aktiv.', 'warning');
+
+                    hrState.backendOnline = Boolean(data.connected ?? true);
+                    hrState.lastSync = data.lastSync || new Date().toISOString();
+                    hrState.sourceName = data.sourceName || 'Backend-Datenbank';
+
+                    if (showMessage) {
+                        hrShowAlert(
+                            hrState.backendOnline ? 'Backend-Datenbank verbunden.' : 'Backend erreichbar, Datenbank aber nicht verbunden.',
+                            hrState.backendOnline ? 'success' : 'warning'
+                        );
+                    }
+                } catch (error) {
+                    hrState.backendOnline = false;
+
+                    if (showMessage) {
+                        hrShowAlert(`Keine Backend-Verbindung: ${error.message}`, 'error');
+                    }
+
+                    throw error;
+                } finally {
+                    hrUpdateStatusUi();
                 }
-                hrUpdateStatusUi();
+            }
+
+            function hrSetLoadingState(isLoading) {
+                document.querySelectorAll('button').forEach(button => {
+                    if (button.dataset.keepEnabled === 'true') return;
+                    button.disabled = Boolean(isLoading);
+                    button.classList.toggle('opacity-60', Boolean(isLoading));
+                    button.classList.toggle('cursor-wait', Boolean(isLoading));
+                });
             }
 
             function hrUpdateStatusUi() {
-                const stat = document.getElementById('system-status-pill'), conn = document.getElementById('connector-mode'), sync = document.getElementById('system-last-sync'), proc = document.getElementById('process-source-pill');
-                if (hrState.backendOnline && !hrState.localFallback) {
-                    stat.textContent = 'Online'; stat.className = 'hr-status-pill online'; conn.textContent = hrGetModeName(); conn.className = 'hr-status-pill online';
-                    proc.textContent = 'Live'; proc.className = 'hr-status-pill online'; sync.textContent = `Letzter Sync: ${hrFormatDateTime(hrState.lastSync)}`;
+                const statusPill = document.getElementById('system-status-pill');
+                const connectorMode = document.getElementById('connector-mode');
+                const lastSync = document.getElementById('system-last-sync');
+                const processSource = document.getElementById('process-source-pill');
+                const sourceLabel = document.getElementById('database-source-label');
+                const healthLabel = document.getElementById('database-health-label');
+
+                if (hrState.backendOnline) {
+                    if (statusPill) {
+                        statusPill.textContent = 'Online';
+                        statusPill.className = 'hr-status-pill online';
+                    }
+
+                    if (connectorMode) {
+                        connectorMode.textContent = 'Datenbank';
+                        connectorMode.className = 'hr-status-pill online';
+                    }
+
+                    if (processSource) {
+                        processSource.textContent = 'Live';
+                        processSource.className = 'hr-status-pill online';
+                    }
+
+                    if (lastSync) {
+                        lastSync.textContent = `Letzter Sync: ${hrFormatDateTime(hrState.lastSync)}`;
+                    }
+
+                    if (healthLabel) {
+                        healthLabel.textContent = `OK · ${hrFormatDateTime(hrState.lastSync)}`;
+                        healthLabel.className = 'mt-2 text-[var(--brand-green)] text-sm';
+                    }
                 } else {
-                    stat.textContent = 'Lokal'; stat.className = 'hr-status-pill warning'; conn.textContent = `${hrGetModeName()} / Lokal`; conn.className = 'hr-status-pill warning';
-                    proc.textContent = 'Lokal'; proc.className = 'hr-status-pill warning'; sync.textContent = 'Lokaler Fallback aktiv';
+                    if (statusPill) {
+                        statusPill.textContent = 'Offline';
+                        statusPill.className = 'hr-status-pill danger';
+                    }
+
+                    if (connectorMode) {
+                        connectorMode.textContent = 'Backend offline';
+                        connectorMode.className = 'hr-status-pill danger';
+                    }
+
+                    if (processSource) {
+                        processSource.textContent = 'Nicht geladen';
+                        processSource.className = 'hr-status-pill danger';
+                    }
+
+                    if (lastSync) {
+                        lastSync.textContent = 'Keine Backend-Verbindung';
+                    }
+
+                    if (healthLabel) {
+                        healthLabel.textContent = 'Backend oder Datenbank nicht erreichbar.';
+                        healthLabel.className = 'mt-2 text-[var(--danger,#f87171)] text-sm';
+                    }
+                }
+
+                if (sourceLabel) {
+                    sourceLabel.textContent = hrState.sourceName || 'Backend-Datenbank';
                 }
             }
 
-            function hrRenderAll() { hrRenderMetrics(); hrRenderEmployees(); hrRenderProcessPlan(); hrRenderChecklist(); hrUpdateStatusUi(); }
+            function hrRenderAll() {
+                hrRenderMetrics();
+                hrRenderEmployees();
+                hrRenderProcessPlan();
+                hrRenderChecklist();
+                hrUpdateStatusUi();
+            }
 
             function hrRenderMetrics() {
-                const emps = hrState.employees || [], chk = hrState.checklist || [];
-                document.getElementById('metric-total').textContent = emps.length;
-                document.getElementById('metric-active').textContent = emps.filter(i => i.status === 'Aktiv').length;
-                document.getElementById('metric-onboarding').textContent = emps.filter(i => i.status === 'Onboarding').length;
-                document.getElementById('metric-checklist').textContent = `${chk.length ? Math.round((chk.filter(i => i.done).length / chk.length) * 100) : 0}%`;
-                document.getElementById('metric-source').textContent = hrState.sourceName || hrGetModeName();
+                const employees = hrState.employees || [];
+                const checklist = hrState.checklist || [];
+                const doneCount = checklist.filter(item => Boolean(item.done)).length;
+                const checklistProgress = checklist.length ? Math.round((doneCount / checklist.length) * 100) : 0;
+
+                document.getElementById('metric-total').textContent = employees.length;
+                document.getElementById('metric-active').textContent = employees.filter(item => item.status === 'Aktiv').length;
+                document.getElementById('metric-onboarding').textContent = employees.filter(item => item.status === 'Onboarding').length;
+                document.getElementById('metric-checklist').textContent = `${checklistProgress}%`;
+                document.getElementById('metric-source').textContent = hrState.sourceName || 'Backend-Datenbank';
             }
 
             function hrRenderEmployees() {
-                const body = document.getElementById('employees-table-body'), sVal = (document.getElementById('hr-search')?.value || '').toLowerCase().trim(), sFil = document.getElementById('hr-status-filter')?.value || 'all';
-                const filtered = (hrState.employees || []).filter(e => {
-                    const matchS = !sVal || `${e.name} ${e.email} ${e.role} ${e.status}`.toLowerCase().includes(sVal);
-                    return matchS && (sFil === 'all' || e.status === sFil);
-                });
-                if (!filtered.length) return body.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-[var(--muted)]">Keine Akten gefunden.</td></tr>';
+                const body = document.getElementById('employees-table-body');
+                if (!body) return;
 
-                body.innerHTML = filtered.map(e => `
+                const searchValue = (document.getElementById('hr-search')?.value || '').toLowerCase().trim();
+                const statusFilter = document.getElementById('hr-status-filter')?.value || 'all';
+
+                const filtered = (hrState.employees || []).filter(employee => {
+                    const haystack = [
+                        employee.name,
+                        employee.email,
+                        employee.role,
+                        employee.status,
+                        employee.process
+                    ].join(' ').toLowerCase();
+
+                    const matchesSearch = !searchValue || haystack.includes(searchValue);
+                    const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+
+                    return matchesSearch && matchesStatus;
+                });
+
+                if (!filtered.length) {
+                    body.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-[var(--muted)]">Keine Akten in der Datenbank gefunden.</td></tr>';
+                    return;
+                }
+
+                body.innerHTML = filtered.map(employee => `
                     <tr>
                         <td>
                             <div class="hr-person">
-                                <div class="hr-avatar">${hrGetInitials(e.name)}</div>
-                                <div><div class="hr-person-name">${hrEscape(e.name)}</div><div class="hr-person-meta">${hrEscape(e.email)}</div></div>
+                                <div class="hr-avatar">${hrGetInitials(employee.name)}</div>
+                                <div>
+                                    <div class="hr-person-name">${hrEscape(employee.name)}</div>
+                                    <div class="hr-person-meta">${hrEscape(employee.email || '-')}</div>
+                                </div>
                             </div>
                         </td>
-                        <td>${hrEscape(e.role || '-')}</td>
-                        <td><span class="hr-badge ${hrGetStatusClass(e.status)}">${hrEscape(e.status)}</span></td>
-                        <td>${hrEscape(e.process || '-')}</td>
+                        <td>${hrEscape(employee.role || '-')}</td>
+                        <td><span class="hr-badge ${hrGetStatusClass(employee.status)}">${hrEscape(employee.status || '-')}</span></td>
+                        <td>${hrEscape(employee.process || '-')}</td>
                         <td>
                             <div class="flex items-center gap-3">
-                                <div class="hr-progress w-24"><div class="hr-progress-bar" style="width: ${Math.max(0, Math.min(100, e.progress || 0))}%"></div></div>
-                                <span class="text-[var(--muted)] text-xs font-bold">${e.progress || 0}%</span>
+                                <div class="hr-progress w-24">
+                                    <div class="hr-progress-bar" style="width: ${hrClampProgress(employee.progress)}%"></div>
+                                </div>
+                                <span class="text-[var(--muted)] text-xs font-bold">${hrClampProgress(employee.progress)}%</span>
                             </div>
                         </td>
-                        <td>${hrFormatDate(e.startDate)}</td>
-                        <td><button type="button" class="btn-secondary !py-1 !px-3 !min-h-0 text-xs" onclick="hrOpenEmployeeModal('${hrEscapeAttribute(e.id)}')">Öffnen</button></td>
+                        <td>${hrFormatDate(employee.startDate)}</td>
+                        <td>
+                            <button type="button" class="btn-secondary !py-1 !px-3 !min-h-0 text-xs" onclick="hrOpenEmployeeModal('${hrEscapeAttribute(employee.id)}')">
+                                Öffnen
+                            </button>
+                        </td>
                     </tr>
                 `).join('');
             }
 
             function hrRenderProcessPlan() {
-                const list = document.getElementById('process-list'), items = hrState.processPlan || [];
-                if (!items.length) return list.innerHTML = '<div class="text-[var(--muted)] py-4 text-sm">Keine Prozesse hinterlegt.</div>';
-                list.innerHTML = items.map((i, idx) => `
+                const list = document.getElementById('process-list');
+                if (!list) return;
+
+                const items = hrState.processPlan || [];
+
+                if (!items.length) {
+                    list.innerHTML = '<div class="hr-empty-state">Keine Prozessschritte in der Datenbank hinterlegt.</div>';
+                    return;
+                }
+
+                list.innerHTML = items.map((item, index) => `
                     <div class="hr-process-item">
-                        <div class="hr-process-index">${String(idx + 1).padStart(2, '0')}</div>
+                        <div class="hr-process-index">${String(index + 1).padStart(2, '0')}</div>
                         <div class="hr-process-content">
-                            <div class="hr-process-title">${hrEscape(i.title)}</div>
-                            <div class="hr-process-meta">${hrEscape(i.description)}</div>
+                            <div class="hr-process-title">${hrEscape(item.title)}</div>
+                            <div class="hr-process-meta">${hrEscape(item.description || '')}</div>
                         </div>
-                        <span class="hr-badge ${hrGetStatusClass(i.phase)}">${hrEscape(i.phase)}</span>
-                    </div>`).join('');
+                        <span class="hr-badge ${hrGetStatusClass(item.phase)}">${hrEscape(item.phase || '-')}</span>
+                    </div>
+                `).join('');
             }
 
             function hrRenderChecklist() {
-                const list = document.getElementById('checklist-list'), items = hrState.checklist || [];
-                const p = items.length ? Math.round((items.filter(i => i.done).length / items.length) * 100) : 0;
-                document.getElementById('checklist-progress-bar').style.width = `${p}%`; document.getElementById('checklist-progress-pill').textContent = `${p}%`;
-                if (!items.length) return list.innerHTML = '<div class="text-[var(--muted)] py-4 text-sm">Keine Aufgaben in der Checkliste.</div>';
-                list.innerHTML = items.map(i => `
+                const list = document.getElementById('checklist-list');
+                const bar = document.getElementById('checklist-progress-bar');
+                const pill = document.getElementById('checklist-progress-pill');
+
+                if (!list || !bar || !pill) return;
+
+                const items = hrState.checklist || [];
+                const progress = items.length ? Math.round((items.filter(item => item.done).length / items.length) * 100) : 0;
+
+                bar.style.width = `${progress}%`;
+                pill.textContent = `${progress}%`;
+
+                if (!items.length) {
+                    list.innerHTML = '<div class="hr-empty-state">Keine Aufgaben in der Datenbank hinterlegt.</div>';
+                    return;
+                }
+
+                list.innerHTML = items.map(item => `
                     <label class="hr-check-row">
-                        <input type="checkbox" ${i.done ? 'checked' : ''} onchange="hrToggleChecklist('${hrEscapeAttribute(i.id)}', this.checked)">
-                        <div><div class="text-[#fff] text-sm font-bold">${hrEscape(i.title)}</div><div class="text-[var(--muted)] text-xs mt-1">Owner: ${hrEscape(i.owner)}</div></div>
-                    </label>`).join('');
+                        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="hrToggleChecklist('${hrEscapeAttribute(item.id)}', this.checked)">
+                        <div>
+                            <div class="text-[#fff] text-sm font-bold">${hrEscape(item.title)}</div>
+                            <div class="text-[var(--muted)] text-xs mt-1">Owner: ${hrEscape(item.owner || '-')}</div>
+                        </div>
+                    </label>
+                `).join('');
             }
 
             function hrBindForms() {
-                document.getElementById('quick-employee-form')?.addEventListener('submit', e => { e.preventDefault(); hrSubmitEmployeeForm(e.target); });
-                document.getElementById('employee-modal-form')?.addEventListener('submit', e => { e.preventDefault(); hrSubmitEmployeeForm(e.target, true); });
+                document.getElementById('quick-employee-form')?.addEventListener('submit', event => {
+                    event.preventDefault();
+                    hrSubmitEmployeeForm(event.target);
+                });
+
+                document.getElementById('employee-modal-form')?.addEventListener('submit', event => {
+                    event.preventDefault();
+                    hrSubmitEmployeeForm(event.target, true);
+                });
             }
 
             async function hrSubmitEmployeeForm(form, closeAfter = false) {
-                hrSaveSystemSettings(false);
-                const emp = Object.fromEntries(new FormData(form).entries());
-                emp.id = emp.id || `EL-HR-${Date.now()}`; emp.progress = hrCalculateProgress(emp); emp.updatedAt = new Date().toISOString();
+                const employee = Object.fromEntries(new FormData(form).entries());
+
+                employee.id = employee.id || null;
+                employee.progress = hrCalculateProgress(employee);
+                employee.updatedAt = new Date().toISOString();
+
                 try {
-                    const data = await hrFetchJson('/personalakten', { method: 'POST', body: JSON.stringify({ employee: emp, config: hrReadCurrentConfig() }) });
-                    hrUpsertEmployee(data.employee || emp); hrState.backendOnline = true; hrState.localFallback = false; hrShowAlert('Erfolgreich gespeichert (Backend)', 'success');
-                } catch (e) {
-                    hrUpsertEmployee(emp); hrPersistLocalDatabase(); hrState.backendOnline = false; hrState.localFallback = true; hrShowAlert('Erfolgreich gespeichert (Lokal)', 'warning');
+                    const data = await hrFetchJson('/personalakten', {
+                        method: 'POST',
+                        body: JSON.stringify({ employee })
+                    });
+
+                    const savedEmployee = data.employee || employee;
+
+                    hrUpsertEmployee(savedEmployee);
+                    hrState.backendOnline = true;
+                    hrState.lastSync = data.lastSync || new Date().toISOString();
+                    hrState.sourceName = data.sourceName || 'Backend-Datenbank';
+
+                    form.reset();
+
+                    if (closeAfter) {
+                        hrCloseEmployeeModal();
+                    }
+
+                    hrShowAlert('Personalakte wurde in der Datenbank gespeichert.', 'success');
+                    hrRenderAll();
+                } catch (error) {
+                    hrState.backendOnline = false;
+                    hrShowAlert(`Speichern fehlgeschlagen: ${error.message}`, 'error');
+                    hrUpdateStatusUi();
                 }
-                form.reset(); if (closeAfter) hrCloseEmployeeModal(); hrRenderAll();
             }
 
-            function hrUpsertEmployee(emp) {
-                const idx = hrState.employees.findIndex(i => i.id === emp.id);
-                if (idx >= 0) hrState.employees[idx] = { ...hrState.employees[idx], ...emp }; else hrState.employees.unshift(emp);
+            function hrUpsertEmployee(employee) {
+                if (!employee.id) {
+                    hrState.employees.unshift(employee);
+                    return;
+                }
+
+                const index = hrState.employees.findIndex(item => String(item.id) === String(employee.id));
+
+                if (index >= 0) {
+                    hrState.employees[index] = { ...hrState.employees[index], ...employee };
+                } else {
+                    hrState.employees.unshift(employee);
+                }
             }
 
             function hrOpenEmployeeModal(id = null) {
-                const m = document.getElementById('employee-modal'), f = document.getElementById('employee-modal-form'), emp = id ? hrState.employees.find(i => i.id === id) : null;
-                f.reset(); if (emp) Object.entries(emp).forEach(([k, v]) => { if(f.elements[k]) f.elements[k].value = v || ''; });
-                m.classList.add('show'); m.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
+                const modal = document.getElementById('employee-modal');
+                const form = document.getElementById('employee-modal-form');
+                const employee = id ? hrState.employees.find(item => String(item.id) === String(id)) : null;
+
+                if (!modal || !form) return;
+
+                form.reset();
+
+                if (employee) {
+                    Object.entries(employee).forEach(([key, value]) => {
+                        if (form.elements[key]) {
+                            form.elements[key].value = value || '';
+                        }
+                    });
+                }
+
+                modal.classList.add('show');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
             }
 
             function hrCloseEmployeeModal() {
-                const m = document.getElementById('employee-modal'); m.classList.remove('show'); m.setAttribute('aria-hidden', 'true'); document.body.style.overflow = '';
+                const modal = document.getElementById('employee-modal');
+
+                if (!modal) return;
+
+                modal.classList.remove('show');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
             }
 
             async function hrToggleChecklist(id, done) {
-                const item = hrState.checklist.find(i => i.id === id); if (!item) return;
-                item.done = done; hrRenderChecklist(); hrRenderMetrics();
+                const item = hrState.checklist.find(checklistItem => String(checklistItem.id) === String(id));
+
+                if (!item) return;
+
+                const previousValue = item.done;
+                item.done = done;
+
+                hrRenderChecklist();
+                hrRenderMetrics();
+
                 try {
-                    await hrFetchJson('/checkliste', { method: 'POST', body: JSON.stringify({ id, done, checklistItem: item, config: hrReadCurrentConfig() }) });
-                    hrState.backendOnline = true; hrState.localFallback = false;
-                } catch (e) {
-                    hrPersistLocalDatabase(); hrState.backendOnline = false; hrState.localFallback = true; hrShowAlert('Lokal aktualisiert', 'warning');
-                } hrUpdateStatusUi();
+                    const data = await hrFetchJson('/checkliste', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            id,
+                            done,
+                            checklistItem: item
+                        })
+                    });
+
+                    const savedItem = data.checklistItem || item;
+                    const index = hrState.checklist.findIndex(checklistItem => String(checklistItem.id) === String(id));
+
+                    if (index >= 0) {
+                        hrState.checklist[index] = { ...hrState.checklist[index], ...savedItem };
+                    }
+
+                    hrState.backendOnline = true;
+                    hrState.lastSync = data.lastSync || new Date().toISOString();
+
+                    hrShowAlert('Checkliste wurde in der Datenbank aktualisiert.', 'success');
+                } catch (error) {
+                    item.done = previousValue;
+                    hrState.backendOnline = false;
+                    hrShowAlert(`Checkliste konnte nicht gespeichert werden: ${error.message}`, 'error');
+                }
+
+                hrRenderAll();
             }
 
-            function hrLoadLocalDatabase() {
-                try { const s = JSON.parse(localStorage.getItem(HR_LOCAL_DB_KEY) || '{}'); return { employees: s.employees?.length ? s.employees : [...hrDemoEmployees], processPlan: s.processPlan?.length ? s.processPlan : [...hrDemoProcessPlan], checklist: s.checklist?.length ? s.checklist : [...hrDemoChecklist] }; } catch (e) { return { employees: [...hrDemoEmployees], processPlan: [...hrDemoProcessPlan], checklist: [...hrDemoChecklist] }; }
-            }
-            function hrPersistLocalDatabase() { localStorage.setItem(HR_LOCAL_DB_KEY, JSON.stringify({ employees: hrState.employees, processPlan: hrState.processPlan, checklist: hrState.checklist, updatedAt: new Date().toISOString() })); }
+            function hrShowAlert(message, type = 'success') {
+                const alert = document.getElementById('hr-alert');
 
-            function hrExportLocalJson() {
-                const b = new Blob([JSON.stringify({ config: hrReadCurrentConfig(), employees: hrState.employees, processPlan: hrState.processPlan, checklist: hrState.checklist }, null, 2)], { type: 'application/json' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `hr-export-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+                if (!alert) return;
+
+                alert.textContent = message;
+                alert.className = `hr-alert show ${type}`;
+
+                clearTimeout(window.__hrAlertTimeout);
+                window.__hrAlertTimeout = setTimeout(() => {
+                    alert.className = 'hr-alert';
+                }, 5000);
             }
 
-            function hrCalculateProgress(e) { if (e.status === 'Aktiv') return 100; if (e.status === 'Onboarding') return e.progress || 25; if (e.status === 'Offboarding') return e.progress || 35; return e.progress || 0; }
-            function hrGetModeName() { return hrState.config.mode === 'google_sheets' ? 'Google Sheets' : 'Eigenes System'; }
-            function hrGetInitials(n = '') { return n.split(' ').filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || 'EL'; }
-            function hrGetStatusClass(s = '') { const n = String(s).toLowerCase(); if (n.includes('aktiv') || n.includes('done')) return 'active'; if (n.includes('onboarding') || n.includes('pending')) return 'onboarding'; if (n.includes('offboarding') || n.includes('inaktiv')) return 'offboarding'; return ''; }
-            function hrFormatDate(v) { if (!v) return '-'; const d = new Date(v); return isNaN(d) ? v : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
-            function hrFormatDateTime(v) { if (!v) return '-'; const d = new Date(v); return isNaN(d) ? v : d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-            function hrEscape(v = '') { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
-            function hrEscapeAttribute(v = '') { return hrEscape(v).replace(/`/g, '&#096;'); }
+            function hrCalculateProgress(employee) {
+                const existing = Number(employee.progress);
+
+                if (Number.isFinite(existing) && existing >= 0) {
+                    return hrClampProgress(existing);
+                }
+
+                if (employee.status === 'Aktiv') return 100;
+                if (employee.status === 'Onboarding') return 25;
+                if (employee.status === 'Offboarding') return 35;
+
+                return 0;
+            }
+
+            function hrClampProgress(value) {
+                const number = Number(value);
+
+                if (!Number.isFinite(number)) return 0;
+
+                return Math.max(0, Math.min(100, Math.round(number)));
+            }
+
+            function hrGetInitials(name = '') {
+                return String(name)
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(part => part[0].toUpperCase())
+                    .join('') || 'EL';
+            }
+
+            function hrGetStatusClass(status = '') {
+                const normalized = String(status).toLowerCase();
+
+                if (normalized.includes('aktiv') || normalized.includes('done')) return 'active';
+                if (normalized.includes('onboarding') || normalized.includes('pending')) return 'onboarding';
+                if (normalized.includes('offboarding') || normalized.includes('inaktiv')) return 'offboarding';
+
+                return '';
+            }
+
+            function hrFormatDate(value) {
+                if (!value) return '-';
+
+                const date = new Date(value);
+
+                return Number.isNaN(date.getTime())
+                    ? value
+                    : date.toLocaleDateString('de-DE', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+            }
+
+            function hrFormatDateTime(value) {
+                if (!value) return '-';
+
+                const date = new Date(value);
+
+                return Number.isNaN(date.getTime())
+                    ? value
+                    : date.toLocaleString('de-DE', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+            }
+
+            function hrEscape(value = '') {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function hrEscapeAttribute(value = '') {
+                return hrEscape(value).replace(/`/g, '&#096;');
+            }
         </script>
     {% else %}
         <section class="hr-panel !max-w-3xl !mx-auto mt-20">
@@ -1305,12 +1588,17 @@
                     <span class="hr-pulse"></span>
                     Zugriff geschützt
                 </p>
+
                 <h1 class="hr-title mt-6 text-4xl">HR <span>Controlling</span></h1>
+
                 <p class="hr-subtitle mt-6 text-center">
                     Dieser Bereich ist streng vertraulich. Melde dich über das Driver Hub an, um das HR-Panel zu verwalten.
                 </p>
+
                 <div class="mt-8">
-                    <a href="/hub" class="btn-primary !px-8 !py-3 text-lg shadow-[0_0_20px_rgba(137,190,50,0.3)] hover:shadow-[0_0_30px_rgba(137,190,50,0.6)] transition-shadow">Zum Driver Hub</a>
+                    <a href="/hub" class="btn-primary !px-8 !py-3 text-lg shadow-[0_0_20px_rgba(137,190,50,0.3)] hover:shadow-[0_0_30px_rgba(137,190,50,0.6)] transition-shadow">
+                        Zum Driver Hub
+                    </a>
                 </div>
             </div>
         </section>
