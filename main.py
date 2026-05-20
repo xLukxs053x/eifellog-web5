@@ -6,6 +6,7 @@ import re
 import json
 import uuid
 import hashlib
+import hmac
 import secrets
 import requests
 from io import BytesIO
@@ -236,6 +237,8 @@ fahrerkarte_beantragungen_collection = db[env_first(
 tracker_driver_cards_collection = db["tracker_driver_cards"]
 tracker_work_sessions_collection = db["tracker_work_sessions"]
 tracker_job_starts_collection = db["tracker_job_starts"]
+driver_logs_collection = db["driver_logs"]
+tracker_shift_logs_collection = db["tracker_shift_logs"]
 
 # HR Controlling läuft ausschließlich über MongoDB / Backend.
 # Keine Google-Sheets-Konfiguration, keine Browser-LocalStorage-Datenbank.
@@ -361,6 +364,23 @@ def ensure_indexes():
         tracker_job_starts_collection.create_index([("tour_start_discord_sent_at", DESCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("completed_at", DESCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("discord_id", ASCENDING), ("job_start_key", ASCENDING), ("status", ASCENDING)], unique=False)
+
+        driver_logs_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("user_id", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("date_str", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("date_display", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("start_time", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("end_time", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("state_key", ASCENDING)], unique=False)
+        driver_logs_collection.create_index([("discord_id", ASCENDING), ("date_str", ASCENDING), ("start_time", ASCENDING)], unique=False)
+
+        tracker_shift_logs_collection.create_index([("shift_id", ASCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("shift_date", ASCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("date_str", ASCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("created_at", DESCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        tracker_shift_logs_collection.create_index([("discord_id", ASCENDING), ("date_str", ASCENDING)], unique=False)
 
         hr_personalakten_collection.create_index([("employee_id", ASCENDING)], unique=False)
         hr_personalakten_collection.create_index([("id", ASCENDING)], unique=False)
@@ -5030,47 +5050,645 @@ def format_ms_to_hhmm(ms):
     minutes = (total_seconds % 3600) // 60
     return f"{hours:02d}:{minutes:02d}"
 
-def generate_shift_log_pdf(shift_doc):
-    """Erstellt den PDF-Beleg für die Schicht/Fahrerkarte."""
-    # Hier nutzen wir deinen neu angelegten Ordner
-    os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
-    
-    date_str = shift_doc.get("shift_date", "Unbekannt")
-    driver_name = shift_doc.get("driver_name", "Unbekannt")
-    
-    # Entfernt Sonderzeichen aus dem Namen für einen sauberen Dateinamen
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", driver_name)[:30]
-    filename = f"Fahrerkarte_Auszug_{safe_name}_{date_str}.pdf"
-    file_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename)
-    
-    # 11 Stunden Ruhezeit Check (11 Stunden = 39.600.000 ms)
-    session_data = shift_doc.get("session_data", {})
-    rest_ms = session_data.get("restMs", 0)
-    rest_check = "Erfüllt (Mindestens 11h erreicht)" if rest_ms >= 39600000 else "Ausstehend / Wird jetzt angetreten"
 
-    created_at = shift_doc.get("created_at")
-    created_at_str = created_at.strftime("%d.%m.%Y %H:%M") if created_at else "Unbekannt"
+DAILY_REST_REQUIRED_MS = 11 * 60 * 60 * 1000
+CONTINUOUS_DRIVE_LIMIT_MS = int(4.5 * 60 * 60 * 1000)
+DAILY_DRIVE_LIMIT_MS = 8 * 60 * 60 * 1000
+
+DRIVER_ACTIVITY_STATE_MAP = {
+    "fahrzeit": ("drive", "Fahrzeit"),
+    "fahrt": ("drive", "Fahrzeit"),
+    "drive": ("drive", "Fahrzeit"),
+    "driving": ("drive", "Fahrzeit"),
+    "lenkzeit": ("drive", "Fahrzeit"),
+    "arbeitszeit": ("work", "Arbeitszeit / Rampe"),
+    "arbeit": ("work", "Arbeitszeit / Rampe"),
+    "work": ("work", "Arbeitszeit / Rampe"),
+    "working": ("work", "Arbeitszeit / Rampe"),
+    "rampe": ("work", "Arbeitszeit / Rampe"),
+    "loading": ("work", "Arbeitszeit / Rampe"),
+    "pause": ("pause", "Pause"),
+    "break": ("pause", "Pause"),
+    "ruhepause": ("pause", "Pause"),
+    "feierabend": ("offDuty", "Feierabend / 11h Ruhezeit"),
+    "shift_end": ("offDuty", "Feierabend / 11h Ruhezeit"),
+    "offduty": ("offDuty", "Ruhezeit / außer Dienst"),
+    "off_duty": ("offDuty", "Ruhezeit / außer Dienst"),
+    "ruhezeit": ("offDuty", "Ruhezeit / außer Dienst"),
+    "rest": ("offDuty", "Ruhezeit / außer Dienst"),
+}
+
+
+def resolve_fahrerkarten_daten_download_folder():
+    folder = safe_str(
+        globals().get("FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER"),
+        os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
+    )
+    if not os.path.isabs(folder):
+        folder = os.path.join(BASE_DIR, folder)
+    return folder
+
+
+def driver_activity_state_info(value):
+    raw = safe_str(value, "Arbeitszeit")
+    key = re.sub(r"[^a-z0-9_]+", "", raw.lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss"))
+    state_key, label = DRIVER_ACTIVITY_STATE_MAP.get(key, ("work", raw[:80] or "Arbeitszeit"))
+    is_shift_end = key in {"feierabend", "shift_end"}
+    return state_key, label, is_shift_end
+
+
+def coerce_driver_log_datetime(value, fallback=None):
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    if isinstance(value, (int, float)):
+        try:
+            timestamp = float(value)
+            if timestamp > 10_000_000_000:
+                timestamp = timestamp / 1000
+            return datetime.utcfromtimestamp(timestamp)
+        except Exception:
+            return fallback or now_utc()
+    text = safe_str(value)
+    if not text:
+        return fallback or now_utc()
+    try:
+        if re.match(r"^\d+(\.\d+)?$", text):
+            timestamp = float(text)
+            if timestamp > 10_000_000_000:
+                timestamp = timestamp / 1000
+            return datetime.utcfromtimestamp(timestamp)
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return fallback or now_utc()
+
+
+def driver_log_date_from_value(value, fallback=None):
+    if isinstance(value, datetime):
+        return value.date()
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        return value
+    text = safe_str(value)
+    if text:
+        for pattern in ("%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(text[:10], pattern).date()
+            except Exception:
+                pass
+    return fallback or now_utc().date()
+
+
+def driver_log_date_keys(value):
+    date_value = driver_log_date_from_value(value)
+    return date_value.strftime("%Y-%m-%d"), date_value.strftime("%d.%m.%Y")
+
+
+def driver_activity_duration_ms(log_doc, now_ref=None):
+    log_doc = log_doc or {}
+    stored_duration = log_doc.get("duration_ms")
+    if stored_duration not in [None, ""]:
+        return max(0, parse_int(stored_duration, 0))
+
+    start_time = log_doc.get("start_time")
+    end_time = log_doc.get("end_time") or now_ref or now_utc()
+    if isinstance(start_time, datetime) and isinstance(end_time, datetime):
+        return max(0, int((end_time - start_time).total_seconds() * 1000))
+    return 0
+
+
+def driver_activity_time_text(value, fallback="-"):
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    return safe_str(value, fallback)
+
+
+def driver_activity_datetime_text(value, fallback="-"):
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M")
+    return safe_str(value, fallback)
+
+
+def driver_activity_duration_text(ms):
+    return format_ms_to_hhmm(parse_int(ms, 0))
+
+
+def driver_log_for_api(log_doc, now_ref=None):
+    log_doc = log_doc or {}
+    duration_ms = driver_activity_duration_ms(log_doc, now_ref=now_ref)
+    return {
+        "activity_id": safe_str(log_doc.get("activity_id") or log_doc.get("_id")),
+        "discord_id": safe_str(log_doc.get("discord_id") or log_doc.get("user_id")),
+        "date_str": safe_str(log_doc.get("date_str")),
+        "date_display": safe_str(log_doc.get("date_display") or log_doc.get("shift_date")),
+        "state": safe_str(log_doc.get("state") or log_doc.get("state_label")),
+        "state_key": safe_str(log_doc.get("state_key")),
+        "state_label": safe_str(log_doc.get("state_label") or log_doc.get("state")),
+        "start_time": datetime_to_iso(log_doc.get("start_time")),
+        "end_time": datetime_to_iso(log_doc.get("end_time")),
+        "start_display": driver_activity_time_text(log_doc.get("start_time")),
+        "end_display": driver_activity_time_text(log_doc.get("end_time"), "läuft"),
+        "duration_ms": duration_ms,
+        "duration": driver_activity_duration_text(duration_ms),
+        "rest_status": safe_str(log_doc.get("rest_status")),
+        "rest_required_ms": parse_int(log_doc.get("rest_required_ms"), 0),
+        "rest_completed_at": datetime_to_iso(log_doc.get("rest_completed_at")),
+        "rest_completed_display": driver_activity_datetime_text(log_doc.get("rest_completed_at"), ""),
+        "rest_violation": bool(log_doc.get("rest_violation", False)),
+        "note": safe_str(log_doc.get("note") or log_doc.get("details")),
+    }
+
+
+def get_driver_activity_logs_for_day(user_doc, date_value):
+    discord_id = safe_str((user_doc or {}).get("discord_id") or (user_doc or {}).get("user_id") or (user_doc or {}).get("id"))
+    if not discord_id:
+        return []
+    date_str, date_display = driver_log_date_keys(date_value)
+    return list(driver_logs_collection.find({
+        "discord_id": discord_id,
+        "$or": [
+            {"date_str": date_str},
+            {"date_display": date_display},
+            {"shift_date": date_display},
+        ],
+        "archived": {"$ne": True},
+    }).sort([("start_time", ASCENDING), ("created_at", ASCENDING)]))
+
+
+def get_driver_activity_logs_for_period(user_doc, date_from="", date_to=""):
+    discord_id = safe_str((user_doc or {}).get("discord_id") or (user_doc or {}).get("user_id") or (user_doc or {}).get("id"))
+    if not discord_id:
+        return []
+
+    start_date = driver_log_date_from_value(date_from) if safe_str(date_from) else now_utc().date()
+    end_date = driver_log_date_from_value(date_to, fallback=start_date) if safe_str(date_to) else start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    start_dt = datetime(start_date.year, start_date.month, start_date.day)
+    end_dt = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
+
+    return list(driver_logs_collection.find({
+        "discord_id": discord_id,
+        "archived": {"$ne": True},
+        "$or": [
+            {"start_time": {"$gte": start_dt, "$lt": end_dt}},
+            {"end_time": {"$gte": start_dt, "$lt": end_dt}},
+            {"date_str": {"$gte": start_date.strftime("%Y-%m-%d"), "$lte": end_date.strftime("%Y-%m-%d")}},
+        ],
+    }).sort([("start_time", ASCENDING), ("created_at", ASCENDING)]))
+
+
+def summarize_driver_activity_logs(logs, now_ref=None):
+    now_ref = now_ref or now_utc()
+    logs = sorted(logs or [], key=lambda item: item.get("start_time") or item.get("created_at") or datetime.min)
+    totals = {
+        "drive_ms": 0,
+        "work_ms": 0,
+        "pause_ms": 0,
+        "rest_ms": 0,
+        "other_ms": 0,
+    }
+    issues = []
+    continuous_drive_ms = 0
+    max_continuous_drive_ms = 0
+    latest_shift_end = None
+
+    for log_doc in logs:
+        duration_ms = driver_activity_duration_ms(log_doc, now_ref=now_ref)
+        state_key = safe_str(log_doc.get("state_key"))
+
+        if state_key == "drive":
+            totals["drive_ms"] += duration_ms
+            continuous_drive_ms += duration_ms
+            max_continuous_drive_ms = max(max_continuous_drive_ms, continuous_drive_ms)
+        elif state_key == "work":
+            totals["work_ms"] += duration_ms
+        elif state_key == "pause":
+            totals["pause_ms"] += duration_ms
+            if duration_ms >= 45 * 60 * 1000:
+                continuous_drive_ms = 0
+        elif state_key == "offDuty":
+            totals["rest_ms"] += duration_ms
+            if log_doc.get("is_shift_end"):
+                latest_shift_end = log_doc
+            if duration_ms >= 45 * 60 * 1000:
+                continuous_drive_ms = 0
+        else:
+            totals["other_ms"] += duration_ms
+
+    if totals["drive_ms"] > DAILY_DRIVE_LIMIT_MS:
+        issues.append("Tageslenkzeit von 8 Stunden wurde überschritten.")
+    if max_continuous_drive_ms > CONTINUOUS_DRIVE_LIMIT_MS:
+        issues.append("Lenkzeit am Stück überschreitet 4,5 Stunden ohne ausreichende Pause.")
+
+    rest_status = "missing"
+    rest_label = "Kein Feierabend erfasst"
+    rest_summary = "Für diesen Tag wurde kein Feierabend mit 11-Stunden-Ruhezeit gespeichert."
+    rest_completed_at = None
+    rest_remaining_ms = 0
+
+    if latest_shift_end:
+        rest_completed_at = latest_shift_end.get("rest_completed_at") or latest_shift_end.get("end_time")
+        stored_status = safe_str(latest_shift_end.get("rest_status"), "pending")
+        if stored_status == "violated":
+            rest_status = "violation"
+            rest_label = "Ruhezeit verletzt"
+            rest_summary = "Nach Feierabend wurde vor Ablauf der 11 Stunden wieder gestartet."
+            issues.append(rest_summary)
+        elif isinstance(rest_completed_at, datetime) and now_ref >= rest_completed_at:
+            rest_status = "fulfilled"
+            rest_label = "11 Stunden Ruhezeit erreicht"
+            rest_summary = f"Feierabend erfasst; Ruhezeit seit {driver_activity_datetime_text(rest_completed_at)} erfüllt."
+        else:
+            rest_status = "pending"
+            rest_label = "11 Stunden Ruhezeit läuft"
+            if isinstance(rest_completed_at, datetime):
+                rest_remaining_ms = max(0, int((rest_completed_at - now_ref).total_seconds() * 1000))
+                rest_summary = f"Feierabend erfasst; Ruhezeit muss bis {driver_activity_datetime_text(rest_completed_at)} laufen."
+            else:
+                rest_summary = "Feierabend erfasst; Zielzeit der Ruhezeit fehlt."
+
+    if issues:
+        compliance_status = "violation"
+        compliance_label = "Verstoß / Prüfung erforderlich"
+    elif rest_status == "fulfilled":
+        compliance_status = "ok"
+        compliance_label = "Eingehalten"
+    elif rest_status == "pending":
+        compliance_status = "warning"
+        compliance_label = "Ruhezeit läuft"
+    else:
+        compliance_status = "warning"
+        compliance_label = "Unvollständig"
+
+    return {
+        "totals": totals,
+        "drive": driver_activity_duration_text(totals["drive_ms"]),
+        "work": driver_activity_duration_text(totals["work_ms"]),
+        "pause": driver_activity_duration_text(totals["pause_ms"]),
+        "rest": driver_activity_duration_text(totals["rest_ms"]),
+        "max_continuous_drive": driver_activity_duration_text(max_continuous_drive_ms),
+        "rest_status": rest_status,
+        "rest_label": rest_label,
+        "rest_summary": rest_summary,
+        "rest_completed_at": rest_completed_at,
+        "rest_completed_display": driver_activity_datetime_text(rest_completed_at, ""),
+        "rest_remaining_ms": rest_remaining_ms,
+        "rest_remaining": driver_activity_duration_text(rest_remaining_ms),
+        "issues": issues,
+        "compliance_status": compliance_status,
+        "compliance_label": compliance_label,
+    }
+
+
+def build_driver_activity_day_snapshot(user_doc, date_value, logs=None):
+    date_str, date_display = driver_log_date_keys(date_value)
+    logs = logs if logs is not None else get_driver_activity_logs_for_day(user_doc, date_str)
+    summary = summarize_driver_activity_logs(logs)
+    return {
+        "date_str": date_str,
+        "shift_date": date_display,
+        "date_display": date_display,
+        "entries": [driver_log_for_api(item) for item in logs],
+        "summary": summary,
+        "entry_count": len(logs),
+    }
+
+
+def build_driver_activity_period_report(user_doc, date_from="", date_to=""):
+    start_date = driver_log_date_from_value(date_from) if safe_str(date_from) else now_utc().date()
+    end_date = driver_log_date_from_value(date_to, fallback=start_date) if safe_str(date_to) else start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    all_logs = get_driver_activity_logs_for_period(user_doc, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    grouped = {}
+    for log_doc in all_logs:
+        date_key = safe_str(log_doc.get("date_str"))
+        if not date_key:
+            date_key, _display = driver_log_date_keys(log_doc.get("start_time") or now_utc())
+        grouped.setdefault(date_key, []).append(log_doc)
+
+    day_summaries = []
+    cursor = start_date
+    while cursor <= end_date:
+        date_key, date_display = driver_log_date_keys(cursor)
+        logs = grouped.get(date_key, [])
+        snapshot = build_driver_activity_day_snapshot(user_doc, cursor, logs=logs)
+        day_summaries.append(snapshot)
+        cursor = cursor + timedelta(days=1)
+
+    entries = []
+    for item in all_logs:
+        entries.append(driver_log_for_api(item))
+
+    combined_summary = summarize_driver_activity_logs(all_logs)
+    return {
+        "date_from": start_date.strftime("%Y-%m-%d"),
+        "date_to": end_date.strftime("%Y-%m-%d"),
+        "date_from_display": start_date.strftime("%d.%m.%Y"),
+        "date_to_display": end_date.strftime("%d.%m.%Y"),
+        "entries": entries,
+        "days": day_summaries,
+        "summary": combined_summary,
+    }
+
+
+def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_filename="", shift_id=""):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if not discord_id:
+        return None
+
+    snapshot = build_driver_activity_day_snapshot(user_doc, date_value)
+    existing = tracker_shift_logs_collection.find_one({
+        "discord_id": discord_id,
+        "date_str": snapshot["date_str"],
+        "archived": {"$ne": True},
+    })
+
+    now = now_utc()
+    document = {
+        "shift_id": safe_str(shift_id or (existing or {}).get("shift_id") or uuid.uuid4().hex),
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "driver_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "Unbekannt",
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "date_str": snapshot["date_str"],
+        "shift_date": snapshot["shift_date"],
+        "activity_entries": snapshot["entries"],
+        "summary": snapshot["summary"],
+        "session_data": {
+            "driveMs": snapshot["summary"]["totals"]["drive_ms"],
+            "workMs": snapshot["summary"]["totals"]["work_ms"],
+            "breakMs": snapshot["summary"]["totals"]["pause_ms"],
+            "restMs": snapshot["summary"]["totals"]["rest_ms"],
+        },
+        "updated_at": now,
+        "source": "driver_activity_logs",
+    }
+    if existing:
+        document["created_at"] = existing.get("created_at") or now
+    else:
+        document["created_at"] = now
+    if pdf_path:
+        document["pdf_path"] = pdf_path
+    elif existing and existing.get("pdf_path"):
+        document["pdf_path"] = existing.get("pdf_path")
+    if pdf_filename:
+        document["pdf_filename"] = pdf_filename
+    elif existing and existing.get("pdf_filename"):
+        document["pdf_filename"] = existing.get("pdf_filename")
+    document["pdf_url"] = f"/api/hr/download_shift_pdf/{document['shift_id']}"
+
+    tracker_shift_logs_collection.update_one(
+        {"discord_id": discord_id, "date_str": snapshot["date_str"]},
+        mongo_upsert_set_preserve_created_at(document),
+        upsert=True,
+    )
+    return tracker_shift_logs_collection.find_one({"discord_id": discord_id, "date_str": snapshot["date_str"]})
+
+
+def driver_shift_log_for_api(shift_doc):
+    shift_doc = dict(shift_doc or {})
+    shift_doc.pop("_id", None)
+    shift_doc["created_at"] = datetime_to_iso(shift_doc.get("created_at"))
+    shift_doc["updated_at"] = datetime_to_iso(shift_doc.get("updated_at"))
+    summary = dict(shift_doc.get("summary") or {})
+    if isinstance(summary.get("rest_completed_at"), datetime):
+        summary["rest_completed_at"] = datetime_to_iso(summary.get("rest_completed_at"))
+    shift_doc["summary"] = summary
+    return shift_doc
+
+
+def update_pending_rest_windows(user_doc, at_time):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return []
+
+    updates = []
+    pending_logs = list(driver_logs_collection.find({
+        "discord_id": discord_id,
+        "is_shift_end": True,
+        "rest_status": "pending",
+        "archived": {"$ne": True},
+    }).sort("start_time", DESCENDING).limit(5))
+
+    for rest_log in pending_logs:
+        rest_completed_at = rest_log.get("rest_completed_at") or rest_log.get("end_time")
+        if not isinstance(rest_completed_at, datetime):
+            continue
+        if at_time >= rest_completed_at:
+            status = "fulfilled"
+            update_fields = {
+                "rest_status": "fulfilled",
+                "rest_violation": False,
+                "actual_rest_ms": DAILY_REST_REQUIRED_MS,
+                "updated_at": now_utc(),
+            }
+        else:
+            status = "violated"
+            actual_rest_ms = max(0, int((at_time - rest_log.get("start_time")).total_seconds() * 1000)) if isinstance(rest_log.get("start_time"), datetime) else 0
+            update_fields = {
+                "rest_status": "violated",
+                "rest_violation": True,
+                "actual_rest_ms": actual_rest_ms,
+                "end_time": at_time,
+                "duration_ms": actual_rest_ms,
+                "duration_display": driver_activity_duration_text(actual_rest_ms),
+                "rest_violation_at": at_time,
+                "updated_at": now_utc(),
+            }
+        driver_logs_collection.update_one({"_id": rest_log["_id"]}, {"$set": update_fields})
+        updates.append({"activity_id": safe_str(rest_log.get("activity_id")), "status": status})
+
+    return updates
+
+
+def close_open_driver_activity_logs(user_doc, end_time):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return []
+
+    closed = []
+    open_logs = list(driver_logs_collection.find({
+        "discord_id": discord_id,
+        "end_time": None,
+        "archived": {"$ne": True},
+    }).sort("start_time", ASCENDING))
+
+    for log_doc in open_logs:
+        start_time = log_doc.get("start_time")
+        duration_ms = max(0, int((end_time - start_time).total_seconds() * 1000)) if isinstance(start_time, datetime) else 0
+        driver_logs_collection.update_one(
+            {"_id": log_doc["_id"]},
+            {"$set": {
+                "end_time": end_time,
+                "duration_ms": duration_ms,
+                "duration_display": driver_activity_duration_text(duration_ms),
+                "closed_at": now_utc(),
+                "updated_at": now_utc(),
+            }}
+        )
+        closed.append(safe_str(log_doc.get("activity_id") or log_doc.get("_id")))
+
+    return closed
+
+
+def record_driver_activity_state(user_doc, state_value, payload=None, at_time=None, source="tracker_activity_state"):
+    user_doc = user_doc or {}
+    payload = payload or {}
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if not discord_id:
+        raise ValueError("Fahrer hat keine Discord-ID.")
+
+    at_time = coerce_driver_log_datetime(
+        at_time or payload.get("timestamp") or payload.get("timestampUtc") or payload.get("at"),
+        fallback=now_utc()
+    )
+    state_key, state_label, is_shift_end = driver_activity_state_info(state_value)
+    date_str, date_display = driver_log_date_keys(at_time)
+
+    closed_ids = close_open_driver_activity_logs(user_doc, at_time)
+    rest_updates = update_pending_rest_windows(user_doc, at_time)
+
+    end_time = None
+    duration_ms = 0
+    rest_completed_at = None
+    rest_status = ""
+    if is_shift_end:
+        rest_completed_at = at_time + timedelta(milliseconds=DAILY_REST_REQUIRED_MS)
+        end_time = rest_completed_at
+        duration_ms = DAILY_REST_REQUIRED_MS
+        rest_status = "pending"
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {
+                "next_allowed_shift": rest_completed_at,
+                "tracker_last_feierabend_at": at_time,
+                "tracker_rest_required_until": rest_completed_at,
+                "tracker_work_status": "offDuty",
+            }}
+        )
+
+    activity_doc = {
+        "activity_id": uuid.uuid4().hex,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "driver_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer",
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "state": safe_str(state_value),
+        "state_key": state_key,
+        "state_label": state_label,
+        "is_shift_end": bool(is_shift_end),
+        "start_time": at_time,
+        "end_time": end_time,
+        "duration_ms": duration_ms,
+        "duration_display": driver_activity_duration_text(duration_ms),
+        "date_str": date_str,
+        "date_display": date_display,
+        "shift_date": date_display,
+        "rest_required_ms": DAILY_REST_REQUIRED_MS if is_shift_end else 0,
+        "rest_completed_at": rest_completed_at,
+        "rest_status": rest_status,
+        "rest_violation": False,
+        "driver_card_id": resolve_driver_card_id(user_doc, payload),
+        "work_session": payload.get("workSession") or payload.get("work_session") or {},
+        "raw_payload": {key: value for key, value in payload.items() if key not in {"clientToken", "token", "trackerClientToken"}},
+        "source": source,
+        "archived": False,
+        "created_at": now_utc(),
+        "updated_at": now_utc(),
+    }
+    driver_logs_collection.insert_one(activity_doc)
+
+    snapshot = persist_tracker_shift_log_snapshot(user_doc, date_str)
+    return {
+        "activity": driver_log_for_api(activity_doc),
+        "closedActivityIds": closed_ids,
+        "restUpdates": rest_updates,
+        "shiftLog": {
+            "shift_id": snapshot.get("shift_id") if snapshot else "",
+            "date_str": date_str,
+            "shift_date": date_display,
+            "pdf_url": snapshot.get("pdf_url") if snapshot else "",
+            "summary": snapshot.get("summary") if snapshot else {},
+        },
+    }
+
+
+def generate_shift_log_pdf(shift_doc):
+    """Erstellt den dauerhaften PDF-Beleg fuer einen Tagesauszug der Fahrerkarte."""
+    target_folder = resolve_fahrerkarten_daten_download_folder()
+    os.makedirs(target_folder, exist_ok=True)
+
+    date_value = shift_doc.get("date_str") or shift_doc.get("shift_date") or now_utc()
+    date_str, date_display = driver_log_date_keys(date_value)
+    driver_name = shift_doc.get("driver_name", "Unbekannt")
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(driver_name, "fahrer"))[:30].strip("_") or "fahrer"
+    filename = f"Fahrerkarte_Auszug_{safe_name}_{date_str}.pdf"
+    file_path = os.path.join(target_folder, filename)
+
+    entries = shift_doc.get("activity_entries") or []
+    if entries and isinstance(entries[0], dict) and "start_display" in entries[0]:
+        api_entries = entries
+        summary = shift_doc.get("summary") or summarize_driver_activity_logs([])
+    else:
+        user_doc = users_collection.find_one({"discord_id": safe_str(shift_doc.get("discord_id"))}) or {}
+        logs = get_driver_activity_logs_for_day(user_doc, date_str) if user_doc else []
+        api_entries = [driver_log_for_api(item) for item in logs]
+        summary = summarize_driver_activity_logs(logs)
+
+    session_data = shift_doc.get("session_data") or {}
+    if not session_data:
+        session_data = {
+            "driveMs": (summary.get("totals") or {}).get("drive_ms", 0),
+            "workMs": (summary.get("totals") or {}).get("work_ms", 0),
+            "breakMs": (summary.get("totals") or {}).get("pause_ms", 0),
+            "restMs": (summary.get("totals") or {}).get("rest_ms", 0),
+        }
+
+    created_at = shift_doc.get("created_at") or now_utc()
+    created_at_str = created_at.strftime("%d.%m.%Y %H:%M") if isinstance(created_at, datetime) else safe_str(created_at, "Unbekannt")
 
     sections = [
         ("Fahrerdaten", [
             ("Name", driver_name),
             ("Discord-ID", shift_doc.get("discord_id", "")),
             ("Rolle", shift_doc.get("role", "")),
-            ("Ausstellungsdatum UTC", created_at_str)
+            ("Datum des Auszugs", date_display),
+            ("Erstellt UTC", created_at_str),
         ]),
-        ("Zeiterfassung (Schicht)", [
-            ("Datum der Schicht", date_str),
-            ("Reine Lenkzeit", format_ms_to_hhmm(session_data.get("driveMs", 0))),
-            ("Arbeitszeit (z.B. Rampe)", format_ms_to_hhmm(session_data.get("workMs", 0))),
+        ("Summen des Tages", [
+            ("Reine Fahrzeit / Lenkzeit", format_ms_to_hhmm(session_data.get("driveMs", 0))),
+            ("Arbeitszeit / Rampe", format_ms_to_hhmm(session_data.get("workMs", 0))),
             ("Pausenzeit", format_ms_to_hhmm(session_data.get("breakMs", 0))),
+            ("Ruhezeit / Feierabend", format_ms_to_hhmm(session_data.get("restMs", 0))),
+            ("Max. Lenkzeit am Stueck", summary.get("max_continuous_drive", "00:00")),
         ]),
-        ("Ruhezeit-Prüfung", [
-            ("Feierabend Check (11 Std.)", rest_check),
-            ("Bisherige Ruhezeit", format_ms_to_hhmm(rest_ms))
-        ])
+        ("11-Stunden-Ruhezeit", [
+            ("Status", summary.get("rest_label", "Nicht geprueft")),
+            ("Zielzeit", summary.get("rest_completed_display", "")),
+            ("Hinweis", summary.get("rest_summary", "")),
+        ]),
     ]
 
-    # Wir nutzen deinen bestehenden PDF-Builder
+    if summary.get("issues"):
+        sections.append(("Auffaelligkeiten", [(f"Hinweis {index}", issue) for index, issue in enumerate(summary.get("issues"), start=1)]))
+
+    entry_rows = []
+    for item in api_entries:
+        entry_rows.append((
+            f"{item.get('start_display', '-')} - {item.get('end_display', '-')}",
+            f"{item.get('state_label') or item.get('state')} / Dauer {item.get('duration')}"
+        ))
+    if entry_rows:
+        sections.append(("Zeitsegmente", entry_rows))
+
     pdf_bytes = build_simple_pdf(
         "Auszug Fahrerkarte / Schichtprotokoll",
         sections
@@ -5080,6 +5698,7 @@ def generate_shift_log_pdf(shift_doc):
         file.write(pdf_bytes)
 
     return file_path, filename
+
 
 def build_simple_pdf(title, sections):
     # Minimaler PDF-Generator ohne externe Bibliothek.
@@ -6902,60 +7521,45 @@ def tracker_feierabend():
         return jsonify({"success": True})
 
     data = request.get_json(silent=True) or {}
-    
-    # Authentifizierung des Trackers/Fahrers
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
     if error_response:
         return error_response
 
-    discord_id = safe_str(user_doc.get("discord_id"))
-    now = now_utc()
-    # Wir formatieren das Datum als DD.MM.YYYY, damit HR es leicht suchen kann
-    shift_date = now.strftime("%d.%m.%Y")
-
-    # Aktuelle Session aus der DB holen
-    current_session_doc = tracker_get_latest_work_session_doc(user_doc)
-    session_data = current_session_doc.get("work_session", {}) if current_session_doc else tracker_default_work_session()
-
-    # Neues historisches Dokument für die Personalabteilung anlegen
-    shift_id = uuid.uuid4().hex
-    
-    # Rolle sicher extrahieren (falls die Funktion get_primary_role_name existiert, ansonsten Fallback)
     try:
-        role = get_primary_role_name(user_doc.get("roles", []))
-    except NameError:
-        role = "Fahrer"
+        activity_result = record_driver_activity_state(
+            user_doc,
+            "Feierabend",
+            payload=data,
+            source="tracker_feierabend",
+        )
+    except Exception as error:
+        return jsonify({"success": False, "error": f"Feierabend konnte nicht protokolliert werden: {error}"}), 500
 
-    shift_doc = {
-        "shift_id": shift_id,
-        "discord_id": discord_id,
-        "driver_name": user_doc.get("display_name") or user_doc.get("username", "Unbekannt"),
-        "role": role,
-        "shift_date": shift_date,
-        "session_data": session_data,
-        "created_at": now
-    }
-
-    # PDF generieren (Funktion aus Schritt 2)
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
+    date_str = activity_result.get("shiftLog", {}).get("date_str") or now_utc().strftime("%Y-%m-%d")
+    shift_doc = persist_tracker_shift_log_snapshot(fresh_user, date_str) or {}
     file_path, filename = generate_shift_log_pdf(shift_doc)
-    shift_doc["pdf_path"] = file_path
-    shift_doc["pdf_filename"] = filename
-    shift_doc["pdf_url"] = f"/api/hr/download_shift_pdf/{shift_id}"
+    shift_doc = persist_tracker_shift_log_snapshot(
+        fresh_user,
+        date_str,
+        pdf_path=file_path,
+        pdf_filename=filename,
+        shift_id=shift_doc.get("shift_id"),
+    ) or shift_doc
 
-    # In die Historie (unsere neue Collection aus Schritt 1) speichern
-    tracker_shift_logs_collection.insert_one(shift_doc)
-
-    # Nach dem Speichern: Aktuelle Tracker-Session für den nächsten Tag resetten
-    # Wir simulieren den Feierabend-Status (OffDuty)
     new_session = tracker_default_work_session()
     new_session["status"] = "offDuty"
-    tracker_save_work_session(user_doc, new_session)
+    new_session["lastShiftEndedAt"] = int(now_utc().timestamp() * 1000)
+    tracker_save_work_session(fresh_user, new_session)
 
     return jsonify({
         "success": True,
-        "message": "Feierabend erfolgreich protokolliert. Daten für die Personalabteilung wurden generiert.",
-        "shift_id": shift_id,
-        "pdf_url": shift_doc["pdf_url"]
+        "message": "Feierabend erfolgreich protokolliert. Die 11-Stunden-Ruhezeit wurde gespeichert und bleibt fuer den Tagesauszug abrufbar.",
+        "shift_id": shift_doc.get("shift_id"),
+        "date": shift_doc.get("shift_date"),
+        "pdf_url": shift_doc.get("pdf_url"),
+        "activity": activity_result.get("activity"),
+        "summary": shift_doc.get("summary"),
     })
 
 # ==========================================
@@ -10198,80 +10802,34 @@ def refresh_driver_card_snapshot_for_personalabteilung(user_doc, card_doc=None, 
 
 @app.route("/api/hr/driver-card/pdf/<user_id>/<date_str>")
 def generate_driver_card_pdf(user_id, date_str):
-    """ Generiert ein PDF-Fahrtenbuch für einen Fahrer an einem bestimmten Datum (Format: YYYY-MM-DD) """
-    
-    # Alle Logs für diesen Fahrer an diesem Tag abrufen, sortiert nach Startzeit
-    logs = list(driver_logs_collection.find({
-        "user_id": str(user_id), 
-        "date_str": date_str
-    }).sort("start_time", ASCENDING))
-    
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    user_doc = find_driver_for_personalabteilung(user_id) or users_collection.find_one({"discord_id": safe_str(user_id)})
+    if not user_doc:
+        return jsonify({"success": False, "error": "Fahrer wurde nicht gefunden."}), 404
+
+    logs = get_driver_activity_logs_for_day(user_doc, date_str)
     if not logs:
-        return jsonify({"success": False, "error": f"Keine Fahrerkarten-Einträge für den {date_str} gefunden."}), 404
-        
-    # PDF Setup
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    
-    # Header
-    pdf.cell(190, 10, txt=f"Fahrerkarte Tagesauszug", ln=True, align="C")
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(190, 10, txt=f"Datum: {date_str} | Fahrer-ID: {user_id}", ln=True, align="C")
-    pdf.ln(10)
-    
-    # Tabellenkopf
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(50, 10, "Aktivitaet", border=1)
-    pdf.cell(40, 10, "Startzeit", border=1)
-    pdf.cell(40, 10, "Endzeit", border=1)
-    pdf.cell(40, 10, "Dauer (Std:Min:Sek)", border=1)
-    pdf.ln()
-    
-    pdf.set_font("Arial", '', 10)
-    feierabend_registered = False
-    
-    # Datenreihen
-    for log in logs:
-        start_str = log["start_time"].strftime("%H:%M:%S")
-        end_str = log["end_time"].strftime("%H:%M:%S") if log.get("end_time") else "Laufend..."
-        
-        # Dauer berechnen
-        if log.get("end_time"):
-            duration = log["end_time"] - log["start_time"]
-            duration_str = str(duration).split('.')[0] # Entfernt Millisekunden
-        else:
-            duration_str = "-"
-            
-        if log["state"] == "Feierabend":
-            feierabend_registered = True
-            
-        pdf.cell(50, 10, log["state"], border=1)
-        pdf.cell(40, 10, start_str, border=1)
-        pdf.cell(40, 10, end_str, border=1)
-        pdf.cell(40, 10, duration_str, border=1)
-        pdf.ln()
-        
-    pdf.ln(10)
-    
-    # Feierabend & Ruhezeit Kontrolle
-    pdf.set_font("Arial", 'B', 12)
-    if feierabend_registered:
-        # Hinweis in Grün, dass die 11h Ruhezeit eingehalten/begonnen wurde
-        pdf.set_text_color(0, 128, 0)
-        pdf.cell(190, 10, txt="INFO: Feierabend registriert. Die 11 Stunden Tagesruhezeit haben begonnen.", ln=True)
-    else:
-        # Warnung in Rot, falls kein Feierabend gestempelt wurde
-        pdf.set_text_color(255, 0, 0)
-        pdf.cell(190, 10, txt="ACHTUNG: Kein Feierabend fuer diesen Tag registriert (Verdacht auf Verstoß)!", ln=True)
-        
-    # PDF als Datei-Download zurückgeben
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
+        _date_str, date_display = driver_log_date_keys(date_str)
+        return jsonify({"success": False, "error": f"Keine Fahrerkarten-Eintraege fuer den {date_display} gefunden."}), 404
+
+    shift_doc = persist_tracker_shift_log_snapshot(user_doc, date_str) or {}
+    file_path, filename = generate_shift_log_pdf(shift_doc)
+    shift_doc = persist_tracker_shift_log_snapshot(
+        user_doc,
+        date_str,
+        pdf_path=file_path,
+        pdf_filename=filename,
+        shift_id=shift_doc.get("shift_id"),
+    ) or shift_doc
+
     return send_file(
-        BytesIO(pdf_bytes),
-        mimetype='application/pdf',
+        file_path,
+        mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"Fahrerkarte_Auszug_{date_str}.pdf"
+        download_name=filename,
     )
 
 def prepare_driver_card_fields_for_personalabteilung(user_doc):
@@ -10694,57 +11252,61 @@ def hr_last_sync_timestamp():
 
 @app.route("/api/hr/driver_card_log/<discord_id>/<date_str>", methods=["GET"])
 def hr_get_driver_card_log(discord_id, date_str):
-    """
-    Holt den Fahrerkarten-Auszug für einen bestimmten Tag aus der Historie.
-    Datum muss im Format DD.MM.YYYY übergeben werden (z.B. 20.05.2026).
-    """
-    # Sicherheitscheck: Nur eingeloggte User mit Dashboard-Rechten (Personalabteilung)
-    user_session = get_current_user()
-    if not user_session or not has_dashboard_permission(user_session.get("roles", [])):
-        return jsonify({"success": False, "error": "Keine Berechtigung."}), 403
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
 
-    # Suche nach dem spezifischen Tag in unserer neuen Collection
-    shift_log = tracker_shift_logs_collection.find_one({
-        "discord_id": safe_str(discord_id),
-        "shift_date": safe_str(date_str)
-    }, {"_id": 0}) # _id ausblenden, damit es sauber als JSON gesendet wird
+    user_doc = find_driver_for_personalabteilung(discord_id) or users_collection.find_one({"discord_id": safe_str(discord_id)})
+    if not user_doc:
+        return jsonify({"success": False, "error": "Fahrer wurde nicht gefunden."}), 404
 
-    if not shift_log:
+    shift_log = persist_tracker_shift_log_snapshot(user_doc, date_str)
+    if not shift_log or not shift_log.get("activity_entries"):
+        _date_str, date_display = driver_log_date_keys(date_str)
         return jsonify({
-            "success": False, 
-            "error": f"Keine Schichtdaten für den {date_str} gefunden."
+            "success": False,
+            "error": f"Keine Schichtdaten fuer den {date_display} gefunden."
         }), 404
 
     return jsonify({
         "success": True,
-        "data": shift_log
+        "data": driver_shift_log_for_api(shift_log)
     })
-
 
 @app.route("/api/hr/download_shift_pdf/<shift_id>", methods=["GET"])
 def hr_download_shift_pdf(shift_id):
-    """Ermöglicht den Download des generierten PDF-Auszugs."""
-    # Sicherheitscheck: Nur für eingeloggte User
-    user_session = get_current_user()
-    if not user_session:
+    user_doc = get_current_user()
+    if not user_doc:
         abort(403)
 
-    # Suche den Eintrag in der Datenbank anhand der ID
-    shift_log = tracker_shift_logs_collection.find_one({"shift_id": safe_str(shift_id)})
-    if not shift_log or not shift_log.get("pdf_path"):
+    shift_log = tracker_shift_logs_collection.find_one({"shift_id": safe_str(shift_id), "archived": {"$ne": True}})
+    if not shift_log:
         abort(404)
 
-    file_path = shift_log["pdf_path"]
-    
-    # Prüfe, ob das Dokument wirklich im Ordner existiert
-    if not os.path.exists(file_path):
+    is_owner = safe_str(user_doc.get("discord_id")) == safe_str(shift_log.get("discord_id"))
+    is_staff = has_personalabteilung_permission(user_doc.get("roles", []))
+    if not is_owner and not is_staff:
+        abort(403)
+
+    file_path = shift_log.get("pdf_path")
+    if not file_path or not os.path.exists(file_path):
+        target_user = users_collection.find_one({"discord_id": safe_str(shift_log.get("discord_id"))}) or {}
+        file_path, filename = generate_shift_log_pdf(shift_log)
+        shift_log = persist_tracker_shift_log_snapshot(
+            target_user,
+            shift_log.get("date_str") or shift_log.get("shift_date"),
+            pdf_path=file_path,
+            pdf_filename=filename,
+            shift_id=shift_log.get("shift_id"),
+        ) or shift_log
+
+    if not file_path or not os.path.exists(file_path):
         abort(404)
 
-    # Sende das PDF als Download-Anhang an den Browser
     return send_file(
-        file_path, 
-        as_attachment=True, 
-        download_name=shift_log.get("pdf_filename", "Fahrerkarte.pdf"),
+        file_path,
+        as_attachment=True,
+        download_name=shift_log.get("pdf_filename", os.path.basename(file_path)),
         mimetype="application/pdf"
     )
 
@@ -11255,53 +11817,72 @@ FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
     default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
 )
 
-# Neue Collection für das genaue Fahrtenbuch
-driver_logs_collection = db["driver_logs"] 
-
-@app.route("/api/tracker/state", methods=["POST"])
+@app.route("/api/tracker/activity-state", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/driver-activity", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/state", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/state/update", methods=["POST", "OPTIONS"])
 def update_driver_state():
-    # Holt die ID des aktuellen Discord-Nutzers
-    user_id = str(session.get("user", {}).get("id"))
-    data = request.json
-    new_state = data.get("state") # z.B. 'Fahrzeit', 'Arbeitszeit', 'Pause', 'Feierabend'
-    now = datetime.utcnow()
-    
-    if not user_id or not new_state:
-        return jsonify({"success": False, "error": "Fehlende Daten"}), 400
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
 
-    # 1. Vorherigen, noch offenen Status beenden
-    driver_logs_collection.update_one(
-        {"user_id": user_id, "end_time": None},
-        {"$set": {"end_time": now}}
+    data = request.get_json(silent=True) or {}
+    new_state = (
+        data.get("state")
+        or data.get("activityState")
+        or data.get("activity")
+        or data.get("status")
     )
-    
-    # 2. Neuen Status in die Datenbank eintragen
-    driver_logs_collection.insert_one({
-        "user_id": user_id,
-        "state": new_state,
-        "start_time": now,
-        "end_time": None,
-        "date_str": now.strftime("%Y-%m-%d") # Speichert das Datum extra für leichteres Suchen
-    })
-    
-    # 3. Feierabend-Logik: 11 Stunden Pflicht-Ruhezeit hinterlegen
-    if new_state == "Feierabend":
-        next_allowed_start = now + timedelta(hours=11)
-        users_collection.update_one(
-            {"discord_id": user_id},
-            {"$set": {"next_allowed_shift": next_allowed_start}}
+    if not new_state:
+        return jsonify({"success": False, "error": "Status fehlt. Erlaubt sind Fahrzeit, Arbeitszeit, Pause oder Feierabend."}), 400
+
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
+    if error_response:
+        session_user = session.get("user") or {}
+        session_discord_id = safe_str(session_user.get("id"))
+        user_doc = users_collection.find_one({"discord_id": session_discord_id}) if session_discord_id else None
+        if not user_doc:
+            return error_response
+
+    try:
+        result = record_driver_activity_state(
+            user_doc,
+            new_state,
+            payload=data,
+            source="tracker_activity_state",
         )
-        
-    return jsonify({"success": True})
+    except Exception as error:
+        return jsonify({"success": False, "error": f"Status konnte nicht gespeichert werden: {error}"}), 500
+
+    state_key, state_label, is_shift_end = driver_activity_state_info(new_state)
+    if is_shift_end:
+        fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
+        date_str = result.get("shiftLog", {}).get("date_str") or now_utc().strftime("%Y-%m-%d")
+        shift_doc = persist_tracker_shift_log_snapshot(fresh_user, date_str) or {}
+        file_path, filename = generate_shift_log_pdf(shift_doc)
+        shift_doc = persist_tracker_shift_log_snapshot(
+            fresh_user,
+            date_str,
+            pdf_path=file_path,
+            pdf_filename=filename,
+            shift_id=shift_doc.get("shift_id"),
+        ) or shift_doc
+        result["shiftLog"] = {
+            "shift_id": shift_doc.get("shift_id"),
+            "date_str": shift_doc.get("date_str"),
+            "shift_date": shift_doc.get("shift_date"),
+            "pdf_url": shift_doc.get("pdf_url"),
+            "summary": shift_doc.get("summary"),
+        }
+
+    return jsonify({
+        "success": True,
+        "message": f"{state_label} wurde dauerhaft in der Fahrerkarte-Historie gespeichert.",
+        "state": state_label,
+        "stateKey": state_key,
+        "result": result,
+    })
 
 # Ordner automatisch erstellen, falls sie nicht existieren
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
-
-# NEU: Datenbank-Collection für die Historie der Personalabteilung
-tracker_shift_logs_collection = db["tracker_shift_logs"]
-
-# Stelle sicher, dass die Ordner beim Start auch wirklich existieren:
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -11846,7 +12427,7 @@ def driver_card_pdf_status_hex(status):
     return "#eef2f7", "#475467", "INFO"
 
 
-def build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note):
+def build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note, activity_report=None):
     lines = [
         f"Referenz: {reference}",
         f"Erstellt am: {format_datetime_for_template(now_utc())}",
@@ -11873,16 +12454,39 @@ def build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note):
         lines.append("")
         lines.append("Hinweise / Verstöße")
         lines.extend([f"- {issue}" for issue in audit.get("issues", [])])
+    if activity_report:
+        lines.extend([
+            "",
+            "Historischer Fahrerkarten-Auszug",
+            f"Zeitraum: {activity_report.get('date_from_display')} bis {activity_report.get('date_to_display')}",
+        ])
+        for day in activity_report.get("days", []):
+            summary = day.get("summary") or {}
+            lines.append(
+                f"{day.get('date_display')}: Fahrzeit {summary.get('drive')}, Arbeitszeit {summary.get('work')}, "
+                f"Pause {summary.get('pause')}, Ruhezeit {summary.get('rest')}, Status {summary.get('rest_label')}"
+            )
+        lines.append("")
+        lines.append("Zeitsegmente")
+        for entry in activity_report.get("entries", []):
+            lines.append(
+                f"{entry.get('date_display')} {entry.get('start_display')}-{entry.get('end_display')}: "
+                f"{entry.get('state_label')} ({entry.get('duration')})"
+            )
     lines.extend(["", "Interner Hinweis", safe_str(note) or "Kein interner Hinweis angegeben."])
     return lines
 
 
-def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filename_prefix):
+def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filename_prefix, activity_report=None):
     """Erzeugt den schön gestalteten Fahrerkarten-/Lenkzeiten-PDF-Beleg mit farbiger Minutenprüfung."""
-    os.makedirs(os.path.join(BASE_DIR, FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER), exist_ok=True)
+    target_folder = resolve_fahrerkarten_daten_download_folder()
+    os.makedirs(target_folder, exist_ok=True)
     filename = f"{filename_prefix}_{now_utc().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
-    relative_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename).replace("\\", "/")
-    absolute_path = os.path.join(BASE_DIR, relative_path)
+    absolute_path = os.path.join(target_folder, filename)
+    try:
+        relative_path = os.path.relpath(absolute_path, BASE_DIR).replace("\\", "/")
+    except Exception:
+        relative_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename).replace("\\", "/")
 
     try:
         from reportlab.lib import colors
@@ -12097,6 +12701,88 @@ def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filena
         audit_table.setStyle(TableStyle(table_style))
         story.append(audit_table)
 
+        if activity_report:
+            story.append(Spacer(1, 7))
+            story.append(p("Historischer Fahrerkarten-Auszug", "SectionTitle"))
+            story.append(p(
+                f"Zeitraum {activity_report.get('date_from_display')} bis {activity_report.get('date_to_display')}. "
+                "Diese Daten kommen aus der dauerhaft gespeicherten Fahrerkarte-Historie.",
+                "Small"
+            ))
+
+            day_rows = [[
+                p("Datum", "CellBold"),
+                p("Fahrzeit", "CellBold"),
+                p("Arbeitszeit", "CellBold"),
+                p("Pause", "CellBold"),
+                p("Ruhezeit", "CellBold"),
+                p("11h-Status", "CellBold"),
+            ]]
+            day_statuses = []
+            for day in activity_report.get("days", []):
+                summary = day.get("summary") or {}
+                day_rows.append([
+                    p(day.get("date_display"), "CellBold"),
+                    p(summary.get("drive"), "Cell"),
+                    p(summary.get("work"), "Cell"),
+                    p(summary.get("pause"), "Cell"),
+                    p(summary.get("rest"), "Cell"),
+                    p(summary.get("rest_label"), "CellBold"),
+                ])
+                day_statuses.append(summary.get("compliance_status") or "unknown")
+
+            day_table = Table(day_rows, colWidths=[26 * mm, 25 * mm, 28 * mm, 23 * mm, 26 * mm, 36 * mm], repeatRows=1)
+            day_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#17345f")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.35, HexColor("#d0d5dd")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+            for index, status in enumerate(day_statuses, start=1):
+                bg, fg, _label = driver_card_pdf_status_hex(status)
+                day_style.append(("BACKGROUND", (0, index), (-1, index), HexColor(bg)))
+                day_style.append(("LINEBEFORE", (0, index), (0, index), 3, HexColor(fg)))
+            day_table.setStyle(TableStyle(day_style))
+            story.append(day_table)
+
+            if activity_report.get("entries"):
+                story.append(Spacer(1, 7))
+                story.append(p("Gespeicherte Zeitsegmente", "SectionTitle"))
+                entry_rows = [[
+                    p("Datum", "CellBold"),
+                    p("Start", "CellBold"),
+                    p("Ende", "CellBold"),
+                    p("Status", "CellBold"),
+                    p("Dauer", "CellBold"),
+                    p("Hinweis", "CellBold"),
+                ]]
+                for entry in activity_report.get("entries", [])[:160]:
+                    rest_hint = entry.get("rest_completed_display") if entry.get("state_key") == "offDuty" else entry.get("note")
+                    entry_rows.append([
+                        p(entry.get("date_display"), "Cell"),
+                        p(entry.get("start_display"), "Cell"),
+                        p(entry.get("end_display"), "Cell"),
+                        p(entry.get("state_label") or entry.get("state"), "CellBold"),
+                        p(entry.get("duration"), "Cell"),
+                        p(rest_hint or "", "Cell"),
+                    ])
+                entry_table = Table(entry_rows, colWidths=[24 * mm, 20 * mm, 20 * mm, 36 * mm, 22 * mm, 42 * mm], repeatRows=1)
+                entry_table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), HexColor("#17345f")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.30, HexColor("#d0d5dd")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]))
+                story.append(entry_table)
+
         detail_lines = [row.get("details") for row in audit.get("rows", []) if safe_str(row.get("details"))]
         if detail_lines:
             story.append(Spacer(1, 6))
@@ -12149,7 +12835,7 @@ def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filena
 
     except Exception as error:
         app.logger.exception("Gestalteter Fahrerkarten-PDF-Beleg konnte nicht erzeugt werden, nutze Fallback.")
-        fallback_lines = build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note)
+        fallback_lines = build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note, activity_report=activity_report)
         return write_simple_pdf_file(title, fallback_lines, filename_prefix)
 
 def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data_pdf", date_from="", date_to="", note=""):
@@ -12168,6 +12854,15 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
 
     compliance = resolve_driver_card_compliance_for_personalabteilung(user_doc, card_doc if card_doc else None)
     audit = build_driver_card_lenk_ruhe_audit(user_doc, card_doc if card_doc else None)
+    activity_report = build_driver_activity_period_report(user_doc, date_from, date_to)
+    period = f"{activity_report.get('date_from_display')} bis {activity_report.get('date_to_display')}"
+    period_summary = activity_report.get("summary") or {}
+    if driver_card_status_rank(period_summary.get("compliance_status")) > driver_card_status_rank(audit.get("status")):
+        audit = dict(audit)
+        audit["status"] = period_summary.get("compliance_status")
+        audit["label"] = period_summary.get("compliance_label")
+        audit["summary"] = period_summary.get("rest_summary") or period_summary.get("compliance_label")
+        audit["issues"] = list(audit.get("issues") or []) + list(period_summary.get("issues") or [])
     compliance_status = safe_str(audit.get("status") or compliance["status"], "unknown").lower()
     compliance_label = safe_str(audit.get("label") or compliance["label"])
     compliance_summary = safe_str(audit.get("summary") or compliance["summary"])
@@ -12202,6 +12897,7 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
         audit=audit,
         note=note,
         filename_prefix=prefix,
+        activity_report=activity_report,
     )
 
     now = now_utc()
@@ -12233,6 +12929,7 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
         "audit_rows": audit.get("rows"),
         "audit_issues": audit.get("issues"),
         "audit_counts": audit.get("counts"),
+        "activity_history": activity_report,
         "created_at": now,
         "created_by": current_staff_identity(),
         "source": "personalabteilung_fahrerkarten_daten",
@@ -14227,10 +14924,14 @@ def health_check():
         "trackerRoutes": [
             "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
             "/api/tracker/state", "/api/tracker/telemetry/live",
+            "/api/tracker/activity-state", "/api/tracker/driver-activity",
+            "/api/tracker/fahrerkarte/state", "/api/tracker/state/update",
             "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
             "/api/tracker/work-session", "/api/tracker/jobs/start",
             TRACKER_JOB_START_PUBLIC_URL,
             "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout",
+            "/api/hr/driver_card_log/<discord_id>/<date_str>",
+            "/api/hr/driver-card/pdf/<user_id>/<date_str>",
             "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
         ]
     })
