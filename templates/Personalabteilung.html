@@ -3084,6 +3084,237 @@
         .personal-page .toolbar.service-center-toolbar { grid-template-columns: 1fr !important; }
     }
 
+
+    /* =========================================================
+       FINAL PATCH: NAV-ABSTAND + KOMPAKTER TOP-BEREICH
+       Fix für: Kopfbereich klebt zu nah/zu weit oben an der Navigation.
+       Der Abstand zur Base-Navigation wird sauber gesetzt, während Header,
+       KPIs und Tabs weiterhin flach und kompakt bleiben.
+    ========================================================= */
+
+    :root {
+        --personal-shell-width: 1400px !important;
+        --personal-nav-offset: clamp(5.65rem, 7.2vh, 6.65rem);
+        --personal-top-gap: 0.35rem;
+        --personal-radius: 14px;
+        --personal-radius-sm: 9px;
+    }
+
+    .base-main {
+        padding-top: var(--personal-nav-offset) !important;
+        padding-bottom: 2rem !important;
+    }
+
+    .base-shell {
+        max-width: min(var(--personal-shell-width), calc(100vw - 2rem)) !important;
+    }
+
+    .personal-page {
+        padding-top: var(--personal-top-gap) !important;
+        padding-bottom: 2.2rem !important;
+    }
+
+    .personal-shell {
+        gap: 0.70rem !important;
+    }
+
+    .personal-page .glass-card {
+        border-radius: var(--personal-radius) !important;
+    }
+
+    .personal-page .page-head {
+        grid-template-columns: minmax(0, 1fr) minmax(235px, 320px) !important;
+        align-items: center !important;
+        padding: 0.82rem 0.95rem !important;
+        gap: 0.75rem !important;
+        border-radius: var(--personal-radius) !important;
+    }
+
+    .personal-page .page-head::after {
+        right: -4.5rem !important;
+        bottom: -6.2rem !important;
+        width: 13rem !important;
+        height: 13rem !important;
+        opacity: 0.62 !important;
+    }
+
+    .personal-page .page-kicker {
+        min-height: 1.34rem !important;
+        margin-bottom: 0.34rem !important;
+        padding: 0 0.58rem !important;
+        font-size: 0.44rem !important;
+        letter-spacing: 0.145em !important;
+    }
+
+    .personal-page .page-kicker i {
+        width: 0.34rem !important;
+        height: 0.34rem !important;
+    }
+
+    .personal-page .page-head h1 {
+        font-size: clamp(1.55rem, 2.55vw, 2.65rem) !important;
+        line-height: 0.92 !important;
+        letter-spacing: -0.06em !important;
+        white-space: nowrap !important;
+    }
+
+    .personal-page .page-head p {
+        max-width: 70rem !important;
+        margin-top: 0.42rem !important;
+        font-size: 0.73rem !important;
+        line-height: 1.32 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    .personal-page .role-access {
+        gap: 0.36rem !important;
+    }
+
+    .personal-page .access-pill {
+        min-height: 1.95rem !important;
+        padding: 0.40rem 0.58rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .access-pill small,
+    .personal-page .access-pill strong {
+        font-size: 0.47rem !important;
+        letter-spacing: 0.105em !important;
+    }
+
+    .personal-page .stats-grid {
+        gap: 0.48rem !important;
+    }
+
+    .personal-page .stat-card {
+        min-height: 4.35rem !important;
+        padding: 0.58rem 0.64rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .stat-card small {
+        font-size: 0.43rem !important;
+        line-height: 1.22 !important;
+        letter-spacing: 0.095em !important;
+    }
+
+    .personal-page .stat-card strong {
+        font-size: clamp(1.02rem, 1.28vw, 1.34rem) !important;
+    }
+
+    .personal-page .tabbar {
+        gap: 0.34rem !important;
+        padding: 0.34rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .tab-btn {
+        flex-basis: 138px !important;
+        min-height: 2.05rem !important;
+        padding: 0 0.56rem !important;
+        border-radius: 0.58rem !important;
+        font-size: 0.44rem !important;
+        letter-spacing: 0.078em !important;
+    }
+
+    .personal-page .toolbar,
+    .personal-page .toolbar.requests,
+    .personal-page .toolbar.accounting,
+    .personal-page .toolbar.service-center-toolbar {
+        padding: 0.50rem !important;
+        gap: 0.45rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .search-box,
+    .filter-select,
+    .modal-input,
+    .modal-textarea,
+    .modal-file {
+        min-height: 2.18rem !important;
+        border-radius: 0.58rem !important;
+        font-size: 0.72rem !important;
+    }
+
+    .personal-page .table-head {
+        min-height: 2.78rem !important;
+        padding: 0.58rem 0.78rem !important;
+    }
+
+    .personal-page .table-head h2 {
+        font-size: 0.70rem !important;
+    }
+
+    .personal-page .table-head span {
+        font-size: 0.66rem !important;
+    }
+
+    @media (min-width: 1536px) {
+        :root {
+            --personal-shell-width: 1460px !important;
+            --personal-nav-offset: clamp(5.85rem, 7vh, 6.8rem);
+        }
+    }
+
+    @media (max-width: 1180px) {
+        :root {
+            --personal-nav-offset: 5.45rem;
+        }
+
+        .personal-page .page-head {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .role-access {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 720px) {
+        :root {
+            --personal-nav-offset: 5.05rem;
+            --personal-top-gap: 0.25rem;
+        }
+
+        .base-shell {
+            max-width: calc(100vw - 1rem) !important;
+        }
+
+        .personal-shell {
+            gap: 0.58rem !important;
+        }
+
+        .personal-page .page-head {
+            padding: 0.72rem !important;
+        }
+
+        .personal-page .page-head h1 {
+            white-space: normal !important;
+            font-size: clamp(1.48rem, 8.8vw, 2.22rem) !important;
+        }
+
+        .personal-page .page-head p {
+            -webkit-line-clamp: 3 !important;
+            font-size: 0.70rem !important;
+        }
+
+        .personal-page .role-access {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .personal-page .tab-btn {
+            flex-basis: 165px !important;
+            min-height: 2.18rem !important;
+        }
+    }
+
 </style>
 
 
