@@ -3740,6 +3740,402 @@
     }
 
 
+
+
+    /* =========================================================
+       FINAL ZOOM-IN PATCH: INHALT ALLER TABS NÄHER RAN
+       Dieser Block steht ganz am Ende und überschreibt den letzten
+       Kompakt-Patch. Er macht die Bühne breiter und hebt Schrift,
+       Tabellen, Buttons, Badges und Cards für alle Tab-Inhalte an.
+    ========================================================= */
+
+    :root {
+        --personal-shell-width: 1360px !important;
+        --personal-ui-scale: 1 !important;
+        --personal-nav-offset: clamp(5.25rem, 6.4vh, 6.10rem) !important;
+        --personal-top-gap: 0.18rem !important;
+        --personal-radius: 15px !important;
+        --personal-radius-sm: 10px !important;
+    }
+
+    .base-main {
+        padding-top: var(--personal-nav-offset) !important;
+        padding-bottom: 2.25rem !important;
+    }
+
+    .base-shell {
+        max-width: min(var(--personal-shell-width), calc(100vw - 2rem)) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    .personal-page {
+        padding-top: var(--personal-top-gap) !important;
+        padding-bottom: 2.45rem !important;
+    }
+
+    .personal-shell {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        translate: none !important;
+        transform: none !important;
+        zoom: 1 !important;
+        gap: 0.78rem !important;
+    }
+
+    .personal-page .glass-card {
+        border-radius: var(--personal-radius) !important;
+        box-shadow: 0 24px 62px rgba(0, 0, 0, 0.48) !important;
+    }
+
+    .personal-page .page-head {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) !important;
+        padding: 0.92rem 1.06rem !important;
+        gap: 0.82rem !important;
+        border-radius: var(--personal-radius) !important;
+    }
+
+    .personal-page .page-kicker {
+        min-height: 1.46rem !important;
+        margin-bottom: 0.42rem !important;
+        padding: 0 0.68rem !important;
+        font-size: 0.48rem !important;
+        letter-spacing: 0.14em !important;
+    }
+
+    .personal-page .page-kicker i {
+        width: 0.38rem !important;
+        height: 0.38rem !important;
+    }
+
+    .personal-page .page-head h1 {
+        font-size: clamp(1.85rem, 3.05vw, 3.25rem) !important;
+        line-height: 0.93 !important;
+        white-space: nowrap !important;
+    }
+
+    .personal-page .page-head p {
+        max-width: 72rem !important;
+        margin-top: 0.52rem !important;
+        font-size: 0.80rem !important;
+        line-height: 1.40 !important;
+        -webkit-line-clamp: initial !important;
+        display: block !important;
+    }
+
+    .personal-page .role-access {
+        gap: 0.42rem !important;
+    }
+
+    .personal-page .access-pill {
+        min-height: 2.18rem !important;
+        padding: 0.48rem 0.66rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .access-pill small,
+    .personal-page .access-pill strong {
+        font-size: 0.50rem !important;
+        letter-spacing: 0.10em !important;
+    }
+
+    .personal-page .stats-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+        gap: 0.46rem !important;
+    }
+
+    .personal-page .stat-card {
+        min-height: 4.70rem !important;
+        padding: 0.68rem 0.72rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .stat-card small {
+        font-size: 0.46rem !important;
+        line-height: 1.22 !important;
+        letter-spacing: 0.10em !important;
+    }
+
+    .personal-page .stat-card strong {
+        font-size: clamp(1.16rem, 1.55vw, 1.52rem) !important;
+    }
+
+    .personal-page .tabbar {
+        gap: 0.36rem !important;
+        padding: 0.36rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .personal-page .tab-btn {
+        flex: 1 0 145px !important;
+        min-height: 2.34rem !important;
+        padding: 0 0.62rem !important;
+        border-radius: 0.66rem !important;
+        font-size: 0.49rem !important;
+        letter-spacing: 0.08em !important;
+        gap: 0.38rem !important;
+    }
+
+    .personal-page .tab-btn::before {
+        width: 0.36rem !important;
+        height: 0.36rem !important;
+    }
+
+    .personal-page .toolbar,
+    .personal-page .toolbar.requests,
+    .personal-page .toolbar.accounting,
+    .personal-page .toolbar.service-center-toolbar {
+        padding: 0.62rem !important;
+        gap: 0.52rem !important;
+        border-radius: var(--personal-radius-sm) !important;
+    }
+
+    .search-box,
+    .filter-select,
+    .modal-input,
+    .modal-textarea,
+    .modal-file {
+        min-height: 2.46rem !important;
+        padding: 0 0.78rem !important;
+        border-radius: 0.66rem !important;
+        font-size: 0.78rem !important;
+    }
+
+    .personal-page .table-head {
+        min-height: 3.05rem !important;
+        padding: 0.70rem 0.88rem !important;
+    }
+
+    .personal-page .table-head h2 {
+        font-size: 0.82rem !important;
+    }
+
+    .personal-page .table-head span {
+        font-size: 0.74rem !important;
+    }
+
+    .personal-page .driver-table {
+        min-width: 1120px !important;
+    }
+
+    .personal-page .request-table {
+        min-width: 1200px !important;
+    }
+
+    .personal-page .request-table.wide-table,
+    .personal-page .driver-table.wide-table {
+        min-width: 1280px !important;
+    }
+
+    .personal-page .driver-table th,
+    .personal-page .request-table th {
+        padding: 0.62rem 0.76rem !important;
+        font-size: 0.52rem !important;
+        letter-spacing: 0.11em !important;
+    }
+
+    .personal-page .driver-table td,
+    .personal-page .request-table td {
+        padding: 0.68rem 0.76rem !important;
+        font-size: 0.82rem !important;
+    }
+
+    .personal-page .driver-cell {
+        min-width: 215px !important;
+        gap: 0.68rem !important;
+    }
+
+    .personal-page .driver-avatar {
+        width: 2.55rem !important;
+        height: 2.55rem !important;
+        border-radius: 0.72rem !important;
+    }
+
+    .driver-meta strong {
+        font-size: 0.86rem !important;
+        margin-bottom: 0.12rem !important;
+    }
+
+    .driver-meta span,
+    .mono,
+    .accounting-message-preview,
+    .compliance-summary span {
+        font-size: 0.74rem !important;
+        line-height: 1.34 !important;
+    }
+
+    .role-badge,
+    .token-badge,
+    .status-badge,
+    .deadline-badge,
+    .compliance-badge {
+        min-height: 1.55rem !important;
+        padding: 0 0.58rem !important;
+        font-size: 0.50rem !important;
+        letter-spacing: 0.08em !important;
+    }
+
+    .aktenzeichen-mono {
+        font-size: 0.68rem !important;
+        padding: 0.24rem 0.44rem !important;
+    }
+
+    .token-btn,
+    .request-btn {
+        min-height: 2.28rem !important;
+        padding: 0 0.76rem !important;
+        border-radius: 0.68rem !important;
+        font-size: 0.51rem !important;
+        letter-spacing: 0.08em !important;
+        gap: 0.38rem !important;
+    }
+
+    .action-wrap {
+        gap: 0.40rem !important;
+    }
+
+    .personal-page .driver-card-command,
+    .personal-page .service-highlight-card,
+    .personal-page .accounting-sidebar {
+        padding: 0.88rem !important;
+        gap: 0.72rem !important;
+        border-radius: var(--personal-radius) !important;
+    }
+
+    .personal-page .driver-card-command,
+    .personal-page .service-highlight-card {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) !important;
+    }
+
+    .personal-page .driver-card-command h2,
+    .personal-page .service-highlight-copy h2 {
+        font-size: clamp(1.32rem, 2vw, 2.05rem) !important;
+    }
+
+    .personal-page .driver-card-command p,
+    .personal-page .service-highlight-copy p {
+        margin-top: 0.46rem !important;
+        font-size: 0.82rem !important;
+        line-height: 1.44 !important;
+    }
+
+    .personal-page .service-flow-step,
+    .detail-pill,
+    .modal-info,
+    .document-mode-panel,
+    .modal-check-row,
+    .personal-page .sidebar-note {
+        padding: 0.72rem !important;
+        border-radius: 0.74rem !important;
+    }
+
+    .personal-page .service-flow-step strong,
+    .document-mode-panel strong,
+    .detail-pill small,
+    .modal-field-label {
+        font-size: 0.58rem !important;
+    }
+
+    .personal-page .service-flow-step span,
+    .detail-pill strong,
+    .modal-info,
+    .document-mode-panel,
+    .modal-check-row {
+        font-size: 0.76rem !important;
+    }
+
+    .personal-page .accounting-layout {
+        grid-template-columns: minmax(250px, 310px) minmax(0, 1fr) !important;
+        gap: 0.86rem !important;
+    }
+
+    .personal-page .sidebar-btn {
+        min-height: 2.46rem !important;
+        padding: 0 0.72rem !important;
+        border-radius: 0.70rem !important;
+        font-size: 0.54rem !important;
+    }
+
+    @media (min-width: 1536px) {
+        :root {
+            --personal-shell-width: 1440px !important;
+            --personal-nav-offset: clamp(5.20rem, 6.2vh, 6.05rem) !important;
+        }
+
+        .base-shell {
+            max-width: min(1440px, calc(100vw - 2.5rem)) !important;
+        }
+    }
+
+    @media (max-width: 1280px) {
+        .base-shell {
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .personal-page .stats-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 1180px) {
+        .personal-page .page-head,
+        .personal-page .driver-card-command,
+        .personal-page .service-highlight-card,
+        .personal-page .accounting-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .role-access {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 720px) {
+        :root {
+            --personal-shell-width: 100vw !important;
+            --personal-nav-offset: 5rem !important;
+            --personal-top-gap: 0.14rem !important;
+        }
+
+        .base-shell {
+            max-width: calc(100vw - 1rem) !important;
+        }
+
+        .personal-shell {
+            gap: 0.54rem !important;
+        }
+
+        .personal-page .page-head {
+            padding: 0.72rem !important;
+        }
+
+        .personal-page .page-head h1 {
+            white-space: normal !important;
+            font-size: clamp(1.55rem, 8.8vw, 2.25rem) !important;
+        }
+
+        .personal-page .page-head p {
+            font-size: 0.72rem !important;
+            line-height: 1.35 !important;
+        }
+
+        .personal-page .role-access,
+        .detail-grid,
+        .modal-grid-two {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .personal-page .tab-btn {
+            flex-basis: 158px !important;
+            min-height: 2.18rem !important;
+        }
+    }
+
 </style>
 
 
