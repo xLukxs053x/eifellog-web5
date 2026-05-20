@@ -7,8 +7,10 @@
 <style>
     /*
         Impressum Page Override
-        Ziel: Hintergrund-Slideshow deutlich rauszoomen,
-        damit das Truck-/Hausmotiv nicht so nah wirkt.
+        Fix:
+        - keine schwarzen Balken mehr oben
+        - Slideshow wirkt rausgezoomt
+        - Hintergrund bleibt vollflächig und sauber
     */
 
     .font-orbitron {
@@ -23,25 +25,42 @@
         background: #030704 !important;
     }
 
+    .hero-bg::before {
+        content: "";
+        position: absolute;
+        inset: -4%;
+        z-index: 0;
+        background-image: url("{{ url_for('static', filename='eifelog1.jpg') }}");
+        background-size: cover;
+        background-position: center center;
+        filter: blur(18px) saturate(1.05) brightness(0.42);
+        transform: scale(1.08);
+        opacity: 0.85;
+    }
+
     .hero-bg .bg-slide {
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 1 !important;
         width: 100% !important;
         height: 100% !important;
         object-fit: contain !important;
         object-position: center center !important;
         transform-origin: center center !important;
-        filter: saturate(1.08) brightness(0.48) !important;
+        filter: saturate(1.08) brightness(0.58) !important;
     }
 
     .hero-overlay {
+        z-index: 2 !important;
         background:
-            radial-gradient(circle at 50% 24%, rgba(10, 20, 15, 0.08) 0%, rgba(4, 10, 6, 0.54) 54%, rgba(2, 5, 3, 0.88) 100%),
-            linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.58)) !important;
+            radial-gradient(circle at 50% 18%, rgba(4, 10, 6, 0.18) 0%, rgba(4, 10, 6, 0.50) 54%, rgba(2, 5, 3, 0.86) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.60)) !important;
     }
 
     @keyframes fadeZoom {
         0% {
             opacity: 0;
-            transform: scale(1);
+            transform: scale(0.98);
         }
 
         10% {
@@ -54,13 +73,17 @@
 
         46% {
             opacity: 0;
-            transform: scale(1.025);
+            transform: scale(1.015);
         }
 
         100% {
             opacity: 0;
-            transform: scale(1.025);
+            transform: scale(1.015);
         }
+    }
+
+    .base-main {
+        padding-top: 7rem !important;
     }
 
     .impressum-page {
@@ -153,7 +176,7 @@
         border: 1px solid rgba(255, 255, 255, 0.075);
         border-radius: 20px;
         padding: 1.25rem;
-        transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+        transition: border-color 0.25s ease, background 0.25s ease;
     }
 
     .impressum-box:hover {
@@ -246,10 +269,18 @@
         }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
+        .base-main {
+            padding-top: 6.5rem !important;
+        }
+
         .hero-bg .bg-slide {
             object-fit: cover !important;
             object-position: center center !important;
+        }
+
+        .hero-bg::before {
+            display: none;
         }
 
         .impressum-card {
@@ -318,40 +349,28 @@
             <!-- Daten Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Betreiber
-                    </p>
-
+                    <p class="impressum-label">Betreiber</p>
                     <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         LukxsDE
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Projektart
-                    </p>
-
+                    <p class="impressum-label">Projektart</p>
                     <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Privates Hobby-Projekt / virtuelle Spedition
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Projektname
-                    </p>
-
+                    <p class="impressum-label">Projektname</p>
                     <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Eifel LOG
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Status
-                    </p>
-
+                    <p class="impressum-label">Status</p>
                     <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Nicht kommerziell betrieben
                     </p>
@@ -360,9 +379,7 @@
 
             <!-- Kontakt Info -->
             <div class="impressum-box">
-                <p class="impressum-label">
-                    Kontakt
-                </p>
+                <p class="impressum-label">Kontakt</p>
 
                 <p class="text-[var(--muted)] text-sm md:text-base leading-8">
                     Für Fragen zum Projekt, zur Community oder zu Eifel LOG kann das Kontaktformular
@@ -387,9 +404,7 @@
             <!-- Kontaktformular -->
             <div class="impressum-box-green">
                 <div class="mb-6">
-                    <p class="impressum-label">
-                        Direkt kommunizieren
-                    </p>
+                    <p class="impressum-label">Direkt kommunizieren</p>
 
                     <h3 class="font-orbitron text-xl md:text-2xl font-bold uppercase tracking-wider text-[var(--text)] mb-3">
                         Kontaktformular
@@ -509,9 +524,7 @@
             <!-- Haftung -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Haftung für Inhalte
-                    </p>
+                    <p class="impressum-label">Haftung für Inhalte</p>
 
                     <p class="text-[var(--muted)] text-sm md:text-base leading-8">
                         Die Inhalte dieser Webseite wurden mit größter Sorgfalt erstellt.
@@ -522,9 +535,7 @@
                 </div>
 
                 <div class="impressum-box">
-                    <p class="impressum-label">
-                        Haftung für Links
-                    </p>
+                    <p class="impressum-label">Haftung für Links</p>
 
                     <p class="text-[var(--muted)] text-sm md:text-base leading-8">
                         Diese Webseite kann Links zu externen Webseiten enthalten.
@@ -536,9 +547,7 @@
 
             <!-- Urheberrecht -->
             <div class="impressum-box">
-                <p class="impressum-label">
-                    Urheberrecht
-                </p>
+                <p class="impressum-label">Urheberrecht</p>
 
                 <p class="text-[var(--muted)] text-sm md:text-base leading-8">
                     Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser Webseite
@@ -551,9 +560,7 @@
 
             <!-- Hobby-Projekt Hinweis -->
             <div class="impressum-box-green">
-                <p class="impressum-label">
-                    Kennzeichnung als Hobby-Projekt
-                </p>
+                <p class="impressum-label">Kennzeichnung als Hobby-Projekt</p>
 
                 <p class="text-[var(--muted)] text-sm md:text-base leading-8">
                     Eifel LOG ist ein freiwillig betriebenes Hobby-Projekt. Es besteht keine Verbindung
