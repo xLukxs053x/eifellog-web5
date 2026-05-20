@@ -2379,6 +2379,85 @@
         }
     }
 
+
+
+    /* =========================================================
+       FINAL HOTFIX: SLIDESHOW DEUTLICH RAUSGEZOOMT
+       Dieser Block steht absichtlich ganz am Ende vom <style>,
+       damit er alle vorherigen .hero-bg/.bg-slide Overrides schlägt.
+    ========================================================= */
+
+    :root {
+        --personal-slideshow-start-scale: 0.88;
+        --personal-slideshow-end-scale: 0.92;
+    }
+
+    .hero-bg {
+        background:
+            radial-gradient(circle at 50% 46%, rgba(8, 18, 11, 0.30), rgba(2, 5, 3, 0.92) 76%),
+            var(--bg-1, #030805) !important;
+        overflow: hidden !important;
+    }
+
+    .hero-bg .bg-slide {
+        width: 100% !important;
+        height: 100% !important;
+        inset: 0 !important;
+        object-fit: cover !important;
+        object-position: center center !important;
+        transform-origin: center center !important;
+        filter: saturate(1.03) brightness(0.36) contrast(1.04) !important;
+        animation-name: personalSlideshowZoomedOut !important;
+        will-change: opacity, transform !important;
+    }
+
+    .hero-overlay {
+        background:
+            radial-gradient(circle at 50% 30%, rgba(8, 18, 11, 0.02) 0%, rgba(4, 10, 6, 0.34) 54%, rgba(2, 5, 3, 0.74) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.36)) !important;
+    }
+
+    @keyframes personalSlideshowZoomedOut {
+        0% {
+            opacity: 0;
+            transform: scale(var(--personal-slideshow-start-scale));
+        }
+
+        10% {
+            opacity: 1;
+            transform: scale(var(--personal-slideshow-start-scale));
+        }
+
+        34% {
+            opacity: 1;
+            transform: scale(var(--personal-slideshow-end-scale));
+        }
+
+        46% {
+            opacity: 0;
+            transform: scale(var(--personal-slideshow-end-scale));
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(var(--personal-slideshow-end-scale));
+        }
+    }
+
+    @media (min-width: 1536px) {
+        :root {
+            --personal-slideshow-start-scale: 0.84;
+            --personal-slideshow-end-scale: 0.88;
+        }
+    }
+
+    @media (max-width: 720px) {
+        :root {
+            --personal-slideshow-start-scale: 0.94;
+            --personal-slideshow-end-scale: 0.98;
+        }
+    }
+
 </style>
 
 
