@@ -6,11 +6,11 @@
 
 <style>
     /*
-        Kompaktes Impressum
-        - Kontaktformular entfernt
-        - weniger Seitenhöhe
-        - Slideshow bleibt sauber vollflächig
-        - keine schwarzen Balken durch object-fit: contain
+        Impressum-Seite
+        - nutzt die Slideshow aus base.html
+        - kein eigener Background-HTML-Block
+        - Slideshow wird nur für diese Seite optisch ruhiger / weniger reingezoomt
+        - object-fit: cover bleibt aktiv, damit keine schwarzen Balken entstehen
     */
 
     .font-orbitron {
@@ -21,6 +21,7 @@
         font-family: 'Inter', sans-serif;
     }
 
+    /* === BASE-SLIDESHOW FÜR IMPRESSUM ANPASSEN === */
     .hero-bg {
         background: #030704 !important;
     }
@@ -28,17 +29,38 @@
     .hero-bg .bg-slide {
         object-fit: cover !important;
         object-position: center center !important;
-        filter: saturate(1.06) brightness(0.46) !important;
+        filter: saturate(1.04) brightness(0.47) !important;
         transform-origin: center center !important;
+
+        /*
+            Wichtig:
+            Die Slides kommen aus base.html.
+            Hier wird nur der Animation-Name ersetzt.
+            Dadurch bleiben slide-1 / slide-2 / slide-3 und deren Timing erhalten.
+        */
+        animation-name: impressumFadeZoom !important;
+        animation-duration: 24s !important;
+        animation-timing-function: ease-in-out !important;
+        animation-iteration-count: infinite !important;
     }
 
-    .hero-overlay {
-        background:
-            radial-gradient(circle at 50% 22%, rgba(4, 10, 6, 0.12) 0%, rgba(4, 10, 6, 0.58) 55%, rgba(2, 5, 3, 0.90) 100%),
-            linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62)) !important;
+    .hero-bg .slide-1 {
+        animation-delay: 0s !important;
     }
 
-    @keyframes fadeZoom {
+    .hero-bg .slide-2 {
+        animation-delay: 8s !important;
+    }
+
+    .hero-bg .slide-3 {
+        animation-delay: 16s !important;
+    }
+
+    /*
+        Weniger Zoom als in base.html.
+        Nicht unter scale(1), damit object-fit: cover keine Ränder/Balken zeigt.
+    */
+    @keyframes impressumFadeZoom {
         0% {
             opacity: 0;
             transform: scale(1);
@@ -48,42 +70,49 @@
             opacity: 1;
         }
 
-        34% {
+        33% {
             opacity: 1;
         }
 
-        46% {
+        45% {
             opacity: 0;
-            transform: scale(1.025);
+            transform: scale(1.018);
         }
 
         100% {
             opacity: 0;
-            transform: scale(1.025);
+            transform: scale(1.018);
         }
     }
 
+    .hero-overlay {
+        background:
+            radial-gradient(circle at 50% 24%, rgba(4, 10, 6, 0.10) 0%, rgba(4, 10, 6, 0.58) 56%, rgba(2, 5, 3, 0.91) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62)) !important;
+    }
+
+    /* === IMPRESSUM LAYOUT KOMPAKTER === */
     .base-main {
-        padding-top: 7rem !important;
-        padding-bottom: 3.5rem !important;
+        padding-top: 6.9rem !important;
+        padding-bottom: 3.25rem !important;
     }
 
     .impressum-page {
         width: 100%;
-        max-width: 860px;
+        max-width: 820px;
         margin-left: auto;
         margin-right: auto;
     }
 
     .impressum-header {
-        margin-bottom: 2rem;
+        margin-bottom: 1.75rem;
     }
 
     .impressum-status {
         display: inline-flex;
         align-items: center;
         gap: 0.55rem;
-        padding: 0.52rem 0.85rem;
+        padding: 0.5rem 0.82rem;
         border-radius: 999px;
         border: 1px solid rgba(137, 190, 50, 0.28);
         background: rgba(137, 190, 50, 0.08);
@@ -119,7 +148,7 @@
 
     .impressum-kicker {
         font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
+        font-size: 8.5px;
         font-weight: 800;
         letter-spacing: 0.34em;
         text-transform: uppercase;
@@ -128,7 +157,7 @@
 
     .impressum-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(2.35rem, 5.5vw, 4.25rem);
+        font-size: clamp(2.15rem, 5vw, 3.85rem);
         font-weight: 800;
         line-height: 0.92;
         letter-spacing: 0.035em;
@@ -143,21 +172,22 @@
 
     .impressum-subtitle {
         color: var(--muted);
-        font-size: 0.96rem;
-        line-height: 1.8;
-        max-width: 720px;
+        font-size: 0.92rem;
+        line-height: 1.75;
+        max-width: 700px;
     }
 
     .impressum-card {
         position: relative;
         overflow: hidden;
+        border-radius: 26px;
     }
 
     .impressum-box {
         background: rgba(255, 255, 255, 0.035);
         border: 1px solid rgba(255, 255, 255, 0.075);
-        border-radius: 20px;
-        padding: 1.15rem;
+        border-radius: 18px;
+        padding: 1.05rem;
         transition: border-color 0.25s ease, background 0.25s ease;
     }
 
@@ -169,8 +199,8 @@
     .impressum-box-green {
         background: rgba(137, 190, 50, 0.055);
         border: 1px solid rgba(137, 190, 50, 0.22);
-        border-radius: 22px;
-        padding: 1.2rem;
+        border-radius: 20px;
+        padding: 1.1rem;
         box-shadow: inset 0 0 24px rgba(137, 190, 50, 0.035);
     }
 
@@ -182,7 +212,7 @@
         text-transform: uppercase;
         letter-spacing: 0.18em;
         color: var(--brand-green);
-        margin-bottom: 0.55rem;
+        margin-bottom: 0.5rem;
     }
 
     .impressum-muted-label {
@@ -193,7 +223,7 @@
         text-transform: uppercase;
         letter-spacing: 0.18em;
         color: var(--muted);
-        margin-bottom: 0.55rem;
+        margin-bottom: 0.5rem;
     }
 
     .impressum-email-disabled {
@@ -201,7 +231,7 @@
         border-radius: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.10);
         background: rgba(255, 255, 255, 0.045);
-        padding: 0.82rem 1rem;
+        padding: 0.78rem 1rem;
         color: var(--muted);
         opacity: 0.62;
         cursor: not-allowed;
@@ -216,18 +246,22 @@
     }
 
     @media (min-width: 1536px) {
+        .base-main {
+            padding-top: 6.6rem !important;
+        }
+
         .impressum-page {
-            max-width: 820px;
+            max-width: 790px;
         }
 
         .impressum-title {
-            font-size: clamp(2.25rem, 5vw, 4rem);
+            font-size: clamp(2.05rem, 4.7vw, 3.65rem);
         }
     }
 
     @media (max-width: 768px) {
         .base-main {
-            padding-top: 6.5rem !important;
+            padding-top: 6.35rem !important;
             padding-bottom: 3rem !important;
         }
 
@@ -244,6 +278,11 @@
         .impressum-box-green {
             padding: 1rem;
         }
+
+        .impressum-subtitle {
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
     }
 </style>
 
@@ -251,7 +290,7 @@
 
     <!-- Header -->
     <div class="impressum-header">
-        <div class="impressum-status mb-6">
+        <div class="impressum-status mb-5">
             <span class="impressum-dot"></span>
             Legal Node Online
         </div>
@@ -260,7 +299,7 @@
             Eifel LOG / Projektinformationen
         </p>
 
-        <h1 class="impressum-title mb-6">
+        <h1 class="impressum-title mb-5">
             Impress<span>um</span>
         </h1>
 
@@ -271,13 +310,13 @@
     </div>
 
     <!-- Main Card -->
-    <div class="glass-card impressum-card p-6 md:p-8 lg:p-9">
+    <div class="glass-card impressum-card p-5 md:p-7 lg:p-8">
 
         <!-- Decorative Glow -->
         <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
         <div class="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-[var(--brand-yellow)]/5 blur-3xl pointer-events-none"></div>
 
-        <div class="relative z-10 space-y-6">
+        <div class="relative z-10 space-y-5">
 
             <!-- Projekt Intro -->
             <div>
@@ -285,11 +324,11 @@
                     Angaben zum Projekt
                 </p>
 
-                <h2 class="font-orbitron text-2xl md:text-3xl font-bold uppercase tracking-wider text-[var(--text)] mb-4">
+                <h2 class="font-orbitron text-xl md:text-2xl font-bold uppercase tracking-wider text-[var(--text)] mb-3">
                     Eifel LOG
                 </h2>
 
-                <p class="text-[var(--muted)] text-sm md:text-base leading-8 max-w-3xl">
+                <p class="text-[var(--muted)] text-sm md:text-[0.95rem] leading-7 max-w-3xl">
                     Diese Webseite dient der Darstellung eines nicht-kommerziellen Hobby-Projekts.
                     Eifel LOG ist keine echte Spedition, kein offizielles Transportunternehmen und
                     kein gewerbliches Logistikangebot.
@@ -333,7 +372,7 @@
             <div class="impressum-box">
                 <p class="impressum-label">Kontakt</p>
 
-                <p class="text-[var(--muted)] text-sm md:text-base leading-8 mb-4">
+                <p class="text-[var(--muted)] text-sm md:text-[0.95rem] leading-7 mb-4">
                     Kontaktaufnahme ist aktuell über die Projekt- und Community-Funktionen von Eifel LOG möglich.
                 </p>
 
@@ -354,7 +393,7 @@
             <div class="impressum-box-green">
                 <p class="impressum-label">Kennzeichnung als Hobby-Projekt</p>
 
-                <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                <p class="text-[var(--muted)] text-sm md:text-[0.95rem] leading-7">
                     Eifel LOG ist ein freiwillig betriebenes Hobby-Projekt. Es besteht keine Verbindung
                     zu einer realen Spedition, einem offiziellen Frachtunternehmen oder einem
                     gewerblichen Transportdienstleister. Alle dargestellten Inhalte dienen ausschließlich
@@ -367,7 +406,7 @@
                 <div class="impressum-box">
                     <p class="impressum-label">Haftung für Inhalte</p>
 
-                    <p class="text-[var(--muted)] text-sm leading-8">
+                    <p class="text-[var(--muted)] text-sm leading-7">
                         Die Inhalte dieser Webseite wurden sorgfältig erstellt. Für Richtigkeit,
                         Vollständigkeit und Aktualität wird keine Gewähr übernommen.
                     </p>
@@ -376,7 +415,7 @@
                 <div class="impressum-box">
                     <p class="impressum-label">Haftung für Links</p>
 
-                    <p class="text-[var(--muted)] text-sm leading-8">
+                    <p class="text-[var(--muted)] text-sm leading-7">
                         Für externe Inhalte sind ausschließlich die jeweiligen Anbieter oder Betreiber
                         der verlinkten Seiten verantwortlich.
                     </p>
@@ -386,7 +425,7 @@
             <div class="impressum-box">
                 <p class="impressum-label">Urheberrecht</p>
 
-                <p class="text-[var(--muted)] text-sm leading-8">
+                <p class="text-[var(--muted)] text-sm leading-7">
                     Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser Webseite
                     unterliegen dem deutschen Urheberrecht. Eine Nutzung außerhalb der gesetzlichen Grenzen
                     bedarf der Zustimmung des jeweiligen Rechteinhabers.
