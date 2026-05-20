@@ -8837,14 +8837,26 @@ def tutorial():
 
 @app.route("/downloads")
 def downloads():
+    title = "Downloads - Eifel LOG"
+
     description = (
-        "In unserem Download-Bereich findest du nützliche Dateien, Formulare und Ressourcen."
+        "In unserem Download-Bereich findest du nützliche Dateien, "
+        "Formulare und Ressourcen für Eifel LOG."
     )
-    if "user" not in session: return redirect(url_for("login"))
-    return render_template("download.html")
+
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    return render_template(
+        "download.html",
+        title=title,
+        description=description
+    )
 
 @app.route("/fuhrpark")
 def fuhrpark():
+    title = "Fuhrpark - Eifel LOG"
+
     description = (
         "In unserem Fuhrpark findest du eine Übersicht über alle verfügbaren Fahrzeuge, "
         "die für deine Touren zur Verfügung stehen."
@@ -8853,14 +8865,19 @@ def fuhrpark():
 
 @app.route("/impressum")
 def impressum():
+    title = "Impressum - Eifel LOG"
+
     description = (
         "Im Impressum findest du alle wichtigen Informationen über Eifel LOG, "
         "Kontaktdaten und rechtliche Hinweise. Schau gerne vorbei, wenn du mehr "
         "über uns erfahren möchtest oder Fragen hast!"
     )
 
-    return render_template("impressum.html", description=description)
-
+    return render_template(
+        "impressum.html",
+        title=title,
+        description=description
+    )
 
 # ==========================================
 # DISPOSITION
