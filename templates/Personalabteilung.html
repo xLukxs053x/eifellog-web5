@@ -2382,42 +2382,83 @@
 
 
     /* =========================================================
-       FINAL HOTFIX: SLIDESHOW DEUTLICH RAUSGEZOOMT
-       Dieser Block steht absichtlich ganz am Ende vom <style>,
-       damit er alle vorherigen .hero-bg/.bg-slide Overrides schlägt.
+       FINAL HOTFIX: SLIDESHOW RAUSGEZOOMT OHNE SCHWARZE RÄNDER
+       Wichtig: Das Bild selbst darf NICHT unter scale(1) skaliert
+       werden. Unter 1 entstehen die schwarzen Balken wie im Screenshot.
+       Rausgezoomt wirkt es jetzt über object-fit: cover ohne Extra-Zoom.
     ========================================================= */
 
     :root {
-        --personal-slideshow-start-scale: 0.88;
-        --personal-slideshow-end-scale: 0.92;
+        --personal-slideshow-start-scale: 1;
+        --personal-slideshow-end-scale: 1.018;
     }
 
     .hero-bg {
-        background:
-            radial-gradient(circle at 50% 46%, rgba(8, 18, 11, 0.30), rgba(2, 5, 3, 0.92) 76%),
-            var(--bg-1, #030805) !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        min-width: 100vw !important;
+        min-height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
         overflow: hidden !important;
+        background: var(--bg-1, #030805) !important;
+        pointer-events: none !important;
+    }
+
+    .hero-bg picture,
+    .hero-bg .bg-slide {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        min-width: 100vw !important;
+        min-height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     .hero-bg .bg-slide {
-        width: 100% !important;
-        height: 100% !important;
-        inset: 0 !important;
+        display: block !important;
         object-fit: cover !important;
         object-position: center center !important;
         transform-origin: center center !important;
-        filter: saturate(1.03) brightness(0.36) contrast(1.04) !important;
-        animation-name: personalSlideshowZoomedOut !important;
+        filter: saturate(1.03) brightness(0.38) contrast(1.04) !important;
+        animation-name: personalSlideshowNoBars !important;
         will-change: opacity, transform !important;
     }
 
+    .hero-bg .slide-1 {
+        animation-delay: 0s !important;
+    }
+
+    .hero-bg .slide-2 {
+        animation-delay: 8s !important;
+    }
+
+    .hero-bg .slide-3 {
+        animation-delay: 16s !important;
+    }
+
     .hero-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        margin: 0 !important;
+        pointer-events: none !important;
         background:
             radial-gradient(circle at 50% 30%, rgba(8, 18, 11, 0.02) 0%, rgba(4, 10, 6, 0.34) 54%, rgba(2, 5, 3, 0.74) 100%),
             linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.36)) !important;
     }
 
-    @keyframes personalSlideshowZoomedOut {
+    @keyframes personalSlideshowNoBars {
         0% {
             opacity: 0;
             transform: scale(var(--personal-slideshow-start-scale));
@@ -2446,15 +2487,15 @@
 
     @media (min-width: 1536px) {
         :root {
-            --personal-slideshow-start-scale: 0.84;
-            --personal-slideshow-end-scale: 0.88;
+            --personal-slideshow-start-scale: 1;
+            --personal-slideshow-end-scale: 1.012;
         }
     }
 
     @media (max-width: 720px) {
         :root {
-            --personal-slideshow-start-scale: 0.94;
-            --personal-slideshow-end-scale: 0.98;
+            --personal-slideshow-start-scale: 1;
+            --personal-slideshow-end-scale: 1.025;
         }
     }
 
