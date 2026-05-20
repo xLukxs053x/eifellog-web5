@@ -7586,9 +7586,9 @@ def home():
 def about():
     title = "Über Eifel LOG - Virtuelle Spedition"
     description = ("Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.")
-    return render_template("about.html", description=description)
+    return render_template("about.html", title=title, description=description)
 
-@@app.route("/changelog")
+@app.route("/changelog")
 def changelog():
     title = "Changelog - Eifel LOG"
 
