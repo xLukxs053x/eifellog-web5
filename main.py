@@ -138,6 +138,18 @@ DISPO_FORM_UPLOAD_FOLDER = env_first(
     default=os.path.join("static", "uploads", "dispo_form")
 )
 ALLOWED_DISPO_FORM_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "webp"}
+BUCHHALTUNG_PDF_UPLOAD_FOLDER = env_first(
+    "BUCHHALTUNG_PDF_UPLOAD_FOLDER",
+    "BUCHHALTUNG_ARCHIVE_UPLOAD_FOLDER",
+    "ACCOUNTING_PDF_UPLOAD_FOLDER",
+    default=os.path.join("static", "uploads", "buchhaltung_pdfs")
+)
+ALLOWED_BUCHHALTUNG_PDF_EXTENSIONS = {"pdf"}
+BUCHHALTUNG_PDF_MAX_BYTES = int(env_float(
+    "BUCHHALTUNG_PDF_MAX_MB",
+    "ACCOUNTING_PDF_MAX_MB",
+    default=8
+) * 1024 * 1024)
 TRACKER_DRIVER_CARD_UPLOAD_FOLDER = env_first(
     "TRACKER_DRIVER_CARD_UPLOAD_FOLDER",
     "FAHRERKARTE_TRACKER_UPLOAD_FOLDER",
@@ -336,6 +348,10 @@ def ensure_indexes():
         buchhaltung_entries_collection.create_index([("type", ASCENDING)], unique=False)
         buchhaltung_entries_collection.create_index([("payment_status", ASCENDING)], unique=False)
         buchhaltung_entries_collection.create_index([("receipt_status", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("job_status", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("pdf_archive_id", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("pdf.sha256", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("pdf.uploaded_at", DESCENDING)], unique=False)
         buchhaltung_entries_collection.create_index([("archived", ASCENDING)], unique=False)
 
         tour_receipts_collection.create_index([("receipt_id", ASCENDING)], unique=False)
@@ -15440,6 +15456,162 @@ def calculate_buchhaltung_vat(gross, vat_rate):
     return round((gross - gross / (1 + vat_rate / 100)) * 100) / 100
 
 
+def normalize_buchhaltung_job_status(value):
+    value = safe_str(value, "Offen")[:60]
+    value_lc = value.lower()
+    if value_lc in {"abgeschlossen", "completed", "complete", "fertig", "done"}:
+        return "Abgeschlossen"
+    if value_lc in {"abgerechnet", "billed", "invoiced"}:
+        return "Abgerechnet"
+    if value_lc in {"archiviert", "archived"}:
+        return "Archiviert"
+    return "Offen"
+
+
+def allowed_buchhaltung_pdf(filename):
+    filename = safe_str(filename)
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_BUCHHALTUNG_PDF_EXTENSIONS
+
+
+def absolute_buchhaltung_pdf_folder():
+    folder = safe_str(BUCHHALTUNG_PDF_UPLOAD_FOLDER, os.path.join("static", "uploads", "buchhaltung_pdfs"))
+    if os.path.isabs(folder):
+        return folder
+    return os.path.join(BASE_DIR, folder)
+
+
+def buchhaltung_pdf_public_path(abs_path):
+    try:
+        rel_path = os.path.relpath(abs_path, BASE_DIR).replace(os.sep, "/")
+    except Exception:
+        rel_path = safe_str(abs_path).replace(os.sep, "/")
+    return rel_path
+
+
+def buchhaltung_pdf_download_url(entry_id):
+    entry_id = safe_str(entry_id)
+    if not entry_id:
+        return ""
+    try:
+        return url_for("api_buchhaltung_entry_pdf", entry_id=entry_id)
+    except Exception:
+        return f"/api/buchhaltung/entries/{entry_id}/pdf"
+
+
+def parse_buchhaltung_entry_payload():
+    if request.content_type and request.content_type.startswith("multipart/form-data"):
+        raw_payload = safe_str(request.form.get("payload"))
+        if raw_payload:
+            try:
+                parsed = json.loads(raw_payload)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return dict(request.form)
+    return request.get_json(silent=True) or {}
+
+
+def generate_buchhaltung_pdf_archive_id():
+    stamp = now_utc().strftime("%Y%m%d")
+    token = secrets.token_hex(4).upper()
+    return f"PDF-{stamp}-{token}"
+
+
+def save_buchhaltung_pdf_file(file_storage, entry_doc, actor, payload=None):
+    payload = payload or {}
+    if not file_storage or not safe_str(file_storage.filename):
+        return {}
+
+    original_filename = secure_filename(file_storage.filename)
+    if not allowed_buchhaltung_pdf(original_filename):
+        raise ValueError("Nur PDF-Dateien sind für das Buchhaltungsarchiv erlaubt.")
+
+    file_storage.stream.seek(0, os.SEEK_END)
+    size_bytes = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+
+    if size_bytes <= 0:
+        raise ValueError("Die PDF-Datei ist leer.")
+    if size_bytes > BUCHHALTUNG_PDF_MAX_BYTES:
+        max_mb = round(BUCHHALTUNG_PDF_MAX_BYTES / (1024 * 1024), 1)
+        raise ValueError(f"Die PDF ist zu groß. Maximal erlaubt sind {max_mb:g} MB.")
+
+    header = file_storage.stream.read(5)
+    file_storage.stream.seek(0)
+    if header != b"%PDF-":
+        raise ValueError("Die Datei sieht nicht wie eine gültige PDF aus.")
+
+    entry_id = safe_str(entry_doc.get("entry_id") or entry_doc.get("id") or uuid.uuid4().hex)
+    archive_id = safe_str(payload.get("pdf_archive_id") or payload.get("pdfArchiveId") or generate_buchhaltung_pdf_archive_id())
+    now = now_utc()
+
+    target_dir = os.path.join(absolute_buchhaltung_pdf_folder(), now.strftime("%Y"), now.strftime("%m"))
+    os.makedirs(target_dir, exist_ok=True)
+
+    safe_archive_id = secure_filename(archive_id) or generate_buchhaltung_pdf_archive_id()
+    filename = f"{safe_archive_id}-{entry_id}.pdf"
+    abs_path = os.path.join(target_dir, filename)
+
+    sha256 = hashlib.sha256()
+    file_storage.stream.seek(0)
+    with open(abs_path, "wb") as target:
+        while True:
+            chunk = file_storage.stream.read(1024 * 1024)
+            if not chunk:
+                break
+            sha256.update(chunk)
+            target.write(chunk)
+
+    checksum = sha256.hexdigest()
+    relative_path = buchhaltung_pdf_public_path(abs_path)
+
+    return {
+        "pdf_archive_id": archive_id,
+        "pdf_file_name": original_filename,
+        "pdf_original_name": original_filename,
+        "pdf_mime_type": "application/pdf",
+        "pdf_size": size_bytes,
+        "pdf_uploaded_at": now,
+        "pdf_uploaded_by": safe_str(actor.get("display_name") or actor.get("username"), "Unbekannt"),
+        "pdf_uploaded_by_identity": {
+            "discord_id": safe_str(actor.get("discord_id")),
+            "username": safe_str(actor.get("username")),
+            "display_name": safe_str(actor.get("display_name"))
+        },
+        "pdf_path": relative_path,
+        "pdf_absolute_path": abs_path,
+        "pdf_sha256": checksum,
+        "pdf_checksum": checksum,
+        "pdf_url": buchhaltung_pdf_download_url(entry_id),
+        "pdf": {
+            "archive_id": archive_id,
+            "fileName": original_filename,
+            "filename": original_filename,
+            "mime_type": "application/pdf",
+            "mimeType": "application/pdf",
+            "size": size_bytes,
+            "size_bytes": size_bytes,
+            "uploaded_at": now,
+            "uploadedAt": datetime_to_client_iso(now),
+            "uploaded_by": safe_str(actor.get("display_name") or actor.get("username"), "Unbekannt"),
+            "uploadedBy": safe_str(actor.get("display_name") or actor.get("username"), "Unbekannt"),
+            "path": relative_path,
+            "sha256": checksum,
+            "checksum": checksum,
+            "url": buchhaltung_pdf_download_url(entry_id),
+            "download_url": buchhaltung_pdf_download_url(entry_id)
+        }
+    }
+
+
+def extract_buchhaltung_pdf_from_request():
+    for field_name in ("pdf", "file", "attachment", "job_pdf"):
+        pdf_file = request.files.get(field_name)
+        if pdf_file and safe_str(pdf_file.filename):
+            return pdf_file
+    return None
+
+
 def datetime_to_client_iso(value):
     if isinstance(value, datetime):
         return value.isoformat() + "Z"
@@ -15452,6 +15624,7 @@ def prepare_buchhaltung_entry_for_api(entry_doc):
     item = dict(entry_doc or {})
     created_by = item.get("created_by") or {}
     updated_by = item.get("updated_by") or {}
+    pdf_doc = item.get("pdf") or {}
 
     entry_id = safe_str(item.get("entry_id") or item.get("id") or item.get("uuid") or item.get("_id"))
     if item.get("_id"):
@@ -15472,6 +15645,21 @@ def prepare_buchhaltung_entry_for_api(entry_doc):
         or item.get("username"),
         "Unbekannt"
     )
+
+    pdf_archive_id = safe_str(item.get("pdf_archive_id") or item.get("pdfArchiveId") or pdf_doc.get("archive_id") or pdf_doc.get("archiveId"))
+    pdf_file_name = safe_str(item.get("pdf_file_name") or item.get("pdfFileName") or pdf_doc.get("fileName") or pdf_doc.get("filename") or pdf_doc.get("name"))
+    pdf_mime_type = safe_str(item.get("pdf_mime_type") or item.get("pdfMimeType") or pdf_doc.get("mime_type") or pdf_doc.get("mimeType"), "application/pdf")
+    pdf_size = parse_int(item.get("pdf_size") or item.get("pdfSize") or pdf_doc.get("size") or pdf_doc.get("size_bytes"), 0)
+    pdf_uploaded_at_raw = item.get("pdf_uploaded_at") or item.get("pdfUploadedAt") or pdf_doc.get("uploaded_at") or pdf_doc.get("uploadedAt")
+    pdf_uploaded_at = datetime_to_client_iso(pdf_uploaded_at_raw)
+    pdf_uploaded_by = safe_str(item.get("pdf_uploaded_by") or item.get("pdfUploadedBy") or pdf_doc.get("uploaded_by") or pdf_doc.get("uploadedBy"))
+    pdf_checksum = safe_str(item.get("pdf_sha256") or item.get("pdf_checksum") or item.get("pdfChecksum") or item.get("sha256") or pdf_doc.get("sha256") or pdf_doc.get("checksum")).lower()
+    pdf_path = safe_str(item.get("pdf_path") or pdf_doc.get("path"))
+    pdf_url = safe_str(item.get("pdf_url") or item.get("attachment_url") or pdf_doc.get("url") or pdf_doc.get("download_url"))
+    if pdf_archive_id and not pdf_url:
+        pdf_url = buchhaltung_pdf_download_url(entry_id or mongo_id)
+
+    has_pdf = bool(pdf_archive_id or pdf_file_name or pdf_path or pdf_url or pdf_checksum)
 
     result = {
         "_id": mongo_id,
@@ -15514,6 +15702,49 @@ def prepare_buchhaltung_entry_for_api(entry_doc):
         "receipt_status": normalize_buchhaltung_receipt(item.get("receipt_status") or item.get("receipt")),
         "payment": normalize_buchhaltung_payment(item.get("payment_status") or item.get("payment")),
         "payment_status": normalize_buchhaltung_payment(item.get("payment_status") or item.get("payment")),
+        "jobStatus": normalize_buchhaltung_job_status(item.get("job_status") or item.get("jobStatus") or item.get("status_job")),
+        "job_status": normalize_buchhaltung_job_status(item.get("job_status") or item.get("jobStatus") or item.get("status_job")),
+        "hasPdf": has_pdf,
+        "has_pdf": has_pdf,
+        "pdfArchiveId": pdf_archive_id,
+        "pdf_archive_id": pdf_archive_id,
+        "pdfFileName": pdf_file_name,
+        "pdf_file_name": pdf_file_name,
+        "pdfMimeType": pdf_mime_type,
+        "pdf_mime_type": pdf_mime_type,
+        "pdfSize": pdf_size,
+        "pdf_size": pdf_size,
+        "pdfUploadedAt": pdf_uploaded_at,
+        "pdf_uploaded_at": pdf_uploaded_at,
+        "pdfUploadedBy": pdf_uploaded_by,
+        "pdf_uploaded_by": pdf_uploaded_by,
+        "pdfChecksum": pdf_checksum,
+        "pdf_checksum": pdf_checksum,
+        "sha256": pdf_checksum,
+        "pdfPath": pdf_path,
+        "pdf_path": pdf_path,
+        "pdfUrl": pdf_url,
+        "pdf_url": pdf_url,
+        "attachment_url": pdf_url,
+        "pdf": {
+            "archive_id": pdf_archive_id,
+            "archiveId": pdf_archive_id,
+            "fileName": pdf_file_name,
+            "filename": pdf_file_name,
+            "mime_type": pdf_mime_type,
+            "mimeType": pdf_mime_type,
+            "size": pdf_size,
+            "size_bytes": pdf_size,
+            "uploaded_at": pdf_uploaded_at,
+            "uploadedAt": pdf_uploaded_at,
+            "uploaded_by": pdf_uploaded_by,
+            "uploadedBy": pdf_uploaded_by,
+            "sha256": pdf_checksum,
+            "checksum": pdf_checksum,
+            "path": pdf_path,
+            "url": pdf_url,
+            "download_url": pdf_url
+        },
         "note": safe_str(item.get("note") or item.get("notes"))[:1000],
         "source": safe_str(item.get("source"), "buchhaltung2")[:80]
     }
@@ -15544,6 +15775,16 @@ def build_buchhaltung_entry_doc(data, actor):
         "tour": safe_str(data.get("tour") or data.get("plate") or data.get("vehicle"))[:120],
         "receipt_status": normalize_buchhaltung_receipt(data.get("receipt_status") or data.get("receipt")),
         "payment_status": normalize_buchhaltung_payment(data.get("payment_status") or data.get("payment")),
+        "job_status": normalize_buchhaltung_job_status(data.get("job_status") or data.get("jobStatus") or data.get("status_job")),
+        "pdf_archive_id": safe_str(data.get("pdf_archive_id") or data.get("pdfArchiveId")),
+        "pdf_file_name": safe_str(data.get("pdf_file_name") or data.get("pdfFileName")),
+        "pdf_mime_type": safe_str(data.get("pdf_mime_type") or data.get("pdfMimeType"), "application/pdf"),
+        "pdf_size": parse_int(data.get("pdf_size") or data.get("pdfSize"), 0),
+        "pdf_uploaded_at": coerce_receipt_datetime(data.get("pdf_uploaded_at") or data.get("pdfUploadedAt"), fallback=None),
+        "pdf_uploaded_by": safe_str(data.get("pdf_uploaded_by") or data.get("pdfUploadedBy")),
+        "pdf_sha256": safe_str(data.get("pdf_sha256") or data.get("pdf_checksum") or data.get("pdfChecksum") or data.get("sha256")).lower(),
+        "pdf_checksum": safe_str(data.get("pdf_checksum") or data.get("pdfChecksum") or data.get("pdf_sha256") or data.get("sha256")).lower(),
+        "pdf_url": safe_str(data.get("pdf_url") or data.get("pdfUrl")),
         "note": safe_str(data.get("note") or data.get("notes"))[:1000],
         "source": safe_str(data.get("source"), "buchhaltung2")[:80],
         "archived": False,
@@ -15676,18 +15917,38 @@ def api_buchhaltung_entries():
             "entries": entries
         })
 
-    data = request.get_json(silent=True) or {}
+    data = parse_buchhaltung_entry_payload()
     amount = parse_number(data.get("amount") or data.get("gross_amount") or data.get("brutto"), 0)
     if amount <= 0:
         return jsonify({"success": False, "message": "Bitte einen gültigen Bruttobetrag eingeben."}), 400
 
     entry_doc = build_buchhaltung_entry_doc(data, actor)
+    pdf_file = extract_buchhaltung_pdf_from_request()
+
+    if pdf_file:
+        try:
+            pdf_meta = save_buchhaltung_pdf_file(pdf_file, entry_doc, actor, payload=data)
+            entry_doc.update(pdf_meta)
+            entry_doc["receipt_status"] = "Vorhanden"
+            if entry_doc.get("job_status") == "Offen":
+                entry_doc["job_status"] = "Abgeschlossen"
+            entry_doc["pdf_archived"] = True
+        except ValueError as error:
+            return jsonify({"success": False, "message": safe_str(error)}), 400
+        except Exception as error:
+            app.logger.exception("Buchhaltungs-PDF konnte nicht gespeichert werden.")
+            return jsonify({
+                "success": False,
+                "message": "Die PDF konnte nicht im Buchhaltungsarchiv gespeichert werden.",
+                "details": safe_str(error)
+            }), 500
+
     buchhaltung_entries_collection.insert_one(entry_doc)
     created = buchhaltung_entries_collection.find_one({"entry_id": entry_doc["entry_id"]})
 
     return jsonify({
         "success": True,
-        "message": "Buchung wurde serverseitig gespeichert.",
+        "message": "Buchung wurde serverseitig gespeichert." + (" PDF wurde archiviert." if pdf_file else ""),
         "entry": prepare_buchhaltung_entry_for_api(created)
     }), 201
 
@@ -15735,7 +15996,7 @@ def api_buchhaltung_entry_detail(entry_id):
         )
         return jsonify({"success": True, "message": "Buchung wurde gelöscht."})
 
-    data = request.get_json(silent=True) or {}
+    data = parse_buchhaltung_entry_payload()
     update_fields = {}
 
     if "date" in data:
@@ -15756,6 +16017,8 @@ def api_buchhaltung_entry_detail(entry_id):
         update_fields["receipt_status"] = normalize_buchhaltung_receipt(data.get("receipt_status") or data.get("receipt"))
     if "payment_status" in data or "payment" in data:
         update_fields["payment_status"] = normalize_buchhaltung_payment(data.get("payment_status") or data.get("payment"))
+    if "job_status" in data or "jobStatus" in data or "status_job" in data:
+        update_fields["job_status"] = normalize_buchhaltung_job_status(data.get("job_status") or data.get("jobStatus") or data.get("status_job"))
     if "note" in data or "notes" in data:
         update_fields["note"] = safe_str(data.get("note") or data.get("notes"))[:1000]
 
@@ -15780,6 +16043,25 @@ def api_buchhaltung_entry_detail(entry_id):
         current_vat_rate = update_fields.get("vat_rate", parse_number(entry_doc.get("vat_rate"), 0))
         update_fields["vat_amount"] = calculate_buchhaltung_vat(current_amount, current_vat_rate)
 
+    pdf_file = extract_buchhaltung_pdf_from_request()
+    if pdf_file:
+        try:
+            pdf_meta = save_buchhaltung_pdf_file(pdf_file, entry_doc, actor, payload=data)
+            update_fields.update(pdf_meta)
+            update_fields["receipt_status"] = "Vorhanden"
+            if update_fields.get("job_status") in {None, "Offen"} and normalize_buchhaltung_job_status(entry_doc.get("job_status")) == "Offen":
+                update_fields["job_status"] = "Abgeschlossen"
+            update_fields["pdf_archived"] = True
+        except ValueError as error:
+            return jsonify({"success": False, "message": safe_str(error)}), 400
+        except Exception as error:
+            app.logger.exception("Buchhaltungs-PDF konnte nicht aktualisiert werden.")
+            return jsonify({
+                "success": False,
+                "message": "Die PDF konnte nicht im Buchhaltungsarchiv aktualisiert werden.",
+                "details": safe_str(error)
+            }), 500
+
     if not update_fields:
         return jsonify({"success": True, "message": "Keine Änderung übergeben.", "entry": prepare_buchhaltung_entry_for_api(entry_doc)})
 
@@ -15794,6 +16076,68 @@ def api_buchhaltung_entry_detail(entry_id):
         "message": "Buchung wurde aktualisiert.",
         "entry": prepare_buchhaltung_entry_for_api(updated)
     })
+
+
+@app.route("/api/buchhaltung/entries/<entry_id>/pdf", methods=["GET", "OPTIONS"])
+def api_buchhaltung_entry_pdf(entry_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = require_buchhaltung_api_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_account_identity()
+    user_roles = session.get("user", {}).get("roles", [])
+    can_view_all_entries = has_buchhaltung_view_all_permission(user_roles)
+
+    entry_doc = buchhaltung_entries_collection.find_one({
+        "$and": [
+            buchhaltung_entry_lookup_query(entry_id),
+            {"archived": {"$ne": True}}
+        ]
+    })
+
+    if not entry_doc:
+        return jsonify({"success": False, "message": "Buchung wurde nicht gefunden."}), 404
+
+    if not can_view_all_entries and not actor_owns_buchhaltung_entry(entry_doc, actor):
+        return jsonify({"success": False, "message": "Nicht berechtigt für diese PDF."}), 403
+
+    pdf_path = safe_str(entry_doc.get("pdf_path") or (entry_doc.get("pdf") or {}).get("path"))
+    if not pdf_path:
+        return jsonify({"success": False, "message": "Für diese Buchung ist keine PDF archiviert."}), 404
+
+    if os.path.isabs(pdf_path):
+        abs_path = pdf_path
+    else:
+        abs_path = os.path.join(BASE_DIR, pdf_path.replace("/", os.sep))
+
+    allowed_root = os.path.abspath(absolute_buchhaltung_pdf_folder())
+    abs_path_normalized = os.path.abspath(abs_path)
+
+    try:
+        inside_archive_root = os.path.commonpath([allowed_root, abs_path_normalized]) == allowed_root
+    except Exception:
+        inside_archive_root = False
+
+    if not inside_archive_root or not os.path.isfile(abs_path_normalized):
+        return jsonify({"success": False, "message": "Die archivierte PDF-Datei wurde im Dateisystem nicht gefunden."}), 404
+
+    filename = safe_str(
+        entry_doc.get("pdf_file_name")
+        or (entry_doc.get("pdf") or {}).get("filename")
+        or (entry_doc.get("pdf") or {}).get("fileName"),
+        "buchhaltung-jobabschluss.pdf"
+    )
+
+    return send_file(
+        abs_path_normalized,
+        mimetype="application/pdf",
+        download_name=filename,
+        as_attachment=False,
+        max_age=0
+    )
 
 
 @app.route("/api/buchhaltung/request", methods=["GET", "POST", "OPTIONS"])
