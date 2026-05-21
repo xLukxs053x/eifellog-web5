@@ -2385,8 +2385,25 @@ Ansicht aktualisieren
                             {% for driver in safe_driver_card_rows %}
                                 {% set display_name = driver.display_name or driver.driverName or driver.name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
                                 {% set username = driver.username or driver.discord_username or "driver" %}
-                                {% set avatar_url = driver.avatar_url or driver.fahrerkarte_avatar_url or driver.discord_avatar_url or "" %}
                                 {% set discord_id = driver.discord_id or driver.discordId or driver.user_id or driver.driverId or driver.driver_id or driver.id or "" %}
+                                {% set direct_avatar_url = driver.avatar_url or driver.avatarUrl or driver.fahrerkarte_avatar_url or driver.discord_avatar_url or driver.discordAvatarUrl or driver.profile_image or driver.profile_image_url or driver.image_url or driver.photo_url or "" %}
+                                {% if not direct_avatar_url and driver.user is defined and driver.user %}
+                                    {% set direct_avatar_url = driver.user.avatar_url or driver.user.avatarUrl or driver.user.discord_avatar_url or driver.user.profile_image_url or "" %}
+                                {% endif %}
+                                {% if not direct_avatar_url and driver.discord_user is defined and driver.discord_user %}
+                                    {% set direct_avatar_url = driver.discord_user.avatar_url or driver.discord_user.avatarUrl or driver.discord_user.profile_image_url or "" %}
+                                {% endif %}
+                                {% set driver_card_avatar = namespace(url=direct_avatar_url) %}
+                                {% if not driver_card_avatar.url and safe_drivers %}
+                                    {% for base_driver in safe_drivers %}
+                                        {% set base_discord_id = base_driver.discord_id or base_driver.discordId or base_driver.user_id or base_driver.driverId or base_driver.driver_id or base_driver.id or "" %}
+                                        {% set base_username = base_driver.username or base_driver.discord_username or "" %}
+                                        {% if not driver_card_avatar.url and ((base_discord_id ~ "") == (discord_id ~ "") or (base_username|lower) == (username|lower)) %}
+                                            {% set driver_card_avatar.url = base_driver.avatar_url or base_driver.avatarUrl or base_driver.discord_avatar_url or base_driver.discordAvatarUrl or base_driver.profile_image or base_driver.profile_image_url or base_driver.image_url or base_driver.photo_url or "" %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                                {% set avatar_url = driver_card_avatar.url %}
                                 {% set aktenzeichen = driver.aktenzeichen or "Nicht vergeben" %}
                                 {% set request_id = driver.fahrerkarte_request_id or driver.request_id or driver.service_request_id or "" %}
                                 {% set card_id = driver.fahrerkarte_card_id or driver.fahrerkarte_id or driver.driver_card_id or driver.driverCardId or driver.card_id or driver.cardId or driver.tacho_card_id or "Keine Fahrerkarte gefunden" %}
