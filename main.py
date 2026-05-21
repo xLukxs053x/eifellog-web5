@@ -4757,69 +4757,19 @@ def normalize_telemetry_payload(raw):
         "timestampUtc": now_utc().isoformat() + "Z"
     }
 
-    no_job_values = {
-        "", "-", "none", "null", "undefined",
-        "freie fahrt", "freiefahrt",
-        "free ride", "freeride",
-        "free drive", "freedrive",
-        "free roam", "freeroam"
-    }
-
-    for key in ["sourceCity", "destinationCity", "cargo"]:
-        value = safe_str(clean.get(key), "-")
-        if value.lower() in no_job_values:
-            clean[key] = "-"
-        else:
-            clean[key] = value
-
-    job_id = safe_str(clean.get("jobId"))
-    if job_id.lower() in no_job_values:
-        clean["jobId"] = ""
-    else:
-        clean["jobId"] = job_id
-
+    if clean["destinationCity"] == "Freie Fahrt": clean["destinationCity"] = "-"
     return clean
 
 def current_job_from_live(live):
     live = live or {}
+    destination = live.get("destinationCity") or "-"
+    source = live.get("sourceCity") or "-"
+    cargo = live.get("cargo") or "-"
 
-    no_job_values = {
-        "", "-", "none", "null", "undefined",
-        "freie fahrt", "freiefahrt",
-        "free ride", "freeride",
-        "free drive", "freedrive",
-        "free roam", "freeroam"
-    }
-
-    def is_no_job_value(value):
-        return safe_str(value).lower() in no_job_values
-
-    destination = safe_str(live.get("destinationCity"), "-")
-    source = safe_str(live.get("sourceCity"), "-")
-    cargo = safe_str(live.get("cargo"), "-")
-    job_id = safe_str(live.get("jobId"))
-
-    if is_no_job_value(destination):
-        destination = "-"
-    if is_no_job_value(source):
-        source = "-"
-    if is_no_job_value(cargo):
-        cargo = "-"
-    if is_no_job_value(job_id):
-        job_id = ""
-
-    has_route_or_cargo = not (destination == "-" and source == "-" and cargo == "-")
-
-    if not has_route_or_cargo and not job_id:
-        return None
-
-    # Ein einzelnes Cargo-Feld ohne Route und ohne echte Job-ID ist kein aktiver Auftrag.
-    # Das verhindert, dass Werte wie "Freie Fahrt" oder leere Telemetrie als Job auftauchen.
-    if not job_id and source == "-" and destination == "-":
-        return None
+    if destination == "-" and source == "-" and cargo == "-": return None
 
     return {
-        "jobId": job_id,
+        "jobId": safe_str(live.get("jobId")),
         "sourceCity": source,
         "destinationCity": destination,
         "cargo": cargo,
@@ -4832,38 +4782,6 @@ def current_job_from_live(live):
         "remainingDistanceKm": parse_number(live.get("remainingDistanceKm"), 0),
         "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
         "status": "Aktiv" if live.get("telemetryConnected") else "Warte"
-    }
-
-
-def tracker_completed_live_state(now=None, game="ETS2/ATS"):
-    """Leerer Live-State nach Tourabschluss, damit alte Aufträge nicht weiter erkannt werden."""
-    now = now or now_utc()
-    return {
-        "isConnected": False,
-        "gameProcessDetected": False,
-        "telemetryConnected": False,
-        "statusText": "stopped",
-        "game": safe_str(game, "ETS2/ATS"),
-        "truck": "-",
-        "sourceCity": "-",
-        "destinationCity": "-",
-        "cargo": "-",
-        "jobId": "",
-        "eta": "-",
-        "speedKmh": 0,
-        "rpm": 0,
-        "fuelPercent": 0,
-        "fuelLiters": -1,
-        "damagePercent": 0,
-        "completedDistanceKm": 0,
-        "tripDistanceKm": 0,
-        "remainingDistanceKm": 0,
-        "plannedDistanceKm": 0,
-        "routeProgressPercent": 0,
-        "engineEnabled": False,
-        "parkingBrake": False,
-        "driverName": "",
-        "timestampUtc": now.isoformat() + "Z"
     }
 
 def get_user_job_entries(user_doc):
@@ -4926,250 +4844,16 @@ def build_active_driver_payload(user_doc):
         "lastSeen": datetime_to_iso(user_doc.get("tracker_live_updated_at"))
     }
 
-def driver_is_really_active(user_doc):
-    """
-    Verhindert Ghost-Online-Fahrer.
-    Ein Fahrer gilt nur als aktiv, wenn die Live-Daten frisch sind UND
-    wirklich Telemetrie/Game verbunden ist.
-    """
-    user_doc = user_doc or {}
-    live = user_doc.get("tracker_live") or {}
-
-    no_job_values = {"", "-", "Freie Fahrt", "Free Ride", "Free Drive", "Free Roam"}
-
-    status_text = safe_str(live.get("statusText")).lower()
-    cargo = safe_str(live.get("cargo"))
-    source_city = safe_str(live.get("sourceCity"))
-    destination_city = safe_str(live.get("destinationCity"))
-    job_id = safe_str(live.get("jobId"))
-
-    telemetry_connected = bool(live.get("telemetryConnected"))
-    game_detected = bool(live.get("gameProcessDetected"))
-    is_connected = bool(live.get("isConnected"))
-
-    if not telemetry_connected and not game_detected and not is_connected:
-        return False
-
-    if status_text in {"", "stopped", "offline", "disconnected"}:
-        return False
-
-    if cargo in no_job_values and source_city in no_job_values and destination_city in no_job_values and not job_id:
-        return False
-
-    return True
-
-
 def get_active_drivers():
     since = now_utc() - timedelta(minutes=2)
-
     users = users_collection.find({
         "tracker_online": True,
         "tracker_live_updated_at": {"$gte": since}
     }).sort("tracker_live_updated_at", DESCENDING)
-
-    active_drivers = []
-
-    for user in users:
-        if driver_is_really_active(user):
-            active_drivers.append(build_active_driver_payload(user))
-        else:
-            users_collection.update_one(
-                {"_id": user["_id"]},
-                {
-                    "$set": {
-                        "tracker_online": False,
-                        "tracker_current_job": None,
-                        "tracker_current_job_key": "",
-                        "tracker_last_cargo": "-",
-                        "tracker_last_destination": "-",
-                        "tracker_live.cargo": "-",
-                        "tracker_live.sourceCity": "-",
-                        "tracker_live.destinationCity": "-",
-                        "tracker_live.jobId": "",
-                        "tracker_live.statusText": "stopped",
-                        "updated_at": now_utc()
-                    }
-                }
-            )
-
-    return active_drivers
-
-# ==========================================
-# TRACKER ACTIVE DRIVER / LOGBOOK / STATE FIX
-# ==========================================
-
-NO_JOB_VALUES = {"", "-", "Freie Fahrt", "Free Ride", "Free Drive", "Free Roam"}
-
-
-def tracker_live_is_fresh(user_doc, max_age_minutes=2):
-    """
-    Live-Daten gelten nur als frisch, wenn tracker_live_updated_at innerhalb des Zeitfensters liegt.
-    """
-    updated_at = (user_doc or {}).get("tracker_live_updated_at")
-    if not isinstance(updated_at, datetime):
-        return False
-
-    return updated_at >= now_utc() - timedelta(minutes=max_age_minutes)
-
-
-def tracker_live_has_connection(live):
-    """
-    Prüft, ob wirklich eine aktive Verbindung/Game-Telemetrie vorhanden ist.
-    """
-    live = live or {}
-
-    telemetry_connected = bool(live.get("telemetryConnected"))
-    game_detected = bool(live.get("gameProcessDetected"))
-    is_connected = bool(live.get("isConnected"))
-
-    return telemetry_connected or game_detected or is_connected
-
-
-def tracker_live_is_stopped(live):
-    """
-    Erkennt gestoppte/offline Tracker-Zustände.
-    """
-    live = live or {}
-    status_text = safe_str(live.get("statusText")).lower()
-
-    return status_text in {
-        "",
-        "stopped",
-        "offline",
-        "disconnected",
-        "not connected",
-        "not_connected"
-    }
-
-
-def tracker_live_has_real_job(live):
-    """
-    Erkennt, ob die Live-Daten wirklich einen Auftrag enthalten.
-    Freie Fahrt zählt NICHT als Auftrag.
-    """
-    live = live or {}
-
-    source_city = safe_str(live.get("sourceCity"))
-    destination_city = safe_str(live.get("destinationCity"))
-    cargo = safe_str(live.get("cargo"))
-    job_id = safe_str(live.get("jobId"))
-
-    source_empty = source_city in NO_JOB_VALUES
-    destination_empty = destination_city in NO_JOB_VALUES
-    cargo_empty = cargo in NO_JOB_VALUES
-    job_id_empty = job_id in NO_JOB_VALUES
-
-    if source_empty and destination_empty and cargo_empty and job_id_empty:
-        return False
-
-    if cargo_empty and destination_empty and job_id_empty:
-        return False
-
-    return True
-
-
-def driver_is_really_active(user_doc):
-    """
-    Finaler Schutz gegen Ghost-Driver.
-
-    Ein Fahrer ist nur aktiv, wenn:
-    - tracker_online true ist
-    - Live-Daten frisch sind
-    - echte Verbindung/Telemetrie vorhanden ist
-    - statusText nicht stopped/offline ist
-    - kein Freie-Fahrt/Leerzustand vorliegt
-    """
-    user_doc = user_doc or {}
-    live = user_doc.get("tracker_live") or {}
-
-    if not user_doc.get("tracker_online"):
-        return False
-
-    if not tracker_live_is_fresh(user_doc, max_age_minutes=2):
-        return False
-
-    if not tracker_live_has_connection(live):
-        return False
-
-    if tracker_live_is_stopped(live):
-        return False
-
-    if not tracker_live_has_real_job(live):
-        return False
-
-    return True
-
-
-def clear_ghost_driver_state(user_doc):
-    """
-    Bereinigt hängen gebliebene Online-/Live-Zustände in MongoDB.
-    """
-    if not user_doc or not user_doc.get("_id"):
-        return
-
-    now = now_utc()
-
-    users_collection.update_one(
-        {"_id": user_doc["_id"]},
-        {
-            "$set": {
-                "tracker_online": False,
-                "tracker_current_job": None,
-                "tracker_current_job_key": "",
-
-                "tracker_last_cargo": "-",
-                "tracker_last_destination": "-",
-
-                "tracker_live.isConnected": False,
-                "tracker_live.gameProcessDetected": False,
-                "tracker_live.telemetryConnected": False,
-                "tracker_live.statusText": "stopped",
-                "tracker_live.sourceCity": "-",
-                "tracker_live.destinationCity": "-",
-                "tracker_live.cargo": "-",
-                "tracker_live.jobId": "",
-                "tracker_live.eta": "-",
-                "tracker_live.speedKm": 0,
-                "tracker_live.rpm": 0,
-                "tracker_live.fuelPercent": 0,
-                "tracker_live.damagePercent": 0,
-                "tracker_live.completedDistanceKm": 0,
-                "tracker_live.tripDistanceKm": 0,
-                "tracker_live.remainingDistanceKm": 0,
-                "tracker_live.plannedDistanceKm": 0,
-                "tracker_live.routeProgressPercent": 0,
-                "tracker_live.timestampUtc": now.isoformat() + "Z",
-
-                "updated_at": now,
-                "last_activity_at": now
-            }
-        }
-    )
-
-
-def get_active_drivers():
-    """
-    Gibt nur echte aktive Fahrer zurück und räumt Ghost-Driver automatisch auf.
-    Wichtig: Query bewusst nur auf tracker_online=True, damit auch alte hängende User bereinigt werden.
-    """
-    users = users_collection.find({
-        "tracker_online": True
-    }).sort("tracker_live_updated_at", DESCENDING)
-
-    active_drivers = []
-
-    for user_doc in users:
-        if driver_is_really_active(user_doc):
-            active_drivers.append(build_active_driver_payload(user_doc))
-        else:
-            clear_ghost_driver_state(user_doc)
-
-    return active_drivers
-
+    return [build_active_driver_payload(user) for user in users]
 
 def build_logbook_payload(limit=30):
     entries = []
-
     for user_doc in users_collection.find({}):
         for raw_entry in get_user_job_entries(user_doc):
             entries.append(normalize_logbook_entry(raw_entry, user_doc))
@@ -5177,38 +4861,29 @@ def build_logbook_payload(limit=30):
         live = user_doc.get("tracker_live") or {}
         updated_at = user_doc.get("tracker_live_updated_at")
 
-        # Aktive Live-Fahrt nur eintragen, wenn es wirklich eine echte aktive Tour ist.
-        if driver_is_really_active(user_doc):
-            current_job = current_job_from_live(live)
-
-            if current_job:
-                entries.append({
-                    "status": "Aktiv",
-                    "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
-                    "sourceCity": current_job.get("sourceCity", "-"),
-                    "destinationCity": current_job.get("destinationCity", "-"),
-                    "cargo": current_job.get("cargo", "-"),
-                    "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
-                    "income": round(parse_number(live.get("tripDistanceKm"), 0) * TOUR_RECEIPT_RATE_PER_KM),
-                    "driverName": (
-                        user_doc.get("display_name")
-                        or user_doc.get("username")
-                        or user_doc.get("discord_username")
-                        or "EifelLog Fahrer"
-                    ),
-                    "createdAt": datetime_to_iso(updated_at),
-                    "_sortDate": updated_at
-                })
+        if user_doc.get("tracker_online") and isinstance(updated_at, datetime):
+            if updated_at >= now_utc() - timedelta(minutes=2):
+                current_job = current_job_from_live(live)
+                if current_job:
+                    entries.append({
+                        "status": "Aktiv",
+                        "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
+                        "sourceCity": current_job.get("sourceCity", "-"),
+                        "destinationCity": current_job.get("destinationCity", "-"),
+                        "cargo": current_job.get("cargo", "-"),
+                        "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
+                        "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
+                        "driverName": (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"),
+                        "createdAt": datetime_to_iso(updated_at),
+                        "_sortDate": updated_at
+                    })
 
     entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
-
     clean_entries = []
     for entry in entries[:limit]:
         entry.pop("_sortDate", None)
         clean_entries.append(entry)
-
     return clean_entries
-
 
 def build_company_stats_payload():
     # Company-All-Time kommt aus einem eigenen MongoDB-Eintrag
@@ -5216,16 +4891,8 @@ def build_company_stats_payload():
     users = list(users_collection.find({}))
     persistent_stats = get_company_all_time_stats()
 
-    company_km = positive_number(
-        persistent_stats.get("all_time_km")
-        or persistent_stats.get("allTimeKilometers"),
-        0.0
-    )
-    company_income = positive_number(
-        persistent_stats.get("all_time_income")
-        or persistent_stats.get("companyIncome"),
-        0.0
-    )
+    company_km = positive_number(persistent_stats.get("all_time_km") or persistent_stats.get("allTimeKilometers"), 0.0)
+    company_income = positive_number(persistent_stats.get("all_time_income") or persistent_stats.get("companyIncome"), 0.0)
     jobs_all_time = parse_int(persistent_stats.get("jobs_all_time"), 0)
     deliveries = parse_int(persistent_stats.get("deliveries_all_time"), 0)
 
@@ -5234,63 +4901,28 @@ def build_company_stats_payload():
     if company_km <= 0 and company_income <= 0 and jobs_all_time <= 0 and deliveries <= 0:
         for user_doc in users:
             stats = get_profile_stats(user_doc)
-
             company_km += positive_number(stats.get("km"), 0.0)
             company_income += positive_number(stats.get("income") or stats.get("revenue"), 0.0)
             deliveries += parse_int(stats.get("deliveries"), 0)
             jobs_all_time += parse_int(stats.get("jobs"), parse_int(stats.get("deliveries"), 0))
 
-    monthly_kilometers = list(
-        persistent_stats.get("monthly_kilometers")
-        or persistent_stats.get("monthlyKilometers")
-        or []
-    )
-    income_series = list(
-        persistent_stats.get("income_series")
-        or persistent_stats.get("incomeSeries")
-        or []
-    )
-    monthly_labels = list(
-        persistent_stats.get("monthly_labels")
-        or persistent_stats.get("monthlyLabels")
-        or []
-    )
+    monthly_kilometers = list(persistent_stats.get("monthly_kilometers") or persistent_stats.get("monthlyKilometers") or [])
+    income_series = list(persistent_stats.get("income_series") or persistent_stats.get("incomeSeries") or [])
+    monthly_labels = list(persistent_stats.get("monthly_labels") or persistent_stats.get("monthlyLabels") or [])
 
     if len(monthly_kilometers) != 6 or len(income_series) != 6:
         month_keys, monthly_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
-
         for user_doc in users:
             job_entries = get_user_job_entries(user_doc)
-
             for job in job_entries:
-                distance = positive_number(
-                    job.get("distanceKm")
-                    or job.get("completedDistanceKm")
-                    or job.get("distance")
-                    or job.get("tripDistanceKm"),
-                    0
-                )
-                income = positive_number(
-                    job.get("income")
-                    or job.get("revenue")
-                    or job.get("money"),
-                    0
-                )
-                created_at = coerce_receipt_datetime(
-                    job.get("createdAt")
-                    or job.get("created_at")
-                    or job.get("submittedAt")
-                    or job.get("submitted_at"),
-                    fallback=now_utc()
-                )
-
+                distance = positive_number(job.get("distanceKm") or job.get("completedDistanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
+                income = positive_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
+                created_at = coerce_receipt_datetime(job.get("createdAt") or job.get("created_at") or job.get("submittedAt") or job.get("submitted_at"), fallback=now_utc())
                 month_key = created_at.strftime("%Y-%m") if isinstance(created_at, datetime) else month_keys[-1]
-
                 if month_key in month_keys:
                     index = month_keys.index(month_key)
                 else:
                     index = -1
-
                 monthly_kilometers[index] += distance
                 income_series[index] += income
 
@@ -5300,49 +4932,30 @@ def build_company_stats_payload():
         "companyIncome": round(company_income),
         "income": round(company_income),
         "revenue": round(company_income),
-
         "allTimeKilometers": round(company_km, 1),
         "allTimeKm": round(company_km, 1),
         "companyAllTimeKilometers": round(company_km, 1),
         "companyAllTimeKm": round(company_km, 1),
         "kilometers": round(company_km, 1),
-
         "jobsAllTime": jobs_all_time,
         "jobs": jobs_all_time,
         "totalJobs": jobs_all_time,
-
         "deliveries": deliveries,
         "totalDeliveries": deliveries,
-
         "activeDrivers": active_driver_count,
-
-        "monthlyKilometers": [
-            round(parse_number(value, 0), 1)
-            for value in monthly_kilometers
-        ],
-        "incomeSeries": [
-            round(parse_number(value, 0), 2)
-            for value in income_series
-        ],
+        "monthlyKilometers": [round(parse_number(value, 0), 1) for value in monthly_kilometers],
+        "incomeSeries": [round(parse_number(value, 0), 2) for value in income_series],
         "monthlyLabels": monthly_labels,
-
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "updatedAt": datetime_to_iso(persistent_stats.get("updated_at"))
     }
-
 
 def tracker_state_payload(user_doc):
     active_drivers = get_active_drivers()
     company_stats = build_company_stats_payload()
     logbook = build_logbook_payload(limit=30)
-
     live = user_doc.get("tracker_live") or {}
-
-    # CurrentJob nur anzeigen, wenn der eigene User wirklich aktiv ist.
-    if driver_is_really_active(user_doc):
-        current_job = current_job_from_live(live)
-    else:
-        current_job = None
+    current_job = current_job_from_live(live)
 
     return {
         "success": True,
@@ -5354,6 +4967,7 @@ def tracker_state_payload(user_doc):
         "lastDeliveries": logbook,
         "activeDrivers": active_drivers
     }
+
 
 
 def dashboard_number(value, fallback=0.0):
@@ -5383,13 +4997,7 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
             continue
 
         normalized = normalize_logbook_entry(raw_entry, user_doc)
-        created_at_raw = (
-            raw_entry.get("createdAt")
-            or raw_entry.get("created_at")
-            or raw_entry.get("finishedAt")
-            or raw_entry.get("submitted_at")
-            or raw_entry.get("timestamp")
-        )
+        created_at_raw = raw_entry.get("createdAt") or raw_entry.get("created_at") or raw_entry.get("finishedAt") or raw_entry.get("submitted_at") or raw_entry.get("timestamp")
         date_text = "-"
 
         if isinstance(created_at_raw, datetime):
@@ -5407,85 +5015,26 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
                 except Exception:
                     date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
 
-        raw_id = (
-            raw_entry.get("id")
-            or raw_entry.get("trip_id")
-            or raw_entry.get("fahrt_id")
-            or raw_entry.get("auftrag_id")
-            or raw_entry.get("jobId")
-            or raw_entry.get("job_id")
-            or raw_entry.get("deliveryId")
-            or raw_entry.get("receipt_id")
-            or raw_entry.get("_id")
-        )
-        raw_id = safe_str(raw_id)
-
-        departure = safe_str(
-            raw_entry.get("departure")
-            or raw_entry.get("start_time")
-            or raw_entry.get("startedAt")
-            or raw_entry.get("startTime")
-            or raw_entry.get("abfahrt"),
-            "-"
-        )
-        arrival = safe_str(
-            raw_entry.get("arrival")
-            or raw_entry.get("end_time")
-            or raw_entry.get("finishedAt")
-            or raw_entry.get("endTime")
-            or raw_entry.get("ankunft"),
-            "-"
-        )
-
-        entry = {
-            "id": raw_id,
-            "trip_id": raw_id,
+        entries.append({
             "date": date_text,
-            "datum": date_text,
             "route": normalized.get("route") or "-",
             "from_city": normalized.get("sourceCity") or "-",
-            "start": normalized.get("sourceCity") or "-",
-            "origin": normalized.get("sourceCity") or "-",
             "to_city": normalized.get("destinationCity") or "-",
-            "destination": normalized.get("destinationCity") or "-",
-            "ziel": normalized.get("destinationCity") or "-",
             "cargo": normalized.get("cargo") or "-",
-            "fracht": normalized.get("cargo") or "-",
             "distance": round(parse_number(normalized.get("distanceKm"), 0), 1),
-            "km": round(parse_number(normalized.get("distanceKm"), 0), 1),
             "earnings": round(parse_number(normalized.get("income"), 0), 2),
-            "income": round(parse_number(normalized.get("income"), 0), 2),
-            "revenue": round(parse_number(normalized.get("income"), 0), 2),
             "status": normalized.get("status") or "Abgeschlossen",
-            "truck": safe_str(raw_entry.get("truck") or raw_entry.get("lkw") or raw_entry.get("vehicle") or raw_entry.get("fahrzeug"), "-"),
-            "truck_plate": safe_str(raw_entry.get("truck_plate") or raw_entry.get("kennzeichen") or raw_entry.get("plate") or raw_entry.get("lkw_kennzeichen"), "-"),
-            "trailer": safe_str(raw_entry.get("trailer") or raw_entry.get("auflieger") or raw_entry.get("trailer_plate") or raw_entry.get("auflieger_kennzeichen"), "-"),
-            "driver": safe_str(raw_entry.get("driver") or raw_entry.get("fahrer") or normalized.get("driverName"), "-"),
-            "departure": departure,
-            "start_time": departure,
-            "arrival": arrival,
-            "end_time": arrival,
-            "duration": safe_str(raw_entry.get("duration") or raw_entry.get("dauer"), "-"),
-            "fuel_used": safe_str(raw_entry.get("fuel_used") or raw_entry.get("fuel") or raw_entry.get("diesel") or raw_entry.get("verbrauch"), "-"),
-            "avg_speed": safe_str(raw_entry.get("avg_speed") or raw_entry.get("average_speed") or raw_entry.get("durchschnitt"), "-"),
-            "note": safe_str(raw_entry.get("note") or raw_entry.get("notes") or raw_entry.get("bemerkung"), ""),
-            "map_embed_url": safe_str(raw_entry.get("map_embed_url") or raw_entry.get("map_url") or raw_entry.get("route_map_url"), ""),
-            "waypoints": raw_entry.get("waypoints") or raw_entry.get("route_points") or raw_entry.get("zwischenstopps") or [],
             "_sortDate": sort_date
-        }
-        entries.append(entry)
+        })
 
     entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
 
     cleaned = []
-    for index, entry in enumerate(entries[:limit], start=1):
+    for entry in entries[:limit]:
         entry.pop("_sortDate", None)
-        if not entry.get("id"):
-            generated_id = str(index)
-            entry["id"] = generated_id
-            entry["trip_id"] = generated_id
         cleaned.append(entry)
     return cleaned
+
 
 def get_driver_current_trip_for_dashboard(user_doc):
     user_doc = user_doc or {}
@@ -7341,22 +6890,12 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
                 "tracker_all_time_jobs": new_jobs,
                 "tracker_all_time_updated_at": now,
 
-                # Wichtig für Dashboard/Buchhaltung/Listen:
-                # Beim Tourabschluss muss das User-Dokument frisch werden.
-                "updated_at": now,
-                "last_activity_at": now,
-
                 # Last-Trip bleibt separat und überschreibt nicht mehr All-Time
                 "tracker_last_completed_distance_km": distance,
                 "tracker_last_trip_distance_km": distance,
                 "tracker_online": False,
                 "tracker_current_job": None,
                 "tracker_current_job_key": "",
-                "tracker_live": tracker_completed_live_state(
-                    now=now,
-                    game=(user_doc.get("tracker_live") or {}).get("game") or "ETS2/ATS"
-                ),
-                "tracker_live_updated_at": now,
                 "tracker_active_tour_start_embed_sent": False,
                 "tracker_active_tour_start_embed_sent_key": "",
                 "tracker_active_tour_start_embed_reset_at": now,
@@ -7812,33 +7351,18 @@ def reset_active_tour_start_embed_state(user_doc, reason="tour_inactive"):
     if not user_doc.get("_id"):
         return
 
-    now = now_utc()
-    reason_text = safe_str(reason, "tour_inactive")
-    set_payload = {
-        "tracker_active_tour_start_embed_sent": False,
-        "tracker_active_tour_start_embed_sent_key": "",
-        "tracker_active_tour_start_embed_reset_at": now,
-        "tracker_active_tour_start_embed_reset_reason": reason_text,
-        "updated_at": now,
-        "last_activity_at": now,
-    }
-
-    if reason_text.startswith("tour_completed"):
-        set_payload.update({
-            "tracker_online": False,
-            "tracker_current_job": None,
-            "tracker_current_job_key": "",
-            "tracker_live": tracker_completed_live_state(
-                now=now,
-                game=(user_doc.get("tracker_live") or {}).get("game") or "ETS2/ATS"
-            ),
-            "tracker_live_updated_at": now,
-        })
-
     users_collection.update_one(
         {"_id": user_doc["_id"]},
-        {"$set": set_payload},
+        {
+            "$set": {
+                "tracker_active_tour_start_embed_sent": False,
+                "tracker_active_tour_start_embed_sent_key": "",
+                "tracker_active_tour_start_embed_reset_at": now_utc(),
+                "tracker_active_tour_start_embed_reset_reason": safe_str(reason, "tour_inactive"),
+            }
+        },
     )
+
 
 def unwrap_tracker_webhook_payload(data):
     data = data or {}
@@ -8962,13 +8486,10 @@ def tracker_telemetry_live():
 
     is_online = bool(telemetry.get("isConnected") or telemetry.get("gameProcessDetected") or telemetry.get("telemetryConnected"))
     previous_job_key = safe_str(user_doc.get("tracker_current_job_key"))
-    now = now_utc()
 
     update_payload = {
         "tracker_live": telemetry,
-        "tracker_live_updated_at": now,
-        "updated_at": now,
-        "last_activity_at": now,
+        "tracker_live_updated_at": now_utc(),
         "tracker_online": is_online,
         "tracker_last_game": telemetry.get("game"),
         "tracker_last_truck": telemetry.get("truck"),
@@ -9357,7 +8878,7 @@ def tracker_logout():
     if client_token:
         users_collection.update_one(
             {"tracker_client_token_hash": hash_secret(client_token)},
-            {"$unset": {"tracker_client_token_hash": ""}, "$set": {"tracker_logged_out_at": now_utc(), "tracker_online": False, "updated_at": now_utc(), "last_activity_at": now_utc()}}
+            {"$unset": {"tracker_client_token_hash": ""}, "$set": {"tracker_logged_out_at": now_utc(), "tracker_online": False}}
         )
 
     return jsonify({"success": True, "message": "Tracker lokal abgemeldet."})
@@ -9501,468 +9022,6 @@ def profile(username):
 # DRIVER HUB & DASHBOARD
 # ==========================================
 
-
-DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
-
-{#
-    Detailansicht Fahrtenbuch
-    URL: /dashboard/detail
-    Erwartete Backend-Variablen optional:
-    - fahrtenbuch_entries oder driver_trips
-    - detail_trip / selected_trip / driver_trip_detail / fahrt_detail für direkte Auswahl
-    - optional query param: ?trip_id=<id>
-#}
-
-{% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
-{% set explicit_trip = detail_trip|default(selected_trip|default(driver_trip_detail|default(fahrt_detail|default({}, true), true), true), true) %}
-{% set detail_query_id = request.args.get('trip_id', '') if request is defined else '' %}
-
-{% if not explicit_trip and safe_fahrtenbuch_entries %}
-    {% set explicit_trip = safe_fahrtenbuch_entries[0] %}
-{% endif %}
-
-{% set selected = namespace(trip=explicit_trip) %}
-{% if detail_query_id and safe_fahrtenbuch_entries %}
-    {% for item in safe_fahrtenbuch_entries %}
-        {% set item_id = item.id|default(item.trip_id|default(item.fahrt_id|default(item.auftrag_id|default(loop.index, true), true), true), true) %}
-        {% if item_id|string == detail_query_id|string %}
-            {% set selected.trip = item %}
-        {% endif %}
-    {% endfor %}
-{% endif %}
-
-{% set trip = selected.trip|default({}, true) %}
-
-{% set trip_id = trip.id|default(trip.trip_id|default(trip.fahrt_id|default(trip.auftrag_id|default(detail_query_id|default('-', true), true), true), true), true) %}
-{% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
-{% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default(trip.start_city|default('-', true), true), true), true) %}
-{% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default(trip.ziel|default(trip.target_city|default('-', true), true), true), true), true) %}
-{% set trip_route = trip.route|default(trip_from ~ ' → ' ~ trip_to, true) %}
-{% set trip_distance = trip.distance|default(trip.km|default(trip.last_trip_distance|default(0, true), true), true) %}
-{% set trip_cargo = trip.cargo|default(trip.freight|default(trip.fracht|default('-', true), true), true) %}
-{% set trip_earnings = trip.earnings|default(trip.income|default(trip.revenue|default(trip.einnahmen|default(0, true), true), true), true) %}
-{% set trip_status = trip.status|default('Abgeschlossen', true) %}
-{% set trip_status_lc = trip_status|lower %}
-{% set trip_truck = trip.truck|default(trip.lkw|default(trip.vehicle|default(trip.fahrzeug|default('-', true), true), true), true) %}
-{% set trip_truck_plate = trip.truck_plate|default(trip.kennzeichen|default(trip.plate|default(trip.lkw_kennzeichen|default('-', true), true), true), true) %}
-{% set trip_trailer = trip.trailer|default(trip.auflieger|default(trip.trailer_plate|default(trip.auflieger_kennzeichen|default('-', true), true), true), true) %}
-{% set trip_driver = trip.driver|default(trip.fahrer|default(current_user.username|default('-', true), true), true) %}
-{% set trip_departure = trip.departure|default(trip.start_time|default(trip.abfahrt|default('-', true), true), true) %}
-{% set trip_arrival = trip.arrival|default(trip.end_time|default(trip.ankunft|default('-', true), true), true) %}
-{% set trip_duration = trip.duration|default(trip.dauer|default('-', true), true) %}
-{% set trip_fuel = trip.fuel_used|default(trip.fuel|default(trip.diesel|default(trip.verbrauch|default('-', true), true), true), true) %}
-{% set trip_avg_speed = trip.avg_speed|default(trip.average_speed|default(trip.durchschnitt|default('-', true), true), true) %}
-{% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
-{% set trip_map_embed_url = trip.map_embed_url|default(trip.map_url|default(trip.route_map_url|default('', true), true), true) %}
-{% set trip_waypoints = trip.waypoints|default(trip.route_points|default(trip.zwischenstopps|default([], true), true), true) %}
-
-{% block title %}EifelLog - Fahrtenbuch Detail{% endblock %}
-
-{% block content %}
-<style>
-    .detail-shell {
-        width: 100%;
-        max-width: 100%;
-        margin-inline: auto;
-    }
-
-    .detail-shell,
-    .detail-shell * {
-        box-sizing: border-box;
-    }
-
-    .detail-card {
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background:
-            radial-gradient(circle at 10% 0%, rgba(137, 190, 50, 0.11), transparent 34%),
-            radial-gradient(circle at 92% 10%, rgba(220, 226, 38, 0.08), transparent 36%),
-            rgba(8, 10, 8, 0.74);
-        border-radius: 1.5rem;
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(18px);
-    }
-
-    .detail-map {
-        min-height: 360px;
-        border-radius: 1.35rem;
-        border: 1px solid rgba(137, 190, 50, 0.18);
-        background:
-            linear-gradient(135deg, rgba(137, 190, 50, 0.08), transparent 38%),
-            radial-gradient(circle at 70% 35%, rgba(220, 226, 38, 0.08), transparent 28%),
-            rgba(0, 0, 0, 0.36);
-        overflow: hidden;
-        position: relative;
-    }
-
-    .detail-map-grid {
-        position: absolute;
-        inset: 0;
-        opacity: 0.14;
-        background-image:
-            linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
-        background-size: 32px 32px;
-        mask-image: radial-gradient(circle at center, black, transparent 75%);
-    }
-
-    .route-svg {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0.95;
-    }
-
-    .route-stop {
-        position: absolute;
-        transform: translate(-50%, -50%);
-        z-index: 5;
-        min-width: 9rem;
-        max-width: 12rem;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.68);
-        padding: 0.8rem;
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-        backdrop-filter: blur(12px);
-    }
-
-    .route-stop.start {
-        left: 18%;
-        top: 72%;
-        border-color: rgba(137, 190, 50, 0.38);
-    }
-
-    .route-stop.end {
-        left: 80%;
-        top: 27%;
-        border-color: rgba(220, 226, 38, 0.38);
-    }
-
-    .detail-stat {
-        border-radius: 1.1rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.045);
-        padding: 1rem;
-    }
-
-    .detail-stat-label {
-        display: block;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.62rem;
-        font-weight: 700;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin-bottom: 0.4rem;
-    }
-
-    .detail-stat-value {
-        display: block;
-        color: rgba(255, 255, 255, 0.94);
-        font-size: 0.95rem;
-        line-height: 1.35;
-        word-break: break-word;
-    }
-
-    .route-timeline {
-        position: relative;
-        display: grid;
-        gap: 0.9rem;
-    }
-
-    .route-timeline::before {
-        content: "";
-        position: absolute;
-        top: 1rem;
-        bottom: 1rem;
-        left: 0.62rem;
-        width: 2px;
-        background: linear-gradient(180deg, var(--brand-green), rgba(255,255,255,0.15), var(--brand-yellow));
-    }
-
-    .route-timeline-item {
-        position: relative;
-        display: grid;
-        grid-template-columns: 1.35rem minmax(0, 1fr);
-        gap: 0.75rem;
-        align-items: start;
-    }
-
-    .route-timeline-dot {
-        position: relative;
-        z-index: 2;
-        width: 1.35rem;
-        height: 1.35rem;
-        border-radius: 9999px;
-        border: 1px solid rgba(255,255,255,0.14);
-        background: rgba(0,0,0,0.86);
-        box-shadow: 0 0 18px rgba(137, 190, 50, 0.12);
-    }
-
-    .route-timeline-dot.start {
-        border-color: rgba(137, 190, 50, 0.65);
-    }
-
-    .route-timeline-dot.end {
-        border-color: rgba(220, 226, 38, 0.65);
-        box-shadow: 0 0 18px rgba(220, 226, 38, 0.12);
-    }
-
-    .trip-list-item[aria-current="true"] {
-        border-color: rgba(137, 190, 50, 0.55);
-        background: rgba(137, 190, 50, 0.10);
-    }
-
-    @media (max-width: 768px) {
-        .detail-map {
-            min-height: 300px;
-        }
-
-        .route-stop {
-            min-width: 7.5rem;
-            max-width: 9.5rem;
-            padding: 0.7rem;
-        }
-
-        .route-stop.start {
-            left: 25%;
-            top: 74%;
-        }
-
-        .route-stop.end {
-            left: 72%;
-            top: 24%;
-        }
-    }
-</style>
-
-<div class="detail-shell">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Fahrtenbuch Detail</span>
-            <h1 class="font-orbitron font-bold text-2xl md:text-3xl text-white mt-2">Gefahrene Route & LKW-Daten</h1>
-            <p class="text-sm text-[var(--muted)] font-inter mt-2">Route, Fahrzeug, Fracht, Zeiten und Abrechnung der ausgewählten Fahrt.</p>
-        </div>
-
-        <a href="/dashboard"
-           class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
-            Zurück zum Dashboard
-        </a>
-    </div>
-
-    {% if trip %}
-    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] gap-6">
-        <div class="flex flex-col gap-6">
-            <div class="detail-card p-5 md:p-6">
-                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
-                    <div>
-                        <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">Ausgewählte Fahrt</span>
-                        <h2 class="font-orbitron font-bold text-xl md:text-2xl text-white mt-2">{{ trip_route }}</h2>
-                        <p class="text-sm text-[var(--muted)] font-inter mt-2">{{ trip_date }}{% if trip_departure != '-' %} • Abfahrt {{ trip_departure }}{% endif %}</p>
-                    </div>
-
-                    <span class="inline-flex items-center justify-center px-3 py-1.5 rounded-full border text-[10px] font-orbitron uppercase tracking-widest
-                        {% if trip_status_lc in ['abgeschlossen', 'completed', 'bezahlt', 'paid'] %}
-                            text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25
-                        {% elif trip_status_lc in ['offen', 'pending', 'aktiv', 'in arbeit'] %}
-                            text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25
-                        {% elif trip_status_lc in ['abgebrochen', 'cancelled', 'storniert'] %}
-                            text-[var(--danger)] bg-[var(--danger)]/10 border-[var(--danger)]/25
-                        {% else %}
-                            text-white/70 bg-white/5 border-white/10
-                        {% endif %}">
-                        {{ trip_status }}
-                    </span>
-                </div>
-
-                <div class="detail-map">
-                    {% if trip_map_embed_url %}
-                        <iframe src="{{ trip_map_embed_url }}" class="absolute inset-0 w-full h-full border-0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Gefahrene Route"></iframe>
-                    {% else %}
-                        <div class="detail-map-grid"></div>
-                        <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="5" stroke-linecap="round"></path>
-                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="url(#routeGradient)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 2"></path>
-                            <defs>
-                                <linearGradient id="routeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="rgb(137,190,50)"></stop>
-                                    <stop offset="100%" stop-color="rgb(220,226,38)"></stop>
-                                </linearGradient>
-                            </defs>
-                        </svg>
-
-                        <div class="route-stop start">
-                            <span class="block text-[9px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">Start</span>
-                            <strong class="block text-white text-sm mt-1">{{ trip_from }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_departure }}</span>
-                        </div>
-
-                        <div class="route-stop end">
-                            <span class="block text-[9px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest">Ziel</span>
-                            <strong class="block text-white text-sm mt-1">{{ trip_to }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_arrival }}</span>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="detail-card p-5 md:p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Gefahrene Route</h2>
-                <div class="route-timeline">
-                    <div class="route-timeline-item">
-                        <span class="route-timeline-dot start"></span>
-                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
-                            <span class="block text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">Start</span>
-                            <strong class="block text-white mt-1">{{ trip_from }}</strong>
-                            <span class="block text-xs text-[var(--muted)] mt-1">Abfahrt: {{ trip_departure }}</span>
-                        </div>
-                    </div>
-
-                    {% if trip_waypoints and trip_waypoints is not string %}
-                        {% for waypoint in trip_waypoints %}
-                        <div class="route-timeline-item">
-                            <span class="route-timeline-dot"></span>
-                            <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
-                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkt</span>
-                                <strong class="block text-white mt-1">{{ waypoint.name|default(waypoint.city|default(waypoint, true), true) }}</strong>
-                                {% if waypoint.time|default('', true) %}
-                                    <span class="block text-xs text-[var(--muted)] mt-1">{{ waypoint.time }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% elif trip_waypoints %}
-                        <div class="route-timeline-item">
-                            <span class="route-timeline-dot"></span>
-                            <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
-                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkte</span>
-                                <strong class="block text-white mt-1">{{ trip_waypoints }}</strong>
-                            </div>
-                        </div>
-                    {% endif %}
-
-                    <div class="route-timeline-item">
-                        <span class="route-timeline-dot end"></span>
-                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
-                            <span class="block text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest">Ziel</span>
-                            <strong class="block text-white mt-1">{{ trip_to }}</strong>
-                            <span class="block text-xs text-[var(--muted)] mt-1">Ankunft: {{ trip_arrival }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {% if trip_note %}
-            <div class="detail-card p-5 md:p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-3">Notiz zur Fahrt</h2>
-                <p class="text-sm text-gray-300 font-inter leading-relaxed">{{ trip_note }}</p>
-            </div>
-            {% endif %}
-        </div>
-
-        <aside class="flex flex-col gap-6">
-            <div class="detail-card p-5 md:p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Fahrt-Daten</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Fahrt-ID</span>
-                        <span class="detail-stat-value">{{ trip_id }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Datum</span>
-                        <span class="detail-stat-value">{{ trip_date }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Kilometer</span>
-                        <span class="detail-stat-value">{{ ('%.1f'|format(trip_distance|float))|replace('.', ',') }} km</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Einnahmen</span>
-                        <span class="detail-stat-value">{{ ('%.2f'|format(trip_earnings|float))|replace('.', ',') }} €</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Fracht</span>
-                        <span class="detail-stat-value">{{ trip_cargo }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Dauer</span>
-                        <span class="detail-stat-value">{{ trip_duration }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="detail-card p-5 md:p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">LKW & Fahrer</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">LKW</span>
-                        <span class="detail-stat-value">{{ trip_truck }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Kennzeichen</span>
-                        <span class="detail-stat-value">{{ trip_truck_plate }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Auflieger</span>
-                        <span class="detail-stat-value">{{ trip_trailer }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Fahrer</span>
-                        <span class="detail-stat-value">{{ trip_driver }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Verbrauch</span>
-                        <span class="detail-stat-value">{{ trip_fuel }}</span>
-                    </div>
-                    <div class="detail-stat">
-                        <span class="detail-stat-label">Ø Geschwindigkeit</span>
-                        <span class="detail-stat-value">{{ trip_avg_speed }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="detail-card p-5 md:p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Weitere Fahrten</h2>
-                <div class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                    {% if safe_fahrtenbuch_entries %}
-                        {% for item in safe_fahrtenbuch_entries %}
-                            {% set item_id = item.id|default(item.trip_id|default(item.fahrt_id|default(item.auftrag_id|default(loop.index, true), true), true), true) %}
-                            {% set item_date = item.date|default(item.datum|default('-', true), true) %}
-                            {% set item_from = item.from_city|default(item.start|default(item.origin|default(item.start_city|default('-', true), true), true), true) %}
-                            {% set item_to = item.to_city|default(item.destination|default(item.target|default(item.ziel|default(item.target_city|default('-', true), true), true), true), true) %}
-                            {% set item_route = item.route|default(item_from ~ ' → ' ~ item_to, true) %}
-                            {% set item_distance = item.distance|default(item.km|default(item.last_trip_distance|default(0, true), true), true) %}
-
-                            <a href="/dashboard/detail?trip_id={{ item_id|string|urlencode }}"
-                               aria-current="{{ 'true' if item_id|string == trip_id|string else 'false' }}"
-                               class="trip-list-item block rounded-2xl border border-white/10 bg-white/[0.035] hover:border-[var(--brand-green)]/45 hover:bg-[var(--brand-green)]/[0.07] transition-all p-4">
-                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">{{ item_date }}</span>
-                                <strong class="block text-sm text-white mt-1">{{ item_route }}</strong>
-                                <span class="block text-xs text-[var(--brand-green)] mt-2">{{ ('%.1f'|format(item_distance|float))|replace('.', ',') }} km</span>
-                            </a>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-sm text-white/50 font-inter">Keine weiteren Fahrten vorhanden.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </aside>
-    </div>
-    {% else %}
-    <div class="detail-card p-8 text-center">
-        <h2 class="font-orbitron font-bold text-xl text-white">Keine Fahrt gefunden</h2>
-        <p class="text-sm text-[var(--muted)] font-inter mt-3">Es gibt noch keinen Eintrag im Fahrtenbuch oder die übergebene Fahrt-ID wurde nicht gefunden.</p>
-        <a href="/dashboard"
-           class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
-            Zurück zum Dashboard
-        </a>
-    </div>
-    {% endif %}
-</div>
-{% endblock %}
-'''
-
 @app.route("/hub")
 def hub():
     if "user" in session: return redirect(url_for("dashboard"))
@@ -10024,60 +9083,6 @@ def dashboard():
         user_documents=user_documents,
         **registration_context,
         **driver_dashboard_context
-    )
-
-
-@app.route("/dashboard/detail")
-def dashboard_detail():
-    if "user" not in session:
-        flash("Bitte logge dich zuerst ein.", "error")
-        return redirect(url_for("hub"))
-
-    user = session["user"]
-    user_roles = user.get("roles", [])
-
-    if not has_dashboard_permission(user_roles):
-        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen.", "error")
-        return redirect(url_for("home"))
-
-    db_user = users_collection.find_one({"discord_id": str(user["id"])})
-    if not db_user:
-        db_user = {
-            "discord_id": str(user["id"]),
-            "username": user.get("username"),
-            "discord_username": user.get("discord_username"),
-            "display_name": user.get("username"),
-            "avatar": user.get("avatar"),
-            "roles": user_roles
-        }
-
-    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(db_user, limit=50)
-    detail_query_id = safe_str(request.args.get("trip_id"))
-    selected_trip = {}
-
-    if fahrtenbuch_entries:
-        selected_trip = fahrtenbuch_entries[0]
-        if detail_query_id:
-            for index, item in enumerate(fahrtenbuch_entries, start=1):
-                item_id = safe_str(
-                    item.get("id")
-                    or item.get("trip_id")
-                    or item.get("fahrt_id")
-                    or item.get("auftrag_id")
-                    or index
-                )
-                if item_id == detail_query_id:
-                    selected_trip = item
-                    break
-
-    return render_template_string(
-        DASHBOARD_DETAIL_TEMPLATE,
-        current_user=user,
-        primary_role_name=get_primary_role_name(user_roles),
-        fahrtenbuch_entries=fahrtenbuch_entries,
-        driver_trips=fahrtenbuch_entries,
-        selected_trip=selected_trip,
-        detail_trip=selected_trip
     )
 
 
