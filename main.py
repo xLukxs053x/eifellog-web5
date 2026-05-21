@@ -4926,13 +4926,73 @@ def build_active_driver_payload(user_doc):
         "lastSeen": datetime_to_iso(user_doc.get("tracker_live_updated_at"))
     }
 
+def driver_is_really_active(user_doc):
+    """
+    Verhindert Ghost-Online-Fahrer.
+    Ein Fahrer gilt nur als aktiv, wenn die Live-Daten frisch sind UND
+    wirklich Telemetrie/Game verbunden ist.
+    """
+    user_doc = user_doc or {}
+    live = user_doc.get("tracker_live") or {}
+
+    no_job_values = {"", "-", "Freie Fahrt", "Free Ride", "Free Drive", "Free Roam"}
+
+    status_text = safe_str(live.get("statusText")).lower()
+    cargo = safe_str(live.get("cargo"))
+    source_city = safe_str(live.get("sourceCity"))
+    destination_city = safe_str(live.get("destinationCity"))
+    job_id = safe_str(live.get("jobId"))
+
+    telemetry_connected = bool(live.get("telemetryConnected"))
+    game_detected = bool(live.get("gameProcessDetected"))
+    is_connected = bool(live.get("isConnected"))
+
+    if not telemetry_connected and not game_detected and not is_connected:
+        return False
+
+    if status_text in {"", "stopped", "offline", "disconnected"}:
+        return False
+
+    if cargo in no_job_values and source_city in no_job_values and destination_city in no_job_values and not job_id:
+        return False
+
+    return True
+
+
 def get_active_drivers():
     since = now_utc() - timedelta(minutes=2)
+
     users = users_collection.find({
         "tracker_online": True,
         "tracker_live_updated_at": {"$gte": since}
     }).sort("tracker_live_updated_at", DESCENDING)
-    return [build_active_driver_payload(user) for user in users]
+
+    active_drivers = []
+
+    for user in users:
+        if driver_is_really_active(user):
+            active_drivers.append(build_active_driver_payload(user))
+        else:
+            users_collection.update_one(
+                {"_id": user["_id"]},
+                {
+                    "$set": {
+                        "tracker_online": False,
+                        "tracker_current_job": None,
+                        "tracker_current_job_key": "",
+                        "tracker_last_cargo": "-",
+                        "tracker_last_destination": "-",
+                        "tracker_live.cargo": "-",
+                        "tracker_live.sourceCity": "-",
+                        "tracker_live.destinationCity": "-",
+                        "tracker_live.jobId": "",
+                        "tracker_live.statusText": "stopped",
+                        "updated_at": now_utc()
+                    }
+                }
+            )
+
+    return active_drivers
 
 def build_logbook_payload(limit=30):
     entries = []
