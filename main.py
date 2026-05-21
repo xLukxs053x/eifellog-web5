@@ -6669,8 +6669,51 @@ def complete_tracker_tour_from_request():
 
     data = request.get_json(silent=True) or {}
     client_token = get_client_token_from_request(data)
+
+    # Verbindung zur WPF/C#-App:
+    # /api/tracker/job/complete, /api/tracker/jobs/complete und /api/tracker/tour/submit
+    # akzeptieren zusätzlich webhookartige Abschluss-Payloads ohne clientToken.
+    # Dadurch kann die C#-App beim Job-Ende direkt an main.py senden; main.py erzeugt
+    # dann den PDF-Beleg, speichert ihn, markiert die Tour als abgeschlossen und hängt
+    # die PDF an die Discord-Meldung.
     if not client_token:
-        return jsonify({"success": False, "error": "ClientToken fehlt."}), 401
+        payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
+        payload.setdefault("event", "tour_completed")
+        payload.setdefault("status", "completed")
+        payload.setdefault("jobFinished", True)
+        payload.setdefault("jobDelivered", True)
+        payload.setdefault("jobCompleted", True)
+        payload.setdefault("completed", True)
+        payload.setdefault("delivered", True)
+        payload.setdefault("jobActive", False)
+        payload.setdefault("hasJob", False)
+
+        database_result = store_tracker_webhook_completed_job(payload)
+        discord_result = database_result.get("discord") or {}
+        success = bool(database_result.get("stored")) or bool(database_result.get("alreadyStored")) or bool(discord_result.get("sent"))
+        status_code = 200 if success else 400
+        if "Kein Fahrer/User" in safe_str(database_result.get("reason")):
+            status_code = 404
+
+        return jsonify({
+            "success": success,
+            "message": "Tour wurde per Webhook abgeschlossen; PDF-Beleg wurde verarbeitet." if success else "Tour-Abschluss konnte nicht verarbeitet werden.",
+            "event": "tour_completed",
+            "submitted": success,
+            "completed": success,
+            "billingRelevant": True,
+            "database": database_result,
+            "discord": discord_result,
+            "receipt": {
+                "receiptId": database_result.get("receiptId"),
+                "receiptNumber": database_result.get("receiptNumber"),
+                "jobId": database_result.get("jobId"),
+                "driverName": database_result.get("driverName"),
+                "distanceKm": database_result.get("distanceKm"),
+                "pdf": database_result.get("pdf"),
+                "discord": discord_result,
+            }
+        }), status_code
 
     user_doc = find_tracker_user_by_client_token(client_token)
     if not user_doc:
@@ -8371,6 +8414,41 @@ def tracker_jobs_start():
         })
 
     data = request.get_json(silent=True) or {}
+
+    # Verbindung zur WPF/C#-App:
+    # Der normale Tracker-Start kommt mit clientToken. Falls der C#-Webhook aber
+    # ohne Token auf /api/tracker/jobs/start postet, behandeln wir den Request
+    # als Tour-Start-Webhook und schicken den Discord-Start-Embed serverseitig
+    # dedupliziert über dieselbe MongoDB-Logik wie /webhook.
+    if not get_client_token_from_request(data):
+        payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
+        payload.setdefault("event", "tour_started")
+        payload.setdefault("status", "started")
+        payload.setdefault("jobActive", True)
+        payload.setdefault("hasJob", True)
+
+        start_result = store_tracker_webhook_start_job(payload, raw_data=data)
+        success = bool(start_result.get("sent")) or bool(start_result.get("skipped")) or bool(start_result.get("jobStartKey"))
+        status_code = 200 if success else 400
+        if "Kein Fahrer/User" in safe_str(start_result.get("reason")):
+            status_code = 404
+        if "Kein stabiler Tour-Key" in safe_str(start_result.get("reason")):
+            status_code = 422
+
+        return jsonify({
+            "success": success,
+            "message": "Tour-Start wurde per Webhook verarbeitet." if success else "Tour-Start konnte nicht verarbeitet werden.",
+            "event": "tour_started",
+            "jobStart": {
+                "jobId": start_result.get("jobId"),
+                "jobStartKey": start_result.get("jobStartKey"),
+                "status": "started",
+                "webhookMode": True,
+            },
+            "tourStartDiscord": start_result.get("discord") or start_result,
+            "webhook": start_result,
+        }), status_code
+
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
     if error_response:
         return error_response
@@ -8498,11 +8576,13 @@ def tracker_jobs_start():
 
 
 @app.route("/api/tracker/tour/submit", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/tour/complete", methods=["GET", "POST", "OPTIONS"])
 def tracker_tour_submit():
     return complete_tracker_tour_from_request()
 
 
 @app.route("/api/tracker/job/complete", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/jobs/complete", methods=["GET", "POST", "OPTIONS"])
 def tracker_job_complete():
     return complete_tracker_tour_from_request()
 
