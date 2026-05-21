@@ -6077,6 +6077,95 @@ def build_receipt_public_url(file_path):
     return base.rstrip("/") + "/" + filename
 
 
+
+def tour_receipt_filename_part(value, fallback="beleg", max_length=64):
+    value = safe_str(value, fallback)
+    value = value.replace("@", "")
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._-")
+    return (value or fallback)[:max_length]
+
+
+def tour_receipt_driver_username(receipt_doc):
+    driver = (receipt_doc or {}).get("driver") or {}
+    username = safe_str(
+        driver.get("username")
+        or driver.get("discord_username")
+        or driver.get("name"),
+        "fahrer"
+    )
+    username = username.lstrip("@")
+    return f"@{username}" if username else "@fahrer"
+
+
+def format_receipt_datetime(value):
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M UTC")
+    value = safe_str(value)
+    if not value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        return parsed.strftime("%d.%m.%Y %H:%M UTC")
+    except Exception:
+        return value
+
+
+def build_accounting_relevant_receipt_sections(receipt_doc):
+    """Nur die fachlich relevanten Daten fuer Buchhaltung / Abrechnung."""
+    receipt_doc = receipt_doc or {}
+    driver = receipt_doc.get("driver") or {}
+    tour = receipt_doc.get("tour") or {}
+    billing = receipt_doc.get("billing") or {}
+    submitted_at = receipt_doc.get("submitted_at") or receipt_doc.get("created_at") or now_utc()
+
+    route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
+    currency = safe_str(billing.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
+    penalty = parse_number(billing.get("penalty"), 0)
+    bonus = parse_number(billing.get("bonus"), 0)
+
+    accounting_rows = [
+        ("Belegart", "Tourbeleg / Abrechnungsbeleg"),
+        ("Belegnummer", receipt_doc.get("receipt_number")),
+        ("Job-ID", receipt_doc.get("job_id")),
+        ("Status", "Abgeschlossen / abgegeben"),
+        ("Buchhaltungsstatus", "Abrechnungsrelevant"),
+        ("Erstellt am", format_receipt_datetime(submitted_at)),
+    ]
+
+    driver_rows = [
+        ("Fahrer", driver.get("name")),
+        ("Username", tour_receipt_driver_username(receipt_doc)),
+        ("Discord-ID", driver.get("discord_id")),
+        ("Fahrerkarte-ID", driver.get("fahrerkarte_id") or "-"),
+    ]
+
+    tour_rows = [
+        ("Route", route),
+        ("Fracht", tour.get("cargo") or "-"),
+        ("Gefahrene Strecke", format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))),
+    ]
+
+    billing_rows = [
+        ("Satz pro KM", format_money(billing.get("rate_per_km"), currency)),
+        ("Grundbetrag", format_money(billing.get("base_amount"), currency)),
+    ]
+    if bonus:
+        billing_rows.append(("Bonus", format_money(bonus, currency)))
+    if penalty:
+        billing_rows.append(("Abzug", format_money(penalty, currency)))
+    billing_rows.extend([
+        ("Gesamtbetrag", format_money(billing.get("total_amount"), currency)),
+        ("Währung", currency),
+    ])
+
+    return [
+        ("Beleg", accounting_rows),
+        ("Fahrer", driver_rows),
+        ("Tour", tour_rows),
+        ("Abrechnung", billing_rows),
+    ]
+
+
 def save_tour_receipt_pdf(receipt_doc):
     submitted_at = receipt_doc.get("submitted_at") or now_utc()
     if not isinstance(submitted_at, datetime):
@@ -6086,75 +6175,245 @@ def save_tour_receipt_pdf(receipt_doc):
     target_folder = os.path.join(TOUR_RECEIPT_FOLDER, month_folder)
     os.makedirs(target_folder, exist_ok=True)
 
-    safe_driver = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(receipt_doc.get("driver", {}).get("name"), "fahrer"))[:60]
-    safe_job = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(receipt_doc.get("job_id"), "job"))[:60]
-    filename = f"EifelLog_Beleg_{receipt_doc['receipt_number']}_{safe_driver}_{safe_job}.pdf"
+    driver_username = tour_receipt_driver_username(receipt_doc)
+    safe_driver = tour_receipt_filename_part(driver_username, "fahrer")
+    safe_job = tour_receipt_filename_part(receipt_doc.get("job_id"), "job")
+    safe_receipt = tour_receipt_filename_part(receipt_doc.get("receipt_number"), "beleg")
+    filename = f"EifelLog_Tourbeleg_{safe_driver}_{safe_job}_{safe_receipt}.pdf"
     file_path = os.path.join(target_folder, filename)
 
-    sections = []
+    sections = build_accounting_relevant_receipt_sections(receipt_doc)
 
-    sections.append(("Status", [
-        ("Status", "Abgegeben / Abgeschlossen"),
-        ("Abrechnung", "Ja, abrechnungsrelevant"),
-        ("Belegnummer", receipt_doc.get("receipt_number")),
-        ("Job-ID", receipt_doc.get("job_id")),
-        ("Eingereicht UTC", submitted_at.isoformat() + "Z"),
-    ]))
+    try:
+        from html import escape
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-    driver = receipt_doc.get("driver") or {}
-    sections.append(("Fahrer", [
-        ("Name", driver.get("name")),
-        ("Username", driver.get("username")),
-        ("Discord-ID", driver.get("discord_id")),
-        ("Rolle", driver.get("role")),
-        ("Fahrerkarte-ID", driver.get("fahrerkarte_id")),
-    ]))
+        def clean(value, fallback="-"):
+            value = safe_str(value, fallback)
+            if not value:
+                value = fallback
+            return escape(value)
 
-    tour = receipt_doc.get("tour") or {}
-    sections.append(("Tourdaten", [
-        ("Spiel", tour.get("game")),
-        ("Truck", tour.get("truck")),
-        ("Start", tour.get("source_city")),
-        ("Ziel", tour.get("destination_city")),
-        ("Fracht", tour.get("cargo")),
-        ("Kraftstoff", format_fuel_display_from_payload(tour)),
-        ("ETA", tour.get("eta")),
-        ("RPM", str(parse_int(tour.get("rpm"), 0))),
-        ("Geplante Distanz", format_km(tour.get("planned_distance_km"))),
-        ("Gefahrene Distanz", format_km(tour.get("driven_distance_km"))),
-        ("Restdistanz", format_km(tour.get("remaining_distance_km"))),
-        ("Fortschritt", format_percent(tour.get("route_progress_percent"))),
-        ("Schaden", format_percent(tour.get("damage_percent"))),
-    ]))
+        def money_value():
+            billing = receipt_doc.get("billing") or {}
+            return format_money(billing.get("total_amount"), billing.get("currency"))
 
-    billing = receipt_doc.get("billing") or {}
-    sections.append(("Abrechnung", [
-        ("Satz pro KM", format_money(billing.get("rate_per_km"), billing.get("currency"))),
-        ("Grundbetrag", format_money(billing.get("base_amount"), billing.get("currency"))),
-        ("Bonus", format_money(billing.get("bonus"), billing.get("currency"))),
-        ("Abzug", format_money(billing.get("penalty"), billing.get("currency"))),
-        ("Gesamtbetrag", format_money(billing.get("total_amount"), billing.get("currency"))),
-        ("Währung", billing.get("currency")),
-    ]))
+        def distance_value():
+            tour = receipt_doc.get("tour") or {}
+            return format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))
 
-    extra = receipt_doc.get("extra") or {}
-    if extra:
-        rows = []
-        for key, value in sorted(extra.items()):
-            if isinstance(value, (dict, list)):
-                value = json.dumps(value, ensure_ascii=False)[:500]
-            rows.append((key, value))
-        sections.append(("Weitere Daten", rows))
+        def route_value():
+            tour = receipt_doc.get("tour") or {}
+            return f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
 
-    pdf_bytes = build_simple_pdf(
-        f"{TOUR_RECEIPT_COMPANY_NAME} - Tour-Beleg / Abrechnung",
-        sections
-    )
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=15 * mm,
+            leftMargin=15 * mm,
+            topMargin=15 * mm,
+            bottomMargin=16 * mm,
+            title=f"Tourbeleg {safe_str(receipt_doc.get('receipt_number'))}",
+            author=TOUR_RECEIPT_COMPANY_NAME,
+        )
 
-    with open(file_path, "wb") as file:
-        file.write(pdf_bytes)
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="HeroTitle",
+            parent=styles["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=21,
+            leading=24,
+            textColor=HexColor("#f8fafc"),
+            spaceAfter=3,
+        ))
+        styles.add(ParagraphStyle(
+            name="HeroSub",
+            parent=styles["BodyText"],
+            fontSize=9.5,
+            leading=12,
+            textColor=HexColor("#cbd5e1"),
+        ))
+        styles.add(ParagraphStyle(
+            name="Badge",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            textColor=HexColor("#082f49"),
+        ))
+        styles.add(ParagraphStyle(
+            name="KpiLabel",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontSize=8,
+            leading=10,
+            textColor=HexColor("#64748b"),
+        ))
+        styles.add(ParagraphStyle(
+            name="KpiValue",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+            fontSize=15,
+            leading=18,
+            textColor=HexColor("#0f172a"),
+        ))
+        styles.add(ParagraphStyle(
+            name="SectionTitle",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            textColor=HexColor("#0f172a"),
+            spaceBefore=7,
+            spaceAfter=5,
+        ))
+        styles.add(ParagraphStyle(
+            name="CellLabel",
+            parent=styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            textColor=HexColor("#475569"),
+        ))
+        styles.add(ParagraphStyle(
+            name="CellValue",
+            parent=styles["BodyText"],
+            fontSize=9,
+            leading=12,
+            textColor=HexColor("#0f172a"),
+        ))
+        styles.add(ParagraphStyle(
+            name="SmallMuted",
+            parent=styles["BodyText"],
+            fontSize=7.5,
+            leading=10,
+            textColor=HexColor("#64748b"),
+        ))
 
-    return file_path, filename, pdf_bytes
+        def p(value, style="CellValue"):
+            return Paragraph(clean(value), styles[style])
+
+        def draw_footer(canvas, pdf_doc):
+            canvas.saveState()
+            width, _height = A4
+            canvas.setStrokeColor(HexColor("#cbd5e1"))
+            canvas.setLineWidth(0.45)
+            canvas.line(15 * mm, 12 * mm, width - 15 * mm, 12 * mm)
+            canvas.setFont("Helvetica", 7)
+            canvas.setFillColor(HexColor("#64748b"))
+            canvas.drawString(15 * mm, 8 * mm, f"{TOUR_RECEIPT_COMPANY_NAME} • Buchhaltungsbeleg • {safe_str(receipt_doc.get('receipt_number'), '-')}")
+            canvas.drawRightString(width - 15 * mm, 8 * mm, f"Seite {pdf_doc.page}")
+            canvas.restoreState()
+
+        story = []
+        driver = receipt_doc.get("driver") or {}
+        tour = receipt_doc.get("tour") or {}
+        billing = receipt_doc.get("billing") or {}
+        receipt_number = safe_str(receipt_doc.get("receipt_number"), "-")
+        job_id = safe_str(receipt_doc.get("job_id"), "-")
+        driver_name = safe_str(driver.get("name"), "EifelLog Fahrer")
+        username = tour_receipt_driver_username(receipt_doc)
+
+        header_left = [
+            Paragraph(f"Tourbeleg von {clean(username)}", styles["HeroTitle"]),
+            Paragraph(f"{clean(driver_name)} • abgeschlossener Auftrag • nur buchhaltungsrelevante Daten", styles["HeroSub"]),
+            Paragraph(f"Belegnummer: <b>{clean(receipt_number)}</b>", styles["HeroSub"]),
+        ]
+        header_right = Paragraph(f"ABGESCHLOSSEN<br/>JOB-ID<br/><font size='8'>{clean(job_id)}</font>", styles["Badge"])
+        header = Table([[header_left, header_right]], colWidths=[125 * mm, 40 * mm])
+        header.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#0f172a")),
+            ("BACKGROUND", (1, 0), (1, 0), HexColor("#bae6fd")),
+            ("BOX", (0, 0), (-1, -1), 0.7, HexColor("#020617")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (0, 0), 12),
+            ("RIGHTPADDING", (0, 0), (0, 0), 12),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("LEFTPADDING", (1, 0), (1, 0), 6),
+            ("RIGHTPADDING", (1, 0), (1, 0), 6),
+        ]))
+        story.append(header)
+        story.append(Spacer(1, 8))
+
+        kpi = Table([
+            [p("Gesamtbetrag", "KpiLabel"), p("Gefahrene Strecke", "KpiLabel"), p("Buchhaltung", "KpiLabel")],
+            [p(money_value(), "KpiValue"), p(distance_value(), "KpiValue"), p("Relevant", "KpiValue")],
+        ], colWidths=[55 * mm, 55 * mm, 55 * mm])
+        kpi.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.45, HexColor("#cbd5e1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.25, HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        story.append(kpi)
+        story.append(Spacer(1, 7))
+
+        route_card = Table([[p("Route", "CellLabel"), p(route_value(), "CellValue"), p("Fracht", "CellLabel"), p(tour.get("cargo") or "-", "CellValue")]], colWidths=[20 * mm, 65 * mm, 20 * mm, 60 * mm])
+        route_card.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#eff6ff")),
+            ("BOX", (0, 0), (-1, -1), 0.4, HexColor("#bfdbfe")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        story.append(route_card)
+
+        for section_title, rows in sections:
+            story.append(Spacer(1, 5))
+            story.append(Paragraph(clean(section_title), styles["SectionTitle"]))
+            table_rows = []
+            for label, value in rows:
+                if value in (None, ""):
+                    value = "-"
+                table_rows.append([p(label, "CellLabel"), p(value, "CellValue")])
+            detail_table = Table(table_rows, colWidths=[46 * mm, 119 * mm])
+            detail_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), HexColor("#ffffff")),
+                ("ROWBACKGROUNDS", (0, 0), (-1, -1), [HexColor("#ffffff"), HexColor("#f8fafc")]),
+                ("GRID", (0, 0), (-1, -1), 0.3, HexColor("#e2e8f0")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(detail_table)
+
+        story.append(Spacer(1, 8))
+        note_text = (
+            "Dieser Beleg enthält bewusst nur abrechnungs- und nachweisrelevante Daten. "
+            "Live-Telemetrie wie Kraftstoff, RPM, ETA, Geschwindigkeit oder Schadensdetails wird nicht im PDF ausgegeben."
+        )
+        story.append(Paragraph(clean(note_text), styles["SmallMuted"]))
+
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+        pdf_bytes = buffer.getvalue()
+        with open(file_path, "wb") as file:
+            file.write(pdf_bytes)
+        return file_path, filename, pdf_bytes
+
+    except Exception as error:
+        app.logger.exception("Gestalteter Tourbeleg konnte nicht erzeugt werden, nutze einfachen PDF-Fallback.")
+        pdf_bytes = build_simple_pdf(
+            f"{TOUR_RECEIPT_COMPANY_NAME} - Tourbeleg von {driver_username}",
+            sections
+        )
+        with open(file_path, "wb") as file:
+            file.write(pdf_bytes)
+        return file_path, filename, pdf_bytes
 
 
 def discord_payload_for_bot(payload):
@@ -6317,6 +6576,7 @@ def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=No
     return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
 
 
+
 def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     if not TOUR_RECEIPT_DISCORD_ENABLED:
         return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
@@ -6324,36 +6584,37 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     driver = receipt_doc.get("driver") or {}
     tour = receipt_doc.get("tour") or {}
     billing = receipt_doc.get("billing") or {}
+    username = tour_receipt_driver_username(receipt_doc)
+    driver_name = safe_str(driver.get("name"), "EifelLog Fahrer")
+    job_id = safe_str(receipt_doc.get("job_id"), "-")
+    receipt_number = safe_str(receipt_doc.get("receipt_number"), "-")
+    route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
+    total_amount = format_money(billing.get("total_amount"), billing.get("currency"))
+    distance = format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))
 
     payload = {
-        "username": "EifelLog Tracker",
+        "username": "EifelLog Buchhaltung",
         "allowed_mentions": {"parse": []},
         "embeds": [
             {
-                "title": "🧾 Tour-Beleg eingereicht",
-                "description": "Der Job wurde abgeschlossen. Der PDF-Beleg ist angehängt und für die Buchhaltung relevant.",
-                "color": 5763719,
+                "title": f"🧾 Tourbeleg abgeschlossen – {discord_text(username, '@fahrer', 80)}",
+                "description": "Der Auftrag wurde abgeschlossen. Der PDF-Tourbeleg ist angehängt und enthält nur buchhaltungsrelevante Daten.",
+                "color": 3447003,
                 "fields": [
-                    {"name": "👤 Fahrer", "value": safe_str(driver.get("name"), "-"), "inline": True},
-                    {"name": "🪪 Fahrerkarte-ID", "value": safe_str(driver.get("fahrerkarte_id"), "-"), "inline": True},
-                    {"name": "🧾 Job-ID", "value": f"`{safe_str(receipt_doc.get('job_id'), '-')}`", "inline": True},
+                    discord_field("👤 Fahrer", f"{driver_name}\n{username}", True),
+                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 120)}`", True),
+                    discord_field("📄 Belegnummer", f"`{discord_text(receipt_number, '-', 120)}`", True),
 
-                    {"name": "🚛 LKW", "value": safe_str(tour.get("truck"), "-"), "inline": True},
-                    {"name": "📦 Fracht", "value": safe_str(tour.get("cargo"), "-"), "inline": True},
-                    {"name": "⛽ Kraftstoff", "value": format_fuel_display_from_payload(tour), "inline": True},
+                    discord_field("📍 Route", route, False),
+                    discord_field("📦 Fracht", tour.get("cargo") or "-", True),
+                    discord_field("📊 Strecke", distance, True),
+                    discord_field("💶 Gesamtbetrag", total_amount, True),
 
-                    {"name": "📍 Von", "value": safe_str(tour.get("source_city"), "-"), "inline": True},
-                    {"name": "🏁 Nach", "value": safe_str(tour.get("destination_city"), "-"), "inline": True},
-                    {"name": "⚙️ RPM", "value": str(parse_int(tour.get("rpm"), 0)), "inline": True},
-
-                    {"name": "🕒 ETA", "value": safe_str(tour.get("eta"), "-"), "inline": True},
-                    {"name": "📊 Strecke", "value": format_km(tour.get("driven_distance_km")), "inline": True},
-                    {"name": "💶 Abrechnung", "value": format_money(billing.get("total_amount"), billing.get("currency")), "inline": True},
-
-                    {"name": "📄 Belegnummer", "value": f"`{safe_str(receipt_doc.get('receipt_number'), '-')}`", "inline": True},
-                    {"name": "🏦 Buchhaltung", "value": "Ja – abrechnungsrelevant", "inline": True}
+                    discord_field("🪪 Fahrerkarte-ID", driver.get("fahrerkarte_id") or "-", True),
+                    discord_field("🏦 Buchhaltung", "Ja – abrechnungsrelevant", True),
+                    discord_field("📎 PDF", filename, True),
                 ],
-                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Touren-Channel"},
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tourbeleg / Buchhaltung"},
                 "timestamp": now_utc().isoformat() + "Z"
             }
         ],
@@ -6361,7 +6622,7 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
             {
                 "id": 0,
                 "filename": filename,
-                "description": f"Tour-Beleg {receipt_doc.get('receipt_number')}"
+                "description": f"Tourbeleg {receipt_number} / Job {job_id}"
             }
         ]
     }
@@ -6534,7 +6795,7 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "created_at": submitted_at,
         "driver": {
             "name": display_name,
-            "username": user_doc.get("username"),
+            "username": user_doc.get("username") or user_doc.get("discord_username") or safe_str(payload.get("username") or payload.get("driverName")),
             "discord_id": user_doc.get("discord_id"),
             "role": get_primary_role_name(user_doc.get("roles", [])),
             "fahrerkarte_id": driver_card_id
@@ -6864,47 +7125,66 @@ def tracker_current_job_key(payload, user_doc=None):
     return "tour:" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
 
 
+
 def build_tour_start_discord_payload(user_doc, telemetry):
     telemetry = telemetry or {}
+    user_doc = user_doc or {}
+    active_job = user_doc.get("tracker_current_job") or {}
+
     display_name = (
-        (user_doc or {}).get("display_name")
-        or (user_doc or {}).get("username")
-        or (user_doc or {}).get("discord_username")
+        user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
         or payload_lookup_value(telemetry, "driverName", "displayName", "username", "driver", fallback="EifelLog Fahrer")
     )
-    truck = payload_lookup_value(telemetry, "truck", "truckName", "truckModel", "truck_model", fallback="-")
-    source = payload_lookup_value(telemetry, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback="-")
-    destination = payload_lookup_value(telemetry, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback="-")
-    cargo = payload_lookup_value(telemetry, "cargo", "freight", "cargoName", "jobCargo", fallback="-")
-    eta = payload_lookup_value(telemetry, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-")
+    username = safe_str(user_doc.get("username") or user_doc.get("discord_username") or payload_lookup_value(telemetry, "username", "driverName", fallback=""))
+    username_display = f"@{username.lstrip('@')}" if username else "@fahrer"
+
+    truck = payload_lookup_value(telemetry, "truck", "truckName", "truckModel", "truck_model", fallback=safe_str(active_job.get("truck"), "-"))
+    source = payload_lookup_value(telemetry, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback=safe_str(active_job.get("sourceCity"), "-"))
+    destination = payload_lookup_value(telemetry, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback=safe_str(active_job.get("destinationCity"), "-"))
+    cargo = payload_lookup_value(telemetry, "cargo", "freight", "cargoName", "jobCargo", fallback=safe_str(active_job.get("cargo"), "-"))
+    eta = payload_lookup_value(telemetry, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback=safe_str(active_job.get("eta"), "-"))
     rpm = first_payload_number(telemetry, "rpm", "engineRpm", "engineRPM", fallback=0)
-    job_id = payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="-")
+
+    job_id = (
+        payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
+        or safe_str(active_job.get("jobId") or active_job.get("id") or active_job.get("deliveryId"))
+    )
+    job_key = tracker_current_job_key(telemetry, user_doc)
+    if not job_id and job_key:
+        job_id = job_key[4:] if job_key.startswith("job:") else job_key
+    job_id = job_id or "-"
+
     driver_card_id = resolve_driver_card_id(user_doc, telemetry)
+    route_line = f"{discord_text(source, '-', 80)} → {discord_text(destination, '-', 80)}"
 
     return {
         "username": "EifelLog Tracker",
         "allowed_mentions": {"parse": []},
         "embeds": [
             {
-                "title": "🚚 Tour gestartet",
-                "description": f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** hat eine Tour gestartet.",
-                "color": 5763719,
+                "title": "🚚 Auftrag / Tour gestartet",
+                "description": (
+                    f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** ({discord_text(username_display, '@fahrer', 80)}) "
+                    f"hat eine Tour gestartet.\n**Job-ID:** `{discord_text(job_id, '-', 120)}`"
+                ),
+                "color": 3447003,
                 "fields": [
-                    discord_field("👤 Fahrer", display_name, True),
+                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 120)}`", True),
+                    discord_field("👤 Fahrer", f"{display_name}\n{username_display}", True),
                     discord_field("🪪 Fahrerkarte-ID", driver_card_id, True),
-                    discord_field("🚛 LKW", truck, True),
 
+                    discord_field("📍 Route", route_line, False),
+                    discord_field("🚛 LKW", truck, True),
                     discord_field("📦 Fracht", cargo, True),
                     discord_field("⛽ Kraftstoff", format_fuel_display_from_payload(telemetry), True),
+
                     discord_field("🕒 ETA", eta, True),
-
                     discord_field("⚙️ RPM", str(parse_int(rpm, 0)), True),
-                    discord_field("📍 Von", source, True),
-                    discord_field("🏁 Nach", destination, True),
-
-                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 120)}`", False)
+                    discord_field("🔐 Dedupe-Key", f"`{discord_text(job_key or '-', '-', 120)}`", True),
                 ],
-                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Touren-Channel"},
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tourstart wird serverseitig dedupliziert"},
                 "timestamp": now_utc().isoformat() + "Z"
             }
         ]
