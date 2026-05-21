@@ -903,18 +903,83 @@ def save_profile_image(file_field):
     return url_for("static", filename=f"uploads/profiles/{filename}")
 
 
+def static_asset_url(filename):
+    filename = safe_str(filename).lstrip("/")
+    if not filename.startswith("static/"):
+        filename = f"static/{filename}"
+    try:
+        return url_for("static", filename=filename.replace("static/", "", 1))
+    except Exception:
+        return f"/{filename}"
+
+
+def discord_cdn_avatar_url(user_doc, size=256):
+    """Erzeugt die echte Discord-CDN-Avatar-URL aus discord_id + Avatar-Hash."""
+    user_doc = user_doc or {}
+    discord_id = safe_str(
+        user_doc.get("discord_id")
+        or user_doc.get("user_id")
+        or user_doc.get("id")
+    )
+    avatar_hash = safe_str(
+        user_doc.get("avatar")
+        or user_doc.get("avatar_hash")
+        or user_doc.get("discord_avatar")
+    )
+    if not discord_id or not avatar_hash or avatar_hash.lower() in {"none", "null", "undefined"}:
+        return ""
+
+    extension = "gif" if avatar_hash.startswith("a_") else "png"
+    try:
+        size = int(size)
+    except Exception:
+        size = 256
+    if size not in {16, 32, 64, 128, 256, 512, 1024, 2048, 4096}:
+        size = 256
+    return f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.{extension}?size={size}"
+
+
 def get_discord_avatar_url(user_doc):
-    custom_avatar = user_doc.get("avatar_url")
-    if custom_avatar: return custom_avatar
+    user_doc = user_doc or {}
+    custom_avatar = safe_str(user_doc.get("avatar_url"))
+    if custom_avatar and "eifellog.jpg" not in custom_avatar.lower():
+        return custom_avatar
 
-    discord_id = user_doc.get("discord_id")
-    avatar_hash = user_doc.get("avatar")
+    cdn_avatar = discord_cdn_avatar_url(user_doc, size=256)
+    if cdn_avatar:
+        return cdn_avatar
 
-    if discord_id and avatar_hash:
-        extension = "gif" if str(avatar_hash).startswith("a_") else "png"
-        return f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.{extension}?size=256"
+    if custom_avatar:
+        return custom_avatar
 
-    return url_for("static", filename="eifellog.jpg")
+    return static_asset_url("eifellog.jpg")
+
+
+def get_fahrerkarte_avatar_url(user_doc=None, request_doc=None, size=256):
+    """Avatar fuer Fahrerkarte/Tracker: Discord-CDN bevorzugen, danach gespeicherte Profilbilder."""
+    user_doc = user_doc or {}
+    request_doc = request_doc or {}
+
+    cdn_avatar = discord_cdn_avatar_url(user_doc, size=size)
+    if cdn_avatar:
+        return cdn_avatar
+
+    cdn_avatar = discord_cdn_avatar_url(request_doc, size=size)
+    if cdn_avatar:
+        return cdn_avatar
+
+    for candidate in (
+        request_doc.get("discord_avatar_url"),
+        request_doc.get("avatar_url"),
+        request_doc.get("avatarUrl"),
+        user_doc.get("avatar_url"),
+        user_doc.get("avatarUrl"),
+    ):
+        candidate = safe_str(candidate)
+        if candidate:
+            return candidate
+
+    return static_asset_url("eifellog.jpg")
 
 
 def make_external_url(possible_url):
@@ -1696,7 +1761,7 @@ def build_fahrerkarte_request_from_user_doc(user_doc):
         "user_id": discord_id,
         "username": user_doc.get("username") or user_doc.get("discord_username"),
         "discord_username": user_doc.get("discord_username") or user_doc.get("username"),
-        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc)),
         "name": display_name,
         "full_name": display_name,
         "display_name": display_name,
@@ -1964,6 +2029,7 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
     card_id = safe_str(user_doc.get("fahrerkarte_card_id"), "Wird nach Ausstellung erzeugt")
     pdf_download_url = ""
     pdf_filename = ""
+    avatar_url = make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=latest_request or {}, size=256))
 
     if latest_request:
         name = latest_request.get("display_name") or latest_request.get("full_name") or latest_request.get("name") or name
@@ -2003,6 +2069,8 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
         "fahrerkarte_note": note,
         "fahrerkarte_pdf_download_url": pdf_download_url,
         "fahrerkarte_pdf_filename": pdf_filename,
+        "fahrerkarte_avatar_url": avatar_url,
+        "fahrerkarte_discord_avatar_url": avatar_url,
     }
 
 
@@ -2169,8 +2237,12 @@ def load_fahrerkarte_avatar_jpeg(request_doc, user_doc=None, size=180):
         return None
 
     user_doc = user_doc or {}
+    request_doc = request_doc or {}
     sources = [
-        request_doc.get("avatar_url") if request_doc else "",
+        get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=size),
+        request_doc.get("discord_avatar_url"),
+        request_doc.get("avatar_url"),
+        request_doc.get("avatarUrl"),
         user_doc.get("avatar_url"),
         get_discord_avatar_url(user_doc) if user_doc else "",
     ]
@@ -2186,7 +2258,7 @@ def load_fahrerkarte_avatar_jpeg(request_doc, user_doc=None, size=180):
                 with open(local_path, "rb") as image_file:
                     raw = image_file.read()
             elif source.startswith("http://") or source.startswith("https://"):
-                response = requests.get(source, timeout=5)
+                response = requests.get(source, timeout=7, headers={"User-Agent": "EifelLog-ServiceCenter/1.0"})
                 if response.ok and response.content:
                     raw = response.content
         except Exception as error:
@@ -2720,6 +2792,8 @@ def save_fahrerkarte_pdf(request_doc, user_doc=None, actor=None, force=False):
     pdf_doc["card_id"] = card_id
     pdf_doc["issued_at"] = issue_time
     pdf_doc["status"] = "issued"
+    pdf_doc["avatar_url"] = get_fahrerkarte_avatar_url(user_doc=user_doc or {}, request_doc=pdf_doc, size=256)
+    pdf_doc["discord_avatar_url"] = discord_cdn_avatar_url(user_doc or {}, size=256) or pdf_doc["avatar_url"]
 
     # Das Fahrerkarte-PDF wird komplett in main.py generiert.
     # Kein Template und keine externe PDF-Bibliothek nötig.
@@ -2846,7 +2920,7 @@ def create_direct_fahrerkarte_request_for_user(user_doc, actor=None, issue_note=
         "user_id": discord_id,
         "username": user_doc.get("username") or user_doc.get("discord_username"),
         "discord_username": user_doc.get("discord_username") or user_doc.get("username"),
-        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc)),
         "name": display_name,
         "full_name": display_name,
         "display_name": display_name,
@@ -2923,6 +2997,7 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
             )
             request_doc = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
         ensure_fahrerkarte_dashboard_document_once(request_doc, actor=actor, description=issue_note)
+        sync_tracker_driver_card_from_fahrerkarte(user_doc, request_doc, source="servicecenter_issue_existing", archive_existing=False)
         return {
             "request": request_doc,
             "download_url": servicecenter_fahrerkarte_download_url(request_doc.get("request_id") or request_doc.get("_id")),
@@ -2952,6 +3027,8 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
         "issued_at": now,
         "issue_note": issue_note,
         "handler_name": handler_name,
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
+        "discord_avatar_url": make_external_url(discord_cdn_avatar_url(user_doc, size=256) or get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
         "tracker_upload_ready": True,
         "updated_at": now,
     }
@@ -2979,6 +3056,7 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
     })
 
     ensure_fahrerkarte_dashboard_document_once(fresh_request, actor=actor, description=issue_note)
+    sync_tracker_driver_card_from_fahrerkarte(user_doc, fresh_request, source="servicecenter_auto_issue", archive_existing=True)
     tasks_collection.update_many(
         {"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")},
         {"$set": {"status": "done", "completed_at": now, "updated_at": now}}
@@ -3048,7 +3126,12 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["pdf_relative_path"] = item.get("pdf_relative_path") or item.get("pdf_path") or ""
     item["download_url"] = servicecenter_fahrerkarte_download_url(item["request_id"]) if item["pdf_relative_path"] else ""
     item["tracker_upload_ready"] = bool(item.get("tracker_upload_ready") or item.get("status") == "issued")
-    item["avatar_url"] = item.get("avatar_url") or ""
+    if not item.get("avatar_url") or "eifellog.jpg" in safe_str(item.get("avatar_url")).lower():
+        preview_user = find_user_for_request_doc(item)
+        item["avatar_url"] = make_external_url(get_fahrerkarte_avatar_url(user_doc=preview_user or {}, request_doc=item, size=256))
+    else:
+        item["avatar_url"] = make_external_url(item.get("avatar_url"))
+    item["discord_avatar_url"] = item["avatar_url"]
     item["source_user_mongo_id"] = item.get("source_user_mongo_id") or item.get("user_mongo_id") or ""
     item["user_mongo_id"] = item["source_user_mongo_id"]
     item["source_collection"] = item.get("source_collection") or item.get("source") or "fahrerkarte_requests"
@@ -3151,6 +3234,8 @@ def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, ext
         "fahrerkarte_request_id": safe_str(request_doc.get("request_id") or request_doc.get("_id")),
         "fahrerkarte_name": request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name"),
         "fahrerkarte_role": request_doc.get("role") or request_doc.get("role_name"),
+        "fahrerkarte_avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
+        "fahrerkarte_discord_avatar_url": make_external_url(discord_cdn_avatar_url(user_doc, size=256) or get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
         "fahrerkarte_updated_at": now,
     }
     if request_doc.get("card_id"):
@@ -4096,7 +4181,8 @@ def tracker_latest_issued_fahrerkarte_request(user_doc):
         return None
 
     status = normalize_fahrerkarte_status(request_doc.get("status"))
-    if status not in {"approved", "issued"}:
+    has_generated_pdf = bool(request_doc.get("pdf_relative_path") or request_doc.get("pdf_path") or request_doc.get("download_url"))
+    if status != "issued" and not has_generated_pdf:
         return None
 
     return request_doc
@@ -4159,6 +4245,14 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
         or (servicecenter_fahrerkarte_download_url(source_request.get("request_id")) if source_request.get("request_id") else "")
         or tracker_public_file_url(file_relative_path)
     )
+    if download_url:
+        download_url = make_external_url(download_url)
+
+    avatar_url = (
+        safe_str(extra.get("avatarUrl") or extra.get("avatar_url"))
+        or get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=source_request, size=256)
+    )
+    avatar_url = make_external_url(avatar_url)
 
     request_id = safe_str(source_request.get("request_id") or source_request.get("_id"))
     doc = {
@@ -4176,6 +4270,9 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
         "personal_number": personal_number,
         "driver_number": personal_number,
         "birth_date": birth_date,
+        "avatar_url": avatar_url,
+        "avatarUrl": avatar_url,
+        "discord_avatar_url": avatar_url,
         "department": safe_str(extra.get("department") or source_request.get("department"), "Web-ServiceCenter"),
         "status": safe_str(extra.get("status") or source_request.get("status"), "Aktiv"),
         "state": "Aktiv",
@@ -4188,8 +4285,12 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
         "file_relative_path": file_relative_path,
         "pdf_relative_path": file_relative_path,
         "download_url": download_url,
+        "servicecenter_download_url": make_external_url(servicecenter_fahrerkarte_download_url(request_id)) if request_id else download_url,
         "source": source,
         "source_request_id": request_id,
+        "servicecenter_request_id": request_id,
+        "manual_upload_required": False,
+        "requiresManualUpload": False,
         "synced": True,
         "active": True,
         "archived": False,
@@ -4209,6 +4310,13 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     driver_name = safe_str(card_doc.get("driver_name") or card_doc.get("display_name") or card_doc.get("name"), "EifelLog Fahrer")
     file_relative_path = safe_str(card_doc.get("file_relative_path") or card_doc.get("pdf_relative_path") or card_doc.get("pdf_path"))
     download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
+    if download_url:
+        download_url = make_external_url(download_url)
+    avatar_url = (
+        safe_str(card_doc.get("avatar_url") or card_doc.get("avatarUrl") or card_doc.get("discord_avatar_url"))
+        or get_fahrerkarte_avatar_url(user_doc=user_doc or {}, request_doc=card_doc, size=256)
+    )
+    avatar_url = make_external_url(avatar_url)
     created_at = card_doc.get("created_at") or card_doc.get("uploaded_at")
     updated_at = card_doc.get("updated_at") or created_at
 
@@ -4222,6 +4330,9 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "name": driver_name,
         "displayName": driver_name,
         "username": card_doc.get("username") or (user_doc or {}).get("username"),
+        "avatarUrl": avatar_url,
+        "avatar_url": avatar_url,
+        "discordAvatarUrl": avatar_url,
         "role": safe_str(card_doc.get("role") or card_doc.get("role_name"), "Fahrer"),
         "position": safe_str(card_doc.get("role") or card_doc.get("role_name"), "Fahrer"),
         "personalNumber": safe_str(card_doc.get("personal_number") or card_doc.get("driver_number"), "-"),
@@ -4244,11 +4355,83 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "filename": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
         "downloadUrl": download_url,
         "download_url": download_url,
+        "pdfUrl": download_url,
+        "pdf_url": download_url,
+        "servicecenterDownloadUrl": safe_str(card_doc.get("servicecenter_download_url")) or download_url,
+        "sourceRequestId": safe_str(card_doc.get("source_request_id") or card_doc.get("servicecenter_request_id")),
+        "manualUploadRequired": bool(card_doc.get("manual_upload_required", False)),
+        "requiresManualUpload": bool(card_doc.get("requiresManualUpload", False)),
         "uploadedAt": datetime_to_iso(card_doc.get("uploaded_at") or created_at),
         "createdAt": datetime_to_iso(created_at),
         "updatedAt": datetime_to_iso(updated_at),
         "synced": True,
     }
+
+
+def sync_tracker_driver_card_from_fahrerkarte(user_doc, request_doc, source="servicecenter_issue", archive_existing=False):
+    """Persistiert die ausgestellte ServiceCenter-Fahrerkarte direkt fuer den Tracker.
+
+    Dadurch muss die PDF im Tracker nicht erneut hochgeladen werden. Der Tracker liest
+    die Karte samt PDF-Download und Discord-Avatar aus MongoDB.
+    """
+    user_doc = user_doc or {}
+    request_doc = request_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id") or request_doc.get("discord_id") or request_doc.get("user_id"))
+    if not discord_id:
+        return None
+
+    if not user_doc:
+        user_doc = users_collection.find_one({"discord_id": discord_id}) or {}
+
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    extra = {
+        "status": "Aktiv",
+        "avatarUrl": get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256),
+        "downloadUrl": servicecenter_fahrerkarte_download_url(request_id) if request_id else safe_str(request_doc.get("download_url")),
+        "fileRelativePath": request_doc.get("pdf_relative_path") or request_doc.get("pdf_path") or "",
+        "fileName": request_doc.get("pdf_filename") or request_doc.get("file_name") or "EifelLog_Fahrerkarte.pdf",
+        "originalFilename": request_doc.get("pdf_filename") or request_doc.get("file_name") or "EifelLog_Fahrerkarte.pdf",
+        "uploadedAt": request_doc.get("issued_at") if isinstance(request_doc.get("issued_at"), datetime) else now_utc(),
+    }
+    card_doc = tracker_build_driver_card_doc(user_doc, source_request=request_doc, source=source, extra=extra)
+
+    if archive_existing:
+        tracker_driver_cards_collection.update_many(
+            {
+                "discord_id": discord_id,
+                "card_id": {"$ne": card_doc["card_id"]},
+                "archived": {"$ne": True},
+            },
+            {"$set": {"archived": True, "archived_at": now_utc(), "active": False}}
+        )
+
+    tracker_driver_cards_collection.update_one(
+        {"discord_id": discord_id, "card_id": card_doc["card_id"]},
+        mongo_upsert_set_preserve_created_at(card_doc),
+        upsert=True
+    )
+
+    users_collection.update_one(
+        {"discord_id": discord_id},
+        {"$set": {
+            "fahrerkarte_card_id": card_doc["card_id"],
+            "personalisierte_fahrerkarte_card_id": card_doc["card_id"],
+            "driver_card_id": card_doc["card_id"],
+            "fahrerkarte_pdf_relative_path": card_doc.get("pdf_relative_path") or request_doc.get("pdf_relative_path") or "",
+            "fahrerkarte_pdf_filename": card_doc.get("file_name") or request_doc.get("pdf_filename") or "EifelLog_Fahrerkarte.pdf",
+            "fahrerkarte_download_url": card_doc.get("download_url"),
+            "fahrerkarte_avatar_url": card_doc.get("avatar_url"),
+            "tracker_driver_card_active": True,
+            "tracker_driver_card_source": source,
+            "tracker_driver_card_synced_at": now_utc(),
+            "tracker_driver_card_requires_upload": False,
+        }}
+    )
+
+    return tracker_driver_cards_collection.find_one(
+        {"discord_id": discord_id, "card_id": card_doc["card_id"], "archived": {"$ne": True}},
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+    ) or tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
 
 
 def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True):
@@ -4257,6 +4440,17 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     if not discord_id:
         return None
 
+    source_request = tracker_latest_issued_fahrerkarte_request(user_doc) if create_from_servicecenter else None
+    if source_request:
+        servicecenter_card = sync_tracker_driver_card_from_fahrerkarte(
+            user_doc,
+            source_request,
+            source="servicecenter_db_fetch",
+            archive_existing=False
+        )
+        if servicecenter_card:
+            return servicecenter_card
+
     card_doc = tracker_driver_cards_collection.find_one(
         {"discord_id": discord_id, "archived": {"$ne": True}},
         sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
@@ -4264,20 +4458,7 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     if card_doc:
         return card_doc
 
-    if not create_from_servicecenter:
-        return None
-
-    source_request = tracker_latest_issued_fahrerkarte_request(user_doc)
-    if not source_request:
-        return None
-
-    card_doc = tracker_build_driver_card_doc(user_doc, source_request=source_request, source="servicecenter_issue")
-    tracker_driver_cards_collection.update_one(
-        {"discord_id": discord_id, "card_id": card_doc["card_id"]},
-        mongo_upsert_set_preserve_created_at(card_doc),
-        upsert=True
-    )
-    return tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
+    return None
 
 
 def tracker_default_work_session():
@@ -4479,7 +4660,7 @@ def tracker_job_id_from_payload(payload, telemetry=None):
 def tracker_profile_payload(user_doc):
     profile = prepare_profile_data(user_doc)
     stats = get_profile_stats(user_doc)
-    avatar_url = make_external_url(profile.get("avatar_url"))
+    avatar_url = make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc={}, size=256))
     banner_url = make_external_url(user_doc.get("banner_url"))
 
     return {
@@ -8663,7 +8844,7 @@ def servicecenter_fahrerkarte_beantragen():
         "user_id": discord_id,
         "username": db_user.get("username") or user.get("username"),
         "discord_username": db_user.get("discord_username") or user.get("discord_username"),
-        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=db_user)),
         "name": full_name,
         "full_name": full_name,
         "display_name": display_name,
@@ -8697,6 +8878,7 @@ def servicecenter_fahrerkarte_beantragen():
                 "fahrerkarte_name": display_name,
                 "fahrerkarte_role": role_name,
                 "fahrerkarte_handler": "Noch nicht zugewiesen",
+                "fahrerkarte_avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=db_user, request_doc=request_doc)),
             }
         }
     )
@@ -8765,7 +8947,7 @@ def api_fahrer_registration():
         "username": db_user.get("username") or session_user.get("username"),
         "discord_username": db_user.get("discord_username") or session_user.get("discord_username"),
         "display_name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
-        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=db_user)),
         "name": name,
         "role": role,
         "status": "pending",
@@ -8830,7 +9012,7 @@ def api_new_token_request():
         "username": db_user.get("username") or session_user.get("username"),
         "discord_username": db_user.get("discord_username") or session_user.get("discord_username"),
         "display_name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
-        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=db_user)),
         "name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
         "role": db_user.get("fahrer_registration_role") or get_primary_role_name(db_user.get("roles", [])),
         "reason": reason or "Kein Grund angegeben",
@@ -9117,7 +9299,7 @@ def build_dispo_driver_for_template(user_doc):
         "name": display_name,
         "truck": safe_str(live.get("truck") or user_doc.get("favorite_truck"), "Kein Fahrzeug gesetzt"),
         "current_location": current_location,
-        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc)),
         "online": bool(user_doc.get("tracker_online", False))
     }
 
@@ -14559,6 +14741,8 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
         "issued_at": now,
         "issue_note": issue_note,
         "handler_name": handler_name,
+        "avatar_url": make_external_url(get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
+        "discord_avatar_url": make_external_url(discord_cdn_avatar_url(user_doc, size=256) or get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
         "tracker_upload_ready": True,
         "updated_at": now,
     }
@@ -14587,6 +14771,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
     })
 
     create_fahrerkarte_pdf_dashboard_document(fresh_request, actor=actor, description=issue_note)
+    sync_tracker_driver_card_from_fahrerkarte(user_doc, fresh_request, source="servicecenter_issue", archive_existing=True)
 
     tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "done", "completed_at": now, "updated_at": now}})
     servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="issued", actor=actor)
@@ -14797,9 +14982,11 @@ def servicecenter_fahrerkarte_download(request_id):
         if normalize_fahrerkarte_status(request_doc.get("status")) == "issued":
             user_doc = find_user_for_request_doc(request_doc)
             file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(request_doc, user_doc=user_doc, actor=request_doc.get("issued_by") or {}, force=True)
-            fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": {"pdf_path": file_path, "pdf_relative_path": relative_path, "pdf_filename": filename, "updated_at": now_utc()}})
+            fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": {"pdf_path": file_path, "pdf_relative_path": relative_path, "pdf_filename": filename, "avatar_url": get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256), "updated_at": now_utc()}})
             resolved_path = file_path
             request_doc["pdf_filename"] = filename
+            request_doc["pdf_relative_path"] = relative_path
+            sync_tracker_driver_card_from_fahrerkarte(user_doc, request_doc, source="servicecenter_download_regen", archive_existing=False)
         else:
             abort(404)
 
