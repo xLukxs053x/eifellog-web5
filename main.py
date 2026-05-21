@@ -4785,43 +4785,271 @@ def current_job_from_live(live):
     }
 
 def get_user_job_entries(user_doc):
+    """
+    Liefert alle bekannten Fahrten eines Users.
+    Quellen:
+    1. gespeicherte Listen im users-Dokument
+    2. tour_receipts-Collection, damit die Detailseite auch alte Belege mit Route/LKW findet
+    """
+    user_doc = user_doc or {}
     result = []
+    seen_keys = set()
+
+    def append_entry(item, source_name="user_doc"):
+        if not isinstance(item, dict):
+            return
+
+        public_key = safe_str(
+            item.get("receiptId")
+            or item.get("receipt_id")
+            or item.get("receiptNumber")
+            or item.get("receipt_number")
+            or item.get("jobId")
+            or item.get("job_id")
+            or item.get("trip_id")
+            or item.get("id")
+        )
+        if not public_key:
+            public_key = f"{source_name}:{len(result)}"
+
+        if public_key in seen_keys:
+            return
+
+        seen_keys.add(public_key)
+        clean_item = dict(item)
+        clean_item.setdefault("_entry_source", source_name)
+        result.append(clean_item)
+
     possible_fields = ["job_history", "jobs", "deliveries", "logbook", "tracker_logbook"]
     for field in possible_fields:
         items = user_doc.get(field)
         if isinstance(items, list):
             for item in items:
-                if isinstance(item, dict): result.append(item)
+                append_entry(item, field)
+
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if discord_id:
+        try:
+            receipt_query = {
+                "$or": [
+                    {"driver.discord_id": discord_id},
+                    {"discord_id": discord_id},
+                    {"user_id": discord_id}
+                ],
+                "archived": {"$ne": True}
+            }
+            for receipt in tour_receipts_collection.find(receipt_query).sort("submitted_at", DESCENDING).limit(150):
+                receipt_payload = dict(receipt)
+                receipt_payload["_entry_source"] = "tour_receipts"
+                append_entry(receipt_payload, "tour_receipts")
+        except Exception as error:
+            print(f"Fahrtenbuch-Belege konnten nicht geladen werden: {error}")
+
     return result
 
 def normalize_logbook_entry(entry, user_doc=None):
+    """
+    Normalisiert Fahrten aus user.job_history, tour_receipts und Tracker-Payloads.
+    Die Ausgabe ist bewusst breit, damit dashboard.html und detail.html dieselben Daten nutzen können.
+    """
+    entry = entry or {}
     user_doc = user_doc or {}
-    source = safe_str(entry.get("sourceCity") or entry.get("source") or entry.get("from") or entry.get("routeOrigin"), "-")
-    destination = safe_str(entry.get("destinationCity") or entry.get("destination") or entry.get("to") or entry.get("routeDestination"), "-")
-    route = safe_str(entry.get("route"))
-    if not route: route = f"{source} → {destination}"
 
-    distance = parse_number(entry.get("distanceKm") or entry.get("distance") or entry.get("tripDistanceKm"), 0)
-    income = parse_number(entry.get("income") or entry.get("revenue") or entry.get("money"), 0)
+    tour = entry.get("tour") if isinstance(entry.get("tour"), dict) else {}
+    billing = entry.get("billing") if isinstance(entry.get("billing"), dict) else {}
+    driver = entry.get("driver") if isinstance(entry.get("driver"), dict) else {}
+    extra = entry.get("extra") if isinstance(entry.get("extra"), dict) else {}
+    raw_telemetry = entry.get("raw_telemetry") if isinstance(entry.get("raw_telemetry"), dict) else {}
 
-    created_at = entry.get("createdAt") or entry.get("created_at") or entry.get("finishedAt") or entry.get("timestamp") or ""
+    def pick(*keys, fallback=""):
+        for source in (entry, tour, billing, driver, extra, raw_telemetry):
+            if not isinstance(source, dict):
+                continue
+            for key in keys:
+                if key in source and source.get(key) not in [None, ""]:
+                    return source.get(key)
+        return fallback
+
+    source = safe_str(
+        pick("sourceCity", "source_city", "source", "from", "from_city", "origin", "routeOrigin", fallback="-"),
+        "-"
+    )
+    destination = safe_str(
+        pick("destinationCity", "destination_city", "destination", "to", "to_city", "target", "ziel", "routeDestination", fallback="-"),
+        "-"
+    )
+
+    route = safe_str(pick("route", "route_text", fallback=""))
+    if not route:
+        route = f"{source} → {destination}"
+
+    distance = parse_number(
+        pick("distanceKm", "completedDistanceKm", "completed_distance_km", "driven_distance_km", "drivenDistanceKm", "distance", "km", "tripDistanceKm", fallback=0),
+        0
+    )
+    income = parse_number(
+        pick("income", "revenue", "money", "earnings", "einnahmen", "total_amount", "base_amount", fallback=0),
+        0
+    )
+
+    created_at = (
+        entry.get("createdAt")
+        or entry.get("created_at")
+        or entry.get("submitted_at")
+        or entry.get("finishedAt")
+        or entry.get("finished_at")
+        or entry.get("timestamp")
+        or entry.get("date")
+        or entry.get("datum")
+        or ""
+    )
+    sort_date = datetime.min
+    created_at_text = ""
+    date_text = "-"
+    time_text = "-"
+
     if isinstance(created_at, datetime):
-        created_at_text = created_at.isoformat() + "Z"
         sort_date = created_at
+        created_at_text = created_at.isoformat() + "Z"
+        date_text = created_at.strftime("%d.%m.%Y")
+        time_text = created_at.strftime("%H:%M")
     else:
         created_at_text = safe_str(created_at)
-        sort_date = datetime.min
+        if created_at_text:
+            try:
+                parsed_date = datetime.fromisoformat(created_at_text.replace("Z", "+00:00")).replace(tzinfo=None)
+                sort_date = parsed_date
+                date_text = parsed_date.strftime("%d.%m.%Y")
+                time_text = parsed_date.strftime("%H:%M")
+            except Exception:
+                date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
+
+    truck = safe_str(
+        pick("truck", "truckName", "truckModel", "truck_model", "lkw", "vehicle", "fahrzeug", fallback="-"),
+        "-"
+    )
+    truck_plate = safe_str(
+        pick("truck_plate", "truckPlate", "kennzeichen", "plate", "lkw_kennzeichen", "vehicle_plate", fallback="-"),
+        "-"
+    )
+    trailer = safe_str(
+        pick("trailer", "auflieger", "trailer_plate", "trailerPlate", "auflieger_kennzeichen", fallback="-"),
+        "-"
+    )
+
+    departure = safe_str(
+        pick("departure", "start_time", "started_at", "abfahrt", fallback=""),
+        ""
+    )
+    arrival = safe_str(
+        pick("arrival", "end_time", "finished_at", "ankunft", fallback=""),
+        ""
+    )
+
+    if not departure:
+        departure = time_text if time_text != "-" else "-"
+    if not arrival:
+        arrival = time_text if time_text != "-" else "-"
+
+    fuel_value = pick("fuel_used", "fuel", "diesel", "verbrauch", "fuel_liters", "fuelLiters", fallback="-")
+    if fuel_value not in [None, "", "-"]:
+        fuel_number = parse_number(fuel_value, -1)
+        fuel_used = f"{fuel_number:.1f} l".replace(".", ",") if fuel_number >= 0 else safe_str(fuel_value, "-")
+    else:
+        fuel_used = "-"
+
+    avg_speed_value = pick("avg_speed", "average_speed", "durchschnitt", "speed_kmh", "speedKmh", fallback="-")
+    if avg_speed_value not in [None, "", "-"]:
+        avg_speed_number = parse_number(avg_speed_value, -1)
+        avg_speed = f"{avg_speed_number:.0f} km/h" if avg_speed_number >= 0 else safe_str(avg_speed_value, "-")
+    else:
+        avg_speed = "-"
+
+    trip_public_id = safe_str(
+        pick("id", "trip_id", "fahrt_id", "auftrag_id", "receiptId", "receipt_id", "jobId", "job_id", fallback="")
+    )
+    if not trip_public_id:
+        trip_public_id = hashlib.sha1(f"{route}|{date_text}|{distance}|{income}".encode("utf-8")).hexdigest()[:12]
+
+    driver_name = safe_str(
+        pick("driverName", "driver_name", "fahrer", "name", fallback="")
+        or user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
+        or "EifelLog Fahrer"
+    )
+
+    status = safe_str(pick("status", fallback="Abgeschlossen"), "Abgeschlossen")
+    if status.lower() in {"fertig", "submitted", "completed", "done", "delivered"}:
+        status = "Abgeschlossen"
+
+    map_embed_url = safe_str(pick("map_embed_url", "map_url", "route_map_url", fallback=""))
+    waypoints = pick("waypoints", "route_points", "zwischenstopps", fallback=[])
+    if not isinstance(waypoints, list):
+        waypoints = []
 
     return {
-        "status": safe_str(entry.get("status"), "Fertig"),
+        "id": trip_public_id,
+        "trip_id": trip_public_id,
+        "fahrt_id": trip_public_id,
+        "auftrag_id": safe_str(pick("jobId", "job_id", fallback=trip_public_id)),
+        "receipt_id": safe_str(pick("receiptId", "receipt_id", fallback="")),
+        "receipt_number": safe_str(pick("receiptNumber", "receipt_number", fallback="")),
+        "status": status,
+        "date": date_text,
+        "datum": date_text,
+        "date_time": created_at_text,
         "route": route,
         "sourceCity": source,
         "destinationCity": destination,
-        "cargo": safe_str(entry.get("cargo") or entry.get("cargoName"), "-"),
-        "distanceKm": distance,
-        "income": income,
-        "driverName": (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"),
-        "createdAt": created_at_text,
+        "from_city": source,
+        "to_city": destination,
+        "start": source,
+        "destination": destination,
+        "target": destination,
+        "cargo": safe_str(pick("cargo", "cargoName", "freight", "fracht", "jobCargo", fallback="-"), "-"),
+        "freight": safe_str(pick("cargo", "cargoName", "freight", "fracht", "jobCargo", fallback="-"), "-"),
+        "distanceKm": round(distance, 1),
+        "distance": round(distance, 1),
+        "km": round(distance, 1),
+        "income": round(income, 2),
+        "earnings": round(income, 2),
+        "revenue": round(income, 2),
+        "truck": truck,
+        "lkw": truck,
+        "vehicle": truck,
+        "fahrzeug": truck,
+        "truck_plate": truck_plate,
+        "kennzeichen": truck_plate,
+        "plate": truck_plate,
+        "trailer": trailer,
+        "auflieger": trailer,
+        "driver": driver_name,
+        "fahrer": driver_name,
+        "departure": departure,
+        "start_time": departure,
+        "abfahrt": departure,
+        "arrival": arrival,
+        "end_time": arrival,
+        "ankunft": arrival,
+        "duration": safe_str(pick("duration", "dauer", "drive_time", "driving_time", fallback="-"), "-"),
+        "fuel_used": fuel_used,
+        "fuel": fuel_used,
+        "diesel": fuel_used,
+        "verbrauch": fuel_used,
+        "avg_speed": avg_speed,
+        "average_speed": avg_speed,
+        "durchschnitt": avg_speed,
+        "note": safe_str(pick("note", "notes", "bemerkung", fallback="")),
+        "notes": safe_str(pick("note", "notes", "bemerkung", fallback="")),
+        "map_embed_url": map_embed_url,
+        "map_url": map_embed_url,
+        "route_map_url": map_embed_url,
+        "waypoints": waypoints,
+        "route_points": waypoints,
+        "game": safe_str(pick("game", fallback="ETS2/ATS"), "ETS2/ATS"),
+        "driver_card_id": safe_str(pick("fahrerkarte_id", "driver_card_id", fallback="")),
+        "pdf_url": safe_str(pick("pdf_url", "pdfFilePath", "file_path", fallback="")),
         "_sortDate": sort_date
     }
 
@@ -4991,48 +5219,28 @@ def calculate_driver_level(total_km=0, completed_trips=0, xp_value=None):
 def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
     user_doc = user_doc or {}
     entries = []
+    seen_ids = set()
 
     for raw_entry in get_user_job_entries(user_doc):
         if not isinstance(raw_entry, dict):
             continue
 
         normalized = normalize_logbook_entry(raw_entry, user_doc)
-        created_at_raw = raw_entry.get("createdAt") or raw_entry.get("created_at") or raw_entry.get("finishedAt") or raw_entry.get("submitted_at") or raw_entry.get("timestamp")
-        date_text = "-"
+        public_id = safe_str(normalized.get("id") or normalized.get("trip_id"))
+        if public_id and public_id in seen_ids:
+            continue
+        if public_id:
+            seen_ids.add(public_id)
 
-        if isinstance(created_at_raw, datetime):
-            date_text = created_at_raw.strftime("%d.%m.%Y")
-            sort_date = created_at_raw
-        else:
-            created_at_text = safe_str(created_at_raw)
-            sort_date = normalized.get("_sortDate") or datetime.min
-            if created_at_text:
-                try:
-                    iso_text = created_at_text.replace("Z", "+00:00")
-                    parsed_date = datetime.fromisoformat(iso_text)
-                    date_text = parsed_date.strftime("%d.%m.%Y")
-                    sort_date = parsed_date.replace(tzinfo=None)
-                except Exception:
-                    date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
-
-        entries.append({
-            "date": date_text,
-            "route": normalized.get("route") or "-",
-            "from_city": normalized.get("sourceCity") or "-",
-            "to_city": normalized.get("destinationCity") or "-",
-            "cargo": normalized.get("cargo") or "-",
-            "distance": round(parse_number(normalized.get("distanceKm"), 0), 1),
-            "earnings": round(parse_number(normalized.get("income"), 0), 2),
-            "status": normalized.get("status") or "Abgeschlossen",
-            "_sortDate": sort_date
-        })
+        entries.append(normalized)
 
     entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
 
     cleaned = []
     for entry in entries[:limit]:
-        entry.pop("_sortDate", None)
-        cleaned.append(entry)
+        clean_entry = dict(entry)
+        clean_entry.pop("_sortDate", None)
+        cleaned.append(clean_entry)
     return cleaned
 
 
@@ -5068,16 +5276,35 @@ def get_driver_current_trip_for_dashboard(user_doc):
     if isinstance(updated_at, datetime):
         departure = updated_at.strftime("%H:%M")
 
+    truck = safe_str(current_job.get("truck") or live.get("truck"), "-")
+
     return {
+        "id": safe_str(current_job.get("jobId") or live.get("jobId") or "current"),
+        "trip_id": safe_str(current_job.get("jobId") or live.get("jobId") or "current"),
         "from_city": source,
         "to_city": destination,
+        "start": source,
+        "destination": destination,
+        "route": f"{source} → {destination}",
         "departure": departure,
+        "start_time": departure,
         "progress": round(max(0, min(100, progress))),
         "cargo": cargo,
+        "freight": cargo,
         "distance": round(trip_distance, 1),
+        "km": round(trip_distance, 1),
         "remaining_distance": round(parse_number(live.get("remainingDistanceKm"), 0), 1),
         "expected_earnings": round(expected_earnings, 2),
-        "status": safe_str(current_job.get("status"), "Aktiv" if user_doc.get("tracker_online") else "Warte")
+        "earnings": round(expected_earnings, 2),
+        "income": round(expected_earnings, 2),
+        "status": safe_str(current_job.get("status"), "Aktiv" if user_doc.get("tracker_online") else "Warte"),
+        "truck": truck,
+        "lkw": truck,
+        "vehicle": truck,
+        "fuel_used": f"{parse_number(live.get('fuelLiters'), -1):.1f} l".replace(".", ",") if parse_number(live.get("fuelLiters"), -1) >= 0 else "-",
+        "avg_speed": f"{parse_number(live.get('speedKmh'), 0):.0f} km/h",
+        "game": safe_str(live.get("game"), "ETS2/ATS"),
+        "eta": safe_str(live.get("eta"), "-")
     }
 
 
@@ -6859,6 +7086,16 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
         "incomeText": format_money(income, billing.get("currency")),
         "driverName": receipt_doc.get("driver", {}).get("name"),
         "createdAt": receipt_doc.get("submitted_at").isoformat() + "Z",
+        "truck": tour.get("truck", "-"),
+        "lkw": tour.get("truck", "-"),
+        "vehicle": tour.get("truck", "-"),
+        "game": tour.get("game", "ETS2/ATS"),
+        "fuel_used": tour.get("fuel_liters", "-"),
+        "fuel_percent": tour.get("fuel_percent", 0),
+        "avg_speed": tour.get("speed_kmh", "-"),
+        "damage_percent": tour.get("damage_percent", 0),
+        "route_progress_percent": tour.get("route_progress_percent", 100),
+        "driver_card_id": receipt_doc.get("driver", {}).get("fahrerkarte_id"),
         "billingRelevant": True,
         "pdfFilePath": receipt_doc.get("pdf", {}).get("file_path"),
         "discordMessageId": receipt_doc.get("discord", {}).get("message_id")
@@ -9083,6 +9320,72 @@ def dashboard():
         user_documents=user_documents,
         **registration_context,
         **driver_dashboard_context
+    )
+
+
+@app.route("/dashboard/detail")
+@app.route("/dashboard/detail.html")
+def dashboard_detail():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session["user"]
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen.", "error")
+        return redirect(url_for("home"))
+
+    discord_id = safe_str(user.get("id"))
+    db_user = users_collection.find_one({"discord_id": discord_id})
+
+    if not db_user:
+        db_user = {
+            "discord_id": discord_id,
+            "username": user.get("username"),
+            "discord_username": user.get("discord_username"),
+            "display_name": user.get("username"),
+            "avatar": user.get("avatar"),
+            "roles": user_roles
+        }
+
+    primary_role_name = get_primary_role_name(user_roles)
+    latest_registration = get_latest_registration_request_for_user(discord_id)
+    registration_context = dashboard_registration_context(db_user, latest_registration)
+    driver_dashboard_context = prepare_driver_dashboard_context(db_user)
+
+    # Für die Detailseite mehr Einträge laden als im Dashboard.
+    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(db_user, limit=150)
+    detail_trip_id = safe_str(request.args.get("trip_id") or request.args.get("id") or request.args.get("fahrt_id"))
+
+    selected_trip = fahrtenbuch_entries[0] if fahrtenbuch_entries else {}
+    if detail_trip_id:
+        for trip in fahrtenbuch_entries:
+            candidate_ids = {
+                safe_str(trip.get("id")),
+                safe_str(trip.get("trip_id")),
+                safe_str(trip.get("fahrt_id")),
+                safe_str(trip.get("auftrag_id")),
+                safe_str(trip.get("receipt_id")),
+                safe_str(trip.get("receipt_number")),
+            }
+            if detail_trip_id in candidate_ids:
+                selected_trip = trip
+                break
+
+    return render_template(
+        "detail.html",
+        current_user=user,
+        primary_role_name=primary_role_name,
+        fahrtenbuch_entries=fahrtenbuch_entries,
+        driver_trips=fahrtenbuch_entries,
+        detail_trip=selected_trip,
+        selected_trip=selected_trip,
+        driver_trip_detail=selected_trip,
+        driver_current_trip=driver_dashboard_context.get("driver_current_trip"),
+        driver_stats=driver_dashboard_context.get("driver_stats"),
+        **registration_context
     )
 
 
