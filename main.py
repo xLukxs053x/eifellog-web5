@@ -4994,8 +4994,182 @@ def get_active_drivers():
 
     return active_drivers
 
+# ==========================================
+# TRACKER ACTIVE DRIVER / LOGBOOK / STATE FIX
+# ==========================================
+
+NO_JOB_VALUES = {"", "-", "Freie Fahrt", "Free Ride", "Free Drive", "Free Roam"}
+
+
+def tracker_live_is_fresh(user_doc, max_age_minutes=2):
+    """
+    Live-Daten gelten nur als frisch, wenn tracker_live_updated_at innerhalb des Zeitfensters liegt.
+    """
+    updated_at = (user_doc or {}).get("tracker_live_updated_at")
+    if not isinstance(updated_at, datetime):
+        return False
+
+    return updated_at >= now_utc() - timedelta(minutes=max_age_minutes)
+
+
+def tracker_live_has_connection(live):
+    """
+    Prüft, ob wirklich eine aktive Verbindung/Game-Telemetrie vorhanden ist.
+    """
+    live = live or {}
+
+    telemetry_connected = bool(live.get("telemetryConnected"))
+    game_detected = bool(live.get("gameProcessDetected"))
+    is_connected = bool(live.get("isConnected"))
+
+    return telemetry_connected or game_detected or is_connected
+
+
+def tracker_live_is_stopped(live):
+    """
+    Erkennt gestoppte/offline Tracker-Zustände.
+    """
+    live = live or {}
+    status_text = safe_str(live.get("statusText")).lower()
+
+    return status_text in {
+        "",
+        "stopped",
+        "offline",
+        "disconnected",
+        "not connected",
+        "not_connected"
+    }
+
+
+def tracker_live_has_real_job(live):
+    """
+    Erkennt, ob die Live-Daten wirklich einen Auftrag enthalten.
+    Freie Fahrt zählt NICHT als Auftrag.
+    """
+    live = live or {}
+
+    source_city = safe_str(live.get("sourceCity"))
+    destination_city = safe_str(live.get("destinationCity"))
+    cargo = safe_str(live.get("cargo"))
+    job_id = safe_str(live.get("jobId"))
+
+    source_empty = source_city in NO_JOB_VALUES
+    destination_empty = destination_city in NO_JOB_VALUES
+    cargo_empty = cargo in NO_JOB_VALUES
+    job_id_empty = job_id in NO_JOB_VALUES
+
+    if source_empty and destination_empty and cargo_empty and job_id_empty:
+        return False
+
+    if cargo_empty and destination_empty and job_id_empty:
+        return False
+
+    return True
+
+
+def driver_is_really_active(user_doc):
+    """
+    Finaler Schutz gegen Ghost-Driver.
+
+    Ein Fahrer ist nur aktiv, wenn:
+    - tracker_online true ist
+    - Live-Daten frisch sind
+    - echte Verbindung/Telemetrie vorhanden ist
+    - statusText nicht stopped/offline ist
+    - kein Freie-Fahrt/Leerzustand vorliegt
+    """
+    user_doc = user_doc or {}
+    live = user_doc.get("tracker_live") or {}
+
+    if not user_doc.get("tracker_online"):
+        return False
+
+    if not tracker_live_is_fresh(user_doc, max_age_minutes=2):
+        return False
+
+    if not tracker_live_has_connection(live):
+        return False
+
+    if tracker_live_is_stopped(live):
+        return False
+
+    if not tracker_live_has_real_job(live):
+        return False
+
+    return True
+
+
+def clear_ghost_driver_state(user_doc):
+    """
+    Bereinigt hängen gebliebene Online-/Live-Zustände in MongoDB.
+    """
+    if not user_doc or not user_doc.get("_id"):
+        return
+
+    now = now_utc()
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_online": False,
+                "tracker_current_job": None,
+                "tracker_current_job_key": "",
+
+                "tracker_last_cargo": "-",
+                "tracker_last_destination": "-",
+
+                "tracker_live.isConnected": False,
+                "tracker_live.gameProcessDetected": False,
+                "tracker_live.telemetryConnected": False,
+                "tracker_live.statusText": "stopped",
+                "tracker_live.sourceCity": "-",
+                "tracker_live.destinationCity": "-",
+                "tracker_live.cargo": "-",
+                "tracker_live.jobId": "",
+                "tracker_live.eta": "-",
+                "tracker_live.speedKm": 0,
+                "tracker_live.rpm": 0,
+                "tracker_live.fuelPercent": 0,
+                "tracker_live.damagePercent": 0,
+                "tracker_live.completedDistanceKm": 0,
+                "tracker_live.tripDistanceKm": 0,
+                "tracker_live.remainingDistanceKm": 0,
+                "tracker_live.plannedDistanceKm": 0,
+                "tracker_live.routeProgressPercent": 0,
+                "tracker_live.timestampUtc": now.isoformat() + "Z",
+
+                "updated_at": now,
+                "last_activity_at": now
+            }
+        }
+    )
+
+
+def get_active_drivers():
+    """
+    Gibt nur echte aktive Fahrer zurück und räumt Ghost-Driver automatisch auf.
+    Wichtig: Query bewusst nur auf tracker_online=True, damit auch alte hängende User bereinigt werden.
+    """
+    users = users_collection.find({
+        "tracker_online": True
+    }).sort("tracker_live_updated_at", DESCENDING)
+
+    active_drivers = []
+
+    for user_doc in users:
+        if driver_is_really_active(user_doc):
+            active_drivers.append(build_active_driver_payload(user_doc))
+        else:
+            clear_ghost_driver_state(user_doc)
+
+    return active_drivers
+
+
 def build_logbook_payload(limit=30):
     entries = []
+
     for user_doc in users_collection.find({}):
         for raw_entry in get_user_job_entries(user_doc):
             entries.append(normalize_logbook_entry(raw_entry, user_doc))
@@ -5003,29 +5177,38 @@ def build_logbook_payload(limit=30):
         live = user_doc.get("tracker_live") or {}
         updated_at = user_doc.get("tracker_live_updated_at")
 
-        if user_doc.get("tracker_online") and isinstance(updated_at, datetime):
-            if updated_at >= now_utc() - timedelta(minutes=2):
-                current_job = current_job_from_live(live)
-                if current_job:
-                    entries.append({
-                        "status": "Aktiv",
-                        "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
-                        "sourceCity": current_job.get("sourceCity", "-"),
-                        "destinationCity": current_job.get("destinationCity", "-"),
-                        "cargo": current_job.get("cargo", "-"),
-                        "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
-                        "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
-                        "driverName": (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"),
-                        "createdAt": datetime_to_iso(updated_at),
-                        "_sortDate": updated_at
-                    })
+        # Aktive Live-Fahrt nur eintragen, wenn es wirklich eine echte aktive Tour ist.
+        if driver_is_really_active(user_doc):
+            current_job = current_job_from_live(live)
+
+            if current_job:
+                entries.append({
+                    "status": "Aktiv",
+                    "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
+                    "sourceCity": current_job.get("sourceCity", "-"),
+                    "destinationCity": current_job.get("destinationCity", "-"),
+                    "cargo": current_job.get("cargo", "-"),
+                    "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
+                    "income": round(parse_number(live.get("tripDistanceKm"), 0) * TOUR_RECEIPT_RATE_PER_KM),
+                    "driverName": (
+                        user_doc.get("display_name")
+                        or user_doc.get("username")
+                        or user_doc.get("discord_username")
+                        or "EifelLog Fahrer"
+                    ),
+                    "createdAt": datetime_to_iso(updated_at),
+                    "_sortDate": updated_at
+                })
 
     entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
+
     clean_entries = []
     for entry in entries[:limit]:
         entry.pop("_sortDate", None)
         clean_entries.append(entry)
+
     return clean_entries
+
 
 def build_company_stats_payload():
     # Company-All-Time kommt aus einem eigenen MongoDB-Eintrag
@@ -5033,8 +5216,16 @@ def build_company_stats_payload():
     users = list(users_collection.find({}))
     persistent_stats = get_company_all_time_stats()
 
-    company_km = positive_number(persistent_stats.get("all_time_km") or persistent_stats.get("allTimeKilometers"), 0.0)
-    company_income = positive_number(persistent_stats.get("all_time_income") or persistent_stats.get("companyIncome"), 0.0)
+    company_km = positive_number(
+        persistent_stats.get("all_time_km")
+        or persistent_stats.get("allTimeKilometers"),
+        0.0
+    )
+    company_income = positive_number(
+        persistent_stats.get("all_time_income")
+        or persistent_stats.get("companyIncome"),
+        0.0
+    )
     jobs_all_time = parse_int(persistent_stats.get("jobs_all_time"), 0)
     deliveries = parse_int(persistent_stats.get("deliveries_all_time"), 0)
 
@@ -5043,28 +5234,63 @@ def build_company_stats_payload():
     if company_km <= 0 and company_income <= 0 and jobs_all_time <= 0 and deliveries <= 0:
         for user_doc in users:
             stats = get_profile_stats(user_doc)
+
             company_km += positive_number(stats.get("km"), 0.0)
             company_income += positive_number(stats.get("income") or stats.get("revenue"), 0.0)
             deliveries += parse_int(stats.get("deliveries"), 0)
             jobs_all_time += parse_int(stats.get("jobs"), parse_int(stats.get("deliveries"), 0))
 
-    monthly_kilometers = list(persistent_stats.get("monthly_kilometers") or persistent_stats.get("monthlyKilometers") or [])
-    income_series = list(persistent_stats.get("income_series") or persistent_stats.get("incomeSeries") or [])
-    monthly_labels = list(persistent_stats.get("monthly_labels") or persistent_stats.get("monthlyLabels") or [])
+    monthly_kilometers = list(
+        persistent_stats.get("monthly_kilometers")
+        or persistent_stats.get("monthlyKilometers")
+        or []
+    )
+    income_series = list(
+        persistent_stats.get("income_series")
+        or persistent_stats.get("incomeSeries")
+        or []
+    )
+    monthly_labels = list(
+        persistent_stats.get("monthly_labels")
+        or persistent_stats.get("monthlyLabels")
+        or []
+    )
 
     if len(monthly_kilometers) != 6 or len(income_series) != 6:
         month_keys, monthly_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
+
         for user_doc in users:
             job_entries = get_user_job_entries(user_doc)
+
             for job in job_entries:
-                distance = positive_number(job.get("distanceKm") or job.get("completedDistanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
-                income = positive_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
-                created_at = coerce_receipt_datetime(job.get("createdAt") or job.get("created_at") or job.get("submittedAt") or job.get("submitted_at"), fallback=now_utc())
+                distance = positive_number(
+                    job.get("distanceKm")
+                    or job.get("completedDistanceKm")
+                    or job.get("distance")
+                    or job.get("tripDistanceKm"),
+                    0
+                )
+                income = positive_number(
+                    job.get("income")
+                    or job.get("revenue")
+                    or job.get("money"),
+                    0
+                )
+                created_at = coerce_receipt_datetime(
+                    job.get("createdAt")
+                    or job.get("created_at")
+                    or job.get("submittedAt")
+                    or job.get("submitted_at"),
+                    fallback=now_utc()
+                )
+
                 month_key = created_at.strftime("%Y-%m") if isinstance(created_at, datetime) else month_keys[-1]
+
                 if month_key in month_keys:
                     index = month_keys.index(month_key)
                 else:
                     index = -1
+
                 monthly_kilometers[index] += distance
                 income_series[index] += income
 
@@ -5074,30 +5300,49 @@ def build_company_stats_payload():
         "companyIncome": round(company_income),
         "income": round(company_income),
         "revenue": round(company_income),
+
         "allTimeKilometers": round(company_km, 1),
         "allTimeKm": round(company_km, 1),
         "companyAllTimeKilometers": round(company_km, 1),
         "companyAllTimeKm": round(company_km, 1),
         "kilometers": round(company_km, 1),
+
         "jobsAllTime": jobs_all_time,
         "jobs": jobs_all_time,
         "totalJobs": jobs_all_time,
+
         "deliveries": deliveries,
         "totalDeliveries": deliveries,
+
         "activeDrivers": active_driver_count,
-        "monthlyKilometers": [round(parse_number(value, 0), 1) for value in monthly_kilometers],
-        "incomeSeries": [round(parse_number(value, 0), 2) for value in income_series],
+
+        "monthlyKilometers": [
+            round(parse_number(value, 0), 1)
+            for value in monthly_kilometers
+        ],
+        "incomeSeries": [
+            round(parse_number(value, 0), 2)
+            for value in income_series
+        ],
         "monthlyLabels": monthly_labels,
+
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "updatedAt": datetime_to_iso(persistent_stats.get("updated_at"))
     }
+
 
 def tracker_state_payload(user_doc):
     active_drivers = get_active_drivers()
     company_stats = build_company_stats_payload()
     logbook = build_logbook_payload(limit=30)
+
     live = user_doc.get("tracker_live") or {}
-    current_job = current_job_from_live(live)
+
+    # CurrentJob nur anzeigen, wenn der eigene User wirklich aktiv ist.
+    if driver_is_really_active(user_doc):
+        current_job = current_job_from_live(live)
+    else:
+        current_job = None
 
     return {
         "success": True,
@@ -5109,7 +5354,6 @@ def tracker_state_payload(user_doc):
         "lastDeliveries": logbook,
         "activeDrivers": active_drivers
     }
-
 
 
 def dashboard_number(value, fallback=0.0):
