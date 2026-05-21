@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from bson.objectid import ObjectId
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import HTTPException
 
 
 try:
@@ -172,18 +173,54 @@ TOUR_COMPLETED_BLOCKS_RESTART_MINUTES = int(env_float(
 
 @app.after_request
 def add_tracker_headers(response):
+    # WebView2 / lokale Tracker-Apps senden je nach Version unterschiedliche
+    # Header. Diese Antworten bleiben deshalb bewusst breit CORS-freundlich,
+    # damit die Oberfläche nicht mit browserseitigem "Failed to fetch" endet.
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, "
-        "X-Tracker-Api-Key, X-Requested-With"
+        "Content-Type, Accept, Origin, Authorization, X-Tracker-Token, X-Tracker-Code, "
+        "X-Tracker-Client-Token, X-Client-Token, X-Tracker-Api-Key, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    response.headers["Access-Control-Max-Age"] = "86400"
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Type"
     return response
 
 
 @app.route("/api/<path:any_path>", methods=["OPTIONS"])
 def api_options(any_path):
     return jsonify({"success": True})
+
+
+def is_api_like_request_path():
+    path = safe_str(request.path)
+    return path.startswith("/api/") or path in {"/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"}
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception_json(error):
+    if is_api_like_request_path():
+        return jsonify({
+            "success": False,
+            "error": safe_str(getattr(error, "description", ""), "HTTP-Fehler"),
+            "statusCode": int(getattr(error, "code", 500) or 500),
+            "path": request.path,
+        }), int(getattr(error, "code", 500) or 500)
+    return error
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_api_exception(error):
+    if is_api_like_request_path():
+        app.logger.exception("Unerwarteter API-/Tracker-Fehler")
+        return jsonify({
+            "success": False,
+            "error": "Interner Serverfehler im Tracker-Backend.",
+            "details": safe_str(error),
+            "path": request.path,
+        }), 500
+    raise error
 
 
 # ==========================================
@@ -4112,9 +4149,35 @@ def normalize_tracker_code(code):
 
 def get_client_token_from_request(data=None):
     data = data or {}
+    if not isinstance(data, dict):
+        data = {}
+
     authorization = safe_str(request.headers.get("Authorization"))
-    if authorization.lower().startswith("bearer "): authorization = authorization[7:].strip()
-    return (safe_str(data.get("clientToken")) or safe_str(request.headers.get("X-Tracker-Token")) or authorization or safe_str(request.args.get("clientToken")))
+    if authorization.lower().startswith("bearer "):
+        authorization = authorization[7:].strip()
+
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+
+    return (
+        safe_str(data.get("clientToken"))
+        or safe_str(data.get("trackerClientToken"))
+        or safe_str(data.get("client_token"))
+        or safe_str(data.get("tracker_token"))
+        or safe_str(data.get("token"))
+        or safe_str(payload.get("clientToken"))
+        or safe_str(payload.get("trackerClientToken"))
+        or safe_str(payload.get("client_token"))
+        or safe_str(payload.get("tracker_token"))
+        or safe_str(payload.get("token"))
+        or safe_str(request.headers.get("X-Tracker-Token"))
+        or safe_str(request.headers.get("X-Tracker-Client-Token"))
+        or safe_str(request.headers.get("X-Client-Token"))
+        or authorization
+        or safe_str(request.args.get("clientToken"))
+        or safe_str(request.args.get("trackerClientToken"))
+        or safe_str(request.args.get("client_token"))
+        or safe_str(request.args.get("token"))
+    )
 
 def find_tracker_user_by_client_token(client_token):
     client_token = safe_str(client_token)
@@ -4491,31 +4554,167 @@ def tracker_ms(value, fallback=0):
         return fallback
 
 
+def tracker_first_present_value(source, *keys, fallback=None):
+    source = source or {}
+    if not isinstance(source, dict):
+        return fallback
+    for key in keys:
+        if key in source and source.get(key) not in (None, ""):
+            return source.get(key)
+    return fallback
+
+
+def tracker_work_status_from_value(value, fallback="offDuty"):
+    raw = safe_str(value).lower()
+    raw = raw.replace("_", " ").replace("-", " ").strip()
+    raw = re.sub(r"\s+", " ", raw)
+
+    if raw in {
+        "working", "work", "on duty", "onduty", "active", "aktiv",
+        "arbeitszeit", "arbeit", "dienst", "schicht", "shift",
+        "driving", "drive", "fahrzeit", "fahren", "fahre", "loading", "rampe"
+    }:
+        return "working"
+
+    if raw in {
+        "pause", "paused", "break", "rest break", "ruhepause", "rast", "pausiert"
+    }:
+        return "pause"
+
+    if raw in {
+        "offduty", "off duty", "off", "feierabend", "ruhezeit", "rest",
+        "stopped", "stop", "offline", "idle", "home", "frei"
+    }:
+        return "offDuty"
+
+    return fallback if fallback in {"working", "pause", "offDuty"} else "offDuty"
+
+
+def tracker_work_session_from_request_payload(data):
+    data = data or {}
+    if not isinstance(data, dict):
+        return {}
+
+    nested = (
+        data.get("workSession")
+        or data.get("work_session")
+        or data.get("driverWorkSession")
+        or data.get("driver_work_session")
+        or data.get("tachograph")
+        or data.get("activitySession")
+        or data.get("activity_session")
+        or {}
+    )
+    if isinstance(nested, dict) and nested:
+        return nested
+
+    # Manche Tracker-Versionen senden den Arbeitsstatus flach am Root-Payload.
+    # Das normale Job-Feld "status=started/completed" wird hier absichtlich
+    # nicht als Arbeitszeit interpretiert.
+    root_status = tracker_first_present_value(
+        data,
+        "workStatus", "work_status", "driverWorkStatus", "driver_work_status",
+        "activityState", "activity_state", "driverActivity", "driver_activity",
+        "currentActivity", "current_activity",
+        fallback=None,
+    )
+
+    root_keys = (
+        "workMs", "work_ms", "workTimeMs", "work_time_ms", "arbeitszeitMs",
+        "driveMs", "drive_ms", "driveTimeMs", "drive_time_ms", "fahrzeitMs",
+        "breakMs", "break_ms", "pauseMs", "pause_ms",
+        "restMs", "rest_ms", "ruhezeitMs",
+        "continuousDriveMs", "continuous_drive_ms", "currentBreakMs", "current_break_ms",
+        "weeklyRestMs", "weekly_rest_ms", "shiftStartedAt", "lastShiftEndedAt", "updatedAt"
+    )
+
+    if root_status is None and not any(key in data for key in root_keys):
+        return {}
+
+    result = {key: data.get(key) for key in root_keys if key in data}
+    if root_status is not None:
+        result["status"] = root_status
+    return result
+
+
+def tracker_request_has_job_fields(data):
+    data = data or {}
+    if not isinstance(data, dict):
+        return False
+    keys = {
+        "jobId", "job_id", "id", "deliveryId", "delivery_id",
+        "sourceCity", "source_city", "source", "from", "routeOrigin",
+        "destinationCity", "destination_city", "destination", "to", "routeDestination", "activeDestination",
+        "cargo", "cargoName", "freight", "jobCargo",
+        "truck", "truckName", "truckModel", "truck_model",
+        "plannedDistanceKm", "remainingDistanceKm", "completedDistanceKm", "routeProgressPercent",
+        "rpm", "engineRpm", "fuelPercent", "fuelLiters", "eta", "etaText"
+    }
+    return any(key in data and safe_str(data.get(key)) for key in keys)
+
+
+def tracker_request_telemetry_payload(data, user_doc=None):
+    data = data or {}
+    if not isinstance(data, dict):
+        data = {}
+    for key in ("telemetry", "snapshot", "live", "trackerLive", "tracker_live", "payload"):
+        value = data.get(key)
+        if isinstance(value, dict) and value:
+            return value
+    if tracker_request_has_job_fields(data):
+        return data
+    user_live = (user_doc or {}).get("tracker_live") or {}
+    return user_live if isinstance(user_live, dict) else {}
+
+
 def tracker_normalize_work_session(raw=None, previous=None):
     previous = previous or tracker_default_work_session()
     raw = raw or {}
+    if not isinstance(raw, dict):
+        raw = {}
 
-    status = safe_str(raw.get("status") or previous.get("status"), "offDuty")
-    if status not in {"working", "pause", "offDuty"}:
-        status = "offDuty"
+    incoming_status = tracker_first_present_value(
+        raw,
+        "status", "workStatus", "work_status", "driverWorkStatus", "driver_work_status",
+        "activityState", "activity_state", "driverActivity", "driver_activity",
+        "currentActivity", "current_activity",
+        fallback=previous.get("status"),
+    )
+    status = tracker_work_status_from_value(incoming_status, fallback=previous.get("status") or "offDuty")
 
+    def ms_value(*keys, previous_key=None, default=0):
+        previous_key = previous_key or (keys[0] if keys else None)
+        return tracker_ms(
+            tracker_first_present_value(raw, *keys, fallback=None),
+            tracker_ms(previous.get(previous_key), default)
+        )
+
+    now_ms = int(now_utc().timestamp() * 1000)
     normalized = dict(previous)
     normalized.update({
         "status": status,
-        "workMs": tracker_ms(raw.get("workMs"), tracker_ms(previous.get("workMs"), 0)),
-        "driveMs": tracker_ms(raw.get("driveMs"), tracker_ms(previous.get("driveMs"), 0)),
-        "breakMs": tracker_ms(raw.get("breakMs"), tracker_ms(previous.get("breakMs"), 0)),
-        "restMs": tracker_ms(raw.get("restMs"), tracker_ms(previous.get("restMs"), 0)),
-        "weeklyRestMs": tracker_ms(raw.get("weeklyRestMs"), tracker_ms(previous.get("weeklyRestMs"), 0)),
-        "continuousDriveMs": tracker_ms(raw.get("continuousDriveMs"), tracker_ms(previous.get("continuousDriveMs"), 0)),
-        "currentBreakMs": tracker_ms(raw.get("currentBreakMs"), tracker_ms(previous.get("currentBreakMs"), 0)),
-        "splitBreakFirstMs": tracker_ms(raw.get("splitBreakFirstMs"), tracker_ms(previous.get("splitBreakFirstMs"), 0)),
-        "reducedDailyRestUsed": tracker_ms(raw.get("reducedDailyRestUsed"), tracker_ms(previous.get("reducedDailyRestUsed"), 0)),
-        "weeklyRestDue": bool_from_payload(raw.get("weeklyRestDue"), fallback=bool(previous.get("weeklyRestDue", False))),
+        "workMs": ms_value("workMs", "work_ms", "workTimeMs", "work_time_ms", "workingMs", "dutyMs", "shiftMs", "arbeitszeitMs", previous_key="workMs"),
+        "driveMs": ms_value("driveMs", "drive_ms", "driveTimeMs", "drive_time_ms", "drivingMs", "fahrzeitMs", previous_key="driveMs"),
+        "breakMs": ms_value("breakMs", "break_ms", "pauseMs", "pause_ms", "breakTimeMs", previous_key="breakMs"),
+        "restMs": ms_value("restMs", "rest_ms", "ruhezeitMs", "restTimeMs", previous_key="restMs"),
+        "weeklyRestMs": ms_value("weeklyRestMs", "weekly_rest_ms", "weeklyRestTimeMs", previous_key="weeklyRestMs"),
+        "continuousDriveMs": ms_value("continuousDriveMs", "continuous_drive_ms", "continuousDrivingMs", previous_key="continuousDriveMs"),
+        "currentBreakMs": ms_value("currentBreakMs", "current_break_ms", "currentPauseMs", previous_key="currentBreakMs"),
+        "splitBreakFirstMs": ms_value("splitBreakFirstMs", "split_break_first_ms", previous_key="splitBreakFirstMs"),
+        "reducedDailyRestUsed": ms_value("reducedDailyRestUsed", "reduced_daily_rest_used", previous_key="reducedDailyRestUsed"),
+        "weeklyRestDue": bool_from_payload(
+            tracker_first_present_value(raw, "weeklyRestDue", "weekly_rest_due", fallback=None),
+            fallback=bool(previous.get("weeklyRestDue", False))
+        ),
         "shiftStartedAt": raw.get("shiftStartedAt") if raw.get("shiftStartedAt") not in ["", None] else previous.get("shiftStartedAt"),
         "lastShiftEndedAt": raw.get("lastShiftEndedAt") if raw.get("lastShiftEndedAt") not in ["", None] else previous.get("lastShiftEndedAt"),
-        "updatedAt": tracker_ms(raw.get("updatedAt"), int(now_utc().timestamp() * 1000)),
+        "updatedAt": tracker_ms(raw.get("updatedAt"), now_ms),
     })
+
+    if normalized["status"] == "working" and not normalized.get("shiftStartedAt"):
+        normalized["shiftStartedAt"] = now_ms
+    if normalized["status"] == "offDuty" and not normalized.get("lastShiftEndedAt"):
+        normalized["lastShiftEndedAt"] = now_ms
 
     return normalized
 
@@ -7443,7 +7642,7 @@ def complete_tracker_tour_from_request():
     if not user_has_tracker_access(user_doc):
         return jsonify({"success": False, "error": "Tracker-Zugriff deaktiviert."}), 403
 
-    telemetry = data.get("telemetry") or data.get("snapshot") or user_doc.get("tracker_live") or {}
+    telemetry = tracker_request_telemetry_payload(data, user_doc=user_doc)
     if telemetry:
         telemetry = normalize_telemetry_payload(telemetry)
 
@@ -9129,6 +9328,8 @@ def tracker_driver_card_upload():
 
 
 @app.route("/api/tracker/work-session", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/worksession", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/arbeitszeit", methods=["GET", "POST", "OPTIONS"])
 def tracker_work_session():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -9139,7 +9340,7 @@ def tracker_work_session():
         return error_response
 
     if request.method == "POST":
-        incoming_session = data.get("workSession") or data.get("work_session") or data.get("driverWorkSession") or data.get("tachograph") or {}
+        incoming_session = tracker_work_session_from_request_payload(data)
         driver_card_id = safe_str(data.get("driverCardId") or data.get("driver_card_id"))
         session_doc = tracker_save_work_session(user_doc, incoming_session, driver_card_id=driver_card_id)
     else:
@@ -9160,6 +9361,8 @@ def tracker_work_session():
 
 
 @app.route("/api/tracker/jobs/start", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/job/start", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/start-job", methods=["GET", "POST", "OPTIONS"])
 def tracker_jobs_start():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -9213,7 +9416,7 @@ def tracker_jobs_start():
         return error_response
 
     driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
-    incoming_session = data.get("workSession") or data.get("work_session") or {}
+    incoming_session = tracker_work_session_from_request_payload(data)
     if incoming_session:
         session_doc = tracker_save_work_session(
             user_doc,
@@ -9236,7 +9439,7 @@ def tracker_jobs_start():
             "driverCard": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=user_doc) if driver_card_doc else None,
         }), 409
 
-    telemetry_raw = data.get("telemetry") or data.get("snapshot") or user_doc.get("tracker_live") or {}
+    telemetry_raw = tracker_request_telemetry_payload(data, user_doc=user_doc)
     telemetry = normalize_telemetry_payload(telemetry_raw) if telemetry_raw else {}
     job_id = tracker_job_id_from_payload(data, telemetry)
     current_job = current_job_from_live(telemetry) if telemetry else None
@@ -9342,6 +9545,9 @@ def tracker_tour_submit():
 
 @app.route("/api/tracker/job/complete", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/jobs/complete", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/job/finish", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/jobs/finish", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/job/completed", methods=["GET", "POST", "OPTIONS"])
 def tracker_job_complete():
     return complete_tracker_tour_from_request()
 
