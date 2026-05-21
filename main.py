@@ -4757,19 +4757,69 @@ def normalize_telemetry_payload(raw):
         "timestampUtc": now_utc().isoformat() + "Z"
     }
 
-    if clean["destinationCity"] == "Freie Fahrt": clean["destinationCity"] = "-"
+    no_job_values = {
+        "", "-", "none", "null", "undefined",
+        "freie fahrt", "freiefahrt",
+        "free ride", "freeride",
+        "free drive", "freedrive",
+        "free roam", "freeroam"
+    }
+
+    for key in ["sourceCity", "destinationCity", "cargo"]:
+        value = safe_str(clean.get(key), "-")
+        if value.lower() in no_job_values:
+            clean[key] = "-"
+        else:
+            clean[key] = value
+
+    job_id = safe_str(clean.get("jobId"))
+    if job_id.lower() in no_job_values:
+        clean["jobId"] = ""
+    else:
+        clean["jobId"] = job_id
+
     return clean
 
 def current_job_from_live(live):
     live = live or {}
-    destination = live.get("destinationCity") or "-"
-    source = live.get("sourceCity") or "-"
-    cargo = live.get("cargo") or "-"
 
-    if destination == "-" and source == "-" and cargo == "-": return None
+    no_job_values = {
+        "", "-", "none", "null", "undefined",
+        "freie fahrt", "freiefahrt",
+        "free ride", "freeride",
+        "free drive", "freedrive",
+        "free roam", "freeroam"
+    }
+
+    def is_no_job_value(value):
+        return safe_str(value).lower() in no_job_values
+
+    destination = safe_str(live.get("destinationCity"), "-")
+    source = safe_str(live.get("sourceCity"), "-")
+    cargo = safe_str(live.get("cargo"), "-")
+    job_id = safe_str(live.get("jobId"))
+
+    if is_no_job_value(destination):
+        destination = "-"
+    if is_no_job_value(source):
+        source = "-"
+    if is_no_job_value(cargo):
+        cargo = "-"
+    if is_no_job_value(job_id):
+        job_id = ""
+
+    has_route_or_cargo = not (destination == "-" and source == "-" and cargo == "-")
+
+    if not has_route_or_cargo and not job_id:
+        return None
+
+    # Ein einzelnes Cargo-Feld ohne Route und ohne echte Job-ID ist kein aktiver Auftrag.
+    # Das verhindert, dass Werte wie "Freie Fahrt" oder leere Telemetrie als Job auftauchen.
+    if not job_id and source == "-" and destination == "-":
+        return None
 
     return {
-        "jobId": safe_str(live.get("jobId")),
+        "jobId": job_id,
         "sourceCity": source,
         "destinationCity": destination,
         "cargo": cargo,
@@ -4782,6 +4832,38 @@ def current_job_from_live(live):
         "remainingDistanceKm": parse_number(live.get("remainingDistanceKm"), 0),
         "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
         "status": "Aktiv" if live.get("telemetryConnected") else "Warte"
+    }
+
+
+def tracker_completed_live_state(now=None, game="ETS2/ATS"):
+    """Leerer Live-State nach Tourabschluss, damit alte Aufträge nicht weiter erkannt werden."""
+    now = now or now_utc()
+    return {
+        "isConnected": False,
+        "gameProcessDetected": False,
+        "telemetryConnected": False,
+        "statusText": "stopped",
+        "game": safe_str(game, "ETS2/ATS"),
+        "truck": "-",
+        "sourceCity": "-",
+        "destinationCity": "-",
+        "cargo": "-",
+        "jobId": "",
+        "eta": "-",
+        "speedKmh": 0,
+        "rpm": 0,
+        "fuelPercent": 0,
+        "fuelLiters": -1,
+        "damagePercent": 0,
+        "completedDistanceKm": 0,
+        "tripDistanceKm": 0,
+        "remainingDistanceKm": 0,
+        "plannedDistanceKm": 0,
+        "routeProgressPercent": 0,
+        "engineEnabled": False,
+        "parkingBrake": False,
+        "driverName": "",
+        "timestampUtc": now.isoformat() + "Z"
     }
 
 def get_user_job_entries(user_doc):
@@ -6955,12 +7037,22 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
                 "tracker_all_time_jobs": new_jobs,
                 "tracker_all_time_updated_at": now,
 
+                # Wichtig für Dashboard/Buchhaltung/Listen:
+                # Beim Tourabschluss muss das User-Dokument frisch werden.
+                "updated_at": now,
+                "last_activity_at": now,
+
                 # Last-Trip bleibt separat und überschreibt nicht mehr All-Time
                 "tracker_last_completed_distance_km": distance,
                 "tracker_last_trip_distance_km": distance,
                 "tracker_online": False,
                 "tracker_current_job": None,
                 "tracker_current_job_key": "",
+                "tracker_live": tracker_completed_live_state(
+                    now=now,
+                    game=(user_doc.get("tracker_live") or {}).get("game") or "ETS2/ATS"
+                ),
+                "tracker_live_updated_at": now,
                 "tracker_active_tour_start_embed_sent": False,
                 "tracker_active_tour_start_embed_sent_key": "",
                 "tracker_active_tour_start_embed_reset_at": now,
@@ -7416,18 +7508,33 @@ def reset_active_tour_start_embed_state(user_doc, reason="tour_inactive"):
     if not user_doc.get("_id"):
         return
 
+    now = now_utc()
+    reason_text = safe_str(reason, "tour_inactive")
+    set_payload = {
+        "tracker_active_tour_start_embed_sent": False,
+        "tracker_active_tour_start_embed_sent_key": "",
+        "tracker_active_tour_start_embed_reset_at": now,
+        "tracker_active_tour_start_embed_reset_reason": reason_text,
+        "updated_at": now,
+        "last_activity_at": now,
+    }
+
+    if reason_text.startswith("tour_completed"):
+        set_payload.update({
+            "tracker_online": False,
+            "tracker_current_job": None,
+            "tracker_current_job_key": "",
+            "tracker_live": tracker_completed_live_state(
+                now=now,
+                game=(user_doc.get("tracker_live") or {}).get("game") or "ETS2/ATS"
+            ),
+            "tracker_live_updated_at": now,
+        })
+
     users_collection.update_one(
         {"_id": user_doc["_id"]},
-        {
-            "$set": {
-                "tracker_active_tour_start_embed_sent": False,
-                "tracker_active_tour_start_embed_sent_key": "",
-                "tracker_active_tour_start_embed_reset_at": now_utc(),
-                "tracker_active_tour_start_embed_reset_reason": safe_str(reason, "tour_inactive"),
-            }
-        },
+        {"$set": set_payload},
     )
-
 
 def unwrap_tracker_webhook_payload(data):
     data = data or {}
@@ -8551,10 +8658,13 @@ def tracker_telemetry_live():
 
     is_online = bool(telemetry.get("isConnected") or telemetry.get("gameProcessDetected") or telemetry.get("telemetryConnected"))
     previous_job_key = safe_str(user_doc.get("tracker_current_job_key"))
+    now = now_utc()
 
     update_payload = {
         "tracker_live": telemetry,
-        "tracker_live_updated_at": now_utc(),
+        "tracker_live_updated_at": now,
+        "updated_at": now,
+        "last_activity_at": now,
         "tracker_online": is_online,
         "tracker_last_game": telemetry.get("game"),
         "tracker_last_truck": telemetry.get("truck"),
@@ -8943,7 +9053,7 @@ def tracker_logout():
     if client_token:
         users_collection.update_one(
             {"tracker_client_token_hash": hash_secret(client_token)},
-            {"$unset": {"tracker_client_token_hash": ""}, "$set": {"tracker_logged_out_at": now_utc(), "tracker_online": False}}
+            {"$unset": {"tracker_client_token_hash": ""}, "$set": {"tracker_logged_out_at": now_utc(), "tracker_online": False, "updated_at": now_utc(), "last_activity_at": now_utc()}}
         )
 
     return jsonify({"success": True, "message": "Tracker lokal abgemeldet."})
