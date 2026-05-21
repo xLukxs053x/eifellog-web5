@@ -242,6 +242,123 @@
         box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.08);
     }
 
+    .bh2-file-input {
+        width: 100%;
+        min-height: 48px;
+        padding: 11px 14px;
+        border-radius: 16px;
+        border: 1px dashed rgba(var(--brand-green-rgb), 0.32);
+        background: rgba(0, 0, 0, 0.42);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        cursor: pointer;
+    }
+
+    .bh2-file-input::file-selector-button {
+        min-height: 30px;
+        margin-right: 12px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--brand-green), var(--brand-yellow));
+        color: #08100a;
+        font-family: "Orbitron", sans-serif;
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.10em;
+        cursor: pointer;
+    }
+
+    .bh2-file-help,
+    .bh2-file-meta {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.55;
+    }
+
+    .bh2-file-meta {
+        display: none;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.20);
+        background: rgba(var(--brand-green-rgb), 0.06);
+    }
+
+    .bh2-file-meta.active {
+        display: block;
+    }
+
+    .bh2-pdf-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 26px;
+        margin-top: 7px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(var(--brand-green-rgb), 0.08);
+        color: var(--brand-green);
+        font-family: "Orbitron", sans-serif;
+        font-size: 7.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .bh2-pdf-link:hover {
+        color: #fff;
+        background: rgba(var(--brand-green-rgb), 0.15);
+    }
+
+    .bh2-archive-panel {
+        display: none;
+    }
+
+    .bh2-archive-panel.active {
+        display: block;
+    }
+
+    .bh2-archive-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .bh2-archive-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.5fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        background: rgba(0, 0, 0, 0.28);
+    }
+
+    .bh2-archive-item strong {
+        display: block;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.11em;
+    }
+
+    .bh2-archive-item span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+    }
+
+
     .bh2-btn-row {
         display: flex;
         flex-wrap: wrap;
@@ -358,7 +475,7 @@
 
     .bh2-table {
         width: max-content;
-        min-width: 1320px;
+        min-width: 1680px;
         border-collapse: collapse;
     }
 
@@ -558,6 +675,10 @@
         .bh2-filter-grid {
             grid-template-columns: 1fr;
         }
+
+        .bh2-archive-item {
+            grid-template-columns: 1fr;
+        }
     }
 
     @media (max-width: 640px) {
@@ -732,9 +853,28 @@
                         </select>
                     </div>
 
+                    <div class="bh2-field">
+                        <label for="entry-job-status">Jobstatus</label>
+                        <select id="entry-job-status" class="bh2-select">
+                            <option value="Offen">Offen / in Bearbeitung</option>
+                            <option value="Abgeschlossen">Abgeschlossen</option>
+                            <option value="Abgerechnet">Abgerechnet</option>
+                            <option value="Archiviert">Archiviert</option>
+                        </select>
+                    </div>
+
+                    <div class="bh2-field full">
+                        <label for="entry-pdf">PDF Jobabschluss / Nachweis</label>
+                        <input id="entry-pdf" class="bh2-file-input" type="file" accept="application/pdf,.pdf">
+                        <div id="entry-pdf-meta" class="bh2-file-meta"></div>
+                        <div class="bh2-file-help">
+                            PDF hochladen, wenn ein Job abgeschlossen wird. Die Datei wird mit Archiv-ID, Upload-Zeit, Benutzer und SHA-256-Prüfsumme am Vorgang gespeichert und bleibt dadurch rückverfolgbar.
+                        </div>
+                    </div>
+
                     <div class="bh2-field full">
                         <label for="entry-note">Notiz</label>
-                        <textarea id="entry-note" class="bh2-textarea" maxlength="500" placeholder="Kurz notieren, was später nachvollziehbar sein muss: Zeitraum, Fahrt, Grund, Rückfrage, zuständige Person."></textarea>
+                        <textarea id="entry-note" class="bh2-textarea" maxlength="500" placeholder="Kurz notieren, was später nachvollziehbar sein muss: Zeitraum, Fahrt, Grund, Rückfrage, zuständige Person. Bei Jobabschluss wird die PDF automatisch dem Archiv zugeordnet."></textarea>
                     </div>
                 </div>
 
@@ -810,6 +950,7 @@
                     <button type="button" id="bh2-generate-report" class="btn-primary">Tagesbericht</button>
                     <button type="button" id="bh2-export-csv" class="btn-secondary">CSV Export</button>
                     <button type="button" id="bh2-export-json" class="btn-secondary">JSON Export</button>
+                    <button type="button" id="bh2-open-pdf-archive" class="btn-secondary">PDF Archiv</button>
                     <button type="button" id="bh2-send-request" class="btn-secondary">An Verwaltung senden</button>
                     <button type="button" id="bh2-clear-all" class="btn-secondary">Alles löschen</button>
                 </div>
@@ -855,6 +996,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     <option value="open">Zahlung offen</option>
                     <option value="receipt-missing">Beleg fehlt</option>
                     <option value="paid">Bezahlt</option>
+                    <option value="pdf">Mit PDF</option>
                 </select>
             </div>
 
@@ -868,6 +1010,8 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                             <th>Brutto</th>
                             <th>USt.</th>
                             <th>Beleg</th>
+                            <th>Job</th>
+                            <th>PDF Archiv</th>
                             <th>Status</th>
                             <th>Erfasst von</th>
                             <th>Info</th>
@@ -880,6 +1024,20 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     Noch keine Buchungen erfasst. Lege links deine erste Einnahme oder Ausgabe an.
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section id="bh2-pdf-archive-panel" class="glass-card bh2-panel bh2-archive-panel" aria-label="PDF Archiv">
+        <div class="bh2-section-head">
+            <div>
+                <h2>PDF-Archiv & Rückverfolgung</h2>
+                <p>Alle gespeicherten Jobabschluss-PDFs mit Archiv-ID, Buchung, Prüfsumme und Upload-Informationen.</p>
+            </div>
+            <span id="bh2-pdf-counter" class="bh2-mini-label">0 PDFs</span>
+        </div>
+
+        <div id="bh2-pdf-archive-list" class="bh2-archive-list">
+            <div class="bh2-empty">Noch keine PDF im Archiv. Lade beim Erfassen eines abgeschlossenen Jobs eine PDF hoch.</div>
         </div>
     </section>
 
@@ -901,12 +1059,16 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             POST   /api/buchhaltung/entries
             PATCH  /api/buchhaltung/entries/<id>
             DELETE /api/buchhaltung/entries/<id>
+            POST   /api/buchhaltung/entries als multipart/form-data mit Feld "payload" und Datei "pdf"
+                   wenn eine Jobabschluss-PDF mit archiviert werden soll.
 
-            Die echte Rechteprüfung muss IM BACKEND erfolgen. Frontend-Prüfungen sind nur Anzeige-/Komfortlogik.
+            Die echte Rechteprüfung, die dauerhafte PDF-Speicherung und die Auslieferung der pdf_url müssen IM BACKEND erfolgen.
+            Frontend-Prüfungen sind nur Anzeige-/Komfortlogik.
         */
 
         const storageKey = "eifellog.buchhaltung2.entries";
         const taskStorageKey = "eifellog.buchhaltung2.tasks";
+        const pdfMaxBytes = 8 * 1024 * 1024;
         const currentUser = {{ display_name|tojson }};
         const sessionUser = {{ session_user|tojson }};
 
@@ -967,6 +1129,9 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             tour: document.getElementById("entry-tour"),
             receipt: document.getElementById("entry-receipt"),
             payment: document.getElementById("entry-payment"),
+            jobStatus: document.getElementById("entry-job-status"),
+            pdf: document.getElementById("entry-pdf"),
+            pdfMeta: document.getElementById("entry-pdf-meta"),
             note: document.getElementById("entry-note")
         };
 
@@ -985,6 +1150,9 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
         const reportBox = document.getElementById("bh2-report");
         const toast = document.getElementById("bh2-toast");
         const storageLabel = document.getElementById("bh2-storage-label");
+        const pdfArchivePanel = document.getElementById("bh2-pdf-archive-panel");
+        const pdfArchiveList = document.getElementById("bh2-pdf-archive-list");
+        const pdfCounter = document.getElementById("bh2-pdf-counter");
 
         const searchInput = document.getElementById("bh2-search");
         const filterType = document.getElementById("bh2-filter-type");
@@ -1022,6 +1190,79 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             const date = new Date(`${value}T12:00:00`);
             if (Number.isNaN(date.getTime())) return value;
             return new Intl.DateTimeFormat("de-DE").format(date);
+        }
+
+        function formatDateTime(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(date);
+        }
+
+        function formatBytes(bytes) {
+            const size = Number(bytes || 0);
+            if (!Number.isFinite(size) || size <= 0) return "0 KB";
+            if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+            return `${(size / (1024 * 1024)).toFixed(2).replace(".", ",")} MB`;
+        }
+
+        function normalizeHash(value) {
+            return String(value || "").trim().toLowerCase();
+        }
+
+        async function sha256File(file) {
+            if (!file || !window.crypto?.subtle) return "";
+            const buffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+            return Array.from(new Uint8Array(hashBuffer))
+                .map((byte) => byte.toString(16).padStart(2, "0"))
+                .join("");
+        }
+
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ""));
+                reader.onerror = () => reject(reader.error || new Error("PDF konnte nicht gelesen werden."));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function selectedPdfFile() {
+            const file = fields.pdf?.files?.[0] || null;
+            return file || null;
+        }
+
+        function validatePdfFile(file) {
+            if (!file) return { ok: true };
+            const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+            if (!isPdf) return { ok: false, message: "Bitte lade nur PDF-Dateien hoch." };
+            if (file.size > pdfMaxBytes) return { ok: false, message: `Die PDF ist zu groß. Maximal erlaubt sind ${formatBytes(pdfMaxBytes)}.` };
+            return { ok: true };
+        }
+
+        function hasPdf(entry) {
+            return Boolean(entry?.pdfArchiveId || entry?.pdfUrl || entry?.pdfDataUrl || entry?.pdfFileName);
+        }
+
+        function pdfHref(entry) {
+            return entry?.pdfUrl || entry?.pdfDataUrl || "";
+        }
+
+        function pdfBadge(entry) {
+            if (!hasPdf(entry)) return `<span class="bh2-badge">Keine PDF</span>`;
+            const href = pdfHref(entry);
+            const archiveId = entry.pdfArchiveId || "Archiv";
+            const checksum = normalizeHash(entry.pdfChecksum);
+            const meta = [
+                entry.pdfFileName || "Jobabschluss.pdf",
+                entry.pdfSize ? formatBytes(entry.pdfSize) : "",
+                checksum ? `SHA-256 ${checksum.slice(0, 12)}…` : ""
+            ].filter(Boolean).join("<br>");
+            const link = href
+                ? `<a class="bh2-pdf-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">PDF öffnen</a>`
+                : `<span class="bh2-badge warn">Backend-Link fehlt</span>`;
+            return `<span class="bh2-badge good">${escapeHtml(archiveId)}</span><br><span style="color: var(--muted);">${meta}</span><br>${link}`;
         }
 
         function calculateVat(gross, vatRate) {
@@ -1117,6 +1358,15 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             const amount = Number(raw.amount ?? raw.gross_amount ?? raw.brutto ?? 0);
             const vatRate = Number(raw.vatRate ?? raw.vat_rate ?? raw.vat ?? raw.tax_rate ?? 0);
             const vatAmount = Number(raw.vatAmount ?? raw.vat_amount ?? raw.tax_amount ?? calculateVat(amount, vatRate));
+            const pdf = raw.pdf || raw.attachment || raw.job_pdf || {};
+            const pdfFileName = raw.pdfFileName || raw.pdf_file_name || raw.pdf_filename || pdf.fileName || pdf.filename || pdf.name || "";
+            const pdfArchiveId = raw.pdfArchiveId || raw.pdf_archive_id || raw.archive_id || pdf.archiveId || pdf.archive_id || "";
+            const pdfUploadedAt = raw.pdfUploadedAt || raw.pdf_uploaded_at || pdf.uploadedAt || pdf.uploaded_at || "";
+            const pdfUploadedBy = raw.pdfUploadedBy || raw.pdf_uploaded_by || pdf.uploadedBy || pdf.uploaded_by || "";
+            const pdfUrl = raw.pdfUrl || raw.pdf_url || raw.attachment_url || pdf.url || pdf.download_url || "";
+            const pdfDataUrl = raw.pdfDataUrl || raw.pdf_data_url || pdf.dataUrl || pdf.data_url || "";
+            const pdfSize = Number(raw.pdfSize ?? raw.pdf_size ?? pdf.size ?? pdf.size_bytes ?? 0);
+            const pdfChecksum = normalizeHash(raw.pdfChecksum || raw.pdf_checksum || raw.sha256 || pdf.checksum || pdf.sha256 || "");
 
             return {
                 id: String(raw.id ?? raw.entry_id ?? raw.uuid ?? uid()),
@@ -1135,6 +1385,16 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 tour: raw.tour || raw.plate || raw.vehicle || "",
                 receipt: raw.receipt || raw.receipt_status || "Vorhanden",
                 payment: raw.payment || raw.payment_status || "Offen",
+                jobStatus: raw.jobStatus || raw.job_status || raw.status_job || "Offen",
+                pdfFileName,
+                pdfMimeType: raw.pdfMimeType || raw.pdf_mime_type || pdf.mimeType || pdf.mime_type || "application/pdf",
+                pdfSize: Number.isFinite(pdfSize) ? pdfSize : 0,
+                pdfUploadedAt,
+                pdfUploadedBy,
+                pdfArchiveId,
+                pdfUrl,
+                pdfDataUrl,
+                pdfChecksum,
                 note: raw.note || raw.notes || ""
             };
         }
@@ -1152,6 +1412,15 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 tour: entry.tour,
                 receipt_status: entry.receipt,
                 payment_status: entry.payment,
+                job_status: entry.jobStatus,
+                pdf_file_name: entry.pdfFileName,
+                pdf_mime_type: entry.pdfMimeType,
+                pdf_size: entry.pdfSize,
+                pdf_uploaded_at: entry.pdfUploadedAt,
+                pdf_uploaded_by: entry.pdfUploadedBy,
+                pdf_archive_id: entry.pdfArchiveId,
+                pdf_url: entry.pdfUrl,
+                pdf_checksum: entry.pdfChecksum,
                 note: entry.note,
                 source: "buchhaltung2"
             };
@@ -1198,6 +1467,10 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     entry.tour,
                     entry.receipt,
                     entry.payment,
+                    entry.jobStatus,
+                    entry.pdfFileName,
+                    entry.pdfArchiveId,
+                    entry.pdfChecksum,
                     entry.createdBy,
                     entry.note
                 ].join(" ").toLowerCase();
@@ -1209,6 +1482,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 if (statusValue === "open") matchesStatus = entry.payment !== "Bezahlt";
                 if (statusValue === "receipt-missing") matchesStatus = entry.receipt === "Fehlt";
                 if (statusValue === "paid") matchesStatus = entry.payment === "Bezahlt";
+                if (statusValue === "pdf") matchesStatus = hasPdf(entry);
 
                 return matchesQuery && matchesType && matchesStatus;
             });
@@ -1251,10 +1525,12 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                         <td><strong>${escapeHtml(formatMoney(entry.amount))}</strong></td>
                         <td>${escapeHtml(formatMoney(entry.vatAmount))}<br><span class="bh2-badge">${escapeHtml(entry.vatRate)} %</span></td>
                         <td>${escapeHtml(entry.documentNo || "-")}<br>${statusBadge(entry.receipt, "receipt")}</td>
+                        <td><span class="bh2-badge ${entry.jobStatus === "Abgeschlossen" || entry.jobStatus === "Abgerechnet" || entry.jobStatus === "Archiviert" ? "good" : "warn"}">${escapeHtml(entry.jobStatus || "Offen")}</span></td>
+                        <td>${pdfBadge(entry)}</td>
                         <td>${statusBadge(entry.payment, "payment")}</td>
                         <td>
                             <strong>${escapeHtml(entry.createdBy || "-")}</strong><br>
-                            <span style="color: var(--muted);">${escapeHtml(entry.createdAt ? new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.createdAt)) : "")}</span>
+                            <span style="color: var(--muted);">${escapeHtml(formatDateTime(entry.createdAt))}</span>
                         </td>
                         <td>
                             <strong>${escapeHtml(entry.partner || "-")}</strong><br>
@@ -1265,6 +1541,8 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                             <div class="bh2-row-actions">
                                 <button type="button" class="bh2-mini-btn" data-action="paid" data-id="${escapeHtml(entry.id)}">Bezahlt</button>
                                 <button type="button" class="bh2-mini-btn" data-action="receipt" data-id="${escapeHtml(entry.id)}">Beleg OK</button>
+                                <button type="button" class="bh2-mini-btn" data-action="jobdone" data-id="${escapeHtml(entry.id)}">Job fertig</button>
+                                ${hasPdf(entry) ? `<button type="button" class="bh2-mini-btn" data-action="pdf" data-id="${escapeHtml(entry.id)}">PDF</button>` : ""}
                                 <button type="button" class="bh2-mini-btn danger" data-action="delete" data-id="${escapeHtml(entry.id)}">Löschen</button>
                             </div>
                         </td>
@@ -1274,6 +1552,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 
             entryCounter.textContent = `${filtered.length} / ${entries.length} Einträge`;
             updateStats();
+            renderPdfArchive();
         }
 
         function updateStats() {
@@ -1312,14 +1591,47 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             fields.vat.value = "19";
             fields.receipt.value = "Vorhanden";
             fields.payment.value = "Offen";
+            fields.jobStatus.value = "Offen";
+            if (fields.pdf) fields.pdf.value = "";
+            if (fields.pdfMeta) {
+                fields.pdfMeta.textContent = "";
+                fields.pdfMeta.classList.remove("active");
+            }
         }
 
-        async function createEntryOnServer(entry) {
+        async function createEntryOnServer(entry, pdfFile = null) {
+            let body;
+            if (pdfFile) {
+                const formData = new FormData();
+                formData.append("payload", JSON.stringify(entryToPayload(entry)));
+                formData.append("pdf", pdfFile, pdfFile.name);
+                body = formData;
+            } else {
+                body = JSON.stringify(entryToPayload(entry));
+            }
+
             const data = await apiRequest(apiBase, {
                 method: "POST",
-                body: JSON.stringify(entryToPayload(entry))
+                body
             });
             return normalizeEntry(data.entry || data.data || data);
+        }
+
+        async function buildLocalPdfArchive(pdfFile, checksum) {
+            if (!pdfFile) return {};
+            const dataUrl = await fileToDataUrl(pdfFile);
+            const archiveId = `PDF-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${uid().slice(-8).toUpperCase()}`;
+            return {
+                pdfFileName: pdfFile.name,
+                pdfMimeType: pdfFile.type || "application/pdf",
+                pdfSize: pdfFile.size,
+                pdfUploadedAt: new Date().toISOString(),
+                pdfUploadedBy: currentUser,
+                pdfArchiveId: archiveId,
+                pdfUrl: "",
+                pdfDataUrl: dataUrl,
+                pdfChecksum: checksum
+            };
         }
 
         async function patchEntryOnServer(id, patch) {
@@ -1346,8 +1658,18 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 return;
             }
 
+            const pdfFile = selectedPdfFile();
+            const pdfValidation = validatePdfFile(pdfFile);
+            if (!pdfValidation.ok) {
+                showToast("PDF ungültig", pdfValidation.message);
+                fields.pdf?.focus();
+                return;
+            }
+
             const vatRate = Number(fields.vat.value || 0);
             const type = fields.type.value;
+            const pdfChecksum = pdfFile ? await sha256File(pdfFile) : "";
+            const localPdfArchive = (!serverMode && pdfFile) ? await buildLocalPdfArchive(pdfFile, pdfChecksum) : {};
 
             const localEntry = normalizeEntry({
                 id: uid(),
@@ -1365,13 +1687,22 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 tour: fields.tour.value.trim(),
                 receipt: fields.receipt.value,
                 payment: fields.payment.value,
+                jobStatus: fields.jobStatus.value,
+                pdfChecksum,
+                pdfFileName: pdfFile?.name || "",
+                pdfMimeType: pdfFile?.type || "application/pdf",
+                pdfSize: pdfFile?.size || 0,
+                pdfUploadedAt: pdfFile ? new Date().toISOString() : "",
+                pdfUploadedBy: pdfFile ? currentUser : "",
+                pdfArchiveId: pdfFile ? `PDF-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${uid().slice(-8).toUpperCase()}` : "",
+                ...localPdfArchive,
                 note: fields.note.value.trim()
             });
 
             try {
                 let savedEntry = localEntry;
                 if (serverMode) {
-                    savedEntry = await createEntryOnServer(localEntry);
+                    savedEntry = await createEntryOnServer(localEntry, pdfFile);
                 }
 
                 entries.unshift(savedEntry);
@@ -1381,8 +1712,8 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 showToast(
                     "Buchung gespeichert",
                     serverMode
-                        ? "Der Vorgang wurde serverseitig gespeichert und ist je nach Rechteumfang für andere sichtbar."
-                        : "Der Vorgang wurde nur lokal gespeichert, weil die Server-API nicht erreichbar ist."
+                        ? (pdfFile ? "Der Vorgang wurde serverseitig gespeichert. Die PDF wurde an das Backend-Archiv übergeben." : "Der Vorgang wurde serverseitig gespeichert und ist je nach Rechteumfang für andere sichtbar.")
+                        : (pdfFile ? "Der Vorgang und die PDF wurden lokal als Fallback gespeichert. Für echte Archivierung muss das Backend angebunden sein." : "Der Vorgang wurde nur lokal gespeichert, weil die Server-API nicht erreichbar ist.")
                 );
             } catch (error) {
                 console.error("Buchung konnte serverseitig nicht gespeichert werden.", error);
@@ -1422,6 +1753,26 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                         saveLocalEntries();
                     }
                     showToast("Beleg aktualisiert", "Der Belegstatus wurde auf vorhanden gesetzt.");
+                }
+
+                if (action === "jobdone") {
+                    if (serverMode) {
+                        const updated = await patchEntryOnServer(id, { job_status: "Abgeschlossen", jobStatus: "Abgeschlossen" });
+                        entries[index] = { ...entries[index], ...updated, jobStatus: "Abgeschlossen" };
+                    } else {
+                        entries[index].jobStatus = "Abgeschlossen";
+                        saveLocalEntries();
+                    }
+                    showToast("Job abgeschlossen", "Der Jobstatus wurde auf abgeschlossen gesetzt.");
+                }
+
+                if (action === "pdf") {
+                    const href = pdfHref(entries[index]);
+                    if (href) {
+                        window.open(href, "_blank", "noopener");
+                    } else {
+                        showToast("PDF nicht abrufbar", "Zum Eintrag gibt es Metadaten, aber keine pdf_url vom Backend.");
+                    }
                 }
 
                 if (action === "delete") {
@@ -1476,6 +1827,75 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             taskCounter.textContent = `${done}/${taskInputs.length} erledigt`;
         }
 
+        function renderPdfArchive() {
+            const pdfEntries = entries
+                .filter(hasPdf)
+                .slice()
+                .sort((a, b) => String(b.pdfUploadedAt || b.createdAt).localeCompare(String(a.pdfUploadedAt || a.createdAt)));
+
+            if (pdfCounter) pdfCounter.textContent = `${pdfEntries.length} PDF${pdfEntries.length === 1 ? "" : "s"}`;
+            if (!pdfArchiveList) return;
+
+            if (!pdfEntries.length) {
+                pdfArchiveList.innerHTML = `<div class="bh2-empty">Noch keine PDF im Archiv. Lade beim Erfassen eines abgeschlossenen Jobs eine PDF hoch.</div>`;
+                return;
+            }
+
+            pdfArchiveList.innerHTML = pdfEntries.map((entry) => {
+                const href = pdfHref(entry);
+                const checksum = normalizeHash(entry.pdfChecksum);
+                const button = href
+                    ? `<a class="bh2-pdf-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">PDF öffnen</a>`
+                    : `<span class="bh2-badge warn">Kein Link</span>`;
+
+                return `
+                    <div class="bh2-archive-item">
+                        <div>
+                            <strong>${escapeHtml(entry.pdfArchiveId || "PDF ohne Archiv-ID")}</strong>
+                            <span>${escapeHtml(entry.pdfFileName || "Jobabschluss.pdf")} · ${escapeHtml(formatBytes(entry.pdfSize))}</span>
+                            <span>Buchung: ${escapeHtml(formatDate(entry.date))} · ${escapeHtml(entry.category)} · ${escapeHtml(entry.partner || "-")} · ${escapeHtml(entry.tour || "-")}</span>
+                        </div>
+                        <div>
+                            <strong>Rückverfolgung</strong>
+                            <span>Upload: ${escapeHtml(formatDateTime(entry.pdfUploadedAt || entry.createdAt))}</span>
+                            <span>Von: ${escapeHtml(entry.pdfUploadedBy || entry.createdBy || "-")}</span>
+                            <span>SHA-256: ${escapeHtml(checksum ? `${checksum.slice(0, 20)}…` : "-")}</span>
+                        </div>
+                        <div>${button}</div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function openPdfArchive() {
+            pdfArchivePanel?.classList.add("active");
+            renderPdfArchive();
+            pdfArchivePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+            const pdfCount = entries.filter(hasPdf).length;
+            showToast("PDF Archiv", `${pdfCount} archivierte PDF${pdfCount === 1 ? "" : "s"} gefunden.`);
+        }
+
+        function updatePdfSelectionMeta() {
+            const file = selectedPdfFile();
+            if (!fields.pdfMeta) return;
+
+            if (!file) {
+                fields.pdfMeta.textContent = "";
+                fields.pdfMeta.classList.remove("active");
+                return;
+            }
+
+            const validation = validatePdfFile(file);
+            fields.pdfMeta.classList.add("active");
+            fields.pdfMeta.textContent = validation.ok
+                ? `Ausgewählt: ${file.name} · ${formatBytes(file.size)} · wird beim Speichern archiviert.`
+                : validation.message;
+
+            if (validation.ok && fields.jobStatus?.value === "Offen") {
+                fields.jobStatus.value = "Abgeschlossen";
+            }
+        }
+
         function buildReport() {
             const incomeEntries = entries.filter((entry) => entry.type === "income");
             const expenseEntries = entries.filter((entry) => entry.type === "expense");
@@ -1485,6 +1905,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
             const inputVat = expenseEntries.reduce((sum, entry) => sum + entry.vatAmount, 0);
             const openPayments = entries.filter((entry) => entry.payment !== "Bezahlt");
             const missingReceipts = entries.filter((entry) => entry.receipt === "Fehlt");
+            const pdfEntries = entries.filter(hasPdf);
             const doneTasks = taskInputs.filter((input) => input.checked).length;
 
             const lines = [
@@ -1503,6 +1924,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 `- USt.-Saldo geschätzt: ${formatMoney(outputVat - inputVat)}`,
                 `- Offene Zahlungen: ${openPayments.length}`,
                 `- Fehlende Belege: ${missingReceipts.length}`,
+                `- Archivierte PDFs: ${pdfEntries.length}`,
                 `- Tagesaufgaben erledigt: ${doneTasks}/${taskInputs.length}`,
                 "",
                 "OFFENE ZAHLUNGEN",
@@ -1514,6 +1936,11 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 missingReceipts.length
                     ? missingReceipts.map((entry) => `- ${formatDate(entry.date)} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.tour || "-"} | Erfasst von: ${entry.createdBy || "-"}`).join("\n")
                     : "- Keine fehlenden Belege.",
+                "",
+                "PDF-ARCHIV / RÜCKVERFOLGUNG",
+                pdfEntries.length
+                    ? pdfEntries.map((entry) => `- ${entry.pdfArchiveId || "PDF"} | ${entry.pdfFileName || "Jobabschluss.pdf"} | Buchung ${formatDate(entry.date)} | ${entry.partner || "-"} | ${entry.tour || "-"} | Upload: ${formatDateTime(entry.pdfUploadedAt || entry.createdAt)} | Von: ${entry.pdfUploadedBy || entry.createdBy || "-"} | SHA-256: ${entry.pdfChecksum || "-"}`).join("\n")
+                    : "- Keine PDFs archiviert.",
                 "",
                 "LETZTE BUCHUNGEN",
                 entries.length
@@ -1561,6 +1988,14 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 "Tour/Kennzeichen",
                 "Belegstatus",
                 "Zahlungsstatus",
+                "Jobstatus",
+                "PDF Archiv ID",
+                "PDF Dateiname",
+                "PDF Größe",
+                "PDF Upload von",
+                "PDF Upload am",
+                "PDF SHA-256",
+                "PDF URL",
                 "Notiz",
                 "Erfasst von",
                 "Erfasst am"
@@ -1578,6 +2013,14 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                 entry.tour,
                 entry.receipt,
                 entry.payment,
+                entry.jobStatus,
+                entry.pdfArchiveId,
+                entry.pdfFileName,
+                entry.pdfSize,
+                entry.pdfUploadedBy,
+                entry.pdfUploadedAt,
+                entry.pdfChecksum,
+                entry.pdfUrl,
                 entry.note,
                 entry.createdBy,
                 entry.createdAt
@@ -1598,6 +2041,18 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                     exportedAt: new Date().toISOString(),
                     user: currentUser,
                     scope: serverMode ? (canViewAllEntries ? "all" : "own") : "local-fallback",
+                    pdfArchive: entries.filter(hasPdf).map((entry) => ({
+                        entryId: entry.id,
+                        archiveId: entry.pdfArchiveId,
+                        fileName: entry.pdfFileName,
+                        mimeType: entry.pdfMimeType,
+                        size: entry.pdfSize,
+                        uploadedAt: entry.pdfUploadedAt,
+                        uploadedBy: entry.pdfUploadedBy,
+                        sha256: entry.pdfChecksum,
+                        url: entry.pdfUrl,
+                        hasLocalFallbackCopy: Boolean(entry.pdfDataUrl)
+                    })),
                     entries
                 }, null, 2),
                 "application/json;charset=utf-8"
@@ -1620,6 +2075,15 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
                         message: report,
                         source: "buchhaltung2",
                         scope: serverMode ? (canViewAllEntries ? "all" : "own") : "local-fallback",
+                        pdfArchive: entries.filter(hasPdf).map((entry) => ({
+                            entryId: entry.id,
+                            archiveId: entry.pdfArchiveId,
+                            fileName: entry.pdfFileName,
+                            uploadedAt: entry.pdfUploadedAt,
+                            uploadedBy: entry.pdfUploadedBy,
+                            sha256: entry.pdfChecksum,
+                            url: entry.pdfUrl
+                        })),
                         entries
                     })
                 });
@@ -1668,6 +2132,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
         document.getElementById("bh2-generate-report")?.addEventListener("click", generateReport);
         document.getElementById("bh2-export-csv")?.addEventListener("click", exportCsv);
         document.getElementById("bh2-export-json")?.addEventListener("click", exportJson);
+        document.getElementById("bh2-open-pdf-archive")?.addEventListener("click", openPdfArchive);
         document.getElementById("bh2-send-request")?.addEventListener("click", sendRequest);
         document.getElementById("bh2-clear-all")?.addEventListener("click", clearAll);
 
@@ -1675,6 +2140,7 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
         searchInput?.addEventListener("input", renderEntries);
         filterType?.addEventListener("change", renderEntries);
         filterStatus?.addEventListener("change", renderEntries);
+        fields.pdf?.addEventListener("change", updatePdfSelectionMeta);
         taskInputs.forEach((input) => input.addEventListener("change", saveTasks));
 
         resetForm();
