@@ -962,6 +962,47 @@
         }
     }
 
+    /* ---------------------------------------------------------
+       LOA-Detailmodal direkt am ausgewählten Urlaub öffnen
+       - Nicht mehr in der leeren Dashboard-Mitte.
+       - Das Panel wird per JS unter/über dem geklickten Urlaub
+         positioniert und bleibt im sichtbaren Viewport.
+    --------------------------------------------------------- */
+    #loa-detail-modal {
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: rgba(0, 0, 0, 0.42) !important;
+        backdrop-filter: blur(10px) !important;
+    }
+
+    #loa-detail-panel {
+        position: absolute !important;
+        left: var(--loa-modal-left, 1rem) !important;
+        top: var(--loa-modal-top, 1rem) !important;
+        width: var(--loa-modal-width, min(32rem, calc(100vw - 1.5rem))) !important;
+        max-width: calc(100vw - 1.5rem) !important;
+        max-height: var(--loa-modal-max-height, calc((var(--dashboard-vh, 1vh) * 100) - 1.5rem)) !important;
+        margin: 0 !important;
+        align-self: auto !important;
+        justify-self: auto !important;
+        transform-origin: top center !important;
+    }
+
+    #loa-detail-panel > div:last-child {
+        max-height: calc(var(--loa-modal-max-height, calc((var(--dashboard-vh, 1vh) * 100) - 1.5rem)) - 5.25rem) !important;
+        overflow-y: auto !important;
+    }
+
+    @media (max-width: 640px) {
+        #loa-detail-panel {
+            width: calc(100vw - 1rem) !important;
+            max-width: calc(100vw - 1rem) !important;
+            border-radius: 1.25rem !important;
+        }
+    }
+
 
 </style>
 
@@ -1615,7 +1656,7 @@
                 <div>
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">LOA / Urlaub</span>
                     <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Anstehende Urlaube</h2>
-                    <p class="text-xs text-[var(--muted)] font-inter mt-1">Genehmigte Abwesenheiten.</p>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">Genehmigte Abwesenheiten aus der LOA-Collection.</p>
                 </div>
                 <span class="inline-flex items-center justify-center min-w-[2.25rem] h-9 px-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] font-orbitron text-xs font-black shadow-[0_0_18px_rgba(137,190,50,0.08)]">
                     {{ safe_loa_items|length }}
@@ -3409,9 +3450,63 @@
 
         let loaLockedScrollY = 0;
         let loaScrollWasAlreadyLocked = false;
+        let activeLoaTrigger = null;
+
+        function clampLoaModalPosition(value, min, max) {
+            if (max < min) return min;
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function positionLoaModalNearTrigger(trigger) {
+            if (!loaModal || !loaPanel || !trigger) return;
+
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const safeGap = viewportWidth <= 640 ? 8 : 16;
+            const anchorGap = viewportWidth <= 640 ? 8 : 12;
+            const preferredWidth = viewportWidth <= 640 ? viewportWidth - (safeGap * 2) : 520;
+            const panelWidth = Math.max(280, Math.min(preferredWidth, viewportWidth - (safeGap * 2)));
+
+            loaPanel.style.setProperty('--loa-modal-width', `${panelWidth}px`);
+
+            const measuredHeight = loaPanel.getBoundingClientRect().height || Math.min(560, viewportHeight - (safeGap * 2));
+            const spaceBelow = viewportHeight - rect.bottom - anchorGap - safeGap;
+            const spaceAbove = rect.top - anchorGap - safeGap;
+
+            let panelTop;
+            let panelMaxHeight;
+
+            if (spaceBelow >= Math.min(measuredHeight, 320) || spaceBelow >= spaceAbove) {
+                panelTop = rect.bottom + anchorGap;
+                panelMaxHeight = Math.max(240, viewportHeight - panelTop - safeGap);
+            } else {
+                panelMaxHeight = Math.max(240, rect.top - anchorGap - safeGap);
+                panelTop = rect.top - anchorGap - Math.min(measuredHeight, panelMaxHeight);
+            }
+
+            panelTop = clampLoaModalPosition(
+                panelTop,
+                safeGap,
+                Math.max(safeGap, viewportHeight - safeGap - Math.min(measuredHeight, panelMaxHeight))
+            );
+
+            const triggerCenter = rect.left + (rect.width / 2);
+            const panelLeft = clampLoaModalPosition(
+                triggerCenter - (panelWidth / 2),
+                safeGap,
+                viewportWidth - panelWidth - safeGap
+            );
+
+            loaModal.style.setProperty('--loa-modal-left', `${Math.round(panelLeft)}px`);
+            loaModal.style.setProperty('--loa-modal-top', `${Math.round(panelTop)}px`);
+            loaModal.style.setProperty('--loa-modal-max-height', `${Math.round(panelMaxHeight)}px`);
+        }
 
         function openLoaModalFromTrigger(trigger) {
             if (!loaModal || !loaPanel || !trigger) return;
+
+            activeLoaTrigger = trigger;
 
             const user = trigger.getAttribute('data-loa-user') || 'Unbekannter User';
             const period = trigger.getAttribute('data-loa-period') || '-';
@@ -3434,21 +3529,26 @@
             loaModal.classList.remove('hidden');
             loaModal.classList.add('flex');
             loaModal.style.display = 'flex';
-            loaModal.style.alignItems = 'center';
-            loaModal.style.justifyContent = 'center';
+            loaModal.style.alignItems = 'flex-start';
+            loaModal.style.justifyContent = 'flex-start';
             loaModal.setAttribute('aria-hidden', 'false');
             loaModal.scrollTop = 0;
 
-            setTimeout(() => {
-                loaModal.classList.remove('opacity-0');
-                loaPanel.classList.remove('opacity-0');
-                if (loaClose) loaClose.focus();
-            }, 10);
+            requestAnimationFrame(() => {
+                positionLoaModalNearTrigger(trigger);
+
+                setTimeout(() => {
+                    loaModal.classList.remove('opacity-0');
+                    loaPanel.classList.remove('opacity-0');
+                    if (loaClose) loaClose.focus();
+                }, 10);
+            });
         }
 
         function closeLoaModal() {
             if (!loaModal || !loaPanel) return;
 
+            activeLoaTrigger = null;
             loaModal.classList.add('opacity-0');
 
             setTimeout(() => {
@@ -3457,6 +3557,10 @@
                 loaModal.style.display = '';
                 loaModal.style.alignItems = '';
                 loaModal.style.justifyContent = '';
+                loaModal.style.removeProperty('--loa-modal-left');
+                loaModal.style.removeProperty('--loa-modal-top');
+                loaModal.style.removeProperty('--loa-modal-max-height');
+                loaPanel.style.removeProperty('--loa-modal-width');
                 loaModal.setAttribute('aria-hidden', 'true');
 
                 if (!loaScrollWasAlreadyLocked) {
@@ -3467,6 +3571,12 @@
                 }
             }, 300);
         }
+
+        window.addEventListener('resize', () => {
+            if (activeLoaTrigger && loaModal && !loaModal.classList.contains('hidden')) {
+                positionLoaModalNearTrigger(activeLoaTrigger);
+            }
+        });
 
         loaTriggers.forEach(trigger => {
             trigger.addEventListener('click', () => openLoaModalFromTrigger(trigger));
