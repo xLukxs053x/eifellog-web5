@@ -4,6 +4,7 @@ eventlet.monkey_patch()
 import os
 import re
 import json
+import time
 import uuid
 import hashlib
 import hmac
@@ -13,7 +14,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, render_template, render_template_string, redirect, request, session, url_for, flash, jsonify, abort, send_file
+from flask import Flask, render_template, render_template_string, redirect, request, session, url_for, flash, jsonify, abort, send_file, Response
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from bson.objectid import ObjectId
@@ -245,6 +246,18 @@ tracker_shift_logs_collection = db["tracker_shift_logs"]
 hr_personalakten_collection = db["hr_personalakten"]
 hr_process_plan_collection = db["hr_process_plan"]
 hr_checklist_collection = db["hr_checklist"]
+hr_sheet_builder_collection = db["hr_sheet_builder"]
+
+# Live Workspace / Tabellen-Builder: reine MongoDB-Schicht.
+# Diese Collections ersetzen Supabase/LocalStorage fuer Workspaces, Ordner, Projektmappen, Sheets und Live-Events.
+workspace_accounts_collection = db["workspace_accounts"]
+workspace_workspaces_collection = db["workspace_workspaces"]
+workspace_members_collection = db["workspace_members"]
+workspace_folders_collection = db["workspace_folders"]
+workspace_project_maps_collection = db["workspace_project_maps"]
+workspace_sheets_collection = db["workspace_sheets"]
+workspace_invites_collection = db["workspace_invites"]
+workspace_events_collection = db["workspace_events"]
 
 
 def ensure_indexes():
@@ -405,6 +418,52 @@ def ensure_indexes():
         hr_checklist_collection.create_index([("archived", ASCENDING)], unique=False)
         hr_checklist_collection.create_index([("created_at", DESCENDING)], unique=False)
         hr_checklist_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        hr_sheet_builder_collection.create_index([("scope", ASCENDING)], unique=False)
+        hr_sheet_builder_collection.create_index([("sheet_id", ASCENDING)], unique=False)
+        hr_sheet_builder_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        hr_sheet_builder_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        workspace_accounts_collection.create_index([("email_lc", ASCENDING)], unique=True)
+        workspace_accounts_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        workspace_accounts_collection.create_index([("role_id", DESCENDING)], unique=False)
+        workspace_accounts_collection.create_index([("created_at", DESCENDING)], unique=False)
+
+        workspace_workspaces_collection.create_index([("id", ASCENDING)], unique=True)
+        workspace_workspaces_collection.create_index([("owner_id", ASCENDING)], unique=False)
+        workspace_workspaces_collection.create_index([("min_role_id", ASCENDING)], unique=False)
+        workspace_workspaces_collection.create_index([("archived", ASCENDING)], unique=False)
+        workspace_workspaces_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        workspace_members_collection.create_index([("workspace_id", ASCENDING), ("user_id", ASCENDING)], unique=True)
+        workspace_members_collection.create_index([("user_id", ASCENDING)], unique=False)
+        workspace_members_collection.create_index([("access", ASCENDING)], unique=False)
+
+        workspace_folders_collection.create_index([("id", ASCENDING)], unique=True)
+        workspace_folders_collection.create_index([("workspace_id", ASCENDING)], unique=False)
+        workspace_folders_collection.create_index([("parent_id", ASCENDING)], unique=False)
+        workspace_folders_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        workspace_project_maps_collection.create_index([("id", ASCENDING)], unique=True)
+        workspace_project_maps_collection.create_index([("workspace_id", ASCENDING)], unique=False)
+        workspace_project_maps_collection.create_index([("folder_id", ASCENDING)], unique=False)
+        workspace_project_maps_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        workspace_sheets_collection.create_index([("id", ASCENDING)], unique=True)
+        workspace_sheets_collection.create_index([("workspace_id", ASCENDING)], unique=False)
+        workspace_sheets_collection.create_index([("project_id", ASCENDING)], unique=False)
+        workspace_sheets_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        workspace_sheets_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        workspace_invites_collection.create_index([("code", ASCENDING)], unique=True)
+        workspace_invites_collection.create_index([("workspace_id", ASCENDING)], unique=False)
+        workspace_invites_collection.create_index([("email_lc", ASCENDING)], unique=False)
+        workspace_invites_collection.create_index([("claimed_by", ASCENDING)], unique=False)
+        workspace_invites_collection.create_index([("created_at", DESCENDING)], unique=False)
+
+        workspace_events_collection.create_index([("workspace_id", ASCENDING), ("created_at", DESCENDING)], unique=False)
+        workspace_events_collection.create_index([("event_id", ASCENDING)], unique=True)
+        workspace_events_collection.create_index([("user_id", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -14970,6 +15029,1158 @@ def personalabteilung_create_tracker_code():
     )
 
     return jsonify({"success": True, "message": "Tracker-Code wurde erstellt und als System-Dokument gesendet.", "trackerCode": tracker_code, "driver": tracker_profile_payload(fresh_user)})
+
+
+
+# ==========================================
+# LIVE WORKSPACE / TABELLEN-BUILDER API (MONGODB)
+# ==========================================
+
+WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID = int(env_float("WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID", default=50))
+WORKSPACE_ADMIN_ROLE_ID = int(env_float("WORKSPACE_ADMIN_ROLE_ID", default=100))
+WORKSPACE_ROLE_REGISTRATION_SECRET = env_first("WORKSPACE_ROLE_REGISTRATION_SECRET", default="")
+WORKSPACE_EVENT_POLL_SECONDS = float(env_float("WORKSPACE_EVENT_POLL_SECONDS", default=1.5))
+WORKSPACE_SSE_KEEPALIVE_SECONDS = float(env_float("WORKSPACE_SSE_KEEPALIVE_SECONDS", default=15))
+WORKSPACE_DEFAULT_SHEET_ROWS = int(env_float("WORKSPACE_DEFAULT_SHEET_ROWS", default=35))
+WORKSPACE_DEFAULT_SHEET_COLS = int(env_float("WORKSPACE_DEFAULT_SHEET_COLS", default=17))
+
+
+def workspace_db_timestamp():
+    return now_utc()
+
+
+def workspace_iso(value=None):
+    value = value or workspace_db_timestamp()
+    if isinstance(value, datetime):
+        return value.isoformat() + "Z"
+    if isinstance(value, ObjectId):
+        return str(value)
+    return str(value)
+
+
+def workspace_clean_email(value):
+    return safe_str(value).lower()
+
+
+def workspace_role_name(role_id):
+    role_id = parse_int(role_id, 0)
+    if role_id >= WORKSPACE_ADMIN_ROLE_ID:
+        return "Admin"
+    if role_id >= WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID:
+        return "Projektleitung"
+    if role_id >= 30:
+        return "Teamleitung"
+    if role_id >= 10:
+        return "Mitarbeiter"
+    return "User"
+
+
+def workspace_recursive_public(value):
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, datetime):
+        return workspace_iso(value)
+    if isinstance(value, list):
+        return [workspace_recursive_public(item) for item in value]
+    if isinstance(value, dict):
+        return {key: workspace_recursive_public(item) for key, item in value.items() if key != "_id" and key != "password_hash"}
+    return value
+
+
+def workspace_public_doc(document):
+    if not document:
+        return None
+    return workspace_recursive_public(dict(document))
+
+
+def workspace_hash_password(password):
+    password = safe_str(password)
+    if len(password) < 6:
+        raise ValueError("Passwort muss mindestens 6 Zeichen haben.")
+    iterations = 220000
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
+    return f"pbkdf2_sha256${iterations}${salt}${digest}"
+
+
+def workspace_verify_password(password, stored_hash):
+    password = safe_str(password)
+    stored_hash = safe_str(stored_hash)
+    try:
+        algorithm, iterations, salt, expected = stored_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), int(iterations)).hex()
+        return hmac.compare_digest(digest, expected)
+    except Exception:
+        return False
+
+
+def workspace_profile_for_api(account_doc):
+    account_doc = account_doc or {}
+    role_id = parse_int(account_doc.get("role_id"), 0)
+    return {
+        "id": account_doc.get("id") or str(account_doc.get("_id", "")),
+        "email": account_doc.get("email") or "",
+        "display_name": account_doc.get("display_name") or account_doc.get("username") or "User",
+        "username": account_doc.get("username") or account_doc.get("display_name") or "User",
+        "role_id": role_id,
+        "role_name": account_doc.get("role_name") or workspace_role_name(role_id),
+        "discord_id": account_doc.get("discord_id") or "",
+        "source": account_doc.get("source") or "workspace",
+        "created_at": workspace_iso(account_doc.get("created_at")) if account_doc.get("created_at") else "",
+        "updated_at": workspace_iso(account_doc.get("updated_at")) if account_doc.get("updated_at") else "",
+    }
+
+
+def workspace_role_id_from_discord_roles(roles):
+    primary = get_primary_role_name(roles or [])
+    if primary in {"Geschäftsleitung", "Geschäftsführung"}:
+        return WORKSPACE_ADMIN_ROLE_ID
+    if primary in {"Projektleitung", "Stellvertretende Projektleitung"}:
+        return WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID
+    if primary in {"Disposition", "Personalmanagement", "HR-Controlling", "Buchhaltung", "Fuhrparkmanagement"}:
+        return 30
+    if primary == "Fahrer":
+        return 10
+    return 0
+
+
+def workspace_get_or_create_discord_account():
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+    if not discord_id:
+        return None
+
+    existing = workspace_accounts_collection.find_one({"discord_id": discord_id, "archived": {"$ne": True}})
+    if existing:
+        return existing
+
+    db_user = users_collection.find_one({"discord_id": discord_id}) or {}
+    display_name = safe_str(
+        db_user.get("display_name")
+        or db_user.get("username")
+        or db_user.get("discord_username")
+        or session_user.get("username"),
+        "Eifel LOG User"
+    )
+    username = normalize_username(display_name, fallback=f"user-{discord_id[-4:]}")
+    email = workspace_clean_email(db_user.get("email") or session_user.get("email") or f"discord-{discord_id}@eifellog.local")
+    role_id = workspace_role_id_from_discord_roles(session_user.get("roles") or db_user.get("roles") or [])
+    now = workspace_db_timestamp()
+    account_doc = {
+        "id": uuid.uuid4().hex,
+        "discord_id": discord_id,
+        "email": email,
+        "email_lc": email,
+        "username": username,
+        "display_name": display_name,
+        "role_id": role_id,
+        "role_name": workspace_role_name(role_id),
+        "source": "discord_session",
+        "created_at": now,
+        "updated_at": now,
+        "last_login_at": now,
+        "archived": False,
+    }
+    workspace_accounts_collection.insert_one(account_doc)
+    session["workspace_account_id"] = account_doc["id"]
+    return workspace_accounts_collection.find_one({"id": account_doc["id"]})
+
+
+def workspace_current_account(auto_from_discord=True):
+    account_id = safe_str(session.get("workspace_account_id"))
+    if account_id:
+        account_doc = workspace_accounts_collection.find_one({"id": account_id, "archived": {"$ne": True}})
+        if account_doc:
+            return account_doc
+
+    if auto_from_discord:
+        return workspace_get_or_create_discord_account()
+    return None
+
+
+def workspace_require_account(auto_from_discord=True):
+    account_doc = workspace_current_account(auto_from_discord=auto_from_discord)
+    if not account_doc:
+        return None, (jsonify({
+            "success": False,
+            "message": "Bitte zuerst im Workspace-Builder anmelden oder einen Account erstellen."
+        }), 401)
+    return account_doc, None
+
+
+def workspace_account_is_projectlead(account_doc):
+    return parse_int((account_doc or {}).get("role_id"), 0) >= WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID
+
+
+def workspace_account_is_admin(account_doc):
+    return parse_int((account_doc or {}).get("role_id"), 0) >= WORKSPACE_ADMIN_ROLE_ID
+
+
+def workspace_membership(workspace_id, user_id):
+    return workspace_members_collection.find_one({
+        "workspace_id": safe_str(workspace_id),
+        "user_id": safe_str(user_id),
+        "archived": {"$ne": True},
+    })
+
+
+def workspace_can_view(workspace_doc, account_doc):
+    if not workspace_doc or not account_doc:
+        return False
+    account_id = safe_str(account_doc.get("id"))
+    if safe_str(workspace_doc.get("owner_id")) == account_id:
+        return True
+    if workspace_membership(workspace_doc.get("id"), account_id):
+        return True
+    if workspace_account_is_admin(account_doc):
+        return True
+    if workspace_account_is_projectlead(account_doc) and workspace_doc.get("projectlead_access", True) is not False:
+        return True
+    min_role_id = parse_int(workspace_doc.get("min_role_id"), 0)
+    if min_role_id > 0 and parse_int(account_doc.get("role_id"), 0) >= min_role_id:
+        return True
+    return False
+
+
+def workspace_can_edit(workspace_doc, account_doc):
+    if not workspace_doc or not account_doc:
+        return False
+    account_id = safe_str(account_doc.get("id"))
+    if safe_str(workspace_doc.get("owner_id")) == account_id:
+        return True
+    if workspace_account_is_admin(account_doc):
+        return True
+    if workspace_account_is_projectlead(account_doc) and workspace_doc.get("projectlead_edit", True) is not False:
+        return True
+    membership_doc = workspace_membership(workspace_doc.get("id"), account_id)
+    return safe_str((membership_doc or {}).get("access"), "viewer") in {"editor", "admin", "owner"}
+
+
+def workspace_get_visible_workspace(workspace_id, account_doc):
+    workspace_doc = workspace_workspaces_collection.find_one({"id": safe_str(workspace_id), "archived": {"$ne": True}})
+    if not workspace_doc or not workspace_can_view(workspace_doc, account_doc):
+        return None
+    return workspace_doc
+
+
+def workspace_require_workspace(workspace_id, account_doc, edit=False):
+    workspace_doc = workspace_get_visible_workspace(workspace_id, account_doc)
+    if not workspace_doc:
+        return None, (jsonify({"success": False, "message": "Workspace wurde nicht gefunden oder ist nicht freigegeben."}), 404)
+    if edit and not workspace_can_edit(workspace_doc, account_doc):
+        return None, (jsonify({"success": False, "message": "Keine Schreibrechte für diesen Workspace."}), 403)
+    return workspace_doc, None
+
+
+def workspace_touch(workspace_id):
+    workspace_workspaces_collection.update_one(
+        {"id": safe_str(workspace_id)},
+        {"$set": {"updated_at": workspace_db_timestamp()}}
+    )
+
+
+def workspace_create_event(workspace_id, account_doc, event_type, message, payload=None):
+    event_doc = {
+        "event_id": uuid.uuid4().hex,
+        "id": uuid.uuid4().hex,
+        "workspace_id": safe_str(workspace_id),
+        "user_id": safe_str((account_doc or {}).get("id")),
+        "display_name": (account_doc or {}).get("display_name") or (account_doc or {}).get("username") or "System",
+        "event_type": safe_str(event_type, "event"),
+        "message": safe_str(message, "Aktualisierung"),
+        "payload": payload or {},
+        "created_at": workspace_db_timestamp(),
+    }
+    workspace_events_collection.insert_one(event_doc)
+    return event_doc
+
+
+def workspace_create_base_sheet(workspace_id, account_doc, project_id=None, title="Unbenannte Tabelle"):
+    now = workspace_db_timestamp()
+    sheet_doc = {
+        "id": uuid.uuid4().hex,
+        "workspace_id": safe_str(workspace_id),
+        "project_id": safe_str(project_id),
+        "title": safe_str(title, "Unbenannte Tabelle"),
+        "sheetName": "Tabellenblatt1",
+        "fileName": safe_str(title, "Unbenannte Tabelle"),
+        "rows": WORKSPACE_DEFAULT_SHEET_ROWS,
+        "cols": WORKSPACE_DEFAULT_SHEET_COLS,
+        "selected": {"row": 1, "col": 1},
+        "data": {},
+        "styles": {},
+        "autoSaveDb": True,
+        "version": 1,
+        "created_by": safe_str(account_doc.get("id")),
+        "updated_by": safe_str(account_doc.get("id")),
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_sheets_collection.insert_one(sheet_doc)
+    return workspace_sheets_collection.find_one({"id": sheet_doc["id"]})
+
+
+def workspace_ensure_default_workspace(account_doc):
+    if not account_doc:
+        return None
+    account_id = safe_str(account_doc.get("id"))
+    owned = workspace_workspaces_collection.find_one({"owner_id": account_id, "archived": {"$ne": True}})
+    if owned:
+        return owned
+
+    membership_doc = workspace_members_collection.find_one({"user_id": account_id, "archived": {"$ne": True}})
+    if membership_doc:
+        existing = workspace_workspaces_collection.find_one({"id": membership_doc.get("workspace_id"), "archived": {"$ne": True}})
+        if existing:
+            return existing
+
+    now = workspace_db_timestamp()
+    workspace_id = uuid.uuid4().hex
+    folder_id = uuid.uuid4().hex
+    project_id = uuid.uuid4().hex
+    display_name = account_doc.get("display_name") or account_doc.get("username") or "Mein"
+
+    workspace_doc = {
+        "id": workspace_id,
+        "owner_id": account_id,
+        "name": f"{display_name} Workspace",
+        "description": "Automatisch erstellt beim ersten Login.",
+        "min_role_id": 0,
+        "projectlead_access": True,
+        "projectlead_edit": True,
+        "created_by": account_id,
+        "updated_by": account_id,
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_workspaces_collection.insert_one(workspace_doc)
+    workspace_members_collection.update_one(
+        {"workspace_id": workspace_id, "user_id": account_id},
+        {"$set": {
+            "id": uuid.uuid4().hex,
+            "workspace_id": workspace_id,
+            "user_id": account_id,
+            "access": "owner",
+            "created_at": now,
+            "updated_at": now,
+            "archived": False,
+        }},
+        upsert=True
+    )
+    workspace_folders_collection.insert_one({
+        "id": folder_id,
+        "workspace_id": workspace_id,
+        "parent_id": "",
+        "name": "Projektmappen",
+        "created_by": account_id,
+        "updated_by": account_id,
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    })
+    workspace_project_maps_collection.insert_one({
+        "id": project_id,
+        "workspace_id": workspace_id,
+        "folder_id": folder_id,
+        "name": "Start-Projektmappe",
+        "description": "Erste Projektmappe für Tabellen und interne Builder-Daten.",
+        "created_by": account_id,
+        "updated_by": account_id,
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    })
+    workspace_create_base_sheet(workspace_id, account_doc, project_id=project_id, title="Start-Tabelle")
+    workspace_create_event(workspace_id, account_doc, "workspace_created", "Workspace automatisch erstellt", {"project_id": project_id})
+    return workspace_workspaces_collection.find_one({"id": workspace_id})
+
+
+def workspace_visible_ids_for_account(account_doc):
+    workspace_ids = []
+    for workspace_doc in workspace_workspaces_collection.find({"archived": {"$ne": True}}).sort("updated_at", DESCENDING):
+        if workspace_can_view(workspace_doc, account_doc):
+            workspace_ids.append(workspace_doc.get("id"))
+    return workspace_ids
+
+
+def workspace_bootstrap_payload(account_doc):
+    workspace_ensure_default_workspace(account_doc)
+    visible_ids = workspace_visible_ids_for_account(account_doc)
+    if not visible_ids:
+        visible_ids = []
+
+    workspaces = list(workspace_workspaces_collection.find({"id": {"$in": visible_ids}, "archived": {"$ne": True}}).sort("updated_at", DESCENDING))
+    memberships = list(workspace_members_collection.find({"workspace_id": {"$in": visible_ids}, "archived": {"$ne": True}}))
+    folders = list(workspace_folders_collection.find({"workspace_id": {"$in": visible_ids}, "archived": {"$ne": True}}).sort([("name", ASCENDING)]))
+    project_maps = list(workspace_project_maps_collection.find({"workspace_id": {"$in": visible_ids}, "archived": {"$ne": True}}).sort([("updated_at", DESCENDING)]))
+    sheets = list(workspace_sheets_collection.find({"workspace_id": {"$in": visible_ids}, "archived": {"$ne": True}}).sort([("updated_at", DESCENDING)]))
+    events = list(workspace_events_collection.find({"workspace_id": {"$in": visible_ids}}).sort("created_at", DESCENDING).limit(100))
+    invites = list(workspace_invites_collection.find({
+        "$or": [
+            {"email_lc": workspace_clean_email(account_doc.get("email"))},
+            {"created_by": account_doc.get("id")},
+            {"workspace_id": {"$in": visible_ids}},
+        ],
+        "archived": {"$ne": True},
+    }).sort("created_at", DESCENDING).limit(100))
+
+    return {
+        "success": True,
+        "mode": "mongodb",
+        "profile": workspace_profile_for_api(account_doc),
+        "workspaces": [workspace_public_doc(item) for item in workspaces],
+        "memberships": [workspace_public_doc(item) for item in memberships],
+        "folders": [workspace_public_doc(item) for item in folders],
+        "projectMaps": [workspace_public_doc(item) for item in project_maps],
+        "projects": [workspace_public_doc(item) for item in project_maps],
+        "sheets": [workspace_public_doc(item) for item in sheets],
+        "events": [workspace_public_doc(item) for item in events],
+        "invites": [workspace_public_doc(item) for item in invites],
+        "lastSync": workspace_iso(workspace_db_timestamp()),
+    }
+
+
+def workspace_parse_since(value):
+    value = safe_str(value)
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+@app.route("/api/workspace/system/status", methods=["GET", "OPTIONS"])
+def api_workspace_system_status():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    try:
+        mongo_client.admin.command("ping")
+        connected = True
+        message = "MongoDB verbunden."
+    except Exception as error:
+        connected = False
+        message = f"MongoDB nicht erreichbar: {error}"
+    return jsonify({
+        "success": connected,
+        "connected": connected,
+        "mode": "mongodb",
+        "message": message,
+        "counts": {
+            "accounts": workspace_accounts_collection.count_documents({"archived": {"$ne": True}}),
+            "workspaces": workspace_workspaces_collection.count_documents({"archived": {"$ne": True}}),
+            "folders": workspace_folders_collection.count_documents({"archived": {"$ne": True}}),
+            "projectMaps": workspace_project_maps_collection.count_documents({"archived": {"$ne": True}}),
+            "sheets": workspace_sheets_collection.count_documents({"archived": {"$ne": True}}),
+        },
+        "lastSync": workspace_iso(workspace_db_timestamp()),
+    }), 200 if connected else 503
+
+
+@app.route("/api/workspace/auth/register", methods=["POST", "OPTIONS"])
+def api_workspace_auth_register():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    data = request.get_json(silent=True) or {}
+    email = workspace_clean_email(data.get("email"))
+    password = safe_str(data.get("password"))
+    display_name = safe_str(data.get("display_name") or data.get("name") or data.get("username"), "User")
+    requested_role_id = parse_int(data.get("role_id"), 0)
+
+    if not email or "@" not in email:
+        return jsonify({"success": False, "message": "Bitte eine gültige E-Mail eintragen."}), 400
+
+    if WORKSPACE_ROLE_REGISTRATION_SECRET and requested_role_id >= WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID:
+        if not hmac.compare_digest(safe_str(data.get("registration_secret")), WORKSPACE_ROLE_REGISTRATION_SECRET):
+            requested_role_id = min(requested_role_id, 30)
+
+    if workspace_accounts_collection.find_one({"email_lc": email, "archived": {"$ne": True}}):
+        return jsonify({"success": False, "message": "Für diese E-Mail existiert bereits ein Workspace-Account."}), 409
+
+    try:
+        password_hash = workspace_hash_password(password)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
+    now = workspace_db_timestamp()
+    account_doc = {
+        "id": uuid.uuid4().hex,
+        "email": email,
+        "email_lc": email,
+        "username": normalize_username(display_name, fallback="workspace-user"),
+        "display_name": display_name,
+        "role_id": requested_role_id,
+        "role_name": workspace_role_name(requested_role_id),
+        "password_hash": password_hash,
+        "source": "workspace_local",
+        "created_at": now,
+        "updated_at": now,
+        "last_login_at": now,
+        "archived": False,
+    }
+    workspace_accounts_collection.insert_one(account_doc)
+    session["workspace_account_id"] = account_doc["id"]
+    saved = workspace_accounts_collection.find_one({"id": account_doc["id"]})
+    workspace_ensure_default_workspace(saved)
+    return jsonify(workspace_bootstrap_payload(saved)), 201
+
+
+@app.route("/api/workspace/auth/login", methods=["POST", "OPTIONS"])
+def api_workspace_auth_login():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    data = request.get_json(silent=True) or {}
+    email = workspace_clean_email(data.get("email"))
+    password = safe_str(data.get("password"))
+    account_doc = workspace_accounts_collection.find_one({"email_lc": email, "archived": {"$ne": True}})
+    if not account_doc or not workspace_verify_password(password, account_doc.get("password_hash")):
+        return jsonify({"success": False, "message": "Login fehlgeschlagen. E-Mail oder Passwort ist falsch."}), 401
+
+    workspace_accounts_collection.update_one({"id": account_doc["id"]}, {"$set": {"last_login_at": workspace_db_timestamp(), "updated_at": workspace_db_timestamp()}})
+    session["workspace_account_id"] = account_doc["id"]
+    account_doc = workspace_accounts_collection.find_one({"id": account_doc["id"]})
+    workspace_ensure_default_workspace(account_doc)
+    return jsonify(workspace_bootstrap_payload(account_doc))
+
+
+@app.route("/api/workspace/auth/logout", methods=["POST", "OPTIONS"])
+def api_workspace_auth_logout():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    session.pop("workspace_account_id", None)
+    return jsonify({"success": True, "message": "Workspace-Account wurde abgemeldet."})
+
+
+@app.route("/api/workspace/me", methods=["GET", "OPTIONS"])
+@app.route("/api/workspace/bootstrap", methods=["GET", "OPTIONS"])
+def api_workspace_bootstrap():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account(auto_from_discord=True)
+    if error_response:
+        return error_response
+    return jsonify(workspace_bootstrap_payload(account_doc))
+
+
+@app.route("/api/workspace/account", methods=["PATCH", "OPTIONS"])
+def api_workspace_account_update():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    data = request.get_json(silent=True) or {}
+    update_doc = {"updated_at": workspace_db_timestamp()}
+    if "display_name" in data or "name" in data:
+        update_doc["display_name"] = safe_str(data.get("display_name") or data.get("name"), account_doc.get("display_name"))
+        update_doc["username"] = normalize_username(update_doc["display_name"], fallback=account_doc.get("username") or "workspace-user")
+    if "role_id" in data:
+        requested_role_id = parse_int(data.get("role_id"), account_doc.get("role_id", 0))
+        if WORKSPACE_ROLE_REGISTRATION_SECRET and requested_role_id >= WORKSPACE_PROJECTLEITUNG_MIN_ROLE_ID:
+            if not hmac.compare_digest(safe_str(data.get("registration_secret")), WORKSPACE_ROLE_REGISTRATION_SECRET):
+                requested_role_id = account_doc.get("role_id", 0)
+        update_doc["role_id"] = requested_role_id
+        update_doc["role_name"] = workspace_role_name(requested_role_id)
+    workspace_accounts_collection.update_one({"id": account_doc["id"]}, {"$set": update_doc})
+    account_doc = workspace_accounts_collection.find_one({"id": account_doc["id"]})
+    return jsonify({"success": True, "profile": workspace_profile_for_api(account_doc)})
+
+
+@app.route("/api/workspace/workspaces", methods=["GET", "POST", "OPTIONS"])
+def api_workspace_workspaces():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        visible_ids = workspace_visible_ids_for_account(account_doc)
+        workspaces = workspace_workspaces_collection.find({"id": {"$in": visible_ids}, "archived": {"$ne": True}}).sort("updated_at", DESCENDING)
+        return jsonify({"success": True, "workspaces": [workspace_public_doc(item) for item in workspaces]})
+
+    data = request.get_json(silent=True) or {}
+    now = workspace_db_timestamp()
+    workspace_id = uuid.uuid4().hex
+    name = safe_str(data.get("name"), "Unbenannter Workspace")
+    workspace_doc = {
+        "id": workspace_id,
+        "owner_id": account_doc["id"],
+        "name": name,
+        "description": safe_str(data.get("description")),
+        "min_role_id": parse_int(data.get("min_role_id"), 0),
+        "projectlead_access": data.get("projectlead_access", True) is not False,
+        "projectlead_edit": data.get("projectlead_edit", True) is not False,
+        "created_by": account_doc["id"],
+        "updated_by": account_doc["id"],
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_workspaces_collection.insert_one(workspace_doc)
+    workspace_members_collection.update_one(
+        {"workspace_id": workspace_id, "user_id": account_doc["id"]},
+        {"$set": {"id": uuid.uuid4().hex, "workspace_id": workspace_id, "user_id": account_doc["id"], "access": "owner", "created_at": now, "updated_at": now, "archived": False}},
+        upsert=True
+    )
+    folder_doc = {
+        "id": uuid.uuid4().hex,
+        "workspace_id": workspace_id,
+        "parent_id": "",
+        "name": "Projektmappen",
+        "created_by": account_doc["id"],
+        "updated_by": account_doc["id"],
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_folders_collection.insert_one(folder_doc)
+    workspace_create_base_sheet(workspace_id, account_doc, title="Unbenannte Tabelle")
+    workspace_create_event(workspace_id, account_doc, "workspace_created", f"Workspace „{name}“ erstellt")
+    return jsonify({"success": True, "workspace": workspace_public_doc(workspace_doc), "folder": workspace_public_doc(folder_doc)}), 201
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+def api_workspace_workspace_detail(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=(request.method != "GET"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        return jsonify({"success": True, "workspace": workspace_public_doc(workspace_doc)})
+
+    if request.method == "DELETE":
+        now = workspace_db_timestamp()
+        workspace_workspaces_collection.update_one({"id": workspace_id}, {"$set": {"archived": True, "archived_at": now, "updated_at": now, "updated_by": account_doc["id"]}})
+        workspace_create_event(workspace_id, account_doc, "workspace_deleted", "Workspace wurde archiviert")
+        return jsonify({"success": True, "message": "Workspace wurde archiviert."})
+
+    data = request.get_json(silent=True) or {}
+    update_doc = {"updated_at": workspace_db_timestamp(), "updated_by": account_doc["id"]}
+    for key in ["name", "description"]:
+        if key in data:
+            update_doc[key] = safe_str(data.get(key))
+    if "min_role_id" in data:
+        update_doc["min_role_id"] = parse_int(data.get("min_role_id"), workspace_doc.get("min_role_id", 0))
+    if "projectlead_access" in data:
+        update_doc["projectlead_access"] = data.get("projectlead_access") is not False
+    if "projectlead_edit" in data:
+        update_doc["projectlead_edit"] = data.get("projectlead_edit") is not False
+    workspace_workspaces_collection.update_one({"id": workspace_id}, {"$set": update_doc})
+    workspace_create_event(workspace_id, account_doc, "workspace_updated", "Workspace wurde aktualisiert", update_doc)
+    saved = workspace_workspaces_collection.find_one({"id": workspace_id})
+    return jsonify({"success": True, "workspace": workspace_public_doc(saved)})
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>/members", methods=["GET", "POST", "OPTIONS"])
+def api_workspace_members(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=(request.method == "POST"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        members = workspace_members_collection.find({"workspace_id": workspace_id, "archived": {"$ne": True}}).sort("created_at", ASCENDING)
+        return jsonify({"success": True, "members": [workspace_public_doc(item) for item in members]})
+
+    data = request.get_json(silent=True) or {}
+    target_email = workspace_clean_email(data.get("email"))
+    target_account = workspace_accounts_collection.find_one({"email_lc": target_email, "archived": {"$ne": True}})
+    if not target_account:
+        return jsonify({"success": False, "message": "Ziel-Account wurde nicht gefunden. Sende zuerst eine Einladung mit Code."}), 404
+    access = safe_str(data.get("access"), "viewer")
+    if access not in {"viewer", "editor", "admin"}:
+        access = "viewer"
+    now = workspace_db_timestamp()
+    workspace_members_collection.update_one(
+        {"workspace_id": workspace_id, "user_id": target_account["id"]},
+        {"$set": {"id": uuid.uuid4().hex, "workspace_id": workspace_id, "user_id": target_account["id"], "access": access, "created_at": now, "updated_at": now, "archived": False}},
+        upsert=True
+    )
+    workspace_create_event(workspace_id, account_doc, "member_added", f"{target_account.get('display_name') or target_email} wurde hinzugefügt", {"access": access})
+    return jsonify({"success": True, "message": "Mitglied wurde hinzugefügt."})
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>/folders", methods=["GET", "POST", "OPTIONS"])
+def api_workspace_folders(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=(request.method == "POST"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        folders = workspace_folders_collection.find({"workspace_id": workspace_id, "archived": {"$ne": True}}).sort("name", ASCENDING)
+        return jsonify({"success": True, "folders": [workspace_public_doc(item) for item in folders]})
+
+    data = request.get_json(silent=True) or {}
+    now = workspace_db_timestamp()
+    folder_doc = {
+        "id": uuid.uuid4().hex,
+        "workspace_id": workspace_id,
+        "parent_id": safe_str(data.get("parent_id")),
+        "name": safe_str(data.get("name"), "Neuer Ordner"),
+        "created_by": account_doc["id"],
+        "updated_by": account_doc["id"],
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_folders_collection.insert_one(folder_doc)
+    workspace_touch(workspace_id)
+    workspace_create_event(workspace_id, account_doc, "folder_created", f"Ordner „{folder_doc['name']}“ erstellt", {"folder_id": folder_doc["id"]})
+    return jsonify({"success": True, "folder": workspace_public_doc(folder_doc)}), 201
+
+
+@app.route("/api/workspace/folders/<folder_id>", methods=["PATCH", "DELETE", "OPTIONS"])
+def api_workspace_folder_detail(folder_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    folder_doc = workspace_folders_collection.find_one({"id": safe_str(folder_id), "archived": {"$ne": True}})
+    if not folder_doc:
+        return jsonify({"success": False, "message": "Ordner wurde nicht gefunden."}), 404
+    workspace_doc, error_response = workspace_require_workspace(folder_doc.get("workspace_id"), account_doc, edit=True)
+    if error_response:
+        return error_response
+    now = workspace_db_timestamp()
+    if request.method == "DELETE":
+        workspace_folders_collection.update_one({"id": folder_id}, {"$set": {"archived": True, "archived_at": now, "updated_at": now, "updated_by": account_doc["id"]}})
+        workspace_create_event(folder_doc["workspace_id"], account_doc, "folder_deleted", f"Ordner „{folder_doc.get('name')}“ archiviert", {"folder_id": folder_id})
+        return jsonify({"success": True})
+    data = request.get_json(silent=True) or {}
+    update_doc = {"updated_at": now, "updated_by": account_doc["id"]}
+    if "name" in data:
+        update_doc["name"] = safe_str(data.get("name"), folder_doc.get("name"))
+    if "parent_id" in data:
+        update_doc["parent_id"] = safe_str(data.get("parent_id"))
+    workspace_folders_collection.update_one({"id": folder_id}, {"$set": update_doc})
+    workspace_create_event(folder_doc["workspace_id"], account_doc, "folder_updated", "Ordner aktualisiert", {"folder_id": folder_id})
+    return jsonify({"success": True, "folder": workspace_public_doc(workspace_folders_collection.find_one({"id": folder_id}))})
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>/project-maps", methods=["GET", "POST", "OPTIONS"])
+def api_workspace_project_maps(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=(request.method == "POST"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        projects = workspace_project_maps_collection.find({"workspace_id": workspace_id, "archived": {"$ne": True}}).sort("updated_at", DESCENDING)
+        return jsonify({"success": True, "projectMaps": [workspace_public_doc(item) for item in projects], "projects": [workspace_public_doc(item) for item in projects]})
+
+    data = request.get_json(silent=True) or {}
+    now = workspace_db_timestamp()
+    project_doc = {
+        "id": uuid.uuid4().hex,
+        "workspace_id": workspace_id,
+        "folder_id": safe_str(data.get("folder_id")),
+        "name": safe_str(data.get("name"), "Neue Projektmappe"),
+        "description": safe_str(data.get("description")),
+        "created_by": account_doc["id"],
+        "updated_by": account_doc["id"],
+        "created_at": now,
+        "updated_at": now,
+        "archived": False,
+    }
+    workspace_project_maps_collection.insert_one(project_doc)
+    sheet_doc = workspace_create_base_sheet(workspace_id, account_doc, project_id=project_doc["id"], title=f"{project_doc['name']} Tabelle")
+    workspace_touch(workspace_id)
+    workspace_create_event(workspace_id, account_doc, "project_created", f"Projektmappe „{project_doc['name']}“ erstellt", {"project_id": project_doc["id"], "sheet_id": sheet_doc["id"]})
+    return jsonify({"success": True, "projectMap": workspace_public_doc(project_doc), "project": workspace_public_doc(project_doc), "sheet": workspace_public_doc(sheet_doc)}), 201
+
+
+@app.route("/api/workspace/project-maps/<project_id>", methods=["PATCH", "DELETE", "OPTIONS"])
+def api_workspace_project_map_detail(project_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    project_doc = workspace_project_maps_collection.find_one({"id": safe_str(project_id), "archived": {"$ne": True}})
+    if not project_doc:
+        return jsonify({"success": False, "message": "Projektmappe wurde nicht gefunden."}), 404
+    workspace_doc, error_response = workspace_require_workspace(project_doc.get("workspace_id"), account_doc, edit=True)
+    if error_response:
+        return error_response
+    now = workspace_db_timestamp()
+    if request.method == "DELETE":
+        workspace_project_maps_collection.update_one({"id": project_id}, {"$set": {"archived": True, "archived_at": now, "updated_at": now, "updated_by": account_doc["id"]}})
+        workspace_sheets_collection.update_many({"project_id": project_id}, {"$set": {"archived": True, "archived_at": now, "updated_at": now, "updated_by": account_doc["id"]}})
+        workspace_create_event(project_doc["workspace_id"], account_doc, "project_deleted", f"Projektmappe „{project_doc.get('name')}“ archiviert", {"project_id": project_id})
+        return jsonify({"success": True})
+    data = request.get_json(silent=True) or {}
+    update_doc = {"updated_at": now, "updated_by": account_doc["id"]}
+    for key in ["name", "description", "folder_id"]:
+        if key in data:
+            update_doc[key] = safe_str(data.get(key))
+    workspace_project_maps_collection.update_one({"id": project_id}, {"$set": update_doc})
+    workspace_create_event(project_doc["workspace_id"], account_doc, "project_updated", "Projektmappe aktualisiert", {"project_id": project_id})
+    return jsonify({"success": True, "projectMap": workspace_public_doc(workspace_project_maps_collection.find_one({"id": project_id}))})
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>/sheets", methods=["GET", "POST", "OPTIONS"])
+def api_workspace_sheets(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=(request.method == "POST"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        query = {"workspace_id": workspace_id, "archived": {"$ne": True}}
+        project_id = safe_str(request.args.get("project_id"))
+        if project_id:
+            query["project_id"] = project_id
+        sheets = workspace_sheets_collection.find(query).sort("updated_at", DESCENDING)
+        return jsonify({"success": True, "sheets": [workspace_public_doc(item) for item in sheets]})
+
+    data = request.get_json(silent=True) or {}
+    sheet_payload = data.get("sheet") if isinstance(data.get("sheet"), dict) else data
+    title = safe_str(sheet_payload.get("title") or sheet_payload.get("fileName") or sheet_payload.get("fileName"), "Unbenannte Tabelle")
+    sheet_doc = workspace_create_base_sheet(workspace_id, account_doc, project_id=sheet_payload.get("project_id") or data.get("project_id"), title=title)
+    workspace_create_event(workspace_id, account_doc, "sheet_created", f"Tabelle „{title}“ erstellt", {"sheet_id": sheet_doc["id"]})
+    return jsonify({"success": True, "sheet": workspace_public_doc(sheet_doc)}), 201
+
+
+def workspace_update_sheet_doc(sheet_doc, sheet_payload, account_doc, reason="manual"):
+    now = workspace_db_timestamp()
+    update_doc = {
+        "updated_at": now,
+        "updated_by": account_doc["id"],
+        "last_reason": safe_str(reason, "manual"),
+        "version": parse_int(sheet_doc.get("version"), 1) + 1,
+    }
+    allowed_keys = [
+        "title", "sheetName", "fileName", "rows", "cols", "selected", "data", "styles",
+        "autoSaveDb", "collapsed", "project_id", "folder_id", "meta"
+    ]
+    for key in allowed_keys:
+        if key in sheet_payload:
+            update_doc[key] = sheet_payload.get(key)
+    if "fileName" in sheet_payload and "title" not in update_doc:
+        update_doc["title"] = safe_str(sheet_payload.get("fileName"), sheet_doc.get("title", "Unbenannte Tabelle"))
+    workspace_sheets_collection.update_one({"id": sheet_doc["id"]}, {"$set": update_doc})
+    return workspace_sheets_collection.find_one({"id": sheet_doc["id"]})
+
+
+@app.route("/api/workspace/sheets/<sheet_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+def api_workspace_sheet_detail(sheet_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    sheet_doc = workspace_sheets_collection.find_one({"id": safe_str(sheet_id), "archived": {"$ne": True}})
+    if not sheet_doc:
+        return jsonify({"success": False, "message": "Tabelle wurde nicht gefunden."}), 404
+    workspace_doc, error_response = workspace_require_workspace(sheet_doc.get("workspace_id"), account_doc, edit=(request.method != "GET"))
+    if error_response:
+        return error_response
+
+    if request.method == "GET":
+        return jsonify({"success": True, "sheet": workspace_public_doc(sheet_doc)})
+
+    if request.method == "DELETE":
+        now = workspace_db_timestamp()
+        workspace_sheets_collection.update_one({"id": sheet_id}, {"$set": {"archived": True, "archived_at": now, "updated_at": now, "updated_by": account_doc["id"]}})
+        workspace_create_event(sheet_doc["workspace_id"], account_doc, "sheet_deleted", f"Tabelle „{sheet_doc.get('title') or sheet_doc.get('fileName')}“ archiviert", {"sheet_id": sheet_id})
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    sheet_payload = data.get("sheet") if isinstance(data.get("sheet"), dict) else data
+    saved = workspace_update_sheet_doc(sheet_doc, sheet_payload, account_doc, reason=data.get("reason") or sheet_payload.get("reason") or "manual")
+    workspace_touch(saved.get("workspace_id"))
+    workspace_create_event(saved.get("workspace_id"), account_doc, "sheet_saved", f"Tabelle „{saved.get('title') or saved.get('fileName')}“ gespeichert", {"sheet_id": saved["id"], "version": saved.get("version")})
+    return jsonify({"success": True, "sheet": workspace_public_doc(saved), "lastSync": workspace_iso(saved.get("updated_at"))})
+
+
+@app.route("/api/workspace/workspaces/<workspace_id>/share", methods=["POST", "OPTIONS"])
+def api_workspace_share(workspace_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=True)
+    if error_response:
+        return error_response
+    data = request.get_json(silent=True) or {}
+    email = workspace_clean_email(data.get("email"))
+    access = safe_str(data.get("access"), "viewer")
+    if access not in {"viewer", "editor", "admin"}:
+        access = "viewer"
+    min_role_id = parse_int(data.get("min_role_id"), 0)
+    if not email or "@" not in email:
+        return jsonify({"success": False, "message": "Bitte eine gültige Ziel-E-Mail eintragen."}), 400
+    now = workspace_db_timestamp()
+    code = secrets.token_urlsafe(18).replace("-", "").replace("_", "")[:24].upper()
+    invite_doc = {
+        "id": uuid.uuid4().hex,
+        "workspace_id": workspace_id,
+        "email": email,
+        "email_lc": email,
+        "code": code,
+        "access": access,
+        "min_role_id": min_role_id,
+        "created_by": account_doc["id"],
+        "created_at": now,
+        "updated_at": now,
+        "claimed_by": "",
+        "claimed_at": None,
+        "archived": False,
+    }
+    workspace_invites_collection.insert_one(invite_doc)
+    target_account = workspace_accounts_collection.find_one({"email_lc": email, "archived": {"$ne": True}})
+    if target_account and parse_int(target_account.get("role_id"), 0) >= min_role_id:
+        workspace_members_collection.update_one(
+            {"workspace_id": workspace_id, "user_id": target_account["id"]},
+            {"$set": {"id": uuid.uuid4().hex, "workspace_id": workspace_id, "user_id": target_account["id"], "access": access, "created_at": now, "updated_at": now, "archived": False}},
+            upsert=True
+        )
+    workspace_create_event(workspace_id, account_doc, "workspace_shared", f"Workspace an {email} gesendet", {"code": code, "access": access, "min_role_id": min_role_id})
+    return jsonify({"success": True, "invite": workspace_public_doc(invite_doc), "code": code, "message": "Einladung wurde erstellt."}), 201
+
+
+@app.route("/api/workspace/share/accept", methods=["POST", "OPTIONS"])
+def api_workspace_share_accept():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    data = request.get_json(silent=True) or {}
+    code = safe_str(data.get("code")).upper()
+    invite_doc = workspace_invites_collection.find_one({"code": code, "archived": {"$ne": True}})
+    if not invite_doc:
+        return jsonify({"success": False, "message": "Einladungscode wurde nicht gefunden."}), 404
+    if parse_int(account_doc.get("role_id"), 0) < parse_int(invite_doc.get("min_role_id"), 0):
+        return jsonify({"success": False, "message": "Deine Rollen-ID ist für diese Einladung zu niedrig."}), 403
+    workspace_doc, error_response = workspace_require_workspace(invite_doc.get("workspace_id"), account_doc, edit=False)
+    if not workspace_doc:
+        # Ein eingeladener Account darf auch dann beitreten, wenn der Workspace vorher noch nicht sichtbar war.
+        workspace_doc = workspace_workspaces_collection.find_one({"id": invite_doc.get("workspace_id"), "archived": {"$ne": True}})
+        if not workspace_doc:
+            return jsonify({"success": False, "message": "Workspace wurde nicht gefunden."}), 404
+    now = workspace_db_timestamp()
+    workspace_members_collection.update_one(
+        {"workspace_id": invite_doc["workspace_id"], "user_id": account_doc["id"]},
+        {"$set": {"id": uuid.uuid4().hex, "workspace_id": invite_doc["workspace_id"], "user_id": account_doc["id"], "access": invite_doc.get("access", "viewer"), "created_at": now, "updated_at": now, "archived": False}},
+        upsert=True
+    )
+    workspace_invites_collection.update_one({"id": invite_doc["id"]}, {"$set": {"claimed_by": account_doc["id"], "claimed_at": now, "updated_at": now}})
+    workspace_create_event(invite_doc["workspace_id"], account_doc, "workspace_joined", f"{account_doc.get('display_name')} ist dem Workspace beigetreten", {"invite_id": invite_doc["id"]})
+    return jsonify({"success": True, "workspace": workspace_public_doc(workspace_doc), "message": "Workspace wurde angenommen."})
+
+
+@app.route("/api/workspace/events", methods=["GET", "OPTIONS"])
+def api_workspace_events():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_id = safe_str(request.args.get("workspace_id"))
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=False)
+    if error_response:
+        return error_response
+    query = {"workspace_id": workspace_id}
+    since = workspace_parse_since(request.args.get("after"))
+    if since:
+        query["created_at"] = {"$gt": since}
+    events = workspace_events_collection.find(query).sort("created_at", DESCENDING).limit(parse_int(request.args.get("limit"), 80))
+    return jsonify({"success": True, "events": [workspace_public_doc(item) for item in events], "lastSync": workspace_iso(workspace_db_timestamp())})
+
+
+@app.route("/api/workspace/live/<workspace_id>", methods=["GET"])
+def api_workspace_live_stream(workspace_id):
+    account_doc, error_response = workspace_require_account()
+    if error_response:
+        return error_response
+    workspace_doc, error_response = workspace_require_workspace(workspace_id, account_doc, edit=False)
+    if error_response:
+        return error_response
+
+    def stream():
+        last_seen = workspace_parse_since(request.args.get("after")) or (workspace_db_timestamp() - timedelta(seconds=3))
+        last_keepalive = time.time()
+        hello = {"type": "connected", "workspace_id": workspace_id, "at": workspace_iso(workspace_db_timestamp())}
+        yield f"event: connected\ndata: {json.dumps(hello, ensure_ascii=False)}\n\n"
+        while True:
+            newest_seen = last_seen
+            cursor = workspace_events_collection.find({
+                "workspace_id": workspace_id,
+                "created_at": {"$gt": last_seen},
+            }).sort("created_at", ASCENDING).limit(50)
+            sent = False
+            for event_doc in cursor:
+                sent = True
+                created_at = event_doc.get("created_at")
+                if isinstance(created_at, datetime) and created_at > newest_seen:
+                    newest_seen = created_at
+                data = workspace_public_doc(event_doc)
+                yield f"id: {data.get('event_id') or data.get('id')}\nevent: {data.get('event_type') or 'event'}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+            if sent:
+                last_seen = newest_seen
+                last_keepalive = time.time()
+            elif time.time() - last_keepalive >= WORKSPACE_SSE_KEEPALIVE_SECONDS:
+                yield f": keepalive {workspace_iso(workspace_db_timestamp())}\n\n"
+                last_keepalive = time.time()
+            time.sleep(WORKSPACE_EVENT_POLL_SECONDS)
+
+    return Response(stream(), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+
+
+@app.route("/api/hr-controlling/tabellen-builder", methods=["GET", "POST", "OPTIONS"])
+def api_hr_controlling_tabellen_builder():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    scope = safe_str(request.args.get("scope"), "hr-controlling-default")
+    actor = current_account_identity()
+    now = hr_db_timestamp() if "hr_db_timestamp" in globals() else now_utc()
+
+    if request.method == "GET":
+        sheet_doc = hr_sheet_builder_collection.find_one({"scope": scope, "archived": {"$ne": True}}, sort=[("updated_at", DESCENDING)])
+        if not sheet_doc:
+            sheet_payload = {
+                "id": uuid.uuid4().hex,
+                "rows": WORKSPACE_DEFAULT_SHEET_ROWS,
+                "cols": WORKSPACE_DEFAULT_SHEET_COLS,
+                "sheetName": "Tabellenblatt1",
+                "fileName": "Unbenannte Tabelle",
+                "selected": {"row": 1, "col": 1},
+                "data": {},
+                "styles": {},
+                "autoSaveDb": True,
+                "updatedAt": workspace_iso(now),
+            }
+            sheet_doc = {
+                "scope": scope,
+                "sheet_id": sheet_payload["id"],
+                "sheet": sheet_payload,
+                "created_by": actor,
+                "updated_by": actor,
+                "created_at": now,
+                "updated_at": now,
+                "archived": False,
+            }
+            hr_sheet_builder_collection.insert_one(sheet_doc)
+        sheet = dict(sheet_doc.get("sheet") or {})
+        sheet["id"] = sheet.get("id") or sheet_doc.get("sheet_id")
+        sheet["updatedAt"] = workspace_iso(sheet_doc.get("updated_at"))
+        return jsonify({
+            "success": True,
+            "connected": True,
+            "mode": "mongodb",
+            "sourceName": "MongoDB / HR Tabellen-Builder",
+            "sheet": workspace_public_doc(sheet),
+            "lastSync": workspace_iso(sheet_doc.get("updated_at")),
+        })
+
+    data = request.get_json(silent=True) or {}
+    sheet_payload = data.get("sheet") if isinstance(data.get("sheet"), dict) else data
+    if not isinstance(sheet_payload, dict):
+        return jsonify({"success": False, "message": "Ungültiger Tabellen-Payload."}), 400
+
+    sheet_id = safe_str(sheet_payload.get("id") or sheet_payload.get("sheetId"), uuid.uuid4().hex)
+    sheet_payload["id"] = sheet_id
+    sheet_payload["updatedAt"] = workspace_iso(now)
+    sheet_payload["lastDatabaseSaveAt"] = workspace_iso(now)
+
+    doc = {
+        "scope": scope,
+        "sheet_id": sheet_id,
+        "sheet": sheet_payload,
+        "reason": safe_str(data.get("reason"), "manual"),
+        "updated_by": actor,
+        "updated_at": now,
+        "archived": False,
+    }
+    existing = hr_sheet_builder_collection.find_one({"scope": scope, "archived": {"$ne": True}})
+    if existing:
+        hr_sheet_builder_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": doc, "$setOnInsert": {"created_at": now, "created_by": actor}}
+        )
+        saved = hr_sheet_builder_collection.find_one({"_id": existing["_id"]})
+    else:
+        doc["created_at"] = now
+        doc["created_by"] = actor
+        hr_sheet_builder_collection.insert_one(doc)
+        saved = hr_sheet_builder_collection.find_one({"scope": scope, "archived": {"$ne": True}})
+
+    sheet = dict(saved.get("sheet") or {})
+    sheet["id"] = sheet.get("id") or saved.get("sheet_id")
+    sheet["updatedAt"] = workspace_iso(saved.get("updated_at"))
+    return jsonify({
+        "success": True,
+        "message": "Tabellen-Builder wurde in MongoDB gespeichert.",
+        "mode": "mongodb",
+        "sheet": workspace_public_doc(sheet),
+        "lastSync": workspace_iso(saved.get("updated_at")),
+    })
+
+
+@app.route("/api/hr-controlling/tabellen-builder/live", methods=["GET"])
+def api_hr_controlling_tabellen_builder_live():
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+    scope = safe_str(request.args.get("scope"), "hr-controlling-default")
+
+    def stream():
+        last_seen = workspace_db_timestamp() - timedelta(seconds=3)
+        yield f"event: connected\ndata: {json.dumps({'scope': scope, 'mode': 'mongodb'}, ensure_ascii=False)}\n\n"
+        while True:
+            doc = hr_sheet_builder_collection.find_one({"scope": scope, "archived": {"$ne": True}, "updated_at": {"$gt": last_seen}}, sort=[("updated_at", DESCENDING)])
+            if doc:
+                last_seen = doc.get("updated_at") or workspace_db_timestamp()
+                payload = {"sheet": workspace_public_doc(doc.get("sheet") or {}), "lastSync": workspace_iso(last_seen)}
+                yield f"event: sheet_saved\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            else:
+                yield f": keepalive {workspace_iso(workspace_db_timestamp())}\n\n"
+            time.sleep(WORKSPACE_EVENT_POLL_SECONDS)
+
+    return Response(stream(), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
 
 
 # ==========================================
