@@ -11,6 +11,7 @@
     - NEU: Disposition-Schnellzugriff für Rolle 1473726639643820344 auf dispo.html.
     - NEU: Servicecenter-Schnellzugriff über /servicecenter statt Mein-Profil-Kachel.
     - NEU: System-Postfach-Hinweis für alle User: Fahrerkarten jetzt verfügbar / beantragbar.
+    - NEU: System-Postfach mit Aktiv-/Archiv-Ansicht, manueller Archivierung und automatischer Archivierung alter Dokumente.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -201,6 +202,52 @@
 
     .doc-trigger[data-read="false"] .doc-new-indicator {
         display: inline-flex;
+    }
+
+    .doc-trigger.is-archived-doc .doc-attention-dot,
+    .doc-trigger.is-archived-doc .doc-new-indicator {
+        display: none !important;
+    }
+
+    .doc-archive-pill {
+        display: none;
+    }
+
+    .doc-trigger.is-archived-doc .doc-archive-pill {
+        display: inline-flex;
+    }
+
+    #postfach-container[data-view="active"] .doc-trigger.is-archived-doc {
+        display: none !important;
+    }
+
+    #postfach-container[data-view="archive"] > :not(.is-archived-doc):not(#postfach-empty-state) {
+        display: none !important;
+    }
+
+    #postfach-container[data-view="archive"] .doc-trigger.is-archived-doc {
+        display: block !important;
+        opacity: 0.72;
+        filter: saturate(0.78);
+    }
+
+    .postfach-view-btn.is-active {
+        color: #0b0d08 !important;
+        background: var(--brand-yellow) !important;
+        border-color: var(--brand-yellow) !important;
+        box-shadow: 0 0 22px rgba(220, 226, 38, 0.18);
+    }
+
+    .postfach-view-btn:not(.is-active) {
+        color: var(--muted);
+    }
+
+    #postfach-empty-state {
+        display: none;
+    }
+
+    #postfach-empty-state.is-visible {
+        display: block;
     }
 
     /* Schmale Custom-Scrollbar für Modals */
@@ -1471,12 +1518,35 @@
             </div>
         </div>
 
-        <div id="postfach-container" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
+        <div class="px-6 pt-5 pb-4 border-b border-white/10 bg-black/10 shrink-0">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="inline-flex rounded-2xl bg-black/35 border border-white/10 p-1">
+                    <button id="postfach-view-active" type="button" class="postfach-view-btn is-active px-4 py-2 rounded-xl border border-transparent transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                        Aktiv <span id="postfach-active-count" class="ml-1">0</span>
+                    </button>
+                    <button id="postfach-view-archive" type="button" class="postfach-view-btn px-4 py-2 rounded-xl border border-transparent hover:border-white/15 hover:bg-white/5 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                        Archiv <span id="postfach-archive-count" class="ml-1">0</span>
+                    </button>
+                </div>
+
+                <button id="postfach-archive-old" type="button" class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-[var(--brand-yellow)]/40 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.14em]">
+                    Ältere jetzt archivieren
+                </button>
+            </div>
+
+            <p class="mt-3 text-[11px] text-[var(--muted)] font-inter leading-relaxed">
+                Nicht fixierte Dokumente werden automatisch archiviert, sobald sie älter als 2 Kalendertage sind oder nicht mehr zu den neuesten 6 aktiven Dokumenten gehören.
+            </p>
+        </div>
+
+        <div id="postfach-container" data-view="active" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="Fahrerkarten jetzt verfügbar"
                     data-sender="Servicecenter"
                     data-date="19.05.2026, 00:51"
                     data-needs-signature="false"
+                    data-fixed-doc="false"
+                    data-archiveable="true"
                     data-doc-id="system-fahrerkarten-verfuegbar-beantragbar-v1">
                 <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
 
@@ -1512,6 +1582,8 @@
                     data-sender="Management"
                     data-date="Standard"
                     data-needs-signature="true"
+                    data-fixed-doc="true"
+                    data-archiveable="false"
                     data-doc-id="policy-eifellog-richtlinien">
                 <div class="flex items-center gap-4">
                     <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
@@ -1544,6 +1616,8 @@
                     data-sender="{{ fahrer_reg_handler }}"
                     data-date="{{ fahrer_token_created_at }}"
                     data-needs-signature="false"
+                    data-fixed-doc="false"
+                    data-archiveable="true"
                     data-doc-id="{{ ('token-' ~ fahrer_reg_name ~ '-' ~ fahrer_token_created_at)|e }}">
                 <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
 
@@ -1578,12 +1652,15 @@
                     {% set doc_title_lc = (doc.title|default('', true))|lower %}
                     {% set doc_type_lc = (doc.type|default('', true))|lower %}
                     {% set is_token_doc = ('token' in doc_title_lc) or ('tracker' in doc_title_lc) or (doc_type_lc in ['driver_token', 'tracker_token', 'token']) %}
+                    {% set is_fixed_doc = doc.fixed|default(doc.pinned|default(false, true), true) %}
                     {% if not is_token_doc or fahrer_reg_status == 'approved' %}
                     <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.06] border border-[var(--brand-yellow)]/25 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                             data-title="{{ doc.title }}"
                             data-sender="{{ doc.sender }}"
                             data-date="{{ doc.date }}"
                             data-needs-signature="{{ 'true' if doc.needs_signature else 'false' }}"
+                            data-fixed-doc="{{ 'true' if is_fixed_doc or doc.needs_signature else 'false' }}"
+                            data-archiveable="{{ 'false' if is_fixed_doc or doc.needs_signature else 'true' }}"
                             data-doc-id="{{ ('doc-' ~ loop.index ~ '-' ~ doc.title ~ '-' ~ doc.sender ~ '-' ~ doc.date)|e }}">
 
                         {% if doc.needs_signature %}
@@ -1614,7 +1691,7 @@
 
         <div class="px-6 py-4 border-t border-white/10 bg-black/20 shrink-0">
             <p class="text-[11px] text-[var(--muted)] font-inter leading-relaxed">
-                Tipp: Klicke auf ein Dokument, um es direkt im zentrierten Reader zu öffnen.
+                Tipp: Klicke auf ein Dokument, um es im Reader zu öffnen. Dort kannst du nicht fixierte Dokumente archivieren oder wiederherstellen.
             </p>
         </div>
     </div>
@@ -1681,6 +1758,17 @@
             <p id="univ-sig-error" class="text-[var(--danger)] text-xs font-inter mt-3 text-center hidden">
                 Fehler beim Bestätigen. Bitte erneut versuchen.
             </p>
+        </div>
+
+        <div id="univ-doc-archive-actions" class="border-t border-white/10 p-6 md:p-8 pt-5 shrink-0 bg-black/20">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p id="univ-doc-archive-hint" class="text-xs text-[var(--muted)] font-inter leading-relaxed">
+                    Nicht fixierte Dokumente können aus dem aktiven Postfach ins Archiv verschoben werden.
+                </p>
+                <button id="univ-doc-archive-toggle" type="button" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-[var(--brand-yellow)]/40 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em] whitespace-nowrap">
+                    Archivieren
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1902,6 +1990,13 @@
         const alertsBackdrop = document.getElementById('alerts-backdrop');
         const btnCloseAlerts = document.getElementById('btn-close-alerts');
 
+        const postfachContainer = document.getElementById('postfach-container');
+        const btnPostfachActive = document.getElementById('postfach-view-active');
+        const btnPostfachArchive = document.getElementById('postfach-view-archive');
+        const btnPostfachArchiveOld = document.getElementById('postfach-archive-old');
+        const postfachActiveCount = document.getElementById('postfach-active-count');
+        const postfachArchiveCount = document.getElementById('postfach-archive-count');
+
         const newDocAlertWrapper = document.getElementById('new-doc-alert-wrapper');
         const newDocAlertPanel = document.getElementById('new-doc-alert-panel');
         const btnOpenInboxFromAlert = document.getElementById('btn-open-inbox-from-alert');
@@ -1917,6 +2012,9 @@
         const univSigInput = document.getElementById('univ-sig-input');
         const univBtnSubmit = document.getElementById('univ-btn-submit');
         const univSigError = document.getElementById('univ-sig-error');
+        const univArchiveActions = document.getElementById('univ-doc-archive-actions');
+        const univArchiveToggle = document.getElementById('univ-doc-archive-toggle');
+        const univArchiveHint = document.getElementById('univ-doc-archive-hint');
 
         const driverRegistrationBtn = document.getElementById('btn-driver-registration');
         const driverRegistrationModal = document.getElementById('driver-registration-modal');
@@ -1996,6 +2094,38 @@
             container.appendChild(item);
         }
 
+        /* Datum robust aus Postfach-Karten lesen. Unterstützt u. a. "21.05.2026, 12:46", "21.05.2026 12:46" und "Heute". */
+        function parsePostfachDate(dStr) {
+            const raw = (dStr || '').trim();
+            if (!raw || raw === 'Standard') return 0;
+            if (raw === 'Heute') return Date.now();
+
+            const match = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,?\s+(\d{1,2}):(\d{2}))?/);
+            if (match) {
+                const day = Number(match[1]);
+                const month = Number(match[2]) - 1;
+                const year = Number(match[3]);
+                const hour = Number(match[4] || 0);
+                const minute = Number(match[5] || 0);
+                return new Date(year, month, day, hour, minute).getTime();
+            }
+
+            const parsed = new Date(raw.replace(',', ''));
+            return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+        }
+
+        function getCalendarAgeInDays(timestamp) {
+            if (!timestamp) return 0;
+
+            const now = new Date();
+            const docDate = new Date(timestamp);
+
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const docStart = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate()).getTime();
+
+            return Math.max(0, Math.floor((todayStart - docStart) / 86400000));
+        }
+
         /* Sortiert das Postfach nach Datum und Uhrzeit */
         function sortPostfach() {
             const container = document.getElementById('postfach-container');
@@ -2004,22 +2134,9 @@
             const items = Array.from(container.children).filter(child => child.hasAttribute('data-date'));
 
             items.sort((a, b) => {
-                const dateA = a.getAttribute('data-date') || '';
-                const dateB = b.getAttribute('data-date') || '';
-
-                function parseDate(dStr) {
-                    if (!dStr || dStr === 'Standard') return 0;
-                    if (dStr === 'Heute') return new Date().getTime();
-                    
-                    const parts = dStr.split(/[. :]/);
-                    if (parts.length >= 5) {
-                        return new Date(parts[2], parts[1]-1, parts[0], parts[3], parts[4]).getTime();
-                    }
-                    const d = new Date(dStr);
-                    return isNaN(d) ? 0 : d.getTime();
-                }
-
-                return parseDate(dateB) - parseDate(dateA); 
+                const dateA = parsePostfachDate(a.getAttribute('data-date') || '');
+                const dateB = parsePostfachDate(b.getAttribute('data-date') || '');
+                return dateB - dateA;
             });
 
             items.forEach(item => container.appendChild(item));
@@ -2046,6 +2163,7 @@
         const defaultDriverSubmitHtml = driverRegistrationSubmit ? driverRegistrationSubmit.innerHTML : '';
         const defaultTokenSubmitHtml = tokenRequestSubmit ? tokenRequestSubmit.innerHTML : '';
         let currentDocumentRequiresSignature = false;
+        let currentDocumentButton = null;
 
         function showCenteredOverlay(element) {
             if (!element) return;
@@ -2171,8 +2289,14 @@
 
         // ====== POSTFACH LOGIK ======
         const readDocumentsStorageKey = `eifellog.dashboard.readDocuments.${currentUserKey || 'user'}`;
+        const archivedDocumentsStorageKey = `eifellog.dashboard.archivedDocuments.${currentUserKey || 'user'}`;
         const inboxFingerprintStorageKey = `eifellog.dashboard.lastInboxFingerprint.${currentUserKey || 'user'}`;
+        const AUTO_ARCHIVE_AFTER_DAYS = 2;
+        const MAX_ACTIVE_DOCUMENTS = 6;
+
         let readDocumentIds = new Set();
+        let archivedDocumentIds = new Set();
+        let currentPostfachView = 'active';
 
         function readJsonArrayFromStorage(key) {
             try {
@@ -2210,6 +2334,159 @@
             ].join('|');
         }
 
+        function getDocumentTimestamp(button) {
+            if (!button) return 0;
+            return parsePostfachDate(button.getAttribute('data-date') || '');
+        }
+
+        function isDocumentArchiveable(button) {
+            if (!button) return false;
+
+            const needsSignature = button.getAttribute('data-needs-signature') === 'true';
+            const fixedDoc = button.getAttribute('data-fixed-doc') === 'true';
+            const archiveable = button.getAttribute('data-archiveable') !== 'false';
+
+            return archiveable && !fixedDoc && !needsSignature;
+        }
+
+        function ensureArchivePill(button) {
+            if (!button || button.querySelector('.doc-archive-pill')) return;
+
+            const pill = document.createElement('span');
+            pill.className = 'doc-archive-pill absolute bottom-4 right-4 rounded-full bg-white/10 text-white/70 border border-white/15 px-2 py-1 text-[9px] font-orbitron font-bold uppercase tracking-widest';
+            pill.textContent = 'Archiv';
+            button.appendChild(pill);
+        }
+
+        function applyDocumentArchiveState(button) {
+            const documentId = getDocumentId(button);
+            if (!button || !documentId) return false;
+
+            ensureArchivePill(button);
+
+            const archived = archivedDocumentIds.has(documentId);
+            button.dataset.archived = archived ? 'true' : 'false';
+            button.classList.toggle('is-archived-doc', archived);
+
+            return archived;
+        }
+
+        function applyAutoArchiveRules() {
+            const candidates = getDocumentButtons()
+                .filter(isDocumentArchiveable)
+                .map(button => ({
+                    button,
+                    id: getDocumentId(button),
+                    timestamp: getDocumentTimestamp(button)
+                }))
+                .filter(item => item.id);
+
+            let changed = false;
+
+            candidates.forEach(item => {
+                const ageInDays = getCalendarAgeInDays(item.timestamp);
+
+                if (item.timestamp && ageInDays >= AUTO_ARCHIVE_AFTER_DAYS && !archivedDocumentIds.has(item.id)) {
+                    archivedDocumentIds.add(item.id);
+                    changed = true;
+                }
+            });
+
+            const activeCandidates = candidates
+                .filter(item => !archivedDocumentIds.has(item.id))
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+            activeCandidates.slice(MAX_ACTIVE_DOCUMENTS).forEach(item => {
+                if (!archivedDocumentIds.has(item.id)) {
+                    archivedDocumentIds.add(item.id);
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                writeJsonArrayToStorage(archivedDocumentsStorageKey, archivedDocumentIds);
+            }
+        }
+
+        function updatePostfachArchiveView() {
+            if (!postfachContainer) return;
+
+            let activeCount = 0;
+            let archiveCount = 0;
+
+            getDocumentButtons().forEach(button => {
+                const archived = applyDocumentArchiveState(button);
+
+                if (archived) {
+                    archiveCount += 1;
+                } else {
+                    activeCount += 1;
+                }
+            });
+
+            postfachContainer.dataset.view = currentPostfachView;
+
+            if (postfachActiveCount) postfachActiveCount.textContent = String(activeCount);
+            if (postfachArchiveCount) postfachArchiveCount.textContent = String(archiveCount);
+
+            if (btnPostfachActive) {
+                btnPostfachActive.classList.toggle('is-active', currentPostfachView === 'active');
+            }
+
+            if (btnPostfachArchive) {
+                btnPostfachArchive.classList.toggle('is-active', currentPostfachView === 'archive');
+            }
+
+            let emptyState = document.getElementById('postfach-empty-state');
+
+            if (!emptyState) {
+                emptyState = document.createElement('div');
+                emptyState.id = 'postfach-empty-state';
+                emptyState.className = 'rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center text-xs text-[var(--muted)] font-inter';
+                postfachContainer.appendChild(emptyState);
+            }
+
+            const currentCount = currentPostfachView === 'archive' ? archiveCount : activeCount;
+
+            emptyState.textContent = currentPostfachView === 'archive'
+                ? 'Im Archiv liegen aktuell keine Dokumente.'
+                : 'Im aktiven Postfach liegen aktuell keine Dokumente. Ältere Dokumente findest du im Archiv.';
+
+            emptyState.classList.toggle('is-visible', currentCount === 0);
+        }
+
+        function setPostfachView(view) {
+            currentPostfachView = view === 'archive' ? 'archive' : 'active';
+            updatePostfachArchiveView();
+        }
+
+        function updateDocumentArchiveActionState() {
+            if (!univArchiveActions || !univArchiveToggle || !univArchiveHint) return;
+
+            if (!currentDocumentButton) {
+                univArchiveActions.classList.add('hidden');
+                return;
+            }
+
+            const archiveable = isDocumentArchiveable(currentDocumentButton);
+            const documentId = getDocumentId(currentDocumentButton);
+            const archived = documentId ? archivedDocumentIds.has(documentId) : false;
+
+            univArchiveActions.classList.remove('hidden');
+
+            if (!archiveable || currentDocumentRequiresSignature) {
+                univArchiveToggle.classList.add('hidden');
+                univArchiveHint.textContent = 'Dieses Dokument ist fixiert oder benötigt eine Signatur und kann deshalb nicht archiviert werden.';
+                return;
+            }
+
+            univArchiveToggle.classList.remove('hidden');
+            univArchiveToggle.textContent = archived ? 'Aus Archiv zurückholen' : 'Archivieren';
+            univArchiveHint.textContent = archived
+                ? 'Dieses Dokument liegt im Archiv. Du kannst es zurück ins aktive Postfach holen, solange es nicht durch die Datumsregel erneut archiviert wird.'
+                : 'Dieses Dokument ist nicht fixiert und kann aus dem aktiven Postfach ins Archiv verschoben werden.';
+        }
+
         function ensureNewIndicator(button) {
             if (!button || button.querySelector('.doc-new-indicator')) return;
 
@@ -2235,15 +2512,18 @@
                 if (!documentId) return;
 
                 ensureNewIndicator(button);
+                const isArchived = applyDocumentArchiveState(button);
 
                 const isUnread = !readDocumentIds.has(documentId);
                 button.dataset.read = isUnread ? 'false' : 'true';
-                button.classList.toggle('is-unread-doc', isUnread);
+                button.classList.toggle('is-unread-doc', isUnread && !isArchived);
 
-                if (isUnread) {
+                if (isUnread && !isArchived) {
                     unreadButtons.push(button);
                 }
             });
+
+            updatePostfachArchiveView();
 
             if (alertBadge) {
                 if (unreadButtons.length > 0) {
@@ -2261,7 +2541,7 @@
                 alertBell.setAttribute(
                     'aria-label',
                     unreadButtons.length > 0
-                        ? `System-Postfach öffnen, ${unreadButtons.length} ungelesene Dokumente`
+                        ? `System-Postfach öffnen, ${unreadButtons.length} ungelesene aktive Dokumente`
                         : 'System-Postfach öffnen'
                 );
             }
@@ -2310,6 +2590,11 @@
             if (isTutorialShowing && !force) return; // Wenn Tutorial-Alert da ist, warte mit den Dokumenten
 
             readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
+            archivedDocumentIds = new Set(readJsonArrayFromStorage(archivedDocumentsStorageKey));
+
+            applyAutoArchiveRules();
+            sortPostfach();
+
             const unreadCount = updateInboxNotificationState();
             const fingerprint = getInboxFingerprint();
 
@@ -2330,8 +2615,9 @@
             }
         }
 
-        function openDocumentModal(title, content, sender, requireSignature) {
+        function openDocumentModal(title, content, sender, requireSignature, sourceButton = null) {
             currentDocumentRequiresSignature = Boolean(requireSignature);
+            currentDocumentButton = sourceButton;
 
             univTitle.textContent = title || 'Dokument';
             univContent.innerHTML = content || '';
@@ -2356,11 +2642,14 @@
                 univSigSection.classList.add('hidden');
             }
 
+            updateDocumentArchiveActionState();
             openAnimatedModal(univModal, univPanel, currentDocumentRequiresSignature ? univSigInput : null);
         }
 
         function closeDocumentModal() {
-            closeAnimatedModal(univModal, univPanel);
+            closeAnimatedModal(univModal, univPanel, () => {
+                currentDocumentButton = null;
+            });
         }
 
         function openDriverRegistrationModal() {
@@ -2382,6 +2671,45 @@
         if (alertBell) alertBell.addEventListener('click', openSidebar);
         if (btnCloseAlerts) btnCloseAlerts.addEventListener('click', closeSidebar);
         if (alertsBackdrop) alertsBackdrop.addEventListener('click', closeSidebar);
+
+        if (btnPostfachActive) {
+            btnPostfachActive.addEventListener('click', () => setPostfachView('active'));
+        }
+
+        if (btnPostfachArchive) {
+            btnPostfachArchive.addEventListener('click', () => setPostfachView('archive'));
+        }
+
+        if (btnPostfachArchiveOld) {
+            btnPostfachArchiveOld.addEventListener('click', () => {
+                archivedDocumentIds = new Set(readJsonArrayFromStorage(archivedDocumentsStorageKey));
+                applyAutoArchiveRules();
+                sortPostfach();
+                updateInboxNotificationState();
+                setPostfachView('archive');
+            });
+        }
+
+        if (univArchiveToggle) {
+            univArchiveToggle.addEventListener('click', () => {
+                if (!currentDocumentButton || !isDocumentArchiveable(currentDocumentButton)) return;
+
+                const documentId = getDocumentId(currentDocumentButton);
+                if (!documentId) return;
+
+                if (archivedDocumentIds.has(documentId)) {
+                    archivedDocumentIds.delete(documentId);
+                } else {
+                    archivedDocumentIds.add(documentId);
+                }
+
+                writeJsonArrayToStorage(archivedDocumentsStorageKey, archivedDocumentIds);
+                applyDocumentArchiveState(currentDocumentButton);
+                sortPostfach();
+                updateInboxNotificationState();
+                updateDocumentArchiveActionState();
+            });
+        }
 
         if (btnOpenInboxFromAlert) {
             btnOpenInboxFromAlert.addEventListener('click', () => {
@@ -2448,7 +2776,7 @@
                 closeSidebar();
 
                 setTimeout(() => {
-                    openDocumentModal(title, content, sender, requiresSig);
+                    openDocumentModal(title, content, sender, requiresSig, btn);
                 }, 300);
             });
         });
@@ -2515,6 +2843,7 @@
         // Dokument-Zähler initialisieren und final sortieren
         initializeInboxNotifications();
         sortPostfach();
+        updatePostfachArchiveView();
 
         if (univSigInput) {
             univSigInput.addEventListener('input', (e) => {
