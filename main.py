@@ -4785,271 +4785,43 @@ def current_job_from_live(live):
     }
 
 def get_user_job_entries(user_doc):
-    """
-    Liefert alle bekannten Fahrten eines Users.
-    Quellen:
-    1. gespeicherte Listen im users-Dokument
-    2. tour_receipts-Collection, damit die Detailseite auch alte Belege mit Route/LKW findet
-    """
-    user_doc = user_doc or {}
     result = []
-    seen_keys = set()
-
-    def append_entry(item, source_name="user_doc"):
-        if not isinstance(item, dict):
-            return
-
-        public_key = safe_str(
-            item.get("receiptId")
-            or item.get("receipt_id")
-            or item.get("receiptNumber")
-            or item.get("receipt_number")
-            or item.get("jobId")
-            or item.get("job_id")
-            or item.get("trip_id")
-            or item.get("id")
-        )
-        if not public_key:
-            public_key = f"{source_name}:{len(result)}"
-
-        if public_key in seen_keys:
-            return
-
-        seen_keys.add(public_key)
-        clean_item = dict(item)
-        clean_item.setdefault("_entry_source", source_name)
-        result.append(clean_item)
-
     possible_fields = ["job_history", "jobs", "deliveries", "logbook", "tracker_logbook"]
     for field in possible_fields:
         items = user_doc.get(field)
         if isinstance(items, list):
             for item in items:
-                append_entry(item, field)
-
-    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
-    if discord_id:
-        try:
-            receipt_query = {
-                "$or": [
-                    {"driver.discord_id": discord_id},
-                    {"discord_id": discord_id},
-                    {"user_id": discord_id}
-                ],
-                "archived": {"$ne": True}
-            }
-            for receipt in tour_receipts_collection.find(receipt_query).sort("submitted_at", DESCENDING).limit(150):
-                receipt_payload = dict(receipt)
-                receipt_payload["_entry_source"] = "tour_receipts"
-                append_entry(receipt_payload, "tour_receipts")
-        except Exception as error:
-            print(f"Fahrtenbuch-Belege konnten nicht geladen werden: {error}")
-
+                if isinstance(item, dict): result.append(item)
     return result
 
 def normalize_logbook_entry(entry, user_doc=None):
-    """
-    Normalisiert Fahrten aus user.job_history, tour_receipts und Tracker-Payloads.
-    Die Ausgabe ist bewusst breit, damit dashboard.html und detail.html dieselben Daten nutzen können.
-    """
-    entry = entry or {}
     user_doc = user_doc or {}
+    source = safe_str(entry.get("sourceCity") or entry.get("source") or entry.get("from") or entry.get("routeOrigin"), "-")
+    destination = safe_str(entry.get("destinationCity") or entry.get("destination") or entry.get("to") or entry.get("routeDestination"), "-")
+    route = safe_str(entry.get("route"))
+    if not route: route = f"{source} → {destination}"
 
-    tour = entry.get("tour") if isinstance(entry.get("tour"), dict) else {}
-    billing = entry.get("billing") if isinstance(entry.get("billing"), dict) else {}
-    driver = entry.get("driver") if isinstance(entry.get("driver"), dict) else {}
-    extra = entry.get("extra") if isinstance(entry.get("extra"), dict) else {}
-    raw_telemetry = entry.get("raw_telemetry") if isinstance(entry.get("raw_telemetry"), dict) else {}
+    distance = parse_number(entry.get("distanceKm") or entry.get("distance") or entry.get("tripDistanceKm"), 0)
+    income = parse_number(entry.get("income") or entry.get("revenue") or entry.get("money"), 0)
 
-    def pick(*keys, fallback=""):
-        for source in (entry, tour, billing, driver, extra, raw_telemetry):
-            if not isinstance(source, dict):
-                continue
-            for key in keys:
-                if key in source and source.get(key) not in [None, ""]:
-                    return source.get(key)
-        return fallback
-
-    source = safe_str(
-        pick("sourceCity", "source_city", "source", "from", "from_city", "origin", "routeOrigin", fallback="-"),
-        "-"
-    )
-    destination = safe_str(
-        pick("destinationCity", "destination_city", "destination", "to", "to_city", "target", "ziel", "routeDestination", fallback="-"),
-        "-"
-    )
-
-    route = safe_str(pick("route", "route_text", fallback=""))
-    if not route:
-        route = f"{source} → {destination}"
-
-    distance = parse_number(
-        pick("distanceKm", "completedDistanceKm", "completed_distance_km", "driven_distance_km", "drivenDistanceKm", "distance", "km", "tripDistanceKm", fallback=0),
-        0
-    )
-    income = parse_number(
-        pick("income", "revenue", "money", "earnings", "einnahmen", "total_amount", "base_amount", fallback=0),
-        0
-    )
-
-    created_at = (
-        entry.get("createdAt")
-        or entry.get("created_at")
-        or entry.get("submitted_at")
-        or entry.get("finishedAt")
-        or entry.get("finished_at")
-        or entry.get("timestamp")
-        or entry.get("date")
-        or entry.get("datum")
-        or ""
-    )
-    sort_date = datetime.min
-    created_at_text = ""
-    date_text = "-"
-    time_text = "-"
-
+    created_at = entry.get("createdAt") or entry.get("created_at") or entry.get("finishedAt") or entry.get("timestamp") or ""
     if isinstance(created_at, datetime):
-        sort_date = created_at
         created_at_text = created_at.isoformat() + "Z"
-        date_text = created_at.strftime("%d.%m.%Y")
-        time_text = created_at.strftime("%H:%M")
+        sort_date = created_at
     else:
         created_at_text = safe_str(created_at)
-        if created_at_text:
-            try:
-                parsed_date = datetime.fromisoformat(created_at_text.replace("Z", "+00:00")).replace(tzinfo=None)
-                sort_date = parsed_date
-                date_text = parsed_date.strftime("%d.%m.%Y")
-                time_text = parsed_date.strftime("%H:%M")
-            except Exception:
-                date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
-
-    truck = safe_str(
-        pick("truck", "truckName", "truckModel", "truck_model", "lkw", "vehicle", "fahrzeug", fallback="-"),
-        "-"
-    )
-    truck_plate = safe_str(
-        pick("truck_plate", "truckPlate", "kennzeichen", "plate", "lkw_kennzeichen", "vehicle_plate", fallback="-"),
-        "-"
-    )
-    trailer = safe_str(
-        pick("trailer", "auflieger", "trailer_plate", "trailerPlate", "auflieger_kennzeichen", fallback="-"),
-        "-"
-    )
-
-    departure = safe_str(
-        pick("departure", "start_time", "started_at", "abfahrt", fallback=""),
-        ""
-    )
-    arrival = safe_str(
-        pick("arrival", "end_time", "finished_at", "ankunft", fallback=""),
-        ""
-    )
-
-    if not departure:
-        departure = time_text if time_text != "-" else "-"
-    if not arrival:
-        arrival = time_text if time_text != "-" else "-"
-
-    fuel_value = pick("fuel_used", "fuel", "diesel", "verbrauch", "fuel_liters", "fuelLiters", fallback="-")
-    if fuel_value not in [None, "", "-"]:
-        fuel_number = parse_number(fuel_value, -1)
-        fuel_used = f"{fuel_number:.1f} l".replace(".", ",") if fuel_number >= 0 else safe_str(fuel_value, "-")
-    else:
-        fuel_used = "-"
-
-    avg_speed_value = pick("avg_speed", "average_speed", "durchschnitt", "speed_kmh", "speedKmh", fallback="-")
-    if avg_speed_value not in [None, "", "-"]:
-        avg_speed_number = parse_number(avg_speed_value, -1)
-        avg_speed = f"{avg_speed_number:.0f} km/h" if avg_speed_number >= 0 else safe_str(avg_speed_value, "-")
-    else:
-        avg_speed = "-"
-
-    trip_public_id = safe_str(
-        pick("id", "trip_id", "fahrt_id", "auftrag_id", "receiptId", "receipt_id", "jobId", "job_id", fallback="")
-    )
-    if not trip_public_id:
-        trip_public_id = hashlib.sha1(f"{route}|{date_text}|{distance}|{income}".encode("utf-8")).hexdigest()[:12]
-
-    driver_name = safe_str(
-        pick("driverName", "driver_name", "fahrer", "name", fallback="")
-        or user_doc.get("display_name")
-        or user_doc.get("username")
-        or user_doc.get("discord_username")
-        or "EifelLog Fahrer"
-    )
-
-    status = safe_str(pick("status", fallback="Abgeschlossen"), "Abgeschlossen")
-    if status.lower() in {"fertig", "submitted", "completed", "done", "delivered"}:
-        status = "Abgeschlossen"
-
-    map_embed_url = safe_str(pick("map_embed_url", "map_url", "route_map_url", fallback=""))
-    waypoints = pick("waypoints", "route_points", "zwischenstopps", fallback=[])
-    if not isinstance(waypoints, list):
-        waypoints = []
+        sort_date = datetime.min
 
     return {
-        "id": trip_public_id,
-        "trip_id": trip_public_id,
-        "fahrt_id": trip_public_id,
-        "auftrag_id": safe_str(pick("jobId", "job_id", fallback=trip_public_id)),
-        "receipt_id": safe_str(pick("receiptId", "receipt_id", fallback="")),
-        "receipt_number": safe_str(pick("receiptNumber", "receipt_number", fallback="")),
-        "status": status,
-        "date": date_text,
-        "datum": date_text,
-        "date_time": created_at_text,
+        "status": safe_str(entry.get("status"), "Fertig"),
         "route": route,
         "sourceCity": source,
         "destinationCity": destination,
-        "from_city": source,
-        "to_city": destination,
-        "start": source,
-        "destination": destination,
-        "target": destination,
-        "cargo": safe_str(pick("cargo", "cargoName", "freight", "fracht", "jobCargo", fallback="-"), "-"),
-        "freight": safe_str(pick("cargo", "cargoName", "freight", "fracht", "jobCargo", fallback="-"), "-"),
-        "distanceKm": round(distance, 1),
-        "distance": round(distance, 1),
-        "km": round(distance, 1),
-        "income": round(income, 2),
-        "earnings": round(income, 2),
-        "revenue": round(income, 2),
-        "truck": truck,
-        "lkw": truck,
-        "vehicle": truck,
-        "fahrzeug": truck,
-        "truck_plate": truck_plate,
-        "kennzeichen": truck_plate,
-        "plate": truck_plate,
-        "trailer": trailer,
-        "auflieger": trailer,
-        "driver": driver_name,
-        "fahrer": driver_name,
-        "departure": departure,
-        "start_time": departure,
-        "abfahrt": departure,
-        "arrival": arrival,
-        "end_time": arrival,
-        "ankunft": arrival,
-        "duration": safe_str(pick("duration", "dauer", "drive_time", "driving_time", fallback="-"), "-"),
-        "fuel_used": fuel_used,
-        "fuel": fuel_used,
-        "diesel": fuel_used,
-        "verbrauch": fuel_used,
-        "avg_speed": avg_speed,
-        "average_speed": avg_speed,
-        "durchschnitt": avg_speed,
-        "note": safe_str(pick("note", "notes", "bemerkung", fallback="")),
-        "notes": safe_str(pick("note", "notes", "bemerkung", fallback="")),
-        "map_embed_url": map_embed_url,
-        "map_url": map_embed_url,
-        "route_map_url": map_embed_url,
-        "waypoints": waypoints,
-        "route_points": waypoints,
-        "game": safe_str(pick("game", fallback="ETS2/ATS"), "ETS2/ATS"),
-        "driver_card_id": safe_str(pick("fahrerkarte_id", "driver_card_id", fallback="")),
-        "pdf_url": safe_str(pick("pdf_url", "pdfFilePath", "file_path", fallback="")),
+        "cargo": safe_str(entry.get("cargo") or entry.get("cargoName"), "-"),
+        "distanceKm": distance,
+        "income": income,
+        "driverName": (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"),
+        "createdAt": created_at_text,
         "_sortDate": sort_date
     }
 
@@ -5219,28 +4991,48 @@ def calculate_driver_level(total_km=0, completed_trips=0, xp_value=None):
 def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
     user_doc = user_doc or {}
     entries = []
-    seen_ids = set()
 
     for raw_entry in get_user_job_entries(user_doc):
         if not isinstance(raw_entry, dict):
             continue
 
         normalized = normalize_logbook_entry(raw_entry, user_doc)
-        public_id = safe_str(normalized.get("id") or normalized.get("trip_id"))
-        if public_id and public_id in seen_ids:
-            continue
-        if public_id:
-            seen_ids.add(public_id)
+        created_at_raw = raw_entry.get("createdAt") or raw_entry.get("created_at") or raw_entry.get("finishedAt") or raw_entry.get("submitted_at") or raw_entry.get("timestamp")
+        date_text = "-"
 
-        entries.append(normalized)
+        if isinstance(created_at_raw, datetime):
+            date_text = created_at_raw.strftime("%d.%m.%Y")
+            sort_date = created_at_raw
+        else:
+            created_at_text = safe_str(created_at_raw)
+            sort_date = normalized.get("_sortDate") or datetime.min
+            if created_at_text:
+                try:
+                    iso_text = created_at_text.replace("Z", "+00:00")
+                    parsed_date = datetime.fromisoformat(iso_text)
+                    date_text = parsed_date.strftime("%d.%m.%Y")
+                    sort_date = parsed_date.replace(tzinfo=None)
+                except Exception:
+                    date_text = created_at_text[:10] if len(created_at_text) >= 10 else created_at_text
+
+        entries.append({
+            "date": date_text,
+            "route": normalized.get("route") or "-",
+            "from_city": normalized.get("sourceCity") or "-",
+            "to_city": normalized.get("destinationCity") or "-",
+            "cargo": normalized.get("cargo") or "-",
+            "distance": round(parse_number(normalized.get("distanceKm"), 0), 1),
+            "earnings": round(parse_number(normalized.get("income"), 0), 2),
+            "status": normalized.get("status") or "Abgeschlossen",
+            "_sortDate": sort_date
+        })
 
     entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
 
     cleaned = []
     for entry in entries[:limit]:
-        clean_entry = dict(entry)
-        clean_entry.pop("_sortDate", None)
-        cleaned.append(clean_entry)
+        entry.pop("_sortDate", None)
+        cleaned.append(entry)
     return cleaned
 
 
@@ -5276,35 +5068,16 @@ def get_driver_current_trip_for_dashboard(user_doc):
     if isinstance(updated_at, datetime):
         departure = updated_at.strftime("%H:%M")
 
-    truck = safe_str(current_job.get("truck") or live.get("truck"), "-")
-
     return {
-        "id": safe_str(current_job.get("jobId") or live.get("jobId") or "current"),
-        "trip_id": safe_str(current_job.get("jobId") or live.get("jobId") or "current"),
         "from_city": source,
         "to_city": destination,
-        "start": source,
-        "destination": destination,
-        "route": f"{source} → {destination}",
         "departure": departure,
-        "start_time": departure,
         "progress": round(max(0, min(100, progress))),
         "cargo": cargo,
-        "freight": cargo,
         "distance": round(trip_distance, 1),
-        "km": round(trip_distance, 1),
         "remaining_distance": round(parse_number(live.get("remainingDistanceKm"), 0), 1),
         "expected_earnings": round(expected_earnings, 2),
-        "earnings": round(expected_earnings, 2),
-        "income": round(expected_earnings, 2),
-        "status": safe_str(current_job.get("status"), "Aktiv" if user_doc.get("tracker_online") else "Warte"),
-        "truck": truck,
-        "lkw": truck,
-        "vehicle": truck,
-        "fuel_used": f"{parse_number(live.get('fuelLiters'), -1):.1f} l".replace(".", ",") if parse_number(live.get("fuelLiters"), -1) >= 0 else "-",
-        "avg_speed": f"{parse_number(live.get('speedKmh'), 0):.0f} km/h",
-        "game": safe_str(live.get("game"), "ETS2/ATS"),
-        "eta": safe_str(live.get("eta"), "-")
+        "status": safe_str(current_job.get("status"), "Aktiv" if user_doc.get("tracker_online") else "Warte")
     }
 
 
@@ -5403,160 +5176,6 @@ def format_liters(value):
     text = f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{text} l"
 
-
-
-def receipt_first_value(*values, fallback="-"):
-    for value in values:
-        if value is None:
-            continue
-        if isinstance(value, str) and not value.strip():
-            continue
-        return value
-    return fallback
-
-
-def receipt_first_text(*values, fallback="-"):
-    return safe_str(receipt_first_value(*values, fallback=fallback), fallback)
-
-
-def receipt_first_number(*values, fallback=0.0):
-    for value in values:
-        if value is None:
-            continue
-        if isinstance(value, str) and not value.strip():
-            continue
-        return parse_number(value, fallback)
-    return fallback
-
-
-def receipt_datetime_from_any(*values, fallback=None):
-    for value in values:
-        parsed = coerce_receipt_datetime(value, fallback=None)
-        if isinstance(parsed, datetime):
-            return parsed
-    return fallback
-
-
-def format_receipt_duration_minutes(value):
-    minutes = parse_number(value, 0)
-    if minutes <= 0:
-        return "-"
-    total_minutes = int(round(minutes))
-    hours = total_minutes // 60
-    mins = total_minutes % 60
-    if hours and mins:
-        return f"{hours} Std. {mins} Min."
-    if hours:
-        return f"{hours} Std."
-    return f"{mins} Min."
-
-
-def format_receipt_duration_ms(value):
-    ms = tracker_ms(value, 0) if 'tracker_ms' in globals() else int(parse_number(value, 0))
-    if ms <= 0:
-        return "0 Min."
-    return format_receipt_duration_minutes(ms / 60000.0)
-
-
-def receipt_iso(value):
-    if isinstance(value, datetime):
-        return value.isoformat() + "Z"
-    return safe_str(value)
-
-
-def receipt_percent_change(actual, expected):
-    expected = parse_number(expected, 0)
-    actual = parse_number(actual, 0)
-    if expected <= 0:
-        return 0.0
-    return round(((actual - expected) / expected) * 100, 2)
-
-
-def build_receipt_security_id(seed):
-    canonical = json.dumps(seed or {}, default=str, sort_keys=True, ensure_ascii=False)
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:18].upper()
-    return f"EL-SID-{digest}"
-
-
-def receipt_audit_event(action, actor_name="System", actor_id="", note="", at=None):
-    at = at or now_utc()
-    return {
-        "action": safe_str(action, "event"),
-        "actor_name": safe_str(actor_name, "System"),
-        "actor_id": safe_str(actor_id),
-        "note": safe_str(note),
-        "at": at,
-        "at_iso": receipt_iso(at),
-    }
-
-
-def receipt_add_audit_event(receipt_doc, action, actor_name="System", actor_id="", note=""):
-    receipt_doc = receipt_doc or {}
-    audit_log = receipt_doc.setdefault("audit_log", [])
-    audit_log.append(receipt_audit_event(action, actor_name=actor_name, actor_id=actor_id, note=note))
-    receipt_doc.setdefault("metadata", {})["audit_log"] = audit_log
-    receipt_doc["updated_at"] = now_utc()
-    return receipt_doc
-
-
-def apply_receipt_pdf_integrity(receipt_doc, pdf_bytes, filename="", file_path=""):
-    receipt_doc = receipt_doc or {}
-    pdf_bytes = pdf_bytes or b""
-    now = now_utc()
-    integrity = receipt_doc.setdefault("integrity", {})
-    if not integrity.get("security_id"):
-        integrity["security_id"] = build_receipt_security_id({
-            "receipt_id": receipt_doc.get("receipt_id"),
-            "receipt_number": receipt_doc.get("receipt_number"),
-            "job_id": receipt_doc.get("job_id"),
-            "driver": receipt_doc.get("driver"),
-            "tour": receipt_doc.get("tour"),
-            "submitted_at": receipt_doc.get("submitted_at"),
-        })
-    integrity.update({
-        "pdf_sha256": hashlib.sha256(pdf_bytes).hexdigest(),
-        "pdf_size_bytes": len(pdf_bytes),
-        "pdf_file_name": safe_str(filename),
-        "pdf_file_path": safe_str(file_path),
-        "pdf_generated_at": now,
-        "pdf_generated_at_iso": receipt_iso(now),
-        "tamper_note": "PDF-Hash ist in MongoDB gespeichert; Sicherheits-ID steht im Beleg.",
-    })
-    receipt_doc["pdf_hash"] = integrity["pdf_sha256"]
-    receipt_doc["security_id"] = integrity["security_id"]
-    receipt_add_audit_event(receipt_doc, "pdf_generated", actor_name="main.py", note=f"PDF {filename} erzeugt und SHA-256 berechnet.")
-    return receipt_doc
-
-
-def insert_tour_receipt_doc(receipt_doc):
-    receipt_doc = receipt_doc or {}
-    metadata = receipt_doc.setdefault("metadata", {})
-    receipt_doc.setdefault("mongo_collection", "tour_receipts")
-    receipt_doc.setdefault("system_reference_id", f"tour_receipts/{safe_str(receipt_doc.get('receipt_id'), uuid.uuid4().hex)}")
-    metadata.setdefault("mongo_collection", "tour_receipts")
-    metadata.setdefault("system_reference_id", receipt_doc.get("system_reference_id"))
-    metadata.setdefault("audit_log", receipt_doc.get("audit_log") or [])
-
-    result = tour_receipts_collection.insert_one(receipt_doc)
-    mongo_id = str(result.inserted_id)
-    system_reference_id = f"tour_receipts/{mongo_id}"
-    updates = {
-        "mongo_object_id": mongo_id,
-        "mongodb_object_id": mongo_id,
-        "system_reference_id": system_reference_id,
-        "metadata.mongo_object_id": mongo_id,
-        "metadata.mongodb_object_id": mongo_id,
-        "metadata.system_reference_id": system_reference_id,
-        "metadata.mongo_collection": "tour_receipts",
-    }
-    receipt_doc["mongo_object_id"] = mongo_id
-    receipt_doc["mongodb_object_id"] = mongo_id
-    receipt_doc["system_reference_id"] = system_reference_id
-    metadata["mongo_object_id"] = mongo_id
-    metadata["mongodb_object_id"] = mongo_id
-    metadata["system_reference_id"] = system_reference_id
-    tour_receipts_collection.update_one({"_id": result.inserted_id}, {"$set": updates})
-    return result.inserted_id
 
 def payload_lookup_value(payload, *keys, fallback=""):
     payload = payload or {}
@@ -6492,147 +6111,58 @@ def format_receipt_datetime(value):
 
 
 def build_accounting_relevant_receipt_sections(receipt_doc):
-    """Buchhaltungsrelevante Daten fuer Tourbeleg, Abrechnung, Audit und Tracker-Nachweis."""
+    """Nur die fachlich relevanten Daten fuer Buchhaltung / Abrechnung."""
     receipt_doc = receipt_doc or {}
     driver = receipt_doc.get("driver") or {}
-    identity = receipt_doc.get("identity") or {}
     tour = receipt_doc.get("tour") or {}
-    route = tour.get("route") or {}
-    kilometers = tour.get("kilometers") or {}
-    vehicle = receipt_doc.get("vehicle") or {}
     billing = receipt_doc.get("billing") or {}
-    costs = billing.get("costs") or {}
-    work_time = receipt_doc.get("work_time") or {}
-    approval = receipt_doc.get("approval") or {}
-    signature = receipt_doc.get("signature") or {}
-    integrity = receipt_doc.get("integrity") or {}
-    metadata = receipt_doc.get("metadata") or {}
-    driver_card = receipt_doc.get("driver_card") or {}
     submitted_at = receipt_doc.get("submitted_at") or receipt_doc.get("created_at") or now_utc()
 
+    route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
     currency = safe_str(billing.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
-    planned_km = receipt_first_number(kilometers.get("planned_km"), tour.get("planned_distance_km"), fallback=0)
-    driven_km = receipt_first_number(kilometers.get("driven_km"), tour.get("driven_distance_km"), receipt_doc.get("distanceKm"), fallback=0)
-    km_difference = round(driven_km - planned_km, 1)
-    km_deviation_percent = receipt_percent_change(driven_km, planned_km)
+    penalty = parse_number(billing.get("penalty"), 0)
+    bonus = parse_number(billing.get("bonus"), 0)
 
     accounting_rows = [
         ("Belegart", "Tourbeleg / Abrechnungsbeleg"),
         ("Belegnummer", receipt_doc.get("receipt_number")),
-        ("Tour-ID / Auftragsnummer", receipt_first_text(receipt_doc.get("tour_id"), receipt_doc.get("job_id"))),
         ("Job-ID", receipt_doc.get("job_id")),
-        ("MongoDB-/System-Referenz-ID", receipt_first_text(receipt_doc.get("system_reference_id"), metadata.get("system_reference_id"))),
-        ("MongoDB Object-ID", receipt_first_text(receipt_doc.get("mongo_object_id"), metadata.get("mongo_object_id"), fallback="wird nach Insert gesetzt")),
-        ("Status", receipt_first_text(receipt_doc.get("status"), fallback="Abgeschlossen")),
-        ("Buchhaltungsstatus", "Abrechnungsrelevant" if receipt_doc.get("billing_relevant", True) else "Nicht abrechnungsrelevant"),
-        ("Zahlungsstatus", receipt_first_text(billing.get("payment_status"), receipt_doc.get("payment_status"), fallback="offen")),
+        ("Status", "Abgeschlossen / abgegeben"),
+        ("Buchhaltungsstatus", "Abrechnungsrelevant"),
         ("Erstellt am", format_receipt_datetime(submitted_at)),
     ]
 
     driver_rows = [
         ("Fahrer", driver.get("name")),
         ("Username", tour_receipt_driver_username(receipt_doc)),
-        ("Discord-/User-ID", receipt_first_text(driver.get("discord_id"), identity.get("discord_id"), identity.get("user_id"))),
-        ("Fahrer-ID / Personalnummer", receipt_first_text(driver.get("employee_id"), identity.get("employee_id"), fallback="-")),
-        ("Rolle", driver.get("role")),
-        ("Fahrerkarte-ID", receipt_first_text(driver.get("fahrerkarte_id"), driver_card.get("card_id"), fallback="-")),
-        ("Fahrerkarte-Status", receipt_first_text(driver_card.get("status"), fallback="nicht geladen")),
-        ("Fahrerkarte-Quelle", receipt_first_text(driver_card.get("source"), fallback="-")),
-    ]
-
-    vehicle_rows = [
-        ("Fahrzeug / Truck", receipt_first_text(vehicle.get("truck"), tour.get("truck"), fallback="-")),
-        ("Kennzeichen", receipt_first_text(vehicle.get("license_plate"), fallback="-")),
-        ("Trailer-/Auflieger-Nummer", receipt_first_text(vehicle.get("trailer_number"), fallback="-")),
-        ("Spiel / System", tour.get("game") or "ETS2/ATS"),
+        ("Discord-ID", driver.get("discord_id")),
+        ("Fahrerkarte-ID", driver.get("fahrerkarte_id") or "-"),
     ]
 
     tour_rows = [
-        ("Kunde / Auftraggeber", receipt_first_text(tour.get("customer"), fallback="-")),
-        ("Beladeort", receipt_first_text(route.get("loading_place"), tour.get("source_city"), fallback="-")),
-        ("Entladeort", receipt_first_text(route.get("unloading_place"), tour.get("destination_city"), fallback="-")),
-        ("Belade- und Entladeorte", f"{receipt_first_text(route.get('loading_place'), tour.get('source_city'), fallback='-')} -> {receipt_first_text(route.get('unloading_place'), tour.get('destination_city'), fallback='-')}"),
-        ("Frachtart", receipt_first_text(tour.get("cargo"), fallback="-")),
-        ("Ladungsbeschreibung", receipt_first_text(tour.get("cargo_description"), tour.get("cargo"), fallback="-")),
-        ("Startzeit Tour", format_receipt_datetime(tour.get("start_time"))),
-        ("Endzeit Tour", format_receipt_datetime(tour.get("end_time"))),
-        ("Gesamtdauer", format_receipt_duration_minutes(tour.get("duration_minutes"))),
-        ("ETA", receipt_first_text(tour.get("eta"), fallback="-")),
-    ]
-
-    kilometer_rows = [
-        ("Soll-Kilometer", format_km(planned_km)),
-        ("Ist-Kilometer", format_km(driven_km)),
-        ("Vergleich Soll-/Ist-Kilometer", f"{format_km(km_difference)} / {format_percent(km_deviation_percent)}"),
-        ("Leerfahrt", format_km(kilometers.get("empty_km"))),
-        ("Lastfahrt", format_km(kilometers.get("loaded_km"))),
-        ("Privatfahrt", format_km(kilometers.get("private_km"))),
-        ("Reststrecke", format_km(tour.get("remaining_distance_km"))),
-        ("Routenfortschritt", format_percent(tour.get("route_progress_percent", 100))),
+        ("Route", route),
+        ("Fracht", tour.get("cargo") or "-"),
+        ("Gefahrene Strecke", format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))),
     ]
 
     billing_rows = [
         ("Satz pro KM", format_money(billing.get("rate_per_km"), currency)),
-        ("Automatisch berechneter Umsatz pro Kilometer", format_money(billing.get("revenue_per_km"), currency)),
         ("Grundbetrag", format_money(billing.get("base_amount"), currency)),
-        ("Bonus", format_money(billing.get("bonus"), currency)),
-        ("Abzug", format_money(billing.get("penalty"), currency)),
-        ("Mautkosten", format_money(costs.get("toll_cost"), currency)),
-        ("Tankkosten", format_money(costs.get("fuel_cost"), currency)),
-        ("Fähre-/Tunnelkosten", format_money(costs.get("ferry_tunnel_cost"), currency)),
-        ("Spesen / Auslagen", format_money(costs.get("expenses"), currency)),
-        ("Auslagen gesamt", format_money(costs.get("total_costs"), currency)),
+    ]
+    if bonus:
+        billing_rows.append(("Bonus", format_money(bonus, currency)))
+    if penalty:
+        billing_rows.append(("Abzug", format_money(penalty, currency)))
+    billing_rows.extend([
         ("Gesamtbetrag", format_money(billing.get("total_amount"), currency)),
-        ("Auszahlungsbetrag inkl. Auslagen", format_money(billing.get("payout_total"), currency)),
         ("Währung", currency),
-    ]
-
-    diesel_rows = [
-        ("Diesel / Kraftstoffstand", format_percent(tour.get("fuel_percent"))),
-        ("Verbrauchsdaten Diesel", format_liters(tour.get("fuel_liters"))),
-        ("Dieselverbrauch l/100 km", f"{parse_number(tour.get('fuel_l_per_100km'), 0):.1f} l/100 km".replace(".", ",")),
-        ("Geschwindigkeit", f"{parse_number(tour.get('speed_kmh'), 0):.0f} km/h"),
-        ("RPM", f"{parse_number(tour.get('rpm'), 0):.0f}"),
-        ("Schaden", format_percent(tour.get("damage_percent"))),
-    ]
-
-    work_rows = [
-        ("Arbeitszeitnachweis", receipt_first_text(work_time.get("summary"), fallback="-")),
-        ("Arbeitsstatus", receipt_first_text(work_time.get("status"), fallback="-")),
-        ("Arbeitszeit", format_receipt_duration_ms(work_time.get("work_ms"))),
-        ("Fahrzeit", format_receipt_duration_ms(work_time.get("drive_ms"))),
-        ("Pause", format_receipt_duration_ms(work_time.get("break_ms"))),
-        ("Ruhezeit", format_receipt_duration_ms(work_time.get("rest_ms"))),
-        ("Fahrerkarte im Arbeitszeitnachweis", receipt_first_text(work_time.get("driver_card_id"), driver.get("fahrerkarte_id"), fallback="-")),
-    ]
-
-    approval_rows = [
-        ("Freigabevermerk", receipt_first_text(approval.get("note"), fallback="Automatisch erstellt - Freigabe durch Buchhaltung offen.")),
-        ("Freigabestatus", receipt_first_text(approval.get("status"), fallback="offen")),
-        ("Freigegeben von", receipt_first_text(approval.get("approved_by"), fallback="-")),
-        ("Freigegeben am", format_receipt_datetime(approval.get("approved_at"))),
-        ("Digitale Fahrer-Unterschrift", receipt_first_text(signature.get("label"), fallback="-")),
-        ("Signatur-ID", receipt_first_text(signature.get("signature_id"), fallback="-")),
-    ]
-
-    audit_rows = [
-        ("Sicherheits-ID", receipt_first_text(integrity.get("security_id"), receipt_doc.get("security_id"), fallback="-")),
-        ("PDF-SHA256", receipt_first_text(integrity.get("pdf_sha256"), receipt_doc.get("pdf_hash"), fallback="wird nach PDF-Erzeugung gespeichert")),
-        ("Audit-Log Einträge", str(len(receipt_doc.get("audit_log") or metadata.get("audit_log") or []))),
-        ("Letzte Änderung", format_receipt_datetime(receipt_doc.get("updated_at") or submitted_at)),
-    ]
+    ])
 
     return [
-        ("Beleg & System", accounting_rows),
-        ("Fahrer & Fahrerkarte", driver_rows),
-        ("Fahrzeug", vehicle_rows),
-        ("Tourdaten", tour_rows),
-        ("Kilometer Soll/Ist", kilometer_rows),
-        ("Abrechnung & Kosten", billing_rows),
-        ("Diesel / Telemetrie", diesel_rows),
-        ("Arbeitszeitnachweis", work_rows),
-        ("Freigabe & Signatur", approval_rows),
-        ("Sicherheit & Audit", audit_rows),
+        ("Beleg", accounting_rows),
+        ("Fahrer", driver_rows),
+        ("Tour", tour_rows),
+        ("Abrechnung", billing_rows),
     ]
 
 
@@ -6657,7 +6187,7 @@ def save_tour_receipt_pdf(receipt_doc):
     try:
         from html import escape
         from reportlab.lib.colors import HexColor
-        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
@@ -6669,169 +6199,218 @@ def save_tour_receipt_pdf(receipt_doc):
                 value = fallback
             return escape(value)
 
-        def p(value, style="CellValue"):
-            return Paragraph(clean(value), styles[style])
+        def money_value():
+            billing = receipt_doc.get("billing") or {}
+            return format_money(billing.get("total_amount"), billing.get("currency"))
 
-        driver = receipt_doc.get("driver") or {}
-        tour = receipt_doc.get("tour") or {}
-        kilometers = tour.get("kilometers") or {}
-        billing = receipt_doc.get("billing") or {}
-        vehicle = receipt_doc.get("vehicle") or {}
-        integrity = receipt_doc.get("integrity") or {}
-        signature = receipt_doc.get("signature") or {}
-        receipt_number = safe_str(receipt_doc.get("receipt_number"), "-")
-        job_id = safe_str(receipt_doc.get("job_id"), "-")
-        driver_name = safe_str(driver.get("name"), "EifelLog Fahrer")
-        username = tour_receipt_driver_username(receipt_doc)
-        currency = safe_str(billing.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
-        planned_km = receipt_first_number(kilometers.get("planned_km"), tour.get("planned_distance_km"), fallback=0)
-        driven_km = receipt_first_number(kilometers.get("driven_km"), tour.get("driven_distance_km"), receipt_doc.get("distanceKm"), fallback=0)
-        km_difference = round(driven_km - planned_km, 1)
-        km_deviation_percent = receipt_percent_change(driven_km, planned_km)
-        route_text = f"{receipt_first_text((tour.get('route') or {}).get('loading_place'), tour.get('source_city'), fallback='-')} -> {receipt_first_text((tour.get('route') or {}).get('unloading_place'), tour.get('destination_city'), fallback='-')}"
-        security_id = receipt_first_text(integrity.get("security_id"), receipt_doc.get("security_id"), fallback="-")
+        def distance_value():
+            tour = receipt_doc.get("tour") or {}
+            return format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))
+
+        def route_value():
+            tour = receipt_doc.get("tour") or {}
+            return f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
-            rightMargin=14 * mm,
-            leftMargin=14 * mm,
-            topMargin=13 * mm,
-            bottomMargin=15 * mm,
-            title=f"Tourbeleg {receipt_number}",
+            rightMargin=15 * mm,
+            leftMargin=15 * mm,
+            topMargin=15 * mm,
+            bottomMargin=16 * mm,
+            title=f"Tourbeleg {safe_str(receipt_doc.get('receipt_number'))}",
             author=TOUR_RECEIPT_COMPANY_NAME,
         )
 
         styles = getSampleStyleSheet()
-        styles.add(ParagraphStyle(name="HeroTitle", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=20, leading=23, textColor=HexColor("#f8fafc"), spaceAfter=3))
-        styles.add(ParagraphStyle(name="HeroSub", parent=styles["BodyText"], fontSize=9, leading=11.5, textColor=HexColor("#cbd5e1")))
-        styles.add(ParagraphStyle(name="Badge", parent=styles["BodyText"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=9.5, leading=12, textColor=HexColor("#082f49")))
-        styles.add(ParagraphStyle(name="KpiLabel", parent=styles["BodyText"], alignment=TA_CENTER, fontSize=7.5, leading=9, textColor=HexColor("#64748b")))
-        styles.add(ParagraphStyle(name="KpiValue", parent=styles["BodyText"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=12.5, leading=15, textColor=HexColor("#0f172a")))
-        styles.add(ParagraphStyle(name="SectionTitle", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=HexColor("#0f172a"), spaceBefore=6, spaceAfter=4))
-        styles.add(ParagraphStyle(name="CellLabel", parent=styles["BodyText"], fontName="Helvetica-Bold", fontSize=7.8, leading=9.8, textColor=HexColor("#475569")))
-        styles.add(ParagraphStyle(name="CellValue", parent=styles["BodyText"], fontSize=8.1, leading=10.2, textColor=HexColor("#0f172a")))
-        styles.add(ParagraphStyle(name="SmallMuted", parent=styles["BodyText"], fontSize=7, leading=9, textColor=HexColor("#64748b")))
-        styles.add(ParagraphStyle(name="Security", parent=styles["BodyText"], fontSize=7.2, leading=9.2, textColor=HexColor("#0f172a")))
+        styles.add(ParagraphStyle(
+            name="HeroTitle",
+            parent=styles["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=21,
+            leading=24,
+            textColor=HexColor("#f8fafc"),
+            spaceAfter=3,
+        ))
+        styles.add(ParagraphStyle(
+            name="HeroSub",
+            parent=styles["BodyText"],
+            fontSize=9.5,
+            leading=12,
+            textColor=HexColor("#cbd5e1"),
+        ))
+        styles.add(ParagraphStyle(
+            name="Badge",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            textColor=HexColor("#082f49"),
+        ))
+        styles.add(ParagraphStyle(
+            name="KpiLabel",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontSize=8,
+            leading=10,
+            textColor=HexColor("#64748b"),
+        ))
+        styles.add(ParagraphStyle(
+            name="KpiValue",
+            parent=styles["BodyText"],
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+            fontSize=15,
+            leading=18,
+            textColor=HexColor("#0f172a"),
+        ))
+        styles.add(ParagraphStyle(
+            name="SectionTitle",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            textColor=HexColor("#0f172a"),
+            spaceBefore=7,
+            spaceAfter=5,
+        ))
+        styles.add(ParagraphStyle(
+            name="CellLabel",
+            parent=styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            textColor=HexColor("#475569"),
+        ))
+        styles.add(ParagraphStyle(
+            name="CellValue",
+            parent=styles["BodyText"],
+            fontSize=9,
+            leading=12,
+            textColor=HexColor("#0f172a"),
+        ))
+        styles.add(ParagraphStyle(
+            name="SmallMuted",
+            parent=styles["BodyText"],
+            fontSize=7.5,
+            leading=10,
+            textColor=HexColor("#64748b"),
+        ))
+
+        def p(value, style="CellValue"):
+            return Paragraph(clean(value), styles[style])
 
         def draw_footer(canvas, pdf_doc):
             canvas.saveState()
             width, _height = A4
             canvas.setStrokeColor(HexColor("#cbd5e1"))
             canvas.setLineWidth(0.45)
-            canvas.line(14 * mm, 11.5 * mm, width - 14 * mm, 11.5 * mm)
+            canvas.line(15 * mm, 12 * mm, width - 15 * mm, 12 * mm)
             canvas.setFont("Helvetica", 7)
             canvas.setFillColor(HexColor("#64748b"))
-            canvas.drawString(14 * mm, 7.8 * mm, f"{TOUR_RECEIPT_COMPANY_NAME} - Buchhaltungsbeleg - {receipt_number} - {security_id}")
-            canvas.drawRightString(width - 14 * mm, 7.8 * mm, f"Seite {pdf_doc.page}")
+            canvas.drawString(15 * mm, 8 * mm, f"{TOUR_RECEIPT_COMPANY_NAME} • Buchhaltungsbeleg • {safe_str(receipt_doc.get('receipt_number'), '-')}")
+            canvas.drawRightString(width - 15 * mm, 8 * mm, f"Seite {pdf_doc.page}")
             canvas.restoreState()
 
         story = []
+        driver = receipt_doc.get("driver") or {}
+        tour = receipt_doc.get("tour") or {}
+        billing = receipt_doc.get("billing") or {}
+        receipt_number = safe_str(receipt_doc.get("receipt_number"), "-")
+        job_id = safe_str(receipt_doc.get("job_id"), "-")
+        driver_name = safe_str(driver.get("name"), "EifelLog Fahrer")
+        username = tour_receipt_driver_username(receipt_doc)
+
         header_left = [
-            Paragraph(f"Tourbeleg / Buchhaltung", styles["HeroTitle"]),
-            Paragraph(f"{clean(driver_name)} ({clean(username)}) - Auftrag {clean(job_id)}", styles["HeroSub"]),
-            Paragraph(f"Belegnummer: <b>{clean(receipt_number)}</b><br/>Sicherheits-ID: <b>{clean(security_id)}</b>", styles["HeroSub"]),
+            Paragraph(f"Tourbeleg von {clean(username)}", styles["HeroTitle"]),
+            Paragraph(f"{clean(driver_name)} • abgeschlossener Auftrag • nur buchhaltungsrelevante Daten", styles["HeroSub"]),
+            Paragraph(f"Belegnummer: <b>{clean(receipt_number)}</b>", styles["HeroSub"]),
         ]
-        header_right = Paragraph(f"ABGESCHLOSSEN<br/>ZAHLUNG<br/><font size='8'>{clean(billing.get('payment_status') or 'offen')}</font>", styles["Badge"])
-        header = Table([[header_left, header_right]], colWidths=[128 * mm, 40 * mm])
+        header_right = Paragraph(f"ABGESCHLOSSEN<br/>JOB-ID<br/><font size='8'>{clean(job_id)}</font>", styles["Badge"])
+        header = Table([[header_left, header_right]], colWidths=[125 * mm, 40 * mm])
         header.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), HexColor("#0f172a")),
             ("BACKGROUND", (1, 0), (1, 0), HexColor("#bae6fd")),
             ("BOX", (0, 0), (-1, -1), 0.7, HexColor("#020617")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (0, 0), 11),
-            ("RIGHTPADDING", (0, 0), (0, 0), 11),
-            ("TOPPADDING", (0, 0), (-1, -1), 10),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING", (0, 0), (0, 0), 12),
+            ("RIGHTPADDING", (0, 0), (0, 0), 12),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
             ("LEFTPADDING", (1, 0), (1, 0), 6),
             ("RIGHTPADDING", (1, 0), (1, 0), 6),
         ]))
         story.append(header)
-        story.append(Spacer(1, 7))
+        story.append(Spacer(1, 8))
 
         kpi = Table([
-            [p("Gesamtbetrag", "KpiLabel"), p("Umsatz/km", "KpiLabel"), p("Soll/Ist", "KpiLabel"), p("Fahrerkarte", "KpiLabel")],
-            [p(format_money(billing.get("total_amount"), currency), "KpiValue"), p(format_money(billing.get("revenue_per_km"), currency), "KpiValue"), p(f"{format_km(km_difference)} / {format_percent(km_deviation_percent)}", "KpiValue"), p(driver.get("fahrerkarte_id") or "-", "KpiValue")],
-        ], colWidths=[42 * mm, 42 * mm, 42 * mm, 42 * mm])
+            [p("Gesamtbetrag", "KpiLabel"), p("Gefahrene Strecke", "KpiLabel"), p("Buchhaltung", "KpiLabel")],
+            [p(money_value(), "KpiValue"), p(distance_value(), "KpiValue"), p("Relevant", "KpiValue")],
+        ], colWidths=[55 * mm, 55 * mm, 55 * mm])
         kpi.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
             ("BOX", (0, 0), (-1, -1), 0.45, HexColor("#cbd5e1")),
             ("INNERGRID", (0, 0), (-1, -1), 0.25, HexColor("#e2e8f0")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         story.append(kpi)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 7))
 
-        route_card = Table([
-            [p("Route", "CellLabel"), p(route_text, "CellValue"), p("Kunde", "CellLabel"), p(tour.get("customer") or "-", "CellValue")],
-            [p("Fracht", "CellLabel"), p(tour.get("cargo_description") or tour.get("cargo") or "-", "CellValue"), p("Fahrzeug", "CellLabel"), p(f"{vehicle.get('license_plate') or '-'} / Trailer {vehicle.get('trailer_number') or '-'}", "CellValue")],
-        ], colWidths=[18 * mm, 66 * mm, 18 * mm, 66 * mm])
+        route_card = Table([[p("Route", "CellLabel"), p(route_value(), "CellValue"), p("Fracht", "CellLabel"), p(tour.get("cargo") or "-", "CellValue")]], colWidths=[20 * mm, 65 * mm, 20 * mm, 60 * mm])
         route_card.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), HexColor("#eff6ff")),
             ("BOX", (0, 0), (-1, -1), 0.4, HexColor("#bfdbfe")),
-            ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#dbeafe")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         story.append(route_card)
 
         for section_title, rows in sections:
-            story.append(Spacer(1, 4))
+            story.append(Spacer(1, 5))
             story.append(Paragraph(clean(section_title), styles["SectionTitle"]))
             table_rows = []
             for label, value in rows:
                 if value in (None, ""):
                     value = "-"
                 table_rows.append([p(label, "CellLabel"), p(value, "CellValue")])
-            detail_table = Table(table_rows, colWidths=[51 * mm, 117 * mm], repeatRows=0)
+            detail_table = Table(table_rows, colWidths=[46 * mm, 119 * mm])
             detail_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), HexColor("#ffffff")),
                 ("ROWBACKGROUNDS", (0, 0), (-1, -1), [HexColor("#ffffff"), HexColor("#f8fafc")]),
-                ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#e2e8f0")),
+                ("GRID", (0, 0), (-1, -1), 0.3, HexColor("#e2e8f0")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ]))
             story.append(detail_table)
 
-        story.append(Spacer(1, 7))
-        signature_text = signature.get("label") or "Digitale Fahrer-Unterschrift wurde nicht gesetzt."
+        story.append(Spacer(1, 8))
         note_text = (
-            "Dieser Beleg enthält Tour-, Kosten-, Fahrerkarte-, Arbeitszeit-, Diesel- und Auditdaten für die Buchhaltung. "
-            "Die PDF-SHA256 wird nach der PDF-Erzeugung in MongoDB gespeichert; im PDF steht die Sicherheits-ID zur Zuordnung."
+            "Dieser Beleg enthält bewusst nur abrechnungs- und nachweisrelevante Daten. "
+            "Live-Telemetrie wie Kraftstoff, RPM, ETA, Geschwindigkeit oder Schadensdetails wird nicht im PDF ausgegeben."
         )
-        security_table = Table([
-            [Paragraph(f"<b>Digitale Signatur:</b> {clean(signature_text)}", styles["Security"])],
-            [Paragraph(clean(note_text), styles["SmallMuted"])],
-        ], colWidths=[168 * mm])
-        security_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#fefce8")),
-            ("BOX", (0, 0), (-1, -1), 0.35, HexColor("#fde68a")),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ]))
-        story.append(security_table)
+        story.append(Paragraph(clean(note_text), styles["SmallMuted"]))
 
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         pdf_bytes = buffer.getvalue()
-        apply_receipt_pdf_integrity(receipt_doc, pdf_bytes, filename=filename, file_path=file_path)
         with open(file_path, "wb") as file:
             file.write(pdf_bytes)
         return file_path, filename, pdf_bytes
 
     except Exception as error:
         app.logger.exception("Gestalteter Tourbeleg konnte nicht erzeugt werden, nutze einfachen PDF-Fallback.")
-        pdf_bytes = build_simple_pdf(f"{TOUR_RECEIPT_COMPANY_NAME} - Tourbeleg von {driver_username}", sections)
-        apply_receipt_pdf_integrity(receipt_doc, pdf_bytes, filename=filename, file_path=file_path)
+        pdf_bytes = build_simple_pdf(
+            f"{TOUR_RECEIPT_COMPANY_NAME} - Tourbeleg von {driver_username}",
+            sections
+        )
         with open(file_path, "wb") as file:
             file.write(pdf_bytes)
         return file_path, filename, pdf_bytes
@@ -7012,8 +6591,6 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
     total_amount = format_money(billing.get("total_amount"), billing.get("currency"))
     distance = format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))
-    integrity = receipt_doc.get("integrity") or {}
-    billing_costs = billing.get("costs") or {}
 
     payload = {
         "username": "EifelLog Buchhaltung",
@@ -7032,18 +6609,9 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
                     discord_field("📦 Fracht", tour.get("cargo") or "-", True),
                     discord_field("📊 Strecke", distance, True),
                     discord_field("💶 Gesamtbetrag", total_amount, True),
-                    discord_field("💶 Umsatz/km", format_money(billing.get("revenue_per_km"), billing.get("currency")), True),
-                    discord_field(
-                        "⛽ Tank/Maut/Auslagen",
-                        "Tank: " + format_money(billing_costs.get("fuel_cost"), billing.get("currency")) +
-                        "\nMaut: " + format_money(billing_costs.get("toll_cost"), billing.get("currency")) +
-                        "\nAuslagen: " + format_money(billing_costs.get("expenses"), billing.get("currency")),
-                        False
-                    ),
 
                     discord_field("🪪 Fahrerkarte-ID", driver.get("fahrerkarte_id") or "-", True),
-                    discord_field("🔐 Sicherheits-ID", integrity.get("security_id") or receipt_doc.get("security_id") or "-", True),
-                    discord_field("🏦 Buchhaltung", "Ja - abrechnungsrelevant", True),
+                    discord_field("🏦 Buchhaltung", "Ja – abrechnungsrelevant", True),
                     discord_field("📎 PDF", filename, True),
                 ],
                 "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tourbeleg / Buchhaltung"},
@@ -7085,18 +6653,6 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or f"job-{submitted_at.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3)}"
     )
 
-    discord_id = safe_str(user_doc.get("discord_id"))
-    job_start_doc = tracker_job_starts_collection.find_one(
-        {"discord_id": discord_id, "$or": [{"job_id": job_id}, {"current_job.jobId": job_id}, {"telemetry.jobId": job_id}]},
-        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
-    ) if discord_id else None
-    job_start_doc = job_start_doc or {}
-
-    driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
-    driver_card_payload = tracker_prepare_driver_card_payload(driver_card_doc, user_doc=user_doc) if driver_card_doc else {}
-    work_session_doc = tracker_get_latest_work_session_doc(user_doc)
-    work_session = tracker_prepare_work_session_payload(work_session_doc or user_doc.get("tracker_work_session") or {})
-
     display_name = (
         user_doc.get("display_name")
         or user_doc.get("username")
@@ -7104,74 +6660,98 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or safe_str(payload.get("driverName"), "EifelLog Fahrer")
     )
 
-    source_city = receipt_first_text(
-        payload.get("sourceCity"), payload.get("source_city"), telemetry.get("sourceCity"),
-        active_job.get("sourceCity"), live_state.get("sourceCity"), fallback="-"
+    source_city = (
+        safe_str(payload.get("sourceCity"))
+        or safe_str(payload.get("source_city"))
+        or safe_str(telemetry.get("sourceCity"))
+        or safe_str(active_job.get("sourceCity"))
+        or safe_str(live_state.get("sourceCity"))
+        or "-"
     )
-    destination_city = receipt_first_text(
-        payload.get("destinationCity"), payload.get("destination_city"), telemetry.get("destinationCity"),
-        active_job.get("destinationCity"), live_state.get("destinationCity"), fallback="-"
+    destination_city = (
+        safe_str(payload.get("destinationCity"))
+        or safe_str(payload.get("destination_city"))
+        or safe_str(telemetry.get("destinationCity"))
+        or safe_str(active_job.get("destinationCity"))
+        or safe_str(live_state.get("destinationCity"))
+        or "-"
     )
-    loading_place = receipt_first_text(payload.get("loadingPlace"), payload.get("loading_place"), payload.get("loadPlace"), payload.get("pickupPlace"), source_city, fallback="-")
-    unloading_place = receipt_first_text(payload.get("unloadingPlace"), payload.get("unloading_place"), payload.get("deliveryPlace"), payload.get("dropoffPlace"), destination_city, fallback="-")
-    customer = receipt_first_text(payload.get("customer"), payload.get("client"), payload.get("auftraggeber"), payload.get("customerName"), telemetry.get("customer"), active_job.get("customer"), fallback="-")
-    cargo = receipt_first_text(payload.get("cargo"), payload.get("freight"), payload.get("cargoName"), payload.get("jobCargo"), telemetry.get("cargo"), active_job.get("cargo"), live_state.get("cargo"), fallback="-")
-    cargo_description = receipt_first_text(payload.get("cargoDescription"), payload.get("cargo_description"), payload.get("loadDescription"), payload.get("freightDescription"), cargo, fallback="-")
-    game = receipt_first_text(payload.get("game"), telemetry.get("game"), live_state.get("game"), fallback="ETS2/ATS")
-    truck = receipt_first_text(payload.get("truck"), payload.get("truckName"), payload.get("truckModel"), payload.get("truck_model"), telemetry.get("truck"), active_job.get("truck"), live_state.get("truck"), fallback="-")
-    license_plate = receipt_first_text(payload.get("licensePlate"), payload.get("license_plate"), payload.get("plate"), telemetry.get("licensePlate"), active_job.get("licensePlate"), user_doc.get("vehicle_license_plate"), fallback="-")
-    trailer_number = receipt_first_text(payload.get("trailerNumber"), payload.get("trailer_number"), payload.get("trailerId"), payload.get("trailer_id"), telemetry.get("trailerNumber"), active_job.get("trailerNumber"), fallback="-")
-    eta = receipt_first_text(payload.get("eta"), payload.get("etaText"), payload.get("eta_text"), telemetry.get("eta"), active_job.get("eta"), fallback="-")
-
-    driver_card_id = (
-        resolve_driver_card_id(user_doc, payload)
-        or resolve_driver_card_id(user_doc, telemetry)
-        or safe_str((driver_card_doc or {}).get("card_id"))
-        or safe_str((job_start_doc.get("driver_card") or {}).get("cardId"))
-        or safe_str(job_start_doc.get("driver_card_id"))
+    cargo = safe_str(
+        payload.get("cargo")
+        or payload.get("freight")
+        or payload.get("cargoName")
+        or payload.get("jobCargo")
+        or telemetry.get("cargo")
+        or active_job.get("cargo")
+        or live_state.get("cargo"),
+        "-"
     )
+    game = safe_str(payload.get("game") or telemetry.get("game") or live_state.get("game"), "ETS2/ATS")
+    truck = safe_str(
+        payload.get("truck")
+        or payload.get("truckName")
+        or payload.get("truckModel")
+        or payload.get("truck_model")
+        or telemetry.get("truck")
+        or active_job.get("truck")
+        or live_state.get("truck"),
+        "-"
+    )
+    eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta") or active_job.get("eta"), "-")
+    driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
 
     planned_distance = parse_number(
-        payload.get("plannedDistanceKm") or payload.get("planned_distance_km") or payload.get("routeDistanceKm") or payload.get("route_distance_km") or
-        payload.get("completedDistanceKm") or payload.get("completed_distance_km") or payload.get("distanceKm") or telemetry.get("plannedDistanceKm") or
-        active_job.get("distanceKm") or live_state.get("plannedDistanceKm"),
+        payload.get("plannedDistanceKm")
+        or payload.get("planned_distance_km")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("distanceKm")
+        or telemetry.get("plannedDistanceKm")
+        or active_job.get("distanceKm")
+        or live_state.get("plannedDistanceKm"),
         0
     )
     driven_distance = parse_number(
-        payload.get("completedDistanceKm") or payload.get("completed_distance_km") or payload.get("drivenDistanceKm") or payload.get("driven_distance_km") or
-        payload.get("distanceKm") or payload.get("distance") or payload.get("routeDistanceKm") or payload.get("route_distance_km") or payload.get("tripDistanceKm") or
-        telemetry.get("completedDistanceKm") or telemetry.get("drivenDistanceKm") or telemetry.get("distanceKm") or telemetry.get("tripDistanceKm") or
-        live_state.get("completedDistanceKm") or live_state.get("drivenDistanceKm") or live_state.get("tripDistanceKm"),
+        payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("drivenDistanceKm")
+        or payload.get("driven_distance_km")
+        or payload.get("distanceKm")
+        or payload.get("distance")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("tripDistanceKm")
+        or telemetry.get("completedDistanceKm")
+        or telemetry.get("drivenDistanceKm")
+        or telemetry.get("distanceKm")
+        or telemetry.get("tripDistanceKm")
+        or live_state.get("completedDistanceKm")
+        or live_state.get("drivenDistanceKm")
+        or live_state.get("tripDistanceKm"),
         0
     )
-    remaining_distance = parse_number(payload.get("remainingDistanceKm") or telemetry.get("remainingDistanceKm") or active_job.get("remainingDistanceKm") or live_state.get("remainingDistanceKm"), 0)
+    remaining_distance = parse_number(
+        payload.get("remainingDistanceKm")
+        or telemetry.get("remainingDistanceKm")
+        or active_job.get("remainingDistanceKm")
+        or live_state.get("remainingDistanceKm"),
+        0
+    )
 
     if driven_distance <= 0 and planned_distance > 0:
-        driven_distance = max(planned_distance - remaining_distance, 0) if remaining_distance > 0 else planned_distance
+        if remaining_distance > 0:
+            driven_distance = max(planned_distance - remaining_distance, 0)
+        else:
+            driven_distance = planned_distance
+
     if driven_distance <= 0:
         driven_distance = completed_distance_fallback_from_user(user_doc)
 
     driven_distance = round(max(0.0, driven_distance), 1)
     planned_distance = round(max(planned_distance, driven_distance, 0.0), 1)
     remaining_distance = round(max(0.0, remaining_distance), 1)
-
-    empty_km = round(max(0.0, receipt_first_number(payload.get("emptyKm"), payload.get("empty_km"), payload.get("leerfahrtKm"), telemetry.get("emptyKm"), fallback=0)), 1)
-    private_km = round(max(0.0, receipt_first_number(payload.get("privateKm"), payload.get("private_km"), payload.get("privatfahrtKm"), telemetry.get("privateKm"), fallback=0)), 1)
-    loaded_km = receipt_first_number(payload.get("loadedKm"), payload.get("loaded_km"), payload.get("lastfahrtKm"), telemetry.get("loadedKm"), fallback=-1)
-    if loaded_km < 0:
-        loaded_km = max(driven_distance - empty_km - private_km, 0)
-    loaded_km = round(max(0.0, loaded_km), 1)
-    km_difference = round(driven_distance - planned_distance, 1)
-    km_deviation_percent = receipt_percent_change(driven_distance, planned_distance)
-
-    start_time = receipt_datetime_from_any(
-        payload.get("startTime"), payload.get("start_time"), payload.get("jobStartTime"), payload.get("job_started_at"),
-        active_job.get("startedAt"), job_start_doc.get("created_at"), user_doc.get("tracker_last_job_started_at"), fallback=None
-    )
-    end_time = receipt_datetime_from_any(payload.get("endTime"), payload.get("end_time"), payload.get("completedAt"), payload.get("completed_at"), telemetry.get("completedAt"), fallback=submitted_at)
-    duration_minutes = receipt_first_number(payload.get("durationMinutes"), payload.get("duration_minutes"), payload.get("tourDurationMinutes"), fallback=0)
-    if duration_minutes <= 0 and isinstance(start_time, datetime) and isinstance(end_time, datetime):
-        duration_minutes = round(max(0.0, (end_time - start_time).total_seconds() / 60.0), 1)
 
     rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
     base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
@@ -7182,73 +6762,28 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     penalty = abs(parse_number(payload.get("penalty") or payload.get("deduction"), 0))
     total_amount = round(base_amount + bonus - penalty, 2)
     currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
-    revenue_per_km = round(total_amount / driven_distance, 2) if driven_distance > 0 else 0.0
-
-    toll_cost = receipt_first_number(payload.get("tollCost"), payload.get("toll_cost"), payload.get("mautkosten"), fallback=0)
-    fuel_cost = receipt_first_number(payload.get("fuelCost"), payload.get("fuel_cost"), payload.get("tankkosten"), fallback=0)
-    ferry_tunnel_cost = receipt_first_number(payload.get("ferryTunnelCost"), payload.get("ferry_tunnel_cost"), payload.get("faehreTunnelKosten"), payload.get("tunnelCost"), fallback=0)
-    expenses = receipt_first_number(payload.get("expenses"), payload.get("spesen"), payload.get("auslagen"), payload.get("allowance"), fallback=0)
-    other_costs = receipt_first_number(payload.get("otherCosts"), payload.get("other_costs"), fallback=0)
-    total_costs = round(toll_cost + fuel_cost + ferry_tunnel_cost + expenses + other_costs, 2)
-    payout_total = round(total_amount + total_costs, 2)
-    payment_status = receipt_first_text(payload.get("paymentStatus"), payload.get("payment_status"), fallback="offen")
-
-    fuel_liters = receipt_first_number(payload.get("fuelLiters"), payload.get("fuel_liters"), payload.get("dieselLiters"), telemetry.get("fuelLiters"), fallback=0)
-    fuel_l_per_100km = round((fuel_liters / driven_distance) * 100, 2) if fuel_liters > 0 and driven_distance > 0 else 0.0
 
     receipt_number = safe_str(payload.get("receiptNumber") or payload.get("receipt_number"))
     if not receipt_number:
         receipt_number = generate_receipt_number(job_id, user_doc.get("discord_id"), submitted_at)
 
-    receipt_id = uuid.uuid4().hex
-    system_reference_id = f"tour_receipts/{receipt_id}"
-    employee_id = receipt_first_text(payload.get("employeeId"), payload.get("employee_id"), payload.get("personalnummer"), user_doc.get("employee_id"), user_doc.get("personalnummer"), user_doc.get("aktenzeichen"), fallback="-")
-    signature_seed = f"{receipt_id}|{job_id}|{discord_id}|{submitted_at.isoformat()}"
-    signature_id = "SIG-" + hashlib.sha256(signature_seed.encode("utf-8")).hexdigest()[:16].upper()
-    signature_label = f"Digital bestätigt durch {display_name} ({discord_id or 'ohne Discord-ID'}) am {format_receipt_datetime(submitted_at)}"
-    approval_status = receipt_first_text(payload.get("approvalStatus"), payload.get("approval_status"), fallback="offen")
-    approval_note = receipt_first_text(payload.get("approvalNote"), payload.get("approval_note"), fallback="Automatisch erstellt - Freigabe durch Buchhaltung offen.")
-
     extra = {}
-    ignored_extra_keys = {
-        "clientToken", "jobId", "job_id", "id", "driverName", "sourceCity", "source_city", "destinationCity", "destination_city",
-        "cargo", "game", "truck", "plannedDistanceKm", "planned_distance_km", "completedDistanceKm", "completed_distance_km",
-        "drivenDistanceKm", "driven_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", "distance", "remainingDistanceKm",
-        "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty", "deduction", "currency", "telemetry",
-        "snapshot", "token", "fuelLiters", "fuel_liters", "fuelPercent", "damagePercent", "speedKmh", "rpm", "engineRpm"
-    }
     for key, value in payload.items():
-        if key not in ignored_extra_keys:
+        if key not in {
+            "clientToken", "jobId", "job_id", "id", "driverName", "sourceCity", "source_city",
+            "destinationCity", "destination_city", "cargo", "game", "truck", "plannedDistanceKm",
+            "planned_distance_km", "completedDistanceKm", "completed_distance_km", "drivenDistanceKm",
+            "driven_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", "distance",
+            "remainingDistanceKm", "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
+            "deduction", "currency", "telemetry", "snapshot", "clientToken", "token"
+        }:
             extra[key] = value
 
-    security_seed = {
-        "receipt_id": receipt_id,
-        "receipt_number": receipt_number,
-        "job_id": job_id,
-        "discord_id": discord_id,
-        "planned_km": planned_distance,
-        "driven_km": driven_distance,
-        "total_amount": total_amount,
-        "submitted_at": submitted_at,
-    }
-    security_id = build_receipt_security_id(security_seed)
-
-    audit_log = [
-        receipt_audit_event("receipt_created", actor_name="Tracker", actor_id=discord_id, note="Tourbeleg aus Tracker-Abschlussdaten erstellt."),
-        receipt_audit_event("fahrerkarte_linked", actor_name="main.py", actor_id=driver_card_id, note="Fahrerkarte aus ServiceCenter/tracker_driver_cards mit Tourbeleg verknüpft." if driver_card_id else "Keine Fahrerkarte gefunden."),
-        receipt_audit_event("accounting_fields_calculated", actor_name="main.py", note="Soll/Ist-KM, Umsatz/km, Kosten, Arbeitszeit und Sicherheits-ID berechnet."),
-    ]
-
     return {
-        "receipt_id": receipt_id,
+        "receipt_id": uuid.uuid4().hex,
         "receipt_number": receipt_number,
-        "tour_id": job_id,
-        "order_number": job_id,
         "job_id": job_id,
-        "system_reference_id": system_reference_id,
-        "mongo_collection": "tour_receipts",
         "status": "submitted",
-        "payment_status": payment_status,
         "submitted": True,
         "completed": True,
         "billing_relevant": True,
@@ -7258,140 +6793,41 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "income": total_amount,
         "submitted_at": submitted_at,
         "created_at": submitted_at,
-        "updated_at": submitted_at,
-        "identity": {
-            "discord_id": discord_id,
-            "user_id": discord_id,
-            "user_mongo_id": safe_str(user_doc.get("_id")),
-            "username": user_doc.get("username") or user_doc.get("discord_username"),
-            "employee_id": employee_id,
-        },
         "driver": {
             "name": display_name,
             "username": user_doc.get("username") or user_doc.get("discord_username") or safe_str(payload.get("username") or payload.get("driverName")),
-            "discord_id": discord_id,
-            "user_id": discord_id,
-            "employee_id": employee_id,
-            "personalnummer": employee_id,
+            "discord_id": user_doc.get("discord_id"),
             "role": get_primary_role_name(user_doc.get("roles", [])),
-            "fahrerkarte_id": driver_card_id,
-        },
-        "driver_card": {
-            "card_id": driver_card_id,
-            "status": receipt_first_text((driver_card_doc or {}).get("status"), driver_card_payload.get("status"), fallback="nicht geladen"),
-            "source": receipt_first_text((driver_card_doc or {}).get("source"), fallback="servicecenter/tracker_driver_cards" if driver_card_id else "-"),
-            "download_url": (driver_card_doc or {}).get("download_url") or driver_card_payload.get("downloadUrl") or user_doc.get("fahrerkarte_download_url"),
-            "pdf_relative_path": (driver_card_doc or {}).get("pdf_relative_path") or user_doc.get("fahrerkarte_pdf_relative_path"),
-            "synced_at": now_utc(),
-        },
-        "vehicle": {
-            "truck": truck,
-            "license_plate": license_plate,
-            "trailer_number": trailer_number,
+            "fahrerkarte_id": driver_card_id
         },
         "tour": {
             "game": game,
             "truck": truck,
             "source_city": source_city,
             "destination_city": destination_city,
-            "customer": customer,
             "cargo": cargo,
-            "cargo_description": cargo_description,
             "eta": eta,
-            "start_time": start_time,
-            "end_time": end_time,
-            "duration_minutes": duration_minutes,
             "planned_distance_km": planned_distance,
             "driven_distance_km": driven_distance,
             "remaining_distance_km": remaining_distance,
-            "km_difference": km_difference,
-            "km_deviation_percent": km_deviation_percent,
-            "route": {
-                "loading_place": loading_place,
-                "unloading_place": unloading_place,
-                "source_city": source_city,
-                "destination_city": destination_city,
-            },
-            "kilometers": {
-                "planned_km": planned_distance,
-                "driven_km": driven_distance,
-                "empty_km": empty_km,
-                "loaded_km": loaded_km,
-                "private_km": private_km,
-                "difference_km": km_difference,
-                "deviation_percent": km_deviation_percent,
-            },
             "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
             "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
             "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
-            "fuel_liters": fuel_liters,
-            "fuel_l_per_100km": fuel_l_per_100km,
+            "fuel_liters": parse_number(payload.get("fuelLiters") or payload.get("fuel_liters") or telemetry.get("fuelLiters"), -1),
             "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
-            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0),
+            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0)
         },
         "billing": {
             "rate_per_km": rate_per_km,
-            "revenue_per_km": revenue_per_km,
             "base_amount": base_amount,
             "bonus": bonus,
             "penalty": penalty,
             "total_amount": total_amount,
-            "payout_total": payout_total,
-            "payment_status": payment_status,
-            "currency": currency,
-            "costs": {
-                "toll_cost": round(toll_cost, 2),
-                "fuel_cost": round(fuel_cost, 2),
-                "ferry_tunnel_cost": round(ferry_tunnel_cost, 2),
-                "expenses": round(expenses, 2),
-                "other_costs": round(other_costs, 2),
-                "total_costs": total_costs,
-            },
+            "currency": currency
         },
-        "work_time": {
-            "status": work_session.get("status"),
-            "work_ms": work_session.get("workMs", 0),
-            "drive_ms": work_session.get("driveMs", 0),
-            "break_ms": work_session.get("breakMs", 0),
-            "rest_ms": work_session.get("restMs", 0),
-            "weekly_rest_ms": work_session.get("weeklyRestMs", 0),
-            "driver_card_id": driver_card_id,
-            "summary": f"Arbeitszeit {format_receipt_duration_ms(work_session.get('workMs'))}, Fahrzeit {format_receipt_duration_ms(work_session.get('driveMs'))}, Pause {format_receipt_duration_ms(work_session.get('breakMs'))}",
-            "raw": work_session,
-        },
-        "approval": {
-            "status": approval_status,
-            "note": approval_note,
-            "approved_by": receipt_first_text(payload.get("approvedBy"), payload.get("approved_by"), fallback="-"),
-            "approved_at": receipt_datetime_from_any(payload.get("approvedAt"), payload.get("approved_at"), fallback=None),
-        },
-        "signature": {
-            "type": "digital_driver_signature",
-            "label": signature_label,
-            "signature_id": signature_id,
-            "signed_by": display_name,
-            "signed_by_discord_id": discord_id,
-            "signed_at": submitted_at,
-        },
-        "integrity": {
-            "security_id": security_id,
-            "hash_algorithm": "SHA-256",
-            "pdf_sha256": "",
-            "created_from": "tracker_tour_completion",
-        },
-        "metadata": {
-            "mongo_collection": "tour_receipts",
-            "system_reference_id": system_reference_id,
-            "audit_log": audit_log,
-            "created_by": "main.py",
-            "tracker_job_start_id": safe_str(job_start_doc.get("_id")),
-            "tracker_job_start_key": job_start_doc.get("job_start_key"),
-        },
-        "audit_log": audit_log,
         "extra": extra,
-        "raw_telemetry": telemetry,
+        "raw_telemetry": telemetry
     }
-
 
 def write_receipt_into_user_stats(user_doc, receipt_doc):
     billing = receipt_doc.get("billing") or {}
@@ -7423,16 +6859,6 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
         "incomeText": format_money(income, billing.get("currency")),
         "driverName": receipt_doc.get("driver", {}).get("name"),
         "createdAt": receipt_doc.get("submitted_at").isoformat() + "Z",
-        "truck": tour.get("truck", "-"),
-        "lkw": tour.get("truck", "-"),
-        "vehicle": tour.get("truck", "-"),
-        "game": tour.get("game", "ETS2/ATS"),
-        "fuel_used": tour.get("fuel_liters", "-"),
-        "fuel_percent": tour.get("fuel_percent", 0),
-        "avg_speed": tour.get("speed_kmh", "-"),
-        "damage_percent": tour.get("damage_percent", 0),
-        "route_progress_percent": tour.get("route_progress_percent", 100),
-        "driver_card_id": receipt_doc.get("driver", {}).get("fahrerkarte_id"),
         "billingRelevant": True,
         "pdfFilePath": receipt_doc.get("pdf", {}).get("file_path"),
         "discordMessageId": receipt_doc.get("discord", {}).get("message_id")
@@ -7597,7 +7023,7 @@ def complete_tracker_tour_from_request():
     discord_result = send_receipt_to_discord(receipt_doc, pdf_bytes, filename)
     receipt_doc["discord"] = discord_result
 
-    insert_tour_receipt_doc(receipt_doc)
+    tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
     mark_tracker_job_start_completed(user_doc, telemetry or data, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
@@ -8549,7 +7975,7 @@ def store_tracker_webhook_completed_job(payload):
     except Exception as error:
         receipt_doc["discord"] = {"sent": False, "error": str(error)}
 
-    insert_tour_receipt_doc(receipt_doc)
+    tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
     mark_tracker_job_start_completed(user_doc, payload_for_db, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
@@ -9657,72 +9083,6 @@ def dashboard():
         user_documents=user_documents,
         **registration_context,
         **driver_dashboard_context
-    )
-
-
-@app.route("/dashboard/detail")
-@app.route("/dashboard/detail.html")
-def dashboard_detail():
-    if "user" not in session:
-        flash("Bitte logge dich zuerst ein.", "error")
-        return redirect(url_for("hub"))
-
-    user = session["user"]
-    user_roles = user.get("roles", [])
-
-    if not has_dashboard_permission(user_roles):
-        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen.", "error")
-        return redirect(url_for("home"))
-
-    discord_id = safe_str(user.get("id"))
-    db_user = users_collection.find_one({"discord_id": discord_id})
-
-    if not db_user:
-        db_user = {
-            "discord_id": discord_id,
-            "username": user.get("username"),
-            "discord_username": user.get("discord_username"),
-            "display_name": user.get("username"),
-            "avatar": user.get("avatar"),
-            "roles": user_roles
-        }
-
-    primary_role_name = get_primary_role_name(user_roles)
-    latest_registration = get_latest_registration_request_for_user(discord_id)
-    registration_context = dashboard_registration_context(db_user, latest_registration)
-    driver_dashboard_context = prepare_driver_dashboard_context(db_user)
-
-    # Für die Detailseite mehr Einträge laden als im Dashboard.
-    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(db_user, limit=150)
-    detail_trip_id = safe_str(request.args.get("trip_id") or request.args.get("id") or request.args.get("fahrt_id"))
-
-    selected_trip = fahrtenbuch_entries[0] if fahrtenbuch_entries else {}
-    if detail_trip_id:
-        for trip in fahrtenbuch_entries:
-            candidate_ids = {
-                safe_str(trip.get("id")),
-                safe_str(trip.get("trip_id")),
-                safe_str(trip.get("fahrt_id")),
-                safe_str(trip.get("auftrag_id")),
-                safe_str(trip.get("receipt_id")),
-                safe_str(trip.get("receipt_number")),
-            }
-            if detail_trip_id in candidate_ids:
-                selected_trip = trip
-                break
-
-    return render_template(
-        "detail.html",
-        current_user=user,
-        primary_role_name=primary_role_name,
-        fahrtenbuch_entries=fahrtenbuch_entries,
-        driver_trips=fahrtenbuch_entries,
-        detail_trip=selected_trip,
-        selected_trip=selected_trip,
-        driver_trip_detail=selected_trip,
-        driver_current_trip=driver_dashboard_context.get("driver_current_trip"),
-        driver_stats=driver_dashboard_context.get("driver_stats"),
-        **registration_context
     )
 
 
