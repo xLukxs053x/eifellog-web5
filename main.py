@@ -308,6 +308,27 @@ workspace_sheets_collection = db["workspace_sheets"]
 workspace_invites_collection = db["workspace_invites"]
 workspace_events_collection = db["workspace_events"]
 
+# LOA / Urlaubs-Dashboard
+# Die LOA-Daten werden vom Discord-Bot in MongoDB geschrieben.
+# Zugangsdaten bleiben bewusst in der .env und werden nicht im Template oder Code hardcodiert.
+LOA_MONGO_URI = env_first("LOA_MONGO_URI", "MONGO_URI", default=MONGO_URI)
+LOA_DB_NAME = env_first(
+    "LOA_DB_NAME",
+    "MONGO_LOA_DB_NAME",
+    "EIFELLOG_LOA_DB_NAME",
+    default="EifelLog"
+)
+LOA_COLLECTION_NAME = env_first(
+    "LOA_COLLECTION_NAME",
+    "MONGO_LOA_COLLECTION_NAME",
+    "EIFELLOG_LOA_COLLECTION_NAME",
+    default="LOA"
+)
+
+loa_mongo_client = mongo_client if LOA_MONGO_URI == MONGO_URI else MongoClient(LOA_MONGO_URI)
+loa_db = loa_mongo_client[LOA_DB_NAME]
+loa_collection = loa_db[LOA_COLLECTION_NAME]
+
 
 def ensure_indexes():
     try:
@@ -517,6 +538,12 @@ def ensure_indexes():
         workspace_events_collection.create_index([("workspace_id", ASCENDING), ("created_at", DESCENDING)], unique=False)
         workspace_events_collection.create_index([("event_id", ASCENDING)], unique=True)
         workspace_events_collection.create_index([("user_id", ASCENDING)], unique=False)
+
+        loa_collection.create_index([("status", ASCENDING)], unique=False)
+        loa_collection.create_index([("start_date", ASCENDING)], unique=False)
+        loa_collection.create_index([("end_date", ASCENDING)], unique=False)
+        loa_collection.create_index([("user_id", ASCENDING)], unique=False)
+        loa_collection.create_index([("timestamp_raw", DESCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -1693,6 +1720,297 @@ def dashboard_registration_context(user_doc, latest_request=None):
         "fahrer_token_value": "",
         "fahrer_token_created_at": format_datetime_for_template(user_doc.get("tracker_code_created_at")) or "Heute"
     }
+
+
+# ==========================================
+# LOA / URLAUBS-DASHBOARD
+# ==========================================
+
+LOA_ACCEPTED_STATUSES = {
+    "accepted",
+    "approved",
+    "angenommen",
+    "genehmigt",
+    "freigegeben",
+    "eingetragen",
+}
+
+LOA_PENDING_STATUSES = {
+    "pending",
+    "open",
+    "offen",
+    "beantragt",
+    "wartet",
+}
+
+LOA_REJECTED_STATUSES = {
+    "rejected",
+    "declined",
+    "abgelehnt",
+    "denied",
+}
+
+
+def loa_first_value(document, *keys, default=""):
+    document = document or {}
+    for key in keys:
+        if key in document and document.get(key) not in [None, ""]:
+            return document.get(key)
+    return default
+
+
+def normalize_loa_status(status):
+    status_raw = safe_str(status, "accepted")
+    status_lc = status_raw.lower()
+
+    if status_lc in LOA_ACCEPTED_STATUSES:
+        return "accepted"
+    if status_lc in LOA_PENDING_STATUSES:
+        return "pending"
+    if status_lc in LOA_REJECTED_STATUSES:
+        return "rejected"
+    return status_raw or "accepted"
+
+
+def parse_loa_datetime(value, end_of_day=False):
+    """Parst LOA-Datumswerte aus Discord-Bot/MongoDB robust fuer Dashboard-Sortierung."""
+    if isinstance(value, datetime):
+        return value
+
+    if value is None:
+        return None
+
+    # Python date ohne datetime importieren zu muessen: date-Objekte haben year/month/day, aber keine hour.
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day") and not hasattr(value, "hour"):
+        hour, minute, second = (23, 59, 59) if end_of_day else (0, 0, 0)
+        try:
+            return datetime(int(value.year), int(value.month), int(value.day), hour, minute, second)
+        except Exception:
+            return None
+
+    value_str = safe_str(value)
+    if not value_str:
+        return None
+
+    # Häufige Zusätze entfernen.
+    cleaned = (
+        value_str
+        .replace("Uhr", "")
+        .replace("uhr", "")
+        .replace("von", "")
+        .replace("bis", "")
+        .strip()
+    )
+
+    # ISO-Strings aus Mongo/JSON.
+    try:
+        iso_candidate = cleaned.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(iso_candidate)
+        return parsed.replace(tzinfo=None)
+    except Exception:
+        pass
+
+    date_formats = [
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y",
+        "%d.%m.%y",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+    ]
+
+    for fmt in date_formats:
+        try:
+            parsed = datetime.strptime(cleaned, fmt)
+            if end_of_day and fmt in {"%d.%m.%Y", "%d.%m.%y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"}:
+                return parsed.replace(hour=23, minute=59, second=59)
+            return parsed
+        except Exception:
+            continue
+
+    return None
+
+
+def format_loa_date(value, fallback="-"):
+    parsed = parse_loa_datetime(value)
+    if parsed:
+        return parsed.strftime("%d.%m.%Y")
+    return safe_str(value, fallback) or fallback
+
+
+def format_loa_datetime(value, fallback="-"):
+    parsed = parse_loa_datetime(value)
+    if parsed:
+        return parsed.strftime("%d.%m.%Y %H:%M")
+    return safe_str(value, fallback) or fallback
+
+
+def loa_user_display_name(discord_id, fallback="Unbekannter User"):
+    discord_id = safe_str(discord_id)
+    if not discord_id:
+        return safe_str(fallback, "Unbekannter User")
+
+    try:
+        user_doc = users_collection.find_one({"discord_id": discord_id})
+        if user_doc:
+            return safe_str(
+                user_doc.get("display_name")
+                or user_doc.get("username")
+                or user_doc.get("discord_username"),
+                fallback
+            )
+    except Exception:
+        pass
+
+    return safe_str(fallback, "Unbekannter User")
+
+
+def prepare_loa_record_for_dashboard(record):
+    record = record or {}
+
+    start_value = loa_first_value(record, "start_date", "start", "start_datum", "von", "from_date")
+    end_value = loa_first_value(record, "end_date", "end", "end_datum", "bis", "to_date")
+    timestamp_value = loa_first_value(record, "timestamp_raw", "created_at", "submitted_at", "timestamp", "date")
+
+    user_id = safe_str(loa_first_value(record, "user_id", "discord_id", "member_id"))
+    user_name = safe_str(
+        loa_first_value(record, "user_name", "username", "member_name", "name", "discord_name"),
+        ""
+    )
+    if not user_name:
+        user_name = loa_user_display_name(user_id)
+
+    approved_by = safe_str(loa_first_value(record, "approved_by_name", "accepted_by_name", "approved_by", "accepted_by"), "-")
+    if approved_by and approved_by != "-" and approved_by.isdigit():
+        approved_by = loa_user_display_name(approved_by, approved_by)
+
+    record_id = safe_str(record.get("_id") or record.get("id") or record.get("record_id"))
+
+    start_dt = parse_loa_datetime(start_value)
+    end_dt = parse_loa_datetime(end_value, end_of_day=True)
+    submitted_dt = parse_loa_datetime(timestamp_value)
+
+    return {
+        "id": record_id,
+        "record_id": record_id,
+        "_id": record_id,
+        "user_id": user_id,
+        "discord_id": user_id,
+        "user_name": user_name or "Unbekannter User",
+        "username": user_name or "Unbekannter User",
+        "start_date": format_loa_date(start_value),
+        "end_date": format_loa_date(end_value),
+        "start_iso": datetime_to_iso(start_dt) if start_dt else "",
+        "end_iso": datetime_to_iso(end_dt) if end_dt else "",
+        "reason": safe_str(loa_first_value(record, "reason", "grund", "note", "notes"), "-"),
+        "status": normalize_loa_status(loa_first_value(record, "status", default="accepted")),
+        "status_raw": safe_str(loa_first_value(record, "status", default="accepted"), "accepted"),
+        "timestamp": format_loa_datetime(timestamp_value),
+        "submitted_at": format_loa_datetime(timestamp_value),
+        "timestamp_iso": datetime_to_iso(submitted_dt) if submitted_dt else "",
+        "approved_by": approved_by or "-",
+        "approved_by_name": approved_by or "-",
+        "ticket_channel_id": safe_str(loa_first_value(record, "ticket_channel_id", "ticket_id", "channel_id"), "-"),
+        "submitted_via": safe_str(loa_first_value(record, "submitted_via", "source"), "-"),
+        "_sort_start": start_dt or datetime.max,
+        "_sort_end": end_dt or start_dt or datetime.max,
+    }
+
+
+def loa_record_is_upcoming(prepared_record, include_pending=False):
+    if not prepared_record:
+        return False
+
+    status = safe_str(prepared_record.get("status")).lower()
+    allowed_statuses = set(LOA_ACCEPTED_STATUSES)
+    allowed_statuses.add("accepted")
+    if include_pending:
+        allowed_statuses.update(LOA_PENDING_STATUSES)
+        allowed_statuses.add("pending")
+
+    if status not in allowed_statuses:
+        return False
+
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    start_dt = prepared_record.get("_sort_start")
+    end_dt = prepared_record.get("_sort_end")
+
+    if isinstance(end_dt, datetime) and end_dt != datetime.max:
+        return end_dt >= today_start
+    if isinstance(start_dt, datetime) and start_dt != datetime.max:
+        return start_dt >= today_start
+    return True
+
+
+def get_upcoming_loa_items(limit=10, include_pending=False):
+    """Lädt genehmigte, laufende oder kommende LOA-Einträge fuer dashboard.html."""
+    try:
+        limit = max(1, min(int(limit), 50))
+    except Exception:
+        limit = 10
+
+    status_values = list(LOA_ACCEPTED_STATUSES)
+    if include_pending:
+        status_values.extend(list(LOA_PENDING_STATUSES))
+
+    query = {
+        "$or": [
+            {"status": {"$in": status_values}},
+            {"status": {"$in": [value.capitalize() for value in status_values]}},
+        ]
+    }
+
+    try:
+        cursor = loa_collection.find(query).sort([("timestamp_raw", DESCENDING), ("created_at", DESCENDING)]).limit(max(limit * 8, 80))
+        records = list(cursor)
+    except Exception as error:
+        app.logger.exception("LOA-Daten konnten nicht geladen werden: %s", error)
+        return []
+
+    prepared_records = []
+    for record in records:
+        prepared = prepare_loa_record_for_dashboard(record)
+        if loa_record_is_upcoming(prepared, include_pending=include_pending):
+            prepared_records.append(prepared)
+
+    prepared_records.sort(key=lambda item: (item.get("_sort_start") or datetime.max, item.get("user_name") or ""))
+
+    cleaned_records = []
+    for item in prepared_records[:limit]:
+        clean_item = dict(item)
+        clean_item.pop("_sort_start", None)
+        clean_item.pop("_sort_end", None)
+        cleaned_records.append(clean_item)
+
+    return cleaned_records
+
+
+def get_loa_record_for_dashboard(record_id):
+    record_id = safe_str(record_id)
+    if not record_id:
+        return None
+
+    query_items = [{"record_id": record_id}, {"id": record_id}]
+    object_id = object_id_or_none(record_id)
+    if object_id:
+        query_items.append({"_id": object_id})
+
+    try:
+        record = loa_collection.find_one({"$or": query_items})
+    except Exception as error:
+        app.logger.exception("LOA-Detail konnte nicht geladen werden: %s", error)
+        return None
+
+    if not record:
+        return None
+
+    prepared = prepare_loa_record_for_dashboard(record)
+    prepared.pop("_sort_start", None)
+    prepared.pop("_sort_end", None)
+    return prepared
 
 
 # ==========================================
@@ -10236,6 +10554,7 @@ def dashboard():
     user_documents.extend(get_system_documents_for_user(user_id_str, user_doc=db_user, latest_registration=latest_registration))
     registration_context = dashboard_registration_context(db_user, latest_registration)
     driver_dashboard_context = prepare_driver_dashboard_context(db_user)
+    loa_upcoming_items = get_upcoming_loa_items(limit=10)
 
     return render_template(
         "dashboard.html",
@@ -10244,9 +10563,54 @@ def dashboard():
         primary_role_name=primary_role_name,
         news_items=news_items,
         user_documents=user_documents,
+        loa_upcoming_items=loa_upcoming_items,
         **registration_context,
         **driver_dashboard_context
     )
+
+
+@app.route("/api/dashboard/loa/upcoming")
+def api_dashboard_loa_upcoming():
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        return jsonify({"success": False, "message": "Zugriff verweigert."}), 403
+
+    include_pending = safe_str(request.args.get("include_pending")).lower() in {"1", "true", "yes", "ja"}
+    limit = parse_int(request.args.get("limit"), 10)
+    items = get_upcoming_loa_items(limit=limit, include_pending=include_pending)
+
+    return jsonify({
+        "success": True,
+        "items": items,
+        "count": len(items),
+        "source": {
+            "database": LOA_DB_NAME,
+            "collection": LOA_COLLECTION_NAME,
+        }
+    })
+
+
+@app.route("/api/dashboard/loa/<record_id>")
+def api_dashboard_loa_detail(record_id):
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        return jsonify({"success": False, "message": "Zugriff verweigert."}), 403
+
+    item = get_loa_record_for_dashboard(record_id)
+    if not item:
+        return jsonify({"success": False, "message": "LOA-Eintrag wurde nicht gefunden."}), 404
+
+    return jsonify({"success": True, "item": item})
 
 
 @app.route("/dashboard/detail")
