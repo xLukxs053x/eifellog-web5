@@ -13,6 +13,7 @@
     {% set safe_service_requests = fahrerkarte_requests|default(driver_card_requests|default(personalisierte_fahrerkarte_requests|default([], true), true), true) %}
 {% endif %} <!-- NEU: Service Center / Fahrerkarte-Anträge -->
 {% set safe_driver_card_data = fahrerkarten_daten|default(driver_card_data|default(fahrerkarte_data|default(tacho_card_data|default([], true), true), true), true) %}
+{% set safe_driver_card_rows = safe_driver_card_data if safe_driver_card_data else safe_drivers %}
 {% set safe_driving_time_audits = lenk_ruhezeiten_audits|default(driving_time_audits|default(tacho_audits|default([], true), true), true) %} <!-- NEU: Fahrerkarten-Daten / Lenk- und Ruhezeiten -->
 
 <style>
@@ -2310,25 +2311,26 @@
             <section class="glass-card driver-card-command">
                 <div>
                     <small>Fahrerkarten Daten abfragen</small>
-                    <h2>PDF-Belege pro User erstellen und versenden</h2>
+                    <h2>PDF-Belege pro User erstellen, prüfen und abrufen</h2>
                     <p>
-                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen nutzen jetzt die Backend-Endpunkte der Personalabteilung:
-                        Datenabfrage, PDF-Erstellung, Download und optionaler Versand werden serverseitig verarbeitet und mit echten Daten zurückgegeben.
+                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Tabelle liest vorhandene PDF-Daten aus
+                        ServiceCenter, tracker_driver_cards und den Personalabteilung-Endpunkten. Download-URL, Dateiname, Karten-ID
+                        und Prüfstatus werden nach jeder Aktion direkt in der Zeile aktualisiert.
                     </p>
                 </div>
 
                 <div class="driver-card-flow">
                     <div class="service-flow-step">
                         <strong>01 · Daten prüfen</strong>
-                        <span>Ruft die aktuellen Fahrerkarten-Daten per Backend-Endpoint ab und aktualisiert die Zeile.</span>
+                        <span>Ruft die aktuellen Fahrerkarten-Daten per Backend-Endpoint ab und aktualisiert Karten-ID, PDF-Status und Lenk-/Ruhezeit-Status.</span>
                     </div>
                     <div class="service-flow-step">
                         <strong>02 · PDF erzeugen</strong>
-                        <span>Öffnet ein kompaktes Formular und lässt den PDF-Beleg serverseitig erzeugen.</span>
+                        <span>Erstellt den Fahrerkarten- oder Lenk-/Ruhezeit-Beleg serverseitig und speichert die echte Download-URL.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>03 · API-Download</strong>
-                        <span>Der Download kommt aus dem Backend-Beleg; optional wird der Beleg im User-Postfach hinterlegt.</span>
+                        <strong>03 · Download / Versand</strong>
+                        <span>Bestehende ServiceCenter-PDFs und neu erzeugte Belege können direkt geöffnet oder im User-Postfach hinterlegt werden.</span>
                     </div>
                 </div>
             </section>
@@ -2338,7 +2340,7 @@
                     class="search-box"
                     id="driverCardSearch"
                     type="search"
-                    placeholder="Fahrerkarte suchen: Name, Discord-ID, Karten-ID, Aktenzeichen..."
+                    placeholder="Fahrerkarte suchen: Name, Discord-ID, Karten-ID, Aktenzeichen, PDF..."
                     autocomplete="off"
                 />
 
@@ -2359,7 +2361,7 @@ Ansicht aktualisieren
                 <div class="table-head">
                     <div>
                         <h2>Fahrerkarten Datenbank</h2>
-                        <span>Aktionen: <strong>Daten abfragen · PDF erstellen · PDF senden · Lenk-/Ruhezeiten prüfen</strong></span>
+                        <span>Aktionen: <strong>Daten abfragen · vorhandenes PDF öffnen · PDF erstellen · PDF senden · Lenk-/Ruhezeiten prüfen</strong></span>
                     </div>
                 </div>
 
@@ -2372,6 +2374,7 @@ Ansicht aktualisieren
                                 <th>Discord-ID</th>
                                 <th>Karten-ID</th>
                                 <th>Letzte Abfrage</th>
+                                <th>PDF</th>
                                 <th>Lenk-/Ruhezeiten</th>
                                 <th>Zusammenfassung</th>
                                 <th style="text-align: right;">Aktion</th>
@@ -2379,18 +2382,23 @@ Ansicht aktualisieren
                         </thead>
 
                         <tbody id="driverCardTableBody">
-                            {% for driver in safe_drivers %}
-                                {% set display_name = driver.display_name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
+                            {% for driver in safe_driver_card_rows %}
+                                {% set display_name = driver.display_name or driver.driverName or driver.name or driver.username or driver.discord_username or "EifelLog Fahrer" %}
                                 {% set username = driver.username or driver.discord_username or "driver" %}
-                                {% set avatar_url = driver.avatar_url or "" %}
-                                {% set discord_id = driver.discord_id or driver.id or "" %}
+                                {% set avatar_url = driver.avatar_url or driver.fahrerkarte_avatar_url or driver.discord_avatar_url or "" %}
+                                {% set discord_id = driver.discord_id or driver.discordId or driver.user_id or driver.driverId or driver.driver_id or driver.id or "" %}
                                 {% set aktenzeichen = driver.aktenzeichen or "Nicht vergeben" %}
-                                {% set card_id = driver.fahrerkarte_id or driver.driver_card_id or driver.card_id or driver.tacho_card_id or "Noch nicht abgefragt" %}
-                                {% set last_query = driver.fahrerkarte_last_query or driver.driver_card_last_query or driver.tacho_last_query or driver.card_last_read_at or "-" %}
-                                {% set compliance_status = driver.lenk_ruhe_status or driver.driving_time_status or driver.compliance_status or "unknown" %}
-                                {% set compliance_label = driver.lenk_ruhe_status_label or driver.driving_time_status_label or driver.compliance_status_label or "Noch nicht geprüft" %}
-                                {% set compliance_summary = driver.lenk_ruhe_summary or driver.driving_time_summary or driver.compliance_summary or "Noch kein Lenk-/Ruhezeit-Beleg erstellt." %}
-                                {% set card_status = driver.fahrerkarte_status or driver.driver_card_status or "unknown" %}
+                                {% set request_id = driver.fahrerkarte_request_id or driver.request_id or driver.service_request_id or "" %}
+                                {% set card_id = driver.fahrerkarte_card_id or driver.fahrerkarte_id or driver.driver_card_id or driver.driverCardId or driver.card_id or driver.cardId or driver.tacho_card_id or "Keine Fahrerkarte gefunden" %}
+                                {% set last_query = driver.fahrerkarte_last_query or driver.driver_card_last_query or driver.tacho_last_query or driver.card_last_read_at or driver.lastQuery or driver.last_query or "-" %}
+                                {% set compliance_status = driver.lenk_ruhe_status or driver.driving_time_status or driver.compliance_status or driver.complianceStatus or "unknown" %}
+                                {% set compliance_label = driver.lenk_ruhe_status_label or driver.driving_time_status_label or driver.compliance_status_label or driver.complianceLabel or "Noch nicht geprüft" %}
+                                {% set compliance_summary = driver.lenk_ruhe_summary or driver.driving_time_summary or driver.compliance_summary or driver.complianceSummary or "Noch kein Lenk-/Ruhezeit-Beleg erstellt." %}
+                                {% set card_status = driver.fahrerkarte_status or driver.driver_card_status or driver.cardStatus or "unknown" %}
+                                {% set pdf_relative_path = driver.driver_card_pdf_relative_path or driver.fahrerkarte_pdf_relative_path or driver.pdf_relative_path or driver.file_relative_path or driver.fileRelativePath or "" %}
+                                {% set pdf_download_url = driver.driver_card_download_url or driver.fahrerkarte_download_url or driver.fahrerkarte_pdf_download_url or driver.downloadUrl or driver.download_url or driver.pdfDownloadUrl or driver.pdf_download_url or driver.pdfUrl or driver.pdf_url or driver.fileUrl or driver.file_url or ("/servicecenter/fahrerkarte/download/" ~ request_id if request_id and pdf_relative_path else "") %}
+                                {% set pdf_download_filename = driver.driver_card_download_filename or driver.fahrerkarte_pdf_filename or driver.downloadFilename or driver.download_filename or driver.pdfFilename or driver.pdf_filename or driver.fileName or driver.file_name or "EifelLog_Fahrerkarte.pdf" %}
+                                {% set pdf_source = driver.driver_card_source or driver.fahrerkarte_source or driver.source or ("ServiceCenter" if pdf_download_url else "Kein PDF") %}
 
                                 <tr
                                     data-driver-card-row
@@ -2398,11 +2406,16 @@ Ansicht aktualisieren
                                     data-driver-card-name="{{ display_name|e }}"
                                     data-driver-card-username="{{ username|e }}"
                                     data-driver-card-discord-id="{{ discord_id }}"
+                                    data-driver-card-request-id="{{ request_id|e }}"
                                     data-driver-card-card-id="{{ card_id|e }}"
                                     data-driver-card-last-query="{{ last_query|e }}"
                                     data-driver-card-status="{{ card_status|e }}"
                                     data-driver-card-compliance="{{ compliance_status|e }}"
-                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ discord_id ~ ' ' ~ aktenzeichen ~ ' ' ~ card_id ~ ' ' ~ compliance_label)|lower|e }}"
+                                    data-driver-card-download-url="{{ pdf_download_url|e }}"
+                                    data-driver-card-download-filename="{{ pdf_download_filename|e }}"
+                                    data-driver-card-pdf-relative-path="{{ pdf_relative_path|e }}"
+                                    data-driver-card-source="{{ pdf_source|e }}"
+                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ discord_id ~ ' ' ~ aktenzeichen ~ ' ' ~ card_id ~ ' ' ~ compliance_label ~ ' ' ~ pdf_download_filename ~ ' ' ~ pdf_source)|lower|e }}"
                                 >
                                     <td>
                                         <div class="driver-cell">
@@ -2426,6 +2439,24 @@ Ansicht aktualisieren
                                     <td><span class="mono">{{ discord_id or "-" }}</span></td>
                                     <td><span class="aktenzeichen-mono" data-driver-card-card-id-text>{{ card_id }}</span></td>
                                     <td><span class="mono" data-driver-card-last-query-text>{{ last_query }}</span></td>
+
+                                    <td data-driver-card-pdf-cell>
+                                        {% if pdf_download_url %}
+                                            <a
+                                                class="request-btn accept"
+                                                href="{{ pdf_download_url }}"
+                                                download="{{ pdf_download_filename }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                PDF öffnen
+                                            </a>
+                                            <span class="mono" style="display:block; margin-top:0.35rem;">{{ pdf_source }}</span>
+                                        {% else %}
+                                            <span class="status-badge disabled">Kein PDF</span>
+                                            <span class="mono" style="display:block; margin-top:0.35rem;">Erst erstellen oder ServiceCenter ausstellen</span>
+                                        {% endif %}
+                                    </td>
 
                                     <td>
                                         {% if compliance_status in ["ok", "compliant", "eingehalten"] %}
@@ -2492,10 +2523,10 @@ Lenk/Ruhe
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="8">
+                                    <td colspan="9">
                                         <div class="empty-state">
                                             <strong>Keine Fahrer für Fahrerkarten-Daten vorhanden</strong>
-                                            Sobald Fahrer in der Datenbank geladen sind, kann hier pro User ein Fahrerkarten- oder Lenk-/Ruhezeit-Beleg erzeugt werden.
+                                            Sobald Fahrer oder Fahrerkarten-Daten in der Datenbank geladen sind, kann hier pro User ein Fahrerkarten- oder Lenk-/Ruhezeit-Beleg erzeugt werden.
                                         </div>
                                     </td>
                                 </tr>
@@ -3068,6 +3099,9 @@ Lenk/Ruhe
             <input type="hidden" id="driverCardDriverId" />
             <input type="hidden" id="driverCardMode" />
             <input type="hidden" id="driverCardCardId" />
+            <input type="hidden" id="driverCardRequestId" />
+            <input type="hidden" id="driverCardDownloadUrl" />
+            <input type="hidden" id="driverCardDownloadFilename" />
 
             <div class="modal-info">
                 <span>Fahrer: <strong id="driverCardDriverName">-</strong></span>
@@ -3237,6 +3271,9 @@ Lenk/Ruhe
         const driverCardDriverId = document.getElementById("driverCardDriverId");
         const driverCardMode = document.getElementById("driverCardMode");
         const driverCardCardId = document.getElementById("driverCardCardId");
+        const driverCardRequestId = document.getElementById("driverCardRequestId");
+        const driverCardDownloadUrl = document.getElementById("driverCardDownloadUrl");
+        const driverCardDownloadFilename = document.getElementById("driverCardDownloadFilename");
         const driverCardDriverName = document.getElementById("driverCardDriverName");
         const driverCardModalTitle = document.getElementById("driverCardModalTitle");
         const driverCardModeHelp = document.getElementById("driverCardModeHelp");
@@ -4004,15 +4041,30 @@ Lenk/Ruhe
             const driverId = row.dataset.driverId || row.dataset.driverCardDiscordId || "";
             const driverName = row.dataset.driverCardName || "Fahrer";
             const cardId = row.dataset.driverCardCardId || "";
+            const requestId = row.dataset.driverCardRequestId || "";
+            const downloadUrl = row.dataset.driverCardDownloadUrl || "";
+            const downloadFilename = row.dataset.driverCardDownloadFilename || "EifelLog_Fahrerkarte.pdf";
             const normalizedMode = mode === "driving_time_compliance_pdf" ? "driving_time_compliance_pdf" : "driver_card_data_pdf";
 
-            currentDriverCardContext = { row, driverId, driverName, cardId, mode: normalizedMode };
+            currentDriverCardContext = {
+                row,
+                driverId,
+                driverName,
+                cardId,
+                requestId,
+                downloadUrl,
+                downloadFilename,
+                mode: normalizedMode
+            };
 
             driverCardForm.reset();
             setDefaultDriverCardDates();
             driverCardDriverId.value = driverId;
             driverCardMode.value = normalizedMode;
             driverCardCardId.value = cardId;
+            if (driverCardRequestId) driverCardRequestId.value = requestId;
+            if (driverCardDownloadUrl) driverCardDownloadUrl.value = downloadUrl;
+            if (driverCardDownloadFilename) driverCardDownloadFilename.value = downloadFilename;
             driverCardDriverName.textContent = driverName;
             driverCardSendToUser.checked = Boolean(sendToUser);
             driverCardAutoDownload.checked = true;
@@ -4024,7 +4076,9 @@ Lenk/Ruhe
                 driverCardNote.placeholder = "Hinweis zur Lenk-/Ruhezeit-Prüfung, z.B. Prüfmonat oder auffällige Tage...";
             } else {
                 driverCardModalTitle.textContent = "Fahrerkarten-PDF-Beleg erstellen";
-                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten über den Backend-Endpoint.";
+                driverCardModeHelp.textContent = downloadUrl
+                    ? "Vorhandenes Fahrerkarte-PDF ist in der Zeile verknüpft. Neue Belege werden trotzdem serverseitig erzeugt und die Download-URL wird aktualisiert."
+                    : "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten über den Backend-Endpoint.";
                 driverCardSubmitButton.textContent = sendToUser ? "PDF an User senden" : "PDF erstellen";
                 driverCardNote.placeholder = "Hinweis zum Fahrerkarten-Beleg, z.B. Abfragegrund oder Aktennotiz...";
             }
@@ -4038,20 +4092,155 @@ Lenk/Ruhe
             document.body.style.overflow = "";
         }
 
+        function pickDriverCardDownloadUrl(result = {}) {
+            const direct = result.downloadUrl
+                || result.download_url
+                || result.pdfDownloadUrl
+                || result.pdf_download_url
+                || result.pdfUrl
+                || result.pdf_url
+                || result.fileUrl
+                || result.file_url
+                || result.fahrerkarte_pdf_download_url
+                || result.driver_card_download_url
+                || "";
+            if (direct) return direct;
+
+            const nested = result.request || result.fahrerkarteRequest || result.driverCard || result.driver_card || {};
+            const nestedUrl = nested.downloadUrl
+                || nested.download_url
+                || nested.pdfDownloadUrl
+                || nested.pdf_download_url
+                || nested.fahrerkarte_pdf_download_url
+                || nested.fileUrl
+                || nested.file_url
+                || "";
+            if (nestedUrl) return nestedUrl;
+
+            const requestId = result.requestId
+                || result.request_id
+                || result.fahrerkarte_request_id
+                || nested.requestId
+                || nested.request_id
+                || "";
+            const hasPdfPath = result.pdf_relative_path
+                || result.pdfRelativePath
+                || nested.pdf_relative_path
+                || nested.pdfRelativePath
+                || nested.file_relative_path
+                || nested.fileRelativePath
+                || "";
+            return requestId && hasPdfPath ? `/servicecenter/fahrerkarte/download/${encodeURIComponent(requestId)}` : "";
+        }
+
+        function pickDriverCardDownloadFilename(result = {}, fallback = "EifelLog_Fahrerkarte.pdf") {
+            const nested = result.request || result.fahrerkarteRequest || result.driverCard || result.driver_card || {};
+            return result.downloadFilename
+                || result.download_filename
+                || result.pdfFilename
+                || result.pdf_filename
+                || result.filename
+                || result.fileName
+                || result.file_name
+                || result.fahrerkarte_pdf_filename
+                || result.driver_card_download_filename
+                || nested.downloadFilename
+                || nested.download_filename
+                || nested.pdfFilename
+                || nested.pdf_filename
+                || nested.fileName
+                || nested.file_name
+                || fallback;
+        }
+
+        function updateDriverCardPdfCell(row) {
+            if (!row) return;
+
+            const cell = row.querySelector("[data-driver-card-pdf-cell]");
+            if (!cell) return;
+
+            const downloadUrl = row.dataset.driverCardDownloadUrl || "";
+            const filename = row.dataset.driverCardDownloadFilename || "EifelLog_Fahrerkarte.pdf";
+            const source = row.dataset.driverCardSource || (downloadUrl ? "Backend-PDF" : "Kein PDF");
+
+            if (downloadUrl) {
+                cell.innerHTML = `
+                    <a
+                        class="request-btn accept"
+                        href="${escapeHtml(downloadUrl)}"
+                        download="${escapeHtml(filename)}"
+                        target="_blank"
+                        rel="noopener"
+                    >PDF öffnen</a>
+                    <span class="mono" style="display:block; margin-top:0.35rem;">${escapeHtml(source)}</span>
+                `;
+            } else {
+                cell.innerHTML = `
+                    <span class="status-badge disabled">Kein PDF</span>
+                    <span class="mono" style="display:block; margin-top:0.35rem;">Erst erstellen oder ServiceCenter ausstellen</span>
+                `;
+            }
+        }
+
         function updateDriverCardRow(row, result = {}) {
             if (!row) return;
 
-            const cardId = result.cardId || result.card_id || result.driverCardId || result.fahrerkarteId || row.dataset.driverCardCardId || "Noch nicht abgefragt";
-            const lastQuery = result.lastQuery || result.last_query || result.queriedAt || result.queried_at || new Date().toLocaleString("de-DE");
-            const complianceStatus = result.complianceStatus || result.compliance_status || result.drivingTimeStatus || result.lenkRuheStatus || row.dataset.driverCardCompliance || "unknown";
-            const complianceLabel = result.complianceLabel || result.compliance_label || result.drivingTimeLabel || result.lenkRuheLabel || humanizeDriverCardCompliance(complianceStatus).label;
-            const complianceSummary = result.complianceSummary || result.compliance_summary || result.drivingTimeSummary || result.lenkRuheSummary || "Prüfergebnis wurde aktualisiert.";
+            const nested = result.request || result.fahrerkarteRequest || result.driverCard || result.driver_card || {};
+            const cardId = result.cardId
+                || result.card_id
+                || result.driverCardId
+                || result.driver_card_id
+                || result.fahrerkarteId
+                || result.fahrerkarte_card_id
+                || nested.cardId
+                || nested.card_id
+                || row.dataset.driverCardCardId
+                || "Keine Fahrerkarte gefunden";
+            const lastQuery = result.lastQuery
+                || result.last_query
+                || result.queriedAt
+                || result.queried_at
+                || result.updatedAt
+                || result.updated_at
+                || new Date().toLocaleString("de-DE");
+            const complianceStatus = result.complianceStatus
+                || result.compliance_status
+                || result.drivingTimeStatus
+                || result.driving_time_status
+                || result.lenkRuheStatus
+                || result.lenk_ruhe_status
+                || row.dataset.driverCardCompliance
+                || "unknown";
+            const complianceLabel = result.complianceLabel
+                || result.compliance_label
+                || result.drivingTimeLabel
+                || result.driving_time_label
+                || result.lenkRuheLabel
+                || result.lenk_ruhe_label
+                || humanizeDriverCardCompliance(complianceStatus).label;
+            const complianceSummary = result.complianceSummary
+                || result.compliance_summary
+                || result.drivingTimeSummary
+                || result.driving_time_summary
+                || result.lenkRuheSummary
+                || result.lenk_ruhe_summary
+                || "Prüfergebnis wurde aktualisiert.";
+            const downloadUrl = pickDriverCardDownloadUrl(result) || row.dataset.driverCardDownloadUrl || "";
+            const downloadFilename = pickDriverCardDownloadFilename(result, row.dataset.driverCardDownloadFilename || "EifelLog_Fahrerkarte.pdf");
+            const requestId = result.requestId || result.request_id || result.fahrerkarte_request_id || nested.requestId || nested.request_id || row.dataset.driverCardRequestId || "";
+            const pdfRelativePath = result.pdfRelativePath || result.pdf_relative_path || nested.pdfRelativePath || nested.pdf_relative_path || row.dataset.driverCardPdfRelativePath || "";
+            const source = result.source || nested.source || (downloadUrl ? (result.documentType || result.document_type || "Backend-PDF") : row.dataset.driverCardSource || "Kein PDF");
 
             row.dataset.driverCardCardId = cardId;
             row.dataset.driverCardLastQuery = lastQuery;
-            row.dataset.driverCardStatus = result.cardStatus || result.status || "queried";
+            row.dataset.driverCardStatus = result.cardStatus || result.card_status || result.status || "queried";
             row.dataset.driverCardCompliance = complianceStatus;
-            row.dataset.search = `${row.dataset.search || ""} ${cardId} ${complianceLabel} ${complianceSummary}`.toLowerCase();
+            row.dataset.driverCardDownloadUrl = downloadUrl;
+            row.dataset.driverCardDownloadFilename = downloadFilename;
+            row.dataset.driverCardRequestId = requestId;
+            row.dataset.driverCardPdfRelativePath = pdfRelativePath;
+            row.dataset.driverCardSource = source;
+            row.dataset.search = `${row.dataset.search || ""} ${cardId} ${complianceLabel} ${complianceSummary} ${downloadFilename} ${source}`.toLowerCase();
 
             const cardIdText = row.querySelector("[data-driver-card-card-id-text]");
             const lastQueryText = row.querySelector("[data-driver-card-last-query-text]");
@@ -4068,12 +4257,24 @@ Lenk/Ruhe
             }
             if (label) label.textContent = complianceLabel;
             if (summary) summary.textContent = complianceSummary;
+            updateDriverCardPdfCell(row);
+
+            if (currentDriverCardContext.row === row) {
+                currentDriverCardContext.cardId = cardId;
+                currentDriverCardContext.requestId = requestId;
+                currentDriverCardContext.downloadUrl = downloadUrl;
+                currentDriverCardContext.downloadFilename = downloadFilename;
+                if (driverCardCardId) driverCardCardId.value = cardId;
+                if (driverCardRequestId) driverCardRequestId.value = requestId;
+                if (driverCardDownloadUrl) driverCardDownloadUrl.value = downloadUrl;
+                if (driverCardDownloadFilename) driverCardDownloadFilename.value = downloadFilename;
+            }
 
             updateStats();
             applyDriverCardFilters();
         }
 
-        document.querySelectorAll("[data-close-modal]").forEach((button) => {
+                document.querySelectorAll("[data-close-modal]").forEach((button) => {
             button.addEventListener("click", () => {
                 if(button.dataset.closeModal === "rejectModal") closeRejectModal();
                 if(button.dataset.closeModal === "documentModal") closeDocumentModal();
@@ -4549,11 +4750,11 @@ Lenk/Ruhe
         }
 
         function getDriverCardDownloadUrl(result = {}) {
-            return result.downloadUrl || result.download_url || result.pdfUrl || result.pdf_url || result.fileUrl || result.file_url || "";
+            return pickDriverCardDownloadUrl(result);
         }
 
         function getDriverCardDownloadFilename(result = {}, fallback = "EifelLog_Fahrerkarten_Beleg.pdf") {
-            return result.downloadFilename || result.download_filename || result.pdfFilename || result.pdf_filename || result.filename || fallback;
+            return pickDriverCardDownloadFilename(result, fallback);
         }
 
         function getDriverCardEndpoint(mode, sendToUser) {
@@ -4572,6 +4773,10 @@ Lenk/Ruhe
             const sendToUser = Boolean(driverCardSendToUser.checked);
             const autoDownload = Boolean(driverCardAutoDownload?.checked);
             const row = currentDriverCardContext.row;
+            const cardId = driverCardCardId?.value || currentDriverCardContext.cardId || row?.dataset.driverCardCardId || "";
+            const requestId = driverCardRequestId?.value || currentDriverCardContext.requestId || row?.dataset.driverCardRequestId || "";
+            const existingDownloadUrl = driverCardDownloadUrl?.value || currentDriverCardContext.downloadUrl || row?.dataset.driverCardDownloadUrl || "";
+            const existingDownloadFilename = driverCardDownloadFilename?.value || currentDriverCardContext.downloadFilename || row?.dataset.driverCardDownloadFilename || "";
 
             if (!driverId) {
                 showToast("Fehler", "Fahrer-ID fehlt. Der Beleg kann nicht erstellt werden.", "error");
@@ -4597,6 +4802,16 @@ Lenk/Ruhe
                 const result = await postJson(endpoint, {
                     driverId,
                     driver_id: driverId,
+                    discordId: driverId,
+                    discord_id: driverId,
+                    cardId,
+                    card_id: cardId,
+                    requestId,
+                    request_id: requestId,
+                    existingDownloadUrl,
+                    existing_download_url: existingDownloadUrl,
+                    existingDownloadFilename,
+                    existing_download_filename: existingDownloadFilename,
                     type: mode,
                     documentType: mode,
                     document_type: mode,
