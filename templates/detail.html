@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{#
+    Detailansicht Fahrtenbuch
+    URL: /dashboard/detail
+    Erwartete Backend-Variablen optional:
+    - fahrtenbuch_entries oder driver_trips
+    - detail_trip / selected_trip / driver_trip_detail / fahrt_detail für direkte Auswahl
+    - optional query param: ?trip_id=<id>
+#}
+
+{% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
+{% set explicit_trip = detail_trip|default(selected_trip|default(driver_trip_detail|default(fahrt_detail|default({}, true), true), true), true) %}
+{% set detail_query_id = request.args.get('trip_id', '') if request is defined else '' %}
+
+{% if not explicit_trip and safe_fahrtenbuch_entries %}
+    {% set explicit_trip = safe_fahrtenbuch_entries[0] %}
+{% endif %}
+
+{% set selected = namespace(trip=explicit_trip) %}
+{% if detail_query_id and safe_fahrtenbuch_entries %}
+    {% for item in safe_fahrtenbuch_entries %}
+        {% set item_id = item.id|default(item.trip_id|default(item.fahrt_id|default(item.auftrag_id|default(loop.index, true), true), true), true) %}
+        {% if item_id|string == detail_query_id|string %}
+            {% set selected.trip = item %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+{% set trip = selected.trip|default({}, true) %}
+
+{% set trip_id = trip.id|default(trip.trip_id|default(trip.fahrt_id|default(trip.auftrag_id|default(detail_query_id|default('-', true), true), true), true), true) %}
+{% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
+{% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default(trip.start_city|default('-', true), true), true), true) %}
+{% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default(trip.ziel|default(trip.target_city|default('-', true), true), true), true), true) %}
+{% set trip_route = trip.route|default(trip_from ~ ' → ' ~ trip_to, true) %}
+{% set trip_distance = trip.distance|default(trip.km|default(trip.last_trip_distance|default(0, true), true), true) %}
+{% set trip_cargo = trip.cargo|default(trip.freight|default(trip.fracht|default('-', true), true), true) %}
+{% set trip_earnings = trip.earnings|default(trip.income|default(trip.revenue|default(trip.einnahmen|default(0, true), true), true), true) %}
+{% set trip_status = trip.status|default('Abgeschlossen', true) %}
+{% set trip_status_lc = trip_status|lower %}
+{% set trip_truck = trip.truck|default(trip.lkw|default(trip.vehicle|default(trip.fahrzeug|default('-', true), true), true), true) %}
+{% set trip_truck_plate = trip.truck_plate|default(trip.kennzeichen|default(trip.plate|default(trip.lkw_kennzeichen|default('-', true), true), true), true) %}
+{% set trip_trailer = trip.trailer|default(trip.auflieger|default(trip.trailer_plate|default(trip.auflieger_kennzeichen|default('-', true), true), true), true) %}
+{% set trip_driver = trip.driver|default(trip.fahrer|default(current_user.username|default('-', true), true), true) %}
+{% set trip_departure = trip.departure|default(trip.start_time|default(trip.abfahrt|default('-', true), true), true) %}
+{% set trip_arrival = trip.arrival|default(trip.end_time|default(trip.ankunft|default('-', true), true), true) %}
+{% set trip_duration = trip.duration|default(trip.dauer|default('-', true), true) %}
+{% set trip_fuel = trip.fuel_used|default(trip.fuel|default(trip.diesel|default(trip.verbrauch|default('-', true), true), true), true) %}
+{% set trip_avg_speed = trip.avg_speed|default(trip.average_speed|default(trip.durchschnitt|default('-', true), true), true) %}
+{% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
+{% set trip_map_embed_url = trip.map_embed_url|default(trip.map_url|default(trip.route_map_url|default('', true), true), true) %}
+{% set trip_waypoints = trip.waypoints|default(trip.route_points|default(trip.zwischenstopps|default([], true), true), true) %}
+
+{% block title %}EifelLog - Fahrtenbuch Detail{% endblock %}
+
+{% block content %}
+<style>
+    .detail-shell {
+        width: 100%;
+        max-width: 100%;
+        margin-inline: auto;
+    }
+
+    .detail-shell,
+    .detail-shell * {
+        box-sizing: border-box;
+    }
+
+    .detail-card {
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background:
+            radial-gradient(circle at 10% 0%, rgba(137, 190, 50, 0.11), transparent 34%),
+            radial-gradient(circle at 92% 10%, rgba(220, 226, 38, 0.08), transparent 36%),
+            rgba(8, 10, 8, 0.74);
+        border-radius: 1.5rem;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(18px);
+    }
+
+    .detail-map {
+        min-height: 360px;
+        border-radius: 1.35rem;
+        border: 1px solid rgba(137, 190, 50, 0.18);
+        background:
+            linear-gradient(135deg, rgba(137, 190, 50, 0.08), transparent 38%),
+            radial-gradient(circle at 70% 35%, rgba(220, 226, 38, 0.08), transparent 28%),
+            rgba(0, 0, 0, 0.36);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .detail-map-grid {
+        position: absolute;
+        inset: 0;
+        opacity: 0.14;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+        background-size: 32px 32px;
+        mask-image: radial-gradient(circle at center, black, transparent 75%);
+    }
+
+    .route-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.95;
+    }
+
+    .route-stop {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        z-index: 5;
+        min-width: 9rem;
+        max-width: 12rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.68);
+        padding: 0.8rem;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(12px);
+    }
+
+    .route-stop.start {
+        left: 18%;
+        top: 72%;
+        border-color: rgba(137, 190, 50, 0.38);
+    }
+
+    .route-stop.end {
+        left: 80%;
+        top: 27%;
+        border-color: rgba(220, 226, 38, 0.38);
+    }
+
+    .detail-stat {
+        border-radius: 1.1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.045);
+        padding: 1rem;
+    }
+
+    .detail-stat-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+    }
+
+    .detail-stat-value {
+        display: block;
+        color: rgba(255, 255, 255, 0.94);
+        font-size: 0.95rem;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .route-timeline {
+        position: relative;
+        display: grid;
+        gap: 0.9rem;
+    }
+
+    .route-timeline::before {
+        content: "";
+        position: absolute;
+        top: 1rem;
+        bottom: 1rem;
+        left: 0.62rem;
+        width: 2px;
+        background: linear-gradient(180deg, var(--brand-green), rgba(255,255,255,0.15), var(--brand-yellow));
+    }
+
+    .route-timeline-item {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1.35rem minmax(0, 1fr);
+        gap: 0.75rem;
+        align-items: start;
+    }
+
+    .route-timeline-dot {
+        position: relative;
+        z-index: 2;
+        width: 1.35rem;
+        height: 1.35rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(0,0,0,0.86);
+        box-shadow: 0 0 18px rgba(137, 190, 50, 0.12);
+    }
+
+    .route-timeline-dot.start {
+        border-color: rgba(137, 190, 50, 0.65);
+    }
+
+    .route-timeline-dot.end {
+        border-color: rgba(220, 226, 38, 0.65);
+        box-shadow: 0 0 18px rgba(220, 226, 38, 0.12);
+    }
+
+    .trip-list-item[aria-current="true"] {
+        border-color: rgba(137, 190, 50, 0.55);
+        background: rgba(137, 190, 50, 0.10);
+    }
+
+    @media (max-width: 768px) {
+        .detail-map {
+            min-height: 300px;
+        }
+
+        .route-stop {
+            min-width: 7.5rem;
+            max-width: 9.5rem;
+            padding: 0.7rem;
+        }
+
+        .route-stop.start {
+            left: 25%;
+            top: 74%;
+        }
+
+        .route-stop.end {
+            left: 72%;
+            top: 24%;
+        }
+    }
+</style>
+
+<div class="detail-shell">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Fahrtenbuch Detail</span>
+            <h1 class="font-orbitron font-bold text-2xl md:text-3xl text-white mt-2">Gefahrene Route & LKW-Daten</h1>
+            <p class="text-sm text-[var(--muted)] font-inter mt-2">Route, Fahrzeug, Fracht, Zeiten und Abrechnung der ausgewählten Fahrt.</p>
+        </div>
+
+        <a href="/dashboard"
+           class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+            Zurück zum Dashboard
+        </a>
+    </div>
+
+    {% if trip %}
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] gap-6">
+        <div class="flex flex-col gap-6">
+            <div class="detail-card p-5 md:p-6">
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">Ausgewählte Fahrt</span>
+                        <h2 class="font-orbitron font-bold text-xl md:text-2xl text-white mt-2">{{ trip_route }}</h2>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-2">{{ trip_date }}{% if trip_departure != '-' %} • Abfahrt {{ trip_departure }}{% endif %}</p>
+                    </div>
+
+                    <span class="inline-flex items-center justify-center px-3 py-1.5 rounded-full border text-[10px] font-orbitron uppercase tracking-widest
+                        {% if trip_status_lc in ['abgeschlossen', 'completed', 'bezahlt', 'paid'] %}
+                            text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25
+                        {% elif trip_status_lc in ['offen', 'pending', 'aktiv', 'in arbeit'] %}
+                            text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25
+                        {% elif trip_status_lc in ['abgebrochen', 'cancelled', 'storniert'] %}
+                            text-[var(--danger)] bg-[var(--danger)]/10 border-[var(--danger)]/25
+                        {% else %}
+                            text-white/70 bg-white/5 border-white/10
+                        {% endif %}">
+                        {{ trip_status }}
+                    </span>
+                </div>
+
+                <div class="detail-map">
+                    {% if trip_map_embed_url %}
+                        <iframe src="{{ trip_map_embed_url }}" class="absolute inset-0 w-full h-full border-0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Gefahrene Route"></iframe>
+                    {% else %}
+                        <div class="detail-map-grid"></div>
+                        <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="5" stroke-linecap="round"></path>
+                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="url(#routeGradient)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 2"></path>
+                            <defs>
+                                <linearGradient id="routeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="rgb(137,190,50)"></stop>
+                                    <stop offset="100%" stop-color="rgb(220,226,38)"></stop>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+
+                        <div class="route-stop start">
+                            <span class="block text-[9px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">Start</span>
+                            <strong class="block text-white text-sm mt-1">{{ trip_from }}</strong>
+                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_departure }}</span>
+                        </div>
+
+                        <div class="route-stop end">
+                            <span class="block text-[9px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest">Ziel</span>
+                            <strong class="block text-white text-sm mt-1">{{ trip_to }}</strong>
+                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_arrival }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="detail-card p-5 md:p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Gefahrene Route</h2>
+                <div class="route-timeline">
+                    <div class="route-timeline-item">
+                        <span class="route-timeline-dot start"></span>
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                            <span class="block text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">Start</span>
+                            <strong class="block text-white mt-1">{{ trip_from }}</strong>
+                            <span class="block text-xs text-[var(--muted)] mt-1">Abfahrt: {{ trip_departure }}</span>
+                        </div>
+                    </div>
+
+                    {% if trip_waypoints and trip_waypoints is not string %}
+                        {% for waypoint in trip_waypoints %}
+                        <div class="route-timeline-item">
+                            <span class="route-timeline-dot"></span>
+                            <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkt</span>
+                                <strong class="block text-white mt-1">{{ waypoint.name|default(waypoint.city|default(waypoint, true), true) }}</strong>
+                                {% if waypoint.time|default('', true) %}
+                                    <span class="block text-xs text-[var(--muted)] mt-1">{{ waypoint.time }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% elif trip_waypoints %}
+                        <div class="route-timeline-item">
+                            <span class="route-timeline-dot"></span>
+                            <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkte</span>
+                                <strong class="block text-white mt-1">{{ trip_waypoints }}</strong>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="route-timeline-item">
+                        <span class="route-timeline-dot end"></span>
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                            <span class="block text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest">Ziel</span>
+                            <strong class="block text-white mt-1">{{ trip_to }}</strong>
+                            <span class="block text-xs text-[var(--muted)] mt-1">Ankunft: {{ trip_arrival }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if trip_note %}
+            <div class="detail-card p-5 md:p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-3">Notiz zur Fahrt</h2>
+                <p class="text-sm text-gray-300 font-inter leading-relaxed">{{ trip_note }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <aside class="flex flex-col gap-6">
+            <div class="detail-card p-5 md:p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Fahrt-Daten</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Fahrt-ID</span>
+                        <span class="detail-stat-value">{{ trip_id }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Datum</span>
+                        <span class="detail-stat-value">{{ trip_date }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Kilometer</span>
+                        <span class="detail-stat-value">{{ ('%.1f'|format(trip_distance|float))|replace('.', ',') }} km</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Einnahmen</span>
+                        <span class="detail-stat-value">{{ ('%.2f'|format(trip_earnings|float))|replace('.', ',') }} €</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Fracht</span>
+                        <span class="detail-stat-value">{{ trip_cargo }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Dauer</span>
+                        <span class="detail-stat-value">{{ trip_duration }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-card p-5 md:p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">LKW & Fahrer</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">LKW</span>
+                        <span class="detail-stat-value">{{ trip_truck }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Kennzeichen</span>
+                        <span class="detail-stat-value">{{ trip_truck_plate }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Auflieger</span>
+                        <span class="detail-stat-value">{{ trip_trailer }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Fahrer</span>
+                        <span class="detail-stat-value">{{ trip_driver }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Verbrauch</span>
+                        <span class="detail-stat-value">{{ trip_fuel }}</span>
+                    </div>
+                    <div class="detail-stat">
+                        <span class="detail-stat-label">Ø Geschwindigkeit</span>
+                        <span class="detail-stat-value">{{ trip_avg_speed }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-card p-5 md:p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Weitere Fahrten</h2>
+                <div class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                    {% if safe_fahrtenbuch_entries %}
+                        {% for item in safe_fahrtenbuch_entries %}
+                            {% set item_id = item.id|default(item.trip_id|default(item.fahrt_id|default(item.auftrag_id|default(loop.index, true), true), true), true) %}
+                            {% set item_date = item.date|default(item.datum|default('-', true), true) %}
+                            {% set item_from = item.from_city|default(item.start|default(item.origin|default(item.start_city|default('-', true), true), true), true) %}
+                            {% set item_to = item.to_city|default(item.destination|default(item.target|default(item.ziel|default(item.target_city|default('-', true), true), true), true), true) %}
+                            {% set item_route = item.route|default(item_from ~ ' → ' ~ item_to, true) %}
+                            {% set item_distance = item.distance|default(item.km|default(item.last_trip_distance|default(0, true), true), true) %}
+
+                            <a href="/dashboard/detail?trip_id={{ item_id|string|urlencode }}"
+                               aria-current="{{ 'true' if item_id|string == trip_id|string else 'false' }}"
+                               class="trip-list-item block rounded-2xl border border-white/10 bg-white/[0.035] hover:border-[var(--brand-green)]/45 hover:bg-[var(--brand-green)]/[0.07] transition-all p-4">
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">{{ item_date }}</span>
+                                <strong class="block text-sm text-white mt-1">{{ item_route }}</strong>
+                                <span class="block text-xs text-[var(--brand-green)] mt-2">{{ ('%.1f'|format(item_distance|float))|replace('.', ',') }} km</span>
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-sm text-white/50 font-inter">Keine weiteren Fahrten vorhanden.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+    </div>
+    {% else %}
+    <div class="detail-card p-8 text-center">
+        <h2 class="font-orbitron font-bold text-xl text-white">Keine Fahrt gefunden</h2>
+        <p class="text-sm text-[var(--muted)] font-inter mt-3">Es gibt noch keinen Eintrag im Fahrtenbuch oder die übergebene Fahrt-ID wurde nicht gefunden.</p>
+        <a href="/dashboard"
+           class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+            Zurück zum Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -577,6 +577,137 @@
         }
     }
 
+    /* ---------------------------------------------------------
+       Fahrtenbuch Hover-Details
+       - Jede Fahrt zeigt beim Hover eine erweiterte Detailkarte.
+       - Die Detailkarte bleibt offen, solange Maus/Fokus auf Zeile
+         oder Detailbereich liegt.
+    --------------------------------------------------------- */
+    .fahrtenbuch-table-wrapper {
+        overflow-x: auto;
+        overflow-y: visible !important;
+        padding-bottom: 0.75rem;
+    }
+
+    .fahrtenbuch-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .trip-master-row {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .trip-master-row:hover,
+    .trip-master-row:focus-within {
+        background: rgba(255, 255, 255, 0.055);
+    }
+
+    .trip-master-row:hover td:first-child,
+    .trip-master-row:focus-within td:first-child {
+        border-top-left-radius: 1rem;
+    }
+
+    .trip-master-row:hover td:last-child,
+    .trip-master-row:focus-within td:last-child {
+        border-top-right-radius: 1rem;
+    }
+
+    .trip-detail-row {
+        display: none;
+    }
+
+    .trip-master-row:hover + .trip-detail-row,
+    .trip-master-row:focus-within + .trip-detail-row,
+    .trip-detail-row:hover,
+    .trip-detail-row:focus-within {
+        display: table-row;
+    }
+
+    .trip-detail-card {
+        margin: -0.1rem 0 0.85rem 0;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        background:
+            radial-gradient(circle at 8% 0%, rgba(137, 190, 50, 0.12), transparent 32%),
+            radial-gradient(circle at 95% 20%, rgba(220, 226, 38, 0.10), transparent 34%),
+            rgba(4, 6, 5, 0.72);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(14px);
+    }
+
+    .trip-mini-route {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        min-height: 2.25rem;
+    }
+
+    .trip-mini-route::before {
+        content: "";
+        position: absolute;
+        left: 1rem;
+        right: 1rem;
+        top: 50%;
+        height: 2px;
+        transform: translateY(-50%);
+        background: linear-gradient(90deg, var(--brand-green), rgba(255,255,255,0.16), var(--brand-yellow));
+        opacity: 0.85;
+    }
+
+    .trip-route-point {
+        position: relative;
+        z-index: 2;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.72);
+    }
+
+    .trip-route-point.start {
+        border-color: rgba(137, 190, 50, 0.45);
+        color: var(--brand-green);
+        box-shadow: 0 0 18px rgba(137, 190, 50, 0.12);
+    }
+
+    .trip-route-point.end {
+        border-color: rgba(220, 226, 38, 0.45);
+        color: var(--brand-yellow);
+        box-shadow: 0 0 18px rgba(220, 226, 38, 0.12);
+    }
+
+    .trip-hover-stat {
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.045);
+        padding: 0.85rem;
+    }
+
+    .trip-hover-stat-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+    }
+
+    .trip-hover-stat-value {
+        display: block;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 0.83rem;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
 </style>
 
 <div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
@@ -800,13 +931,19 @@
         </div>
 
         <div class="glass-card p-6 flex-grow flex flex-col">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">Fahrtenbuch</h2>
-                <button class="text-xs font-orbitron text-[var(--brand-green)] uppercase tracking-wider hover:text-white transition-colors">Alle anzeigen &rarr;</button>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">Fahrtenbuch</h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">Hover über eine Fahrt zeigt Route, LKW und weitere Details.</p>
+                </div>
+                <a href="/dashboard/detail"
+                   class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all duration-300 text-xs font-orbitron uppercase tracking-wider">
+                    Alle anzeigen &rarr;
+                </a>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+            <div class="fahrtenbuch-table-wrapper">
+                <table class="fahrtenbuch-table w-full text-left">
                     <thead>
                         <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
                             <th class="pb-3 px-2">Datum</th>
@@ -820,18 +957,38 @@
                     <tbody class="text-sm font-inter text-gray-300">
                         {% if safe_fahrtenbuch_entries %}
                             {% for trip in safe_fahrtenbuch_entries %}
+                                {% set trip_id = trip.id|default(trip.trip_id|default(trip.fahrt_id|default(trip.auftrag_id|default(loop.index, true), true), true), true) %}
                                 {% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
-                                {% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default('-', true), true), true) %}
-                                {% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default('-', true), true), true) %}
+                                {% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default(trip.start_city|default('-', true), true), true), true) %}
+                                {% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default(trip.ziel|default(trip.target_city|default('-', true), true), true), true), true) %}
                                 {% set trip_route = trip.route|default(trip_from ~ ' → ' ~ trip_to, true) %}
                                 {% set trip_distance = trip.distance|default(trip.km|default(trip.last_trip_distance|default(0, true), true), true) %}
-                                {% set trip_cargo = trip.cargo|default(trip.freight|default('-', true), true) %}
-                                {% set trip_earnings = trip.earnings|default(trip.income|default(trip.revenue|default(0, true), true), true) %}
+                                {% set trip_cargo = trip.cargo|default(trip.freight|default(trip.fracht|default('-', true), true), true) %}
+                                {% set trip_earnings = trip.earnings|default(trip.income|default(trip.revenue|default(trip.einnahmen|default(0, true), true), true), true) %}
                                 {% set trip_status = trip.status|default('Abgeschlossen', true) %}
                                 {% set trip_status_lc = trip_status|lower %}
-                                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                                {% set trip_truck = trip.truck|default(trip.lkw|default(trip.vehicle|default(trip.fahrzeug|default('-', true), true), true), true) %}
+                                {% set trip_truck_plate = trip.truck_plate|default(trip.kennzeichen|default(trip.plate|default(trip.lkw_kennzeichen|default('-', true), true), true), true) %}
+                                {% set trip_trailer = trip.trailer|default(trip.auflieger|default(trip.trailer_plate|default(trip.auflieger_kennzeichen|default('-', true), true), true), true) %}
+                                {% set trip_driver = trip.driver|default(trip.fahrer|default(current_user.username, true), true) %}
+                                {% set trip_departure = trip.departure|default(trip.start_time|default(trip.abfahrt|default('-', true), true), true) %}
+                                {% set trip_arrival = trip.arrival|default(trip.end_time|default(trip.ankunft|default('-', true), true), true) %}
+                                {% set trip_duration = trip.duration|default(trip.dauer|default('-', true), true) %}
+                                {% set trip_fuel = trip.fuel_used|default(trip.fuel|default(trip.diesel|default(trip.verbrauch|default('-', true), true), true), true) %}
+                                {% set trip_avg_speed = trip.avg_speed|default(trip.average_speed|default(trip.durchschnitt|default('-', true), true), true) %}
+                                {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
+                                {% set trip_detail_url = '/dashboard/detail?trip_id=' ~ (trip_id|string|urlencode) %}
+
+                                <tr class="trip-master-row border-b border-white/5 transition-colors group" tabindex="0">
                                     <td class="py-4 px-2 whitespace-nowrap text-white/70">{{ trip_date }}</td>
-                                    <td class="py-4 px-2 text-white font-medium">{{ trip_route }}</td>
+                                    <td class="py-4 px-2 text-white font-medium">
+                                        <div class="flex flex-col gap-1">
+                                            <span>{{ trip_route }}</span>
+                                            <span class="text-[10px] font-orbitron uppercase tracking-widest text-[var(--brand-green)]/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                Mehr Details per Hover
+                                            </span>
+                                        </div>
+                                    </td>
                                     <td class="py-4 px-2 text-right text-[var(--brand-green)] font-orbitron font-bold whitespace-nowrap">
                                         {{ ('%.1f'|format(trip_distance|float))|replace('.', ',') }} km
                                     </td>
@@ -852,6 +1009,96 @@
                                             {% endif %}">
                                             {{ trip_status }}
                                         </span>
+                                    </td>
+                                </tr>
+
+                                <tr class="trip-detail-row">
+                                    <td colspan="6" class="px-2 pb-4">
+                                        <div class="trip-detail-card p-4 md:p-5">
+                                            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(260px,0.75fr)] gap-4">
+                                                <div class="space-y-4">
+                                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                        <div>
+                                                            <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-[0.2em]">Gefahrene Route</p>
+                                                            <h3 class="text-base font-orbitron font-bold text-white mt-1">{{ trip_route }}</h3>
+                                                        </div>
+                                                        <a href="{{ trip_detail_url }}"
+                                                           class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/25 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.15em] whitespace-nowrap">
+                                                            Detail öffnen
+                                                        </a>
+                                                    </div>
+
+                                                    <div class="trip-mini-route">
+                                                        <span class="trip-route-point start">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21s7-4.438 7-11a7 7 0 10-14 0c0 6.562 7 11 7 11z"></path>
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10.5h.01"></path>
+                                                            </svg>
+                                                        </span>
+                                                        <div class="relative z-10 flex-1 grid grid-cols-2 gap-3 text-xs">
+                                                            <div class="rounded-xl bg-black/45 border border-white/10 p-3">
+                                                                <span class="block text-[9px] font-orbitron uppercase tracking-widest text-[var(--brand-green)]">Start</span>
+                                                                <span class="block text-white font-bold mt-1">{{ trip_from }}</span>
+                                                            </div>
+                                                            <div class="rounded-xl bg-black/45 border border-white/10 p-3 text-right">
+                                                                <span class="block text-[9px] font-orbitron uppercase tracking-widest text-[var(--brand-yellow)]">Ziel</span>
+                                                                <span class="block text-white font-bold mt-1">{{ trip_to }}</span>
+                                                            </div>
+                                                        </div>
+                                                        <span class="trip-route-point end">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5v16m0-16h11l-1 4 1 4H5"></path>
+                                                            </svg>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">LKW</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_truck }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Kennzeichen</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_truck_plate }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Auflieger</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_trailer }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Fahrer</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_driver }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Abfahrt</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_departure }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Ankunft</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_arrival }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Dauer</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_duration }}</span>
+                                                    </div>
+                                                    <div class="trip-hover-stat">
+                                                        <span class="trip-hover-stat-label">Verbrauch</span>
+                                                        <span class="trip-hover-stat-value">{{ trip_fuel }}</span>
+                                                    </div>
+                                                    {% if trip_avg_speed != '-' or trip_note %}
+                                                    <div class="trip-hover-stat col-span-2">
+                                                        <span class="trip-hover-stat-label">Zusatz</span>
+                                                        <span class="trip-hover-stat-value">
+                                                            {% if trip_avg_speed != '-' %}Ø Geschwindigkeit: {{ trip_avg_speed }}{% endif %}
+                                                            {% if trip_avg_speed != '-' and trip_note %}<br>{% endif %}
+                                                            {% if trip_note %}{{ trip_note }}{% endif %}
+                                                        </span>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -1228,7 +1475,7 @@
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="Fahrerkarten jetzt verfügbar"
                     data-sender="Servicecenter"
-                    data-date="Heute"
+                    data-date="19.05.2026, 00:51"
                     data-needs-signature="false"
                     data-doc-id="system-fahrerkarten-verfuegbar-beantragbar-v1">
                 <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
@@ -1241,7 +1488,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <h4 class="text-sm font-bold font-orbitron text-white truncate">Fahrerkarten jetzt verfügbar</h4>
-                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">Servicecenter • Heute</p>
+                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">Servicecenter • 19.05.2026, 00:51</p>
                         <p class="text-[10px] text-[var(--brand-green)] font-orbitron uppercase tracking-widest mt-2">Beantragbar</p>
                     </div>
                 </div>
