@@ -295,7 +295,8 @@
     #new-doc-alert-wrapper,
     #universal-doc-modal,
     #driver-registration-modal,
-    #token-request-modal {
+    #token-request-modal,
+    #loa-detail-modal {
         overscroll-behavior: contain;
     }
 
@@ -309,6 +310,130 @@
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
         touch-action: pan-y;
+    }
+
+    /* ---------------------------------------------------------
+       Modal-Centering-Fix
+       - Alle Dashboard-Overlays werden unabhängig vom Dashboard-Grid
+         exakt im sichtbaren Viewport zentriert.
+       - Wichtig für Anstehende Urlaube, Dokument Reader und Postfach:
+         fixed + inset + body-Append verhindern, dass transformierte oder
+         gescrollte Parent-Container das Modal verschieben.
+    --------------------------------------------------------- */
+    #tutorial-alert-wrapper,
+    #new-doc-alert-wrapper,
+    #general-alerts-wrapper,
+    #universal-doc-modal,
+    #driver-registration-modal,
+    #token-request-modal,
+    #loa-detail-modal {
+        position: fixed !important;
+        inset: 0 !important;
+        left: 0 !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: calc(var(--dashboard-vh, 1vh) * 100) !important;
+        min-height: calc(var(--dashboard-vh, 1vh) * 100) !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: clamp(0.75rem, 2vw, 1.5rem) !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        transform: none !important;
+        box-sizing: border-box !important;
+    }
+
+    #tutorial-alert-wrapper.hidden,
+    #new-doc-alert-wrapper.hidden,
+    #general-alerts-wrapper.hidden,
+    #universal-doc-modal.hidden,
+    #driver-registration-modal.hidden,
+    #token-request-modal.hidden,
+    #loa-detail-modal.hidden {
+        display: none !important;
+    }
+
+    #tutorial-alert-wrapper:not(.hidden),
+    #new-doc-alert-wrapper:not(.hidden),
+    #general-alerts-wrapper:not(.hidden),
+    #universal-doc-modal:not(.hidden),
+    #driver-registration-modal:not(.hidden),
+    #token-request-modal:not(.hidden),
+    #loa-detail-modal:not(.hidden) {
+        display: flex !important;
+    }
+
+    #tutorial-alert-panel,
+    #new-doc-alert-panel,
+    #general-alerts-panel,
+    #univ-doc-panel,
+    #driver-registration-panel,
+    #token-request-panel,
+    #loa-detail-panel {
+        position: relative !important;
+        margin: auto !important;
+        align-self: center !important;
+        justify-self: center !important;
+        width: min(calc(100vw - 1.5rem), var(--modal-center-max-width, 40rem)) !important;
+        max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1.5rem) !important;
+        transform-origin: center center !important;
+    }
+
+    #tutorial-alert-panel,
+    #new-doc-alert-panel,
+    #token-request-panel {
+        --modal-center-max-width: 32rem;
+    }
+
+    #general-alerts-panel,
+    #driver-registration-panel {
+        --modal-center-max-width: 36rem;
+    }
+
+    #univ-doc-panel,
+    #loa-detail-panel {
+        --modal-center-max-width: 42rem;
+    }
+
+    #general-alerts-panel,
+    #univ-doc-panel,
+    #driver-registration-panel,
+    #loa-detail-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+    }
+
+    #loa-detail-panel > div:last-child,
+    #univ-doc-content,
+    #postfach-container {
+        min-height: 0 !important;
+    }
+
+    @supports (height: 100dvh) {
+        #tutorial-alert-wrapper,
+        #new-doc-alert-wrapper,
+        #general-alerts-wrapper,
+        #universal-doc-modal,
+        #driver-registration-modal,
+        #token-request-modal,
+        #loa-detail-modal {
+            height: 100dvh !important;
+            min-height: 100dvh !important;
+        }
+
+        #tutorial-alert-panel,
+        #new-doc-alert-panel,
+        #general-alerts-panel,
+        #univ-doc-panel,
+        #driver-registration-panel,
+        #token-request-panel,
+        #loa-detail-panel {
+            max-height: calc(100dvh - 1.5rem) !important;
+        }
     }
 
     /* ---------------------------------------------------------
@@ -583,7 +708,8 @@
         #general-alerts-wrapper,
         #universal-doc-modal,
         #driver-registration-modal,
-        #token-request-modal {
+        #token-request-modal,
+        #loa-detail-modal {
             padding: 0.5rem !important;
             align-items: center !important;
         }
@@ -593,7 +719,8 @@
         #general-alerts-panel,
         #univ-doc-panel,
         #driver-registration-panel,
-        #token-request-panel {
+        #token-request-panel,
+        #loa-detail-panel {
             width: 100% !important;
             max-width: 100% !important;
             max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
@@ -610,7 +737,9 @@
         #driver-registration-panel .p-6,
         #driver-registration-panel .p-8,
         #token-request-panel .p-6,
-        #token-request-panel .p-8 {
+        #token-request-panel .p-8,
+        #loa-detail-panel .p-6,
+        #loa-detail-panel .p-8 {
             padding: 1rem !important;
         }
 
@@ -2398,7 +2527,8 @@
             alertsWrapper,
             univModal,
             driverRegistrationModal,
-            tokenRequestModal
+            tokenRequestModal,
+            document.getElementById('loa-detail-modal')
         ].forEach((modalWrapper) => {
             if (modalWrapper && modalWrapper.parentElement !== document.body) {
                 document.body.appendChild(modalWrapper);
@@ -2415,6 +2545,9 @@
             if (!element) return;
             element.classList.remove('hidden');
             element.classList.add('flex'); // Nutzt flex für saubere Zentrierung im Viewport
+            element.style.display = 'flex';
+            element.style.alignItems = 'center';
+            element.style.justifyContent = 'center';
             element.setAttribute('aria-hidden', 'false');
             element.scrollTop = 0;
         }
@@ -2423,6 +2556,9 @@
             if (!element) return;
             element.classList.add('hidden');
             element.classList.remove('flex');
+            element.style.display = '';
+            element.style.alignItems = '';
+            element.style.justifyContent = '';
             element.setAttribute('aria-hidden', 'true');
         }
 
@@ -2445,8 +2581,10 @@
             const newDocAlertHidden = !newDocAlertWrapper || newDocAlertWrapper.classList.contains('hidden');
             const docHidden = !univModal || univModal.classList.contains('hidden');
             const tutorialHidden = !tutorialAlertWrapper || tutorialAlertWrapper.classList.contains('hidden');
+            const loaDetailModal = document.getElementById('loa-detail-modal');
+            const loaHidden = !loaDetailModal || loaDetailModal.classList.contains('hidden');
 
-            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && tutorialHidden) {
+            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && tutorialHidden && loaHidden) {
                 document.documentElement.classList.remove('modal-scroll-locked');
                 document.body.classList.remove('modal-scroll-locked', 'overflow-hidden');
                 document.body.style.top = '';
@@ -3265,6 +3403,10 @@
         const loaClose = document.getElementById('loa-detail-close');
         const loaTriggers = Array.from(document.querySelectorAll('.loa-detail-trigger'));
 
+        if (loaModal && loaModal.parentElement !== document.body) {
+            document.body.appendChild(loaModal);
+        }
+
         let loaLockedScrollY = 0;
         let loaScrollWasAlreadyLocked = false;
 
@@ -3291,6 +3433,9 @@
 
             loaModal.classList.remove('hidden');
             loaModal.classList.add('flex');
+            loaModal.style.display = 'flex';
+            loaModal.style.alignItems = 'center';
+            loaModal.style.justifyContent = 'center';
             loaModal.setAttribute('aria-hidden', 'false');
             loaModal.scrollTop = 0;
 
@@ -3309,6 +3454,9 @@
             setTimeout(() => {
                 loaModal.classList.add('hidden');
                 loaModal.classList.remove('flex');
+                loaModal.style.display = '';
+                loaModal.style.alignItems = '';
+                loaModal.style.justifyContent = '';
                 loaModal.setAttribute('aria-hidden', 'true');
 
                 if (!loaScrollWasAlreadyLocked) {
