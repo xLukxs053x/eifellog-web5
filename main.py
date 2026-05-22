@@ -64,7 +64,17 @@ TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
 
 # Discord Webhook für Job-Abschluss-Meldungen vom Tracker.
 # Wichtig: Webhook-URLs bitte nur über .env setzen, nicht fest im Code speichern.
-DISCORD_JOB_COMPLETE_WEBHOOK_URL = os.getenv("DISCORD_JOB_COMPLETE_WEBHOOK_URL", "").strip()
+DISCORD_JOB_COMPLETE_WEBHOOK_URL = (
+    os.getenv("DISCORD_JOB_COMPLETE_WEBHOOK_URL")
+    or os.getenv("DISCORD_TOUR_WEBHOOK_URL")
+    or os.getenv("TOUR_CHANNEL_WEBHOOK_URL")
+    or os.getenv("DISCORD_TOUREN_WEBHOOK_URL")
+    or os.getenv("TOUREN_WEBHOOK_URL")
+    or os.getenv("DISCORD_WEBHOOK_URL")
+    or os.getenv("DISCORD_WEBHOOK")
+    or os.getenv("WEBHOOK_URL")
+    or ""
+).strip()
 
 
 # ==========================================
@@ -7419,9 +7429,17 @@ def discord_wait_url(url):
     return url
 
 
+
 def post_discord_json_to_tour_channel(discord_payload, channel_id=None, webhook_url=None):
+    """
+    Sendet JSON nach Discord. Wenn ein Bot-Token konfiguriert ist, aber der
+    Bot-Post fehlschlägt, wird automatisch auf den Webhook zurückgefallen.
+    Dadurch blockiert ein falscher/fehlender Bot-Scope nicht mehr den Tour-Channel.
+    """
     channel_id = safe_str(channel_id or TOUR_CHANNEL_ID or TOUR_RECEIPT_CHANNEL_ID)
     webhook_url = safe_str(webhook_url or DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+    bot_error = None
+    webhook_error = None
 
     if DISCORD_BOT_TOKEN and channel_id:
         try:
@@ -7431,65 +7449,77 @@ def post_discord_json_to_tour_channel(discord_payload, channel_id=None, webhook_
                 json=discord_payload_for_bot(discord_payload),
                 timeout=20
             )
-        except Exception as error:
-            return {"sent": False, "method": "bot", "channel_id": channel_id, "error": str(error)}
 
-        if response.status_code not in range(200, 300):
-            return {
-                "sent": False,
+            if response.status_code in range(200, 300):
+                try:
+                    message = response.json()
+                except Exception:
+                    message = {}
+
+                return {
+                    "sent": True,
+                    "method": "bot",
+                    "channel_id": channel_id,
+                    "message_id": message.get("id"),
+                    "raw": message
+                }
+
+            bot_error = {
                 "method": "bot",
                 "channel_id": channel_id,
                 "status_code": response.status_code,
                 "error": response.text[:1000]
             }
-
-        try:
-            message = response.json()
-        except Exception:
-            message = {}
-
-        return {
-            "sent": True,
-            "method": "bot",
-            "channel_id": channel_id,
-            "message_id": message.get("id"),
-            "raw": message
-        }
+        except Exception as error:
+            bot_error = {"method": "bot", "channel_id": channel_id, "error": str(error)}
 
     if webhook_url:
         try:
             response = requests.post(discord_wait_url(webhook_url), json=discord_payload, timeout=20)
-        except Exception as error:
-            return {"sent": False, "method": "webhook", "error": str(error)}
 
-        if response.status_code not in range(200, 300):
-            return {
-                "sent": False,
+            if response.status_code in range(200, 300):
+                try:
+                    message = response.json()
+                except Exception:
+                    message = {}
+
+                return {
+                    "sent": True,
+                    "method": "webhook",
+                    "channel_id": message.get("channel_id") or channel_id,
+                    "message_id": message.get("id"),
+                    "raw": message,
+                    "bot_fallback_error": bot_error
+                }
+
+            webhook_error = {
                 "method": "webhook",
                 "status_code": response.status_code,
                 "error": response.text[:1000]
             }
+        except Exception as error:
+            webhook_error = {"method": "webhook", "error": str(error)}
 
-        try:
-            message = response.json()
-        except Exception:
-            message = {}
-
-        return {
-            "sent": True,
-            "method": "webhook",
-            "channel_id": message.get("channel_id") or channel_id,
-            "message_id": message.get("id"),
-            "raw": message
-        }
-
-    return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
+    return {
+        "sent": False,
+        "reason": "Discord konnte nicht senden. Prüfe DISCORD_BOT_TOKEN/Channel-ID oder DISCORD_TOUR_WEBHOOK_URL.",
+        "bot": bot_error,
+        "webhook": webhook_error,
+        "channel_id": channel_id
+    }
 
 
 def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=None, webhook_url=None):
+    """
+    Sendet Discord-Nachrichten mit PDF-Anhang. Bot zuerst, Webhook als Fallback.
+    Wichtig fuer Tracker-Abschluss: Ein fehlerhafter Bot darf den PDF-Post nicht verhindern,
+    solange ein Discord-Webhook konfiguriert ist.
+    """
     channel_id = safe_str(channel_id or TOUR_RECEIPT_CHANNEL_ID or TOUR_CHANNEL_ID)
     webhook_url = safe_str(webhook_url or DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL)
     filename, file_bytes, content_type = file_tuple
+    bot_error = None
+    webhook_error = None
 
     if DISCORD_BOT_TOKEN and channel_id:
         try:
@@ -7500,30 +7530,29 @@ def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=No
                 files={"files[0]": (filename, file_bytes, content_type)},
                 timeout=25
             )
-        except Exception as error:
-            return {"sent": False, "method": "bot", "channel_id": channel_id, "error": str(error)}
 
-        if response.status_code not in range(200, 300):
-            return {
-                "sent": False,
+            if response.status_code in range(200, 300):
+                try:
+                    message = response.json()
+                except Exception:
+                    message = {}
+
+                return {
+                    "sent": True,
+                    "method": "bot",
+                    "channel_id": channel_id,
+                    "message_id": message.get("id"),
+                    "raw": message
+                }
+
+            bot_error = {
                 "method": "bot",
                 "channel_id": channel_id,
                 "status_code": response.status_code,
                 "error": response.text[:1000]
             }
-
-        try:
-            message = response.json()
-        except Exception:
-            message = {}
-
-        return {
-            "sent": True,
-            "method": "bot",
-            "channel_id": channel_id,
-            "message_id": message.get("id"),
-            "raw": message
-        }
+        except Exception as error:
+            bot_error = {"method": "bot", "channel_id": channel_id, "error": str(error)}
 
     if webhook_url:
         try:
@@ -7533,33 +7562,37 @@ def post_discord_file_to_tour_channel(discord_payload, file_tuple, channel_id=No
                 files={"files[0]": (filename, file_bytes, content_type)},
                 timeout=25
             )
-        except Exception as error:
-            return {"sent": False, "method": "webhook", "error": str(error)}
 
-        if response.status_code not in range(200, 300):
-            return {
-                "sent": False,
+            if response.status_code in range(200, 300):
+                try:
+                    message = response.json()
+                except Exception:
+                    message = {}
+
+                return {
+                    "sent": True,
+                    "method": "webhook",
+                    "channel_id": message.get("channel_id") or channel_id,
+                    "message_id": message.get("id"),
+                    "raw": message,
+                    "bot_fallback_error": bot_error
+                }
+
+            webhook_error = {
                 "method": "webhook",
                 "status_code": response.status_code,
                 "error": response.text[:1000]
             }
+        except Exception as error:
+            webhook_error = {"method": "webhook", "error": str(error)}
 
-        try:
-            message = response.json()
-        except Exception:
-            message = {}
-
-        return {
-            "sent": True,
-            "method": "webhook",
-            "channel_id": message.get("channel_id") or channel_id,
-            "message_id": message.get("id"),
-            "raw": message
-        }
-
-    return {"sent": False, "reason": "Kein DISCORD_BOT_TOKEN/TOUR_CHANNEL_ID oder DISCORD_TOUR_WEBHOOK_URL konfiguriert."}
-
-
+    return {
+        "sent": False,
+        "reason": "Discord konnte PDF nicht senden. Prüfe Bot-Rechte oder Discord-Webhook-URL.",
+        "bot": bot_error,
+        "webhook": webhook_error,
+        "channel_id": channel_id
+    }
 
 def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     if not TOUR_RECEIPT_DISCORD_ENABLED:
@@ -7913,6 +7946,7 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
     refresh_company_all_time_stats_from_receipts()
 
 
+
 def complete_tracker_tour_from_request():
     if not TOUR_RECEIPT_ENABLED:
         return jsonify({"success": False, "error": "TOUR_RECEIPT_ENABLED ist deaktiviert."}), 503
@@ -7923,6 +7957,9 @@ def complete_tracker_tour_from_request():
         return jsonify({"success": False, "message": "Method not allowed"}), 200
 
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+
     client_token = get_client_token_from_request(data)
 
     # Verbindung zur WPF/C#-App:
@@ -7934,12 +7971,15 @@ def complete_tracker_tour_from_request():
     if not client_token:
         payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
         payload.setdefault("event", "tour_completed")
+        payload.setdefault("type", "tour_completed")
+        payload.setdefault("messageType", "tour_completed")
         payload.setdefault("status", "completed")
         payload.setdefault("jobFinished", True)
         payload.setdefault("jobDelivered", True)
         payload.setdefault("jobCompleted", True)
         payload.setdefault("completed", True)
         payload.setdefault("delivered", True)
+        payload.setdefault("submitted", True)
         payload.setdefault("jobActive", False)
         payload.setdefault("hasJob", False)
 
@@ -7976,11 +8016,37 @@ def complete_tracker_tour_from_request():
     if not user_has_tracker_access(user_doc):
         return jsonify({"success": False, "error": "Tracker-Zugriff deaktiviert."}), 403
 
-    telemetry = tracker_request_telemetry_payload(data, user_doc=user_doc)
+    # Abschluss-Payload normalisieren, damit auch die tokenbasierte Route dieselben
+    # Felder liefert wie der /webhook-Pfad.
+    completion_payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
+    completion_payload["clientToken"] = client_token
+    completion_payload.setdefault("event", "tour_completed")
+    completion_payload.setdefault("type", "tour_completed")
+    completion_payload.setdefault("messageType", "tour_completed")
+    completion_payload.setdefault("status", "completed")
+    completion_payload.setdefault("jobFinished", True)
+    completion_payload.setdefault("jobDelivered", True)
+    completion_payload.setdefault("jobCompleted", True)
+    completion_payload.setdefault("completed", True)
+    completion_payload.setdefault("delivered", True)
+    completion_payload.setdefault("submitted", True)
+    completion_payload.setdefault("jobActive", False)
+    completion_payload.setdefault("hasJob", False)
+
+    telemetry = tracker_request_telemetry_payload(completion_payload, user_doc=user_doc)
     if telemetry:
         telemetry = normalize_telemetry_payload(telemetry)
+        # Kritische Abschlusswerte auch in die Telemetrie spiegeln, damit PDF/DB konsistent sind.
+        telemetry["jobFinished"] = True
+        telemetry["jobDelivered"] = True
+        telemetry["jobCompleted"] = True
+        telemetry["completed"] = True
+        telemetry["delivered"] = True
+        telemetry["jobActive"] = False
+        telemetry["hasJob"] = False
+        telemetry["status"] = "completed"
 
-    receipt_doc = build_tour_receipt_doc(user_doc, data, telemetry=telemetry)
+    receipt_doc = build_tour_receipt_doc(user_doc, completion_payload, telemetry=telemetry)
 
     existing = tour_receipts_collection.find_one({
         "job_id": receipt_doc["job_id"],
@@ -7988,20 +8054,28 @@ def complete_tracker_tour_from_request():
         "archived": {"$ne": True}
     })
     if existing:
+        mark_tracker_job_start_completed(user_doc, telemetry or completion_payload, existing)
+        reset_active_tour_start_embed_state(user_doc, reason="tour_completed_existing")
+        fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
         return jsonify({
             "success": True,
             "message": "Diese Tour wurde bereits abgegeben.",
             "alreadySubmitted": True,
+            "submitted": True,
+            "completed": True,
+            "billingRelevant": bool(existing.get("billing_relevant", True)),
             "receipt": {
                 "receiptId": existing.get("receipt_id"),
                 "receiptNumber": existing.get("receipt_number"),
                 "jobId": existing.get("job_id"),
                 "pdfFilePath": existing.get("pdf", {}).get("file_path"),
                 "discordMessageId": existing.get("discord", {}).get("message_id"),
+                "discordSent": bool((existing.get("discord") or {}).get("sent")),
                 "billingRelevant": bool(existing.get("billing_relevant", True)),
                 "totalAmount": existing.get("billing", {}).get("total_amount"),
                 "currency": existing.get("billing", {}).get("currency")
-            }
+            },
+            "state": tracker_state_payload(fresh_user)
         })
 
     file_path, filename, pdf_bytes = save_tour_receipt_pdf(receipt_doc)
@@ -8019,7 +8093,7 @@ def complete_tracker_tour_from_request():
 
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
-    mark_tracker_job_start_completed(user_doc, telemetry or data, receipt_doc)
+    mark_tracker_job_start_completed(user_doc, telemetry or completion_payload, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
@@ -8049,6 +8123,7 @@ def complete_tracker_tour_from_request():
             "discordChannelId": discord_result.get("channel_id") or TOUR_RECEIPT_CHANNEL_ID,
             "discordMessageId": discord_result.get("message_id"),
             "discordError": discord_result.get("error") or discord_result.get("reason"),
+            "discordResult": discord_result,
             "totalAmount": receipt_doc.get("billing", {}).get("total_amount"),
             "currency": receipt_doc.get("billing", {}).get("currency"),
             "submittedAt": receipt_doc.get("submitted_at").isoformat() + "Z"
@@ -8641,6 +8716,7 @@ def extract_tracker_payload_from_discord_payload(data):
     return result
 
 
+
 def merge_tracker_webhook_payload(data, payload):
     payload = dict(payload or {})
 
@@ -8650,22 +8726,47 @@ def merge_tracker_webhook_payload(data, payload):
             payload[key] = value
 
     # Falls die App ein normales Wrapper-Objekt sendet, wichtige Root-Felder mitnehmen.
+    # Hier sind bewusst viele Alias-Namen enthalten, weil C#, WebView und alte Tracker-Versionen
+    # nicht immer dieselben Keys nutzen.
     if isinstance(data, dict):
         for key in (
-            "clientToken", "trackerClientToken", "token",
+            "clientToken", "trackerClientToken", "client_token", "tracker_token", "token",
             "driverName", "username", "displayName", "discordId", "discord_id",
-            "jobId", "job_id", "status", "event", "type",
-            "jobFinished", "jobDelivered", "jobCompleted", "completed", "delivered",
-            "sourceCity", "destinationCity", "cargo", "truck", "distanceKm",
-            "completedDistanceKm", "plannedDistanceKm", "remainingDistanceKm",
-            "routeProgressPercent", "damagePercent", "fuelPercent", "fuelLiters",
-            "rpm", "eta", "game", "driverCardId", "fahrerkarteId"
+            "driverDiscordId", "driver_discord_id",
+            "jobId", "jobID", "job_id", "auftragId", "auftragID", "deliveryId", "delivery_id",
+            "receiptNumber", "receipt_number", "belegnummer", "belegNummer",
+            "status", "jobStatus", "job_status", "event", "type", "messageType",
+            "jobFinished", "jobDelivered", "jobCompleted", "jobCancelled",
+            "completed", "delivered", "submitted", "finished",
+            "jobActive", "hasJob", "activeJob",
+            "sourceCity", "source_city", "source", "jobSourceCity", "from", "routeOrigin",
+            "destinationCity", "destination_city", "destination", "targetCity",
+            "jobDestinationCity", "to", "routeDestination",
+            "cargo", "freight", "cargoName", "jobCargo",
+            "truck", "truckName", "truckModel", "truck_model",
+            "distanceKm", "distance", "completedDistanceKm", "completed_distance_km",
+            "drivenDistanceKm", "driven_distance_km", "deliveryDistanceKm",
+            "jobDistanceKm", "routeDistanceKm", "route_distance_km",
+            "plannedDistanceKm", "planned_distance_km", "tripDistanceKm",
+            "navigationDistanceKm", "navigation_distance_km",
+            "remainingDistanceKm", "remaining_distance_km", "routeRemainingDistance",
+            "routeProgressPercent", "damagePercent", "truckDamagePercent", "trailerDamagePercent",
+            "fuelPercent", "fuelLiters", "fuel_liters", "rpm", "engineRpm",
+            "speedKmh", "eta", "etaText", "game", "gameCode", "gameName",
+            "driverCardId", "fahrerkarteId"
         ):
             if key in data and (key not in payload or payload.get(key) in (None, "", "-")):
                 payload[key] = data.get(key)
 
-    return payload
+        # Auch verschachtelte Nutzdaten einziehen, ohne vorhandene Werte zu überschreiben.
+        for wrapper_key in ("payload", "telemetry", "snapshot", "live", "trackerLive", "tracker_live"):
+            nested = data.get(wrapper_key)
+            if isinstance(nested, dict):
+                for nested_key, nested_value in nested.items():
+                    if nested_key not in payload or payload.get(nested_key) in (None, "", "-"):
+                        payload[nested_key] = nested_value
 
+    return payload
 
 def tracker_webhook_payload_is_start(payload, raw_data=None):
     payload = payload or {}
@@ -8830,15 +8931,34 @@ def store_tracker_webhook_start_job(payload, raw_data=None):
     }
 
 
+
 def tracker_webhook_payload_is_completed(payload):
     payload = payload or {}
-    status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower()
-    event = first_payload_value(payload, "event", "type", "messageType", fallback="").lower()
+    status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower().replace("_", "-")
+    event = first_payload_value(payload, "event", "type", "messageType", fallback="").lower().replace("_", "-")
+
+    completed_statuses = {
+        "finished", "finish", "completed", "complete", "delivered", "delivery-complete",
+        "done", "fertig", "submitted", "submit", "abgegeben", "abgeschlossen",
+        "job-complete", "job-completed", "tour-complete", "tour-completed",
+        "auftrag-abgeschlossen", "auftrag-abgegeben"
+    }
+    completed_events = {
+        "tour-completed", "tour-complete", "tour:completed", "tour:complete",
+        "job-completed", "job-complete", "job:completed", "job:complete",
+        "completed", "complete", "delivered", "submitted",
+        "auftrag-abgeschlossen", "auftrag-abgabe", "auftrag-abgegeben"
+    }
 
     explicit_completed = (
-        payload_bool(payload, "jobFinished", "jobDelivered", "jobCompleted", "completed", "delivered", fallback=False)
-        or status in {"finished", "completed", "complete", "delivered", "done", "fertig", "submitted", "abgegeben", "abgeschlossen"}
-        or event in {"tour_completed", "tour:completed", "job_completed", "job:complete", "completed", "delivered"}
+        payload_bool(
+            payload,
+            "jobFinished", "jobDelivered", "jobCompleted", "completed",
+            "delivered", "submitted", "finished",
+            fallback=False
+        )
+        or status in completed_statuses
+        or event in completed_events
     )
 
     if explicit_completed:
@@ -8865,15 +8985,19 @@ def tracker_webhook_payload_is_completed(payload):
 
     return False
 
+
 def tracker_webhook_completed_distance(payload):
     return first_payload_number(
         payload,
-        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
-        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "plannedDistanceKm",
-        "tripDistanceKm",
+        "completedDistanceKm", "completed_distance_km",
+        "drivenDistanceKm", "driven_distance_km",
+        "deliveryDistanceKm", "delivery_distance_km",
+        "distanceKm", "distance", "jobDistanceKm", "job_distance_km",
+        "routeDistanceKm", "route_distance_km",
+        "plannedDistanceKm", "planned_distance_km",
+        "tripDistanceKm", "navigationDistanceKm", "navigation_distance_km",
         fallback=0.0
     )
-
 
 def resolve_tracker_webhook_user(payload):
     payload = payload or {}
