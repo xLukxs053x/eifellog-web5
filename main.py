@@ -181,11 +181,13 @@ TRACKER_JOB_START_PUBLIC_URL = env_first(
 TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
     "TOUR_START_DUPLICATE_WINDOW_MINUTES",
     "JOB_START_WEBHOOK_DUPLICATE_WINDOW_MINUTES",
-    default=180
+    # Nur echte Parallel-/Doppelstarts werden geblockt. Eine neue Tour darf direkt starten.
+    default=2
 ))
 TOUR_COMPLETED_BLOCKS_RESTART_MINUTES = int(env_float(
     "TOUR_COMPLETED_BLOCKS_RESTART_MINUTES",
-    default=180
+    # 0 = abgeschlossene Touren blockieren keinen neuen Tour-Start mit gleicher Route/Fracht.
+    default=0
 ))
 
 
@@ -5254,51 +5256,78 @@ def tracker_api_key_required(func):
 
 def normalize_telemetry_payload(raw):
     raw = raw or {}
+    if not isinstance(raw, dict):
+        raw = {}
+
     def n(*keys, fallback=0):
         for key in keys:
-            if key in raw and raw.get(key) is not None: return parse_number(raw.get(key), fallback)
+            if key in raw and raw.get(key) is not None:
+                return parse_number(raw.get(key), fallback)
         return fallback
+
     def s(*keys, fallback="-"):
         for key in keys:
             value = safe_str(raw.get(key))
-            if value: return value
+            if value:
+                return value
         return fallback
+
     def b(*keys, fallback=False):
         for key in keys:
             if key in raw:
                 value = raw.get(key)
-                if isinstance(value, bool): return value
-                if isinstance(value, str): return value.lower() in {"true", "1", "yes", "ja"}
+                if isinstance(value, bool):
+                    return value
+                if isinstance(value, str):
+                    return value.lower() in {"true", "1", "yes", "ja", "on", "active", "started"}
                 return bool(value)
         return fallback
 
     clean = {
-        "isConnected": b("isConnected", "telemetryConnected", fallback=False),
-        "gameProcessDetected": b("gameProcessDetected", fallback=False),
-        "telemetryConnected": b("telemetryConnected", "isConnected", fallback=False),
+        "isConnected": b("isConnected", "telemetryConnected", "connected", "running", "detected", fallback=False),
+        "gameProcessDetected": b("gameProcessDetected", "detected", "running", fallback=False),
+        "telemetryConnected": b("telemetryConnected", "isConnected", "connected", fallback=False),
         "statusText": s("statusText", fallback=""),
-        "game": s("game", fallback="ETS2/ATS"),
-        "truck": s("truck", "driverTruckModel", fallback="-"),
-        "sourceCity": s("sourceCity", "routeOrigin", fallback="-"),
-        "destinationCity": s("destinationCity", "routeDestination", "activeDestination", fallback="-"),
+        "game": s("game", "gameCode", "gameName", fallback="ETS2/ATS"),
+        "truck": s("truck", "truckName", "truckModel", "truck_model", "driverTruckModel", fallback="-"),
+        "sourceCity": s("sourceCity", "source_city", "source", "from", "routeOrigin", "jobSourceCity", fallback="-"),
+        "destinationCity": s("destinationCity", "destination_city", "destination", "to", "targetCity", "routeDestination", "activeDestination", "jobDestinationCity", fallback="-"),
         "cargo": s("cargo", "cargoName", "freight", "jobCargo", fallback="-"),
-        "jobId": s("jobId", "job_id", "id", "deliveryId", "delivery_id", fallback=""),
+        "jobId": s("jobId", "jobID", "job_id", "id", "deliveryId", "delivery_id", "auftragId", "auftragID", fallback=""),
         "eta": s("eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-"),
         "speedKmh": n("speedKmh", "speed", fallback=0),
         "rpm": n("rpm", "engineRpm", "engineRPM", fallback=0),
         "fuelPercent": n("fuelPercent", "fuel", "tankPercent", "fuel_percent", fallback=0),
         "fuelLiters": n("fuelLiters", "fuel_liters", "fuelUsed", fallback=-1),
-        "damagePercent": n("damagePercent", "damage", fallback=0),
-        "completedDistanceKm": n("completedDistanceKm", "drivenDistanceKm", "distanceKm", "routeDistanceKm", fallback=0),
+        "damagePercent": n("damagePercent", "truckDamagePercent", "trailerDamagePercent", "damage", fallback=0),
+        "completedDistanceKm": n("completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km", "distanceKm", "routeDistanceKm", fallback=0),
         "tripDistanceKm": n("tripDistanceKm", "driverKm", fallback=0),
-        "remainingDistanceKm": n("remainingDistanceKm", "routeRemainingDistance", fallback=0),
-        "plannedDistanceKm": n("plannedDistanceKm", fallback=0),
+        "remainingDistanceKm": n("remainingDistanceKm", "remaining_distance_km", "routeRemainingDistance", "navigationDistanceKm", "navigation_distance_km", fallback=0),
+        "plannedDistanceKm": n("plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", fallback=0),
         "routeProgressPercent": n("routeProgressPercent", fallback=0),
         "engineEnabled": b("engineEnabled", fallback=False),
         "parkingBrake": b("parkingBrake", fallback=False),
-        "driverName": s("driverName", fallback=""),
-        "timestampUtc": now_utc().isoformat() + "Z"
+        "driverName": s("driverName", "displayName", "username", "driver", fallback=""),
+        "driverCardId": s("driverCardId", "driverCardID", "driverCard", "driver_card_id", "driverCardNumber", "fahrerkarteId", "fahrerkarteID", "fahrerkarte", "fahrerkarteNummer", fallback=""),
+        "event": s("event", "type", "messageType", fallback=""),
+        "status": s("status", "jobStatus", "job_status", fallback=""),
+        "jobActive": b("jobActive", "hasJob", "activeJob", "onJob", "deliveryActive", "tourActive", fallback=False),
+        "hasJob": b("hasJob", "jobActive", "activeJob", "onJob", "deliveryActive", "tourActive", fallback=False),
+        "completed": b("completed", "delivered", "submitted", "finished", "jobFinished", "jobDelivered", "jobCompleted", fallback=False),
+        "timestampUtc": s("timestampUtc", "timestamp", fallback=now_utc().isoformat() + "Z"),
     }
+
+    # Diese Felder kommen aus der C#-App und sind entscheidend, damit jede reale Tour-Instanz
+    # einen eigenen Start-Embed bekommt, selbst wenn Route/Fracht direkt erneut identisch sind.
+    for key in (
+        "activeJobKey", "jobKey", "tourKey", "currentJobKey", "jobStartKey",
+        "startedAtUtc", "jobStartedAtUtc", "tourStartedAtUtc", "startTimestampUtc",
+        "jobStartTimestampUtc", "startTimeUtc", "completedAtUtc", "jobCompletedAtUtc",
+        "tourCompletedAtUtc", "receiptNumber", "receipt_number"
+    ):
+        value = safe_str(raw.get(key))
+        if value:
+            clean[key] = value
 
     no_job_values = {
         "", "-", "none", "null", "undefined",
@@ -5322,6 +5351,7 @@ def normalize_telemetry_payload(raw):
         clean["jobId"] = job_id
 
     return clean
+
 
 def current_job_from_live(live):
     live = live or {}
@@ -8216,24 +8246,108 @@ def discord_field(name, value, inline=True):
     }
 
 
+def normalize_tracker_key_token(value):
+    value = safe_str(value)
+    if not value:
+        return ""
+    value = value.replace("`", "").strip()
+    value = re.sub(r"\s+", " ", value)
+    return value
+
+
+def tracker_payload_started_at_token(payload):
+    payload = payload or {}
+    started_at = payload_lookup_value(
+        payload,
+        "startedAtUtc", "jobStartedAtUtc", "tourStartedAtUtc",
+        "startTimestampUtc", "jobStartTimestampUtc", "startTimeUtc",
+        fallback=""
+    )
+    return normalize_tracker_key_token(started_at)
+
+
+def tracker_payload_explicit_job_key(payload):
+    payload = payload or {}
+    explicit_key = payload_lookup_value(
+        payload,
+        "activeJobKey", "jobKey", "tourKey", "currentJobKey", "jobStartKey",
+        fallback=""
+    )
+    explicit_key = normalize_tracker_key_token(explicit_key)
+    if not explicit_key:
+        return ""
+
+    if explicit_key.lower() in {"-", "unknown", "unknown-job-start", "none", "null", "undefined"}:
+        return ""
+
+    return explicit_key
+
+
+def tracker_make_instance_key(base_key, payload):
+    base_key = normalize_tracker_key_token(base_key)
+    if not base_key:
+        return ""
+
+    started_at = tracker_payload_started_at_token(payload)
+    if started_at and "|started:" not in base_key.lower():
+        return f"{base_key}|started:{started_at}"
+
+    return base_key
+
+
 def tracker_current_job_key(payload, user_doc=None):
     payload = payload or {}
-    job_id = payload_lookup_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
-    if job_id:
-        return f"job:{job_id}"
 
+    explicit_key = tracker_payload_explicit_job_key(payload)
+    if explicit_key:
+        return tracker_make_instance_key(explicit_key, payload)
+
+    job_id = payload_lookup_value(
+        payload,
+        "jobId", "jobID", "job_id", "id", "deliveryId", "delivery_id",
+        "auftragId", "auftragID", "orderId", "tourId", "tour_id",
+        fallback=""
+    )
     driver_id = safe_str((user_doc or {}).get("discord_id"))
     driver_name = payload_lookup_value(payload, "driverName", "displayName", "username", "driver", fallback=driver_id)
-    source = payload_lookup_value(payload, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback="-")
-    destination = payload_lookup_value(payload, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback="-")
+    driver_card_id = payload_lookup_value(
+        payload,
+        "driverCardId", "driverCardID", "driverCard", "driver_card_id",
+        "fahrerkarteId", "fahrerkarteID", "fahrerkarte", "fahrerkarteNummer",
+        fallback=""
+    )
+    game = payload_lookup_value(payload, "game", "gameCode", "gameId", "gameName", fallback="ETS2/ATS")
+
+    if job_id:
+        return tracker_make_instance_key(
+            "|".join(["id", normalize_tracker_key_token(job_id), normalize_tracker_key_token(driver_id or driver_name), normalize_tracker_key_token(driver_card_id), normalize_tracker_key_token(game)]),
+            payload
+        )
+
+    source = payload_lookup_value(payload, "sourceCity", "source_city", "source", "from", "routeOrigin", "jobSourceCity", fallback="-")
+    destination = payload_lookup_value(payload, "destinationCity", "destination_city", "destination", "to", "targetCity", "routeDestination", "jobDestinationCity", fallback="-")
     cargo = payload_lookup_value(payload, "cargo", "freight", "cargoName", "jobCargo", fallback="-")
     truck = payload_lookup_value(payload, "truck", "truckName", "truckModel", "truck_model", fallback="-")
 
-    raw_key = "|".join([driver_id or driver_name, source, destination, cargo, truck])
-    if raw_key.replace("|", "").replace("-", "").strip() == "":
+    has_route_identity = any(
+        safe_str(value).lower() not in {"", "-", "none", "null", "undefined"}
+        for value in (source, destination, cargo)
+    )
+    if not has_route_identity:
         return ""
-    return "tour:" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
 
+    raw_key = "|".join([
+        "route",
+        normalize_tracker_key_token(driver_id or driver_name),
+        normalize_tracker_key_token(driver_card_id),
+        normalize_tracker_key_token(cargo),
+        normalize_tracker_key_token(source),
+        normalize_tracker_key_token(destination),
+        normalize_tracker_key_token(truck),
+        normalize_tracker_key_token(game),
+    ])
+
+    return tracker_make_instance_key(raw_key, payload)
 
 
 def build_tour_start_discord_payload(user_doc, telemetry):
@@ -8254,6 +8368,7 @@ def build_tour_start_discord_payload(user_doc, telemetry):
     source = payload_lookup_value(telemetry, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback=safe_str(active_job.get("sourceCity"), "-"))
     destination = payload_lookup_value(telemetry, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback=safe_str(active_job.get("destinationCity"), "-"))
     cargo = payload_lookup_value(telemetry, "cargo", "freight", "cargoName", "jobCargo", fallback=safe_str(active_job.get("cargo"), "-"))
+    game = payload_lookup_value(telemetry, "game", "gameCode", "gameName", fallback=safe_str((user_doc.get("tracker_live") or {}).get("game"), "ETS2/ATS"))
     eta = payload_lookup_value(telemetry, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback=safe_str(active_job.get("eta"), "-"))
     rpm = first_payload_number(telemetry, "rpm", "engineRpm", "engineRPM", fallback=0)
 
@@ -8266,6 +8381,12 @@ def build_tour_start_discord_payload(user_doc, telemetry):
         job_id = job_key[4:] if job_key.startswith("job:") else job_key
     job_id = job_id or "-"
 
+    start_time = payload_lookup_value(
+        telemetry,
+        "startedAtUtc", "jobStartedAtUtc", "tourStartedAtUtc", "timestampUtc", "timestamp",
+        fallback=now_utc().isoformat() + "Z"
+    )
+
     driver_card_id = resolve_driver_card_id(user_doc, telemetry)
     route_line = f"{discord_text(source, '-', 80)} → {discord_text(destination, '-', 80)}"
 
@@ -8274,27 +8395,29 @@ def build_tour_start_discord_payload(user_doc, telemetry):
         "allowed_mentions": {"parse": []},
         "embeds": [
             {
-                "title": "🚚 Auftrag / Tour gestartet",
+                "title": "🟢 Tour gestartet",
                 "description": (
                     f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** ({discord_text(username_display, '@fahrer', 80)}) "
-                    f"hat eine Tour gestartet.\n**Job-ID:** `{discord_text(job_id, '-', 120)}`"
+                    f"hat eine neue Tour gestartet."
                 ),
-                "color": 3447003,
+                "color": 5763719,
                 "fields": [
-                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 120)}`", True),
                     discord_field("👤 Fahrer", f"{display_name}\n{username_display}", True),
                     discord_field("🪪 Fahrerkarte-ID", driver_card_id, True),
+                    discord_field("🎮 Spiel", game, True),
 
                     discord_field("📍 Route", route_line, False),
                     discord_field("🚛 LKW", truck, True),
                     discord_field("📦 Fracht", cargo, True),
-                    discord_field("⛽ Kraftstoff", format_fuel_display_from_payload(telemetry), True),
+                    discord_field("🛣️ Strecke", f"{round(first_payload_number(telemetry, 'plannedDistanceKm', 'routeDistanceKm', 'distanceKm', fallback=0), 1)} km", True),
 
-                    discord_field("🕒 ETA", eta, True),
+                    discord_field("🕒 Startzeit", start_time, True),
+                    discord_field("🧭 ETA", eta, True),
                     discord_field("⚙️ RPM", str(parse_int(rpm, 0)), True),
-                    discord_field("🔐 Dedupe-Key", f"`{discord_text(job_key or '-', '-', 120)}`", True),
+
+                    discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 180)}`", False),
                 ],
-                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tourstart wird serverseitig dedupliziert"},
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tour-Start"},
                 "timestamp": now_utc().isoformat() + "Z"
             }
         ]
@@ -8314,12 +8437,12 @@ def send_tour_start_to_discord(user_doc, telemetry):
 
 def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=None):
     """
-    Sendet den Discord-Embed "Tour gestartet" serverseitig genau einmal pro Tour.
+    Sendet den Discord-Embed "Tour gestartet" serverseitig genau einmal pro aktiver Tour.
 
-    Die Dedupe liegt bewusst in MongoDB und nicht nur im Prozessspeicher:
-    - verhindert doppelte Startmeldungen nach App-Neustart
-    - verhindert erneute Startmeldungen, wenn RPM/Kraftstoff/ETA sich ändern
-    - blockiert einen Neustart derselben Tour kurz nach Abschluss/PDF
+    Wichtig:
+    - Eine abgeschlossene Tour blockiert keinen neuen Start mehr.
+    - Gleiche Route/Fracht/LKW darf direkt erneut gestartet werden.
+    - Dedupe greift nur für denselben aktuell offenen Job-Key.
     """
     user_doc = user_doc or {}
     telemetry = telemetry or {}
@@ -8336,50 +8459,35 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
         return {"sent": False, "skipped": True, "reason": "User-Dokument ohne Discord-ID.", "job_key": current_job_key}
 
     now = now_utc()
-    duplicate_cutoff = now - timedelta(minutes=max(1, TOUR_START_DUPLICATE_WINDOW_MINUTES))
-    completed_cutoff = now - timedelta(minutes=max(1, TOUR_COMPLETED_BLOCKS_RESTART_MINUTES))
+    job_id = payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="") or current_job_key
 
-    recently_completed = tracker_job_starts_collection.find_one({
-        "discord_id": discord_id,
-        "job_start_key": current_job_key,
-        "status": {"$in": ["completed", "submitted", "done"]},
-        "completed_at": {"$gte": completed_cutoff},
-    })
-    if recently_completed:
-        return {
-            "sent": False,
-            "skipped": True,
-            "already_completed": True,
-            "reason": "Diese Tour wurde bereits abgeschlossen; erneute Start-Meldung unterdrückt.",
-            "job_key": current_job_key,
-        }
-
+    # Nur offene/aktive Starts mit exakt demselben Instanz-Key gelten als Duplikat.
+    # Abgeschlossene Starts werden bewusst ignoriert, damit direkt die nächste Tour starten kann.
     already_sent = tracker_job_starts_collection.find_one({
         "discord_id": discord_id,
         "job_start_key": current_job_key,
+        "status": {"$in": ["started", "active"]},
         "tour_start_discord_sent": True,
-        "tour_start_discord_sent_at": {"$gte": duplicate_cutoff},
     })
     if already_sent:
         return {
             "sent": False,
             "skipped": True,
             "already_sent": True,
-            "reason": "Tour-Start-Embed wurde für diese Tour bereits gesendet.",
+            "reason": "Tour-Start-Embed wurde für diese aktuell offene Tour bereits gesendet.",
             "job_key": current_job_key,
             "message_id": already_sent.get("tour_start_discord_message_id"),
             "channel_id": already_sent.get("tour_start_discord_channel_id") or TOUR_CHANNEL_ID,
         }
 
-    job_id = payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
     claim_result = tracker_job_starts_collection.update_one(
         {
             "discord_id": discord_id,
             "job_start_key": current_job_key,
+            "status": {"$nin": ["completed", "submitted", "done"]},
             "$or": [
                 {"tour_start_discord_sent": {"$ne": True}},
-                {"tour_start_discord_sent_at": {"$lt": duplicate_cutoff}},
-                {"tour_start_discord_sent_at": {"$exists": False}},
+                {"tour_start_discord_sent": {"$exists": False}},
             ],
         },
         {
@@ -8389,7 +8497,7 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
                 "user_mongo_id": safe_str(user_doc.get("_id")),
                 "username": user_doc.get("username") or user_doc.get("discord_username"),
                 "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"),
-                "job_id": job_id or current_job_key,
+                "job_id": job_id,
                 "job_start_key": current_job_key,
                 "telemetry": telemetry,
                 "current_job": current_job_from_live(telemetry),
@@ -8423,6 +8531,7 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
         {
             "discord_id": discord_id,
             "job_start_key": current_job_key,
+            "status": {"$in": ["started", "active"]},
         },
         {
             "$set": {
@@ -8434,7 +8543,7 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
                 "updated_at": now,
             }
         },
-        upsert=True,
+        upsert=False,
     )
 
     users_collection.update_one(
@@ -8454,6 +8563,7 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
     )
 
     return discord_result
+
 
 def reset_active_tour_start_embed_state(user_doc, reason="tour_inactive"):
     """Gibt den einmaligen Tour-Start-Embed wieder für die nächste Tour frei."""
@@ -8883,12 +8993,22 @@ def mark_tracker_job_start_completed(user_doc, payload, receipt_doc=None):
         return
 
     now = now_utc()
-    tracker_job_starts_collection.update_many(
-        {
-            "discord_id": discord_id,
-            "$or": clauses,
-            "status": {"$in": ["started", "active"]},
-        },
+    query = {
+        "discord_id": discord_id,
+        "$or": clauses,
+        "status": {"$in": ["started", "active"]},
+    }
+
+    # Nur den neuesten offenen Start markieren, nicht mehrere alte Touren mit gleicher Route.
+    job_start_doc = tracker_job_starts_collection.find_one(
+        query,
+        sort=[("created_at", DESCENDING), ("updated_at", DESCENDING)]
+    )
+    if not job_start_doc:
+        return
+
+    tracker_job_starts_collection.update_one(
+        {"_id": job_start_doc["_id"]},
         {
             "$set": {
                 "status": "completed",
@@ -8918,10 +9038,14 @@ def store_tracker_webhook_start_job(payload, raw_data=None):
 
     now = now_utc()
     job_id = stable_webhook_job_id(payload)
+
+    # Nicht abgeschlossene Starts dürfen aktualisiert werden. Bereits abgeschlossene Touren
+    # werden nicht wieder geöffnet, damit dieselbe Route direkt erneut als neuer Auftrag zählt.
     tracker_job_starts_collection.update_one(
         {
             "discord_id": safe_str(user_doc.get("discord_id")),
             "job_start_key": current_job_key,
+            "status": {"$nin": ["completed", "submitted", "done"]},
         },
         {
             "$set": {
@@ -8972,7 +9096,6 @@ def store_tracker_webhook_start_job(payload, raw_data=None):
     }
 
 
-
 def tracker_webhook_payload_is_completed(payload):
     payload = payload or {}
     status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower().replace("_", "-")
@@ -9005,25 +9128,8 @@ def tracker_webhook_payload_is_completed(payload):
     if explicit_completed:
         return True
 
-    # Fallback für Telemetrie: Nur als Abschluss werten, wenn eine Reststrecke wirklich vorhanden
-    # ist und der Job gleichzeitig als nicht mehr aktiv markiert wurde. Fehlende Werte werden
-    # bewusst nicht als 0-km-Abschluss interpretiert.
-    has_remaining_key = any(key in payload for key in (
-        "remainingDistanceKm", "remaining_distance_km", "navigationDistanceKm",
-        "navigation_distance_km", "routeRemainingDistance"
-    ))
-    if has_remaining_key:
-        remaining = first_payload_number(
-            payload,
-            "remainingDistanceKm", "remaining_distance_km",
-            "navigationDistanceKm", "navigation_distance_km",
-            "routeRemainingDistance",
-            fallback=999999.0
-        )
-        job_active = payload_bool(payload, "jobActive", "hasJob", "activeJob", fallback=True)
-        if remaining <= 0.1 and not job_active:
-            return True
-
+    # Kein stiller Abschluss mehr durch "remainingDistance=0 + jobActive=false".
+    # Diese Kombination entsteht beim Beenden von ETS2/Telemetrie und darf keinen alten Auftrag abschließen.
     return False
 
 
