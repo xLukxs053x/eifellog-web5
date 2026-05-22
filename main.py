@@ -7161,6 +7161,13 @@ def build_accounting_relevant_receipt_sections(receipt_doc):
 
 
 def save_tour_receipt_pdf(receipt_doc):
+    """
+    Erstellt den PDF-Tourbeleg nach Job-Abgabe im Layout aus dem Screenshot.
+
+    Der Beleg enthält nur abrechnungs-/nachweisrelevante Daten:
+    Beleg, Fahrer, Tour und Abrechnung. Live-Telemetrie wie RPM, ETA,
+    Geschwindigkeit, Tank oder Schaden wird bewusst nicht ausgegeben.
+    """
     submitted_at = receipt_doc.get("submitted_at") or now_utc()
     if not isinstance(submitted_at, datetime):
         submitted_at = now_utc()
@@ -7181,11 +7188,25 @@ def save_tour_receipt_pdf(receipt_doc):
     try:
         from html import escape
         from reportlab.lib.colors import HexColor
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        # Farbwerte exakt fuer das schlanke Eifel-LOG-Beleglayout.
+        COLOR_NAVY = HexColor("#0f172a")
+        COLOR_NAVY_DARK = HexColor("#020617")
+        COLOR_TEXT = HexColor("#0f172a")
+        COLOR_MUTED = HexColor("#64748b")
+        COLOR_LABEL = HexColor("#475569")
+        COLOR_BORDER = HexColor("#e2e8f0")
+        COLOR_BORDER_STRONG = HexColor("#cbd5e1")
+        COLOR_ROW = HexColor("#f8fafc")
+        COLOR_ROUTE = HexColor("#eff6ff")
+        COLOR_ROUTE_BORDER = HexColor("#bfdbfe")
+        COLOR_BADGE = HexColor("#bae6fd")
+        COLOR_BADGE_TEXT = HexColor("#082f49")
 
         def clean(value, fallback="-"):
             value = safe_str(value, fallback)
@@ -7203,9 +7224,12 @@ def save_tour_receipt_pdf(receipt_doc):
 
         def route_value():
             tour = receipt_doc.get("tour") or {}
-            return f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
+            source = safe_str(tour.get("source_city"), "-")
+            destination = safe_str(tour.get("destination_city"), "-")
+            return f"{source} → {destination}"
 
         buffer = BytesIO()
+        page_width, _page_height = A4
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
@@ -7219,7 +7243,7 @@ def save_tour_receipt_pdf(receipt_doc):
 
         styles = getSampleStyleSheet()
         styles.add(ParagraphStyle(
-            name="HeroTitle",
+            name="ReceiptHeroTitle",
             parent=styles["Heading1"],
             fontName="Helvetica-Bold",
             fontSize=21,
@@ -7228,84 +7252,91 @@ def save_tour_receipt_pdf(receipt_doc):
             spaceAfter=3,
         ))
         styles.add(ParagraphStyle(
-            name="HeroSub",
+            name="ReceiptHeroSub",
             parent=styles["BodyText"],
-            fontSize=9.5,
+            fontName="Helvetica",
+            fontSize=9.2,
             leading=12,
             textColor=HexColor("#cbd5e1"),
         ))
         styles.add(ParagraphStyle(
-            name="Badge",
+            name="ReceiptBadge",
             parent=styles["BodyText"],
             alignment=TA_CENTER,
             fontName="Helvetica-Bold",
             fontSize=10,
-            leading=13,
-            textColor=HexColor("#082f49"),
+            leading=12.5,
+            textColor=COLOR_BADGE_TEXT,
         ))
         styles.add(ParagraphStyle(
-            name="KpiLabel",
+            name="ReceiptKpiLabel",
             parent=styles["BodyText"],
             alignment=TA_CENTER,
-            fontSize=8,
-            leading=10,
-            textColor=HexColor("#64748b"),
+            fontName="Helvetica",
+            fontSize=7.8,
+            leading=9.5,
+            textColor=COLOR_MUTED,
         ))
         styles.add(ParagraphStyle(
-            name="KpiValue",
+            name="ReceiptKpiValue",
             parent=styles["BodyText"],
             alignment=TA_CENTER,
             fontName="Helvetica-Bold",
-            fontSize=15,
-            leading=18,
-            textColor=HexColor("#0f172a"),
+            fontSize=14.5,
+            leading=17,
+            textColor=COLOR_TEXT,
         ))
         styles.add(ParagraphStyle(
-            name="SectionTitle",
+            name="ReceiptSectionTitle",
             parent=styles["Heading2"],
             fontName="Helvetica-Bold",
-            fontSize=12,
-            leading=15,
-            textColor=HexColor("#0f172a"),
+            fontSize=11.8,
+            leading=14,
+            textColor=COLOR_TEXT,
             spaceBefore=7,
             spaceAfter=5,
         ))
         styles.add(ParagraphStyle(
-            name="CellLabel",
+            name="ReceiptCellLabel",
             parent=styles["BodyText"],
             fontName="Helvetica-Bold",
-            fontSize=8.5,
-            leading=11,
-            textColor=HexColor("#475569"),
+            fontSize=8.1,
+            leading=10.5,
+            textColor=COLOR_LABEL,
         ))
         styles.add(ParagraphStyle(
-            name="CellValue",
+            name="ReceiptCellValue",
             parent=styles["BodyText"],
-            fontSize=9,
-            leading=12,
-            textColor=HexColor("#0f172a"),
+            fontName="Helvetica",
+            fontSize=8.6,
+            leading=11.2,
+            textColor=COLOR_TEXT,
         ))
         styles.add(ParagraphStyle(
-            name="SmallMuted",
+            name="ReceiptSmallMuted",
             parent=styles["BodyText"],
-            fontSize=7.5,
-            leading=10,
-            textColor=HexColor("#64748b"),
+            fontName="Helvetica",
+            fontSize=7.2,
+            leading=9.4,
+            textColor=COLOR_MUTED,
         ))
 
-        def p(value, style="CellValue"):
+        def p(value, style="ReceiptCellValue"):
             return Paragraph(clean(value), styles[style])
 
         def draw_footer(canvas, pdf_doc):
             canvas.saveState()
-            width, _height = A4
-            canvas.setStrokeColor(HexColor("#cbd5e1"))
+            canvas.setStrokeColor(COLOR_BORDER_STRONG)
             canvas.setLineWidth(0.45)
-            canvas.line(15 * mm, 12 * mm, width - 15 * mm, 12 * mm)
+            canvas.line(15 * mm, 12 * mm, page_width - 15 * mm, 12 * mm)
             canvas.setFont("Helvetica", 7)
-            canvas.setFillColor(HexColor("#64748b"))
-            canvas.drawString(15 * mm, 8 * mm, f"{TOUR_RECEIPT_COMPANY_NAME} • Buchhaltungsbeleg • {safe_str(receipt_doc.get('receipt_number'), '-')}")
-            canvas.drawRightString(width - 15 * mm, 8 * mm, f"Seite {pdf_doc.page}")
+            canvas.setFillColor(COLOR_MUTED)
+            canvas.drawString(
+                15 * mm,
+                8 * mm,
+                f"{TOUR_RECEIPT_COMPANY_NAME} • Buchhaltungsbeleg • {safe_str(receipt_doc.get('receipt_number'), '-')}",
+            )
+            canvas.drawRightString(page_width - 15 * mm, 8 * mm, f"Seite {pdf_doc.page}")
             canvas.restoreState()
 
         story = []
@@ -7318,16 +7349,22 @@ def save_tour_receipt_pdf(receipt_doc):
         username = tour_receipt_driver_username(receipt_doc)
 
         header_left = [
-            Paragraph(f"Tourbeleg von {clean(username)}", styles["HeroTitle"]),
-            Paragraph(f"{clean(driver_name)} • abgeschlossener Auftrag • nur buchhaltungsrelevante Daten", styles["HeroSub"]),
-            Paragraph(f"Belegnummer: <b>{clean(receipt_number)}</b>", styles["HeroSub"]),
+            Paragraph(f"Tourbeleg von {clean(username)}", styles["ReceiptHeroTitle"]),
+            Paragraph(
+                f"{clean(driver_name)} • abgeschlossener Auftrag • nur buchhaltungsrelevante Daten",
+                styles["ReceiptHeroSub"],
+            ),
+            Paragraph(f"Belegnummer: <b>{clean(receipt_number)}</b>", styles["ReceiptHeroSub"]),
         ]
-        header_right = Paragraph(f"ABGESCHLOSSEN<br/>JOB-ID<br/><font size='8'>{clean(job_id)}</font>", styles["Badge"])
+        header_right = Paragraph(
+            f"ABGESCHLOSSEN<br/>JOB-ID<br/><font size='7.8'>{clean(job_id)}</font>",
+            styles["ReceiptBadge"],
+        )
         header = Table([[header_left, header_right]], colWidths=[125 * mm, 40 * mm])
         header.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#0f172a")),
-            ("BACKGROUND", (1, 0), (1, 0), HexColor("#bae6fd")),
-            ("BOX", (0, 0), (-1, -1), 0.7, HexColor("#020617")),
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_NAVY),
+            ("BACKGROUND", (1, 0), (1, 0), COLOR_BADGE),
+            ("BOX", (0, 0), (-1, -1), 0.7, COLOR_NAVY_DARK),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (0, 0), 12),
             ("RIGHTPADDING", (0, 0), (0, 0), 12),
@@ -7340,23 +7377,29 @@ def save_tour_receipt_pdf(receipt_doc):
         story.append(Spacer(1, 8))
 
         kpi = Table([
-            [p("Gesamtbetrag", "KpiLabel"), p("Gefahrene Strecke", "KpiLabel"), p("Buchhaltung", "KpiLabel")],
-            [p(money_value(), "KpiValue"), p(distance_value(), "KpiValue"), p("Relevant", "KpiValue")],
+            [p("Gesamtbetrag", "ReceiptKpiLabel"), p("Gefahrene Strecke", "ReceiptKpiLabel"), p("Buchhaltung", "ReceiptKpiLabel")],
+            [p(money_value(), "ReceiptKpiValue"), p(distance_value(), "ReceiptKpiValue"), p("Relevant", "ReceiptKpiValue")],
         ], colWidths=[55 * mm, 55 * mm, 55 * mm])
         kpi.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
-            ("BOX", (0, 0), (-1, -1), 0.45, HexColor("#cbd5e1")),
-            ("INNERGRID", (0, 0), (-1, -1), 0.25, HexColor("#e2e8f0")),
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_ROW),
+            ("BOX", (0, 0), (-1, -1), 0.45, COLOR_BORDER_STRONG),
+            ("INNERGRID", (0, 0), (-1, -1), 0.25, COLOR_BORDER),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 7),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         story.append(kpi)
         story.append(Spacer(1, 7))
 
-        route_card = Table([[p("Route", "CellLabel"), p(route_value(), "CellValue"), p("Fracht", "CellLabel"), p(tour.get("cargo") or "-", "CellValue")]], colWidths=[20 * mm, 65 * mm, 20 * mm, 60 * mm])
+        route_card = Table([[
+            p("Route", "ReceiptCellLabel"),
+            p(route_value(), "ReceiptCellValue"),
+            p("Fracht", "ReceiptCellLabel"),
+            p(tour.get("cargo") or "-", "ReceiptCellValue"),
+        ]], colWidths=[20 * mm, 65 * mm, 20 * mm, 60 * mm])
         route_card.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#eff6ff")),
-            ("BOX", (0, 0), (-1, -1), 0.4, HexColor("#bfdbfe")),
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_ROUTE),
+            ("BOX", (0, 0), (-1, -1), 0.4, COLOR_ROUTE_BORDER),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (-1, -1), 7),
             ("RIGHTPADDING", (0, 0), (-1, -1), 7),
@@ -7367,17 +7410,15 @@ def save_tour_receipt_pdf(receipt_doc):
 
         for section_title, rows in sections:
             story.append(Spacer(1, 5))
-            story.append(Paragraph(clean(section_title), styles["SectionTitle"]))
+            story.append(Paragraph(clean(section_title), styles["ReceiptSectionTitle"]))
             table_rows = []
             for label, value in rows:
-                if value in (None, ""):
-                    value = "-"
-                table_rows.append([p(label, "CellLabel"), p(value, "CellValue")])
+                table_rows.append([p(label, "ReceiptCellLabel"), p(value if value not in (None, "") else "-", "ReceiptCellValue")])
             detail_table = Table(table_rows, colWidths=[46 * mm, 119 * mm])
             detail_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), HexColor("#ffffff")),
-                ("ROWBACKGROUNDS", (0, 0), (-1, -1), [HexColor("#ffffff"), HexColor("#f8fafc")]),
-                ("GRID", (0, 0), (-1, -1), 0.3, HexColor("#e2e8f0")),
+                ("ROWBACKGROUNDS", (0, 0), (-1, -1), [HexColor("#ffffff"), COLOR_ROW]),
+                ("GRID", (0, 0), (-1, -1), 0.3, COLOR_BORDER),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -7391,7 +7432,7 @@ def save_tour_receipt_pdf(receipt_doc):
             "Dieser Beleg enthält bewusst nur abrechnungs- und nachweisrelevante Daten. "
             "Live-Telemetrie wie Kraftstoff, RPM, ETA, Geschwindigkeit oder Schadensdetails wird nicht im PDF ausgegeben."
         )
-        story.append(Paragraph(clean(note_text), styles["SmallMuted"]))
+        story.append(Paragraph(clean(note_text), styles["ReceiptSmallMuted"]))
 
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         pdf_bytes = buffer.getvalue()
@@ -7399,7 +7440,7 @@ def save_tour_receipt_pdf(receipt_doc):
             file.write(pdf_bytes)
         return file_path, filename, pdf_bytes
 
-    except Exception as error:
+    except Exception:
         app.logger.exception("Gestalteter Tourbeleg konnte nicht erzeugt werden, nutze einfachen PDF-Fallback.")
         pdf_bytes = build_simple_pdf(
             f"{TOUR_RECEIPT_COMPANY_NAME} - Tourbeleg von {driver_username}",
