@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Team - Eifel LOG{% endblock %}
+
+{% block content %}
+<section class="w-full py-6 md:py-10">
+    <!-- Header -->
+    <div class="text-center mb-10 md:mb-14">
+        <p class="font-orbitron text-[10px] md:text-xs uppercase tracking-[0.35em] text-[var(--brand-green)] mb-4">
+            Eifel LOG Struktur
+        </p>
+
+        <h1 class="font-orbitron text-3xl md:text-5xl font-extrabold uppercase tracking-[0.14em] text-[var(--text)]">
+            Unser Team
+        </h1>
+
+        <p class="max-w-2xl mx-auto mt-5 text-sm md:text-base text-[var(--muted)] leading-relaxed">
+            Die Organisation von Eifel LOG: von der Geschäftsleitung über Projektleitung und Verwaltung bis zu unseren Fahrern.
+        </p>
+    </div>
+
+    <!-- Team Layout -->
+    <div class="max-w-6xl mx-auto space-y-8 md:space-y-10">
+
+        <!-- Geschäftsleitung -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Geschäftsleitung
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
+                {{ team_card("Max", "Geschäftsleitung", "Max.png", "max.png") }}
+                {{ team_card("Frecherdachs", "Geschäftsleitung", "Frecherdachs.png", "frecherdachs.png") }}
+            </div>
+        </section>
+
+        <!-- Projektleitung -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Projektleitung
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 max-w-md mx-auto">
+                {{ team_card("LuxksDE", "Projektleitung", "LuxksDE.png", "luxksde.png") }}
+            </div>
+        </section>
+
+        <!-- Stellvertretende Projektleitung -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Stellvertretende Projektleitung
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 max-w-md mx-auto">
+                {{ team_card("durch_trucker_ibo", "Stellvertretende Projektleitung", "durch_trucker_ibo.png", "Durch_Trucker_Ibo.png") }}
+            </div>
+        </section>
+
+        <!-- HR / Personal -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Verwaltung & Personal
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
+                {{ team_card("Prysm", "HR-Controlling", "Prysm.png", "prysm.png") }}
+                {{ team_card("daivd_tmp", "Personalmanagement", "daivd_tmp.png", "Daivd_tmp.png") }}
+            </div>
+        </section>
+
+        <!-- Buchhaltung -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Buchhaltung
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 max-w-md mx-auto">
+                {{ team_card("danielsurig", "Buchhaltung", "danielsurig.png", "Danielsurig.png") }}
+            </div>
+        </section>
+
+        <!-- Disposition -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Disposition
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 max-w-md mx-auto">
+                {{ team_card("Kalle", "Disposition", "Kalle.png", "kalle.png") }}
+            </div>
+        </section>
+
+        <!-- Fahrer -->
+        <section class="glass-card p-5 md:p-7">
+            <div class="flex flex-col items-center text-center mb-6">
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                    Fahrer
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
+                {{ team_card("ghost_robbert", "Fahrer", "ghost_robbert.png", "Ghost_Robbert.png") }}
+                {{ team_card("jus_tin123", "Fahrer", "jus_tin123.png", "Jus_Tin123.png") }}
+            </div>
+        </section>
+
+    </div>
+</section>
+
+{% macro team_card(name, role, image_file, image_fallback) %}
+<article class="group relative overflow-hidden rounded-3xl border border-white/10 bg-black/35 p-5 md:p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:border-[var(--brand-green)]/40 hover:bg-black/45 hover:shadow-[0_0_35px_rgba(137,190,50,0.13)]">
+    <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/60 to-transparent opacity-60"></div>
+
+    <div class="relative mx-auto mb-5 h-28 w-28 md:h-32 md:w-32">
+        <div class="absolute -inset-2 rounded-full bg-[var(--brand-green)]/10 blur-xl opacity-70 transition-opacity duration-300 group-hover:opacity-100"></div>
+
+        <img
+            src="{{ url_for('static', filename=image_file) }}"
+            data-alt-src="{{ url_for('static', filename=image_fallback) }}"
+            data-fallback-src="{{ url_for('static', filename='eifellog.jpg') }}"
+            alt="{{ name }} Avatar"
+            loading="lazy"
+            class="team-avatar relative h-full w-full rounded-full border border-[var(--brand-green)]/45 object-cover bg-black/50 shadow-[0_0_20px_rgba(137,190,50,0.18)]"
+        >
+    </div>
+
+    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-widest uppercase text-[var(--text)]">
+        {{ name }}
+    </h2>
+
+    <p class="mt-3 inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-2 font-orbitron text-[9px] uppercase tracking-[0.2em] text-[var(--brand-yellow)]">
+        {{ role }}
+    </p>
+</article>
+{% endmacro %}
+
+<script>
+    /*
+        Avatar-Fallback:
+        1. Versucht zuerst den exakt angegebenen PNG-Dateinamen.
+        2. Falls nicht vorhanden, versucht eine alternative Schreibweise.
+        3. Falls auch diese fehlt, wird static/eifellog.jpg angezeigt.
+    */
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.team-avatar').forEach((img) => {
+            img.addEventListener('error', () => {
+                const altSrc = img.dataset.altSrc;
+                const fallbackSrc = img.dataset.fallbackSrc;
+
+                if (!img.dataset.triedAlt && altSrc && img.src !== altSrc) {
+                    img.dataset.triedAlt = 'true';
+                    img.src = altSrc;
+                    return;
+                }
+
+                if (!img.dataset.triedFallback && fallbackSrc && img.src !== fallbackSrc) {
+                    img.dataset.triedFallback = 'true';
+                    img.src = fallbackSrc;
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
