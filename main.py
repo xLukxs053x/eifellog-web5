@@ -11061,12 +11061,20 @@ def impressum():
         description=description
     )
 
-    @app.route("/team")
+ 
+@app.route("/team")
 def team():
+    title = "Team - Eifel LOG"
+
+    description = (
+        "Entdecke unser engagiertes Team hinter Eifel LOG. "
+        "Wir sind ein motiviertes und kompetentes Team, das sich für Qualität und Kundenservice einsetzt."
+    )
+
     return render_template(
         "team.html",
-        title="Team - Eifel LOG",
-        description="Lerne das Team von Eifel LOG kennen: Geschäftsleitung, Projektleitung, Verwaltung, Disposition und Fahrer."
+        title=title,
+        description=description
     )
 
 # ==========================================
