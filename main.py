@@ -10285,24 +10285,68 @@ def changelog():
         "für unsere Fahrer zu bieten!"
     )
 
-    # Pfad zur JSON-Datei
-    # Falls changelog.json im static-Ordner liegt:
-    # json_path = os.path.join(app.root_path, "static", "changelog.json")
-    json_path = os.path.join(app.root_path, "changelog.json")
-
+    # -------------------------------------------------
+    # Changelog JSON laden
+    # -------------------------------------------------
     changelog_data = []
 
-    # Changelog JSON laden
-    try:
-        if os.path.exists(json_path):
-            with open(json_path, "r", encoding="utf-8") as f:
-                changelog_data = json.load(f)
-        else:
-            print(f"Changelog-Datei nicht gefunden: {json_path}")
-    except Exception as e:
-        print(f"Fehler beim Laden der Changelog-Daten: {e}")
+    possible_json_paths = [
+        os.path.join(current_app.root_path, "changelog.json"),
+        os.path.join(current_app.root_path, "static", "changelog.json"),
+        os.path.join(current_app.root_path, "data", "changelog.json"),
+    ]
 
+    json_path = None
+
+    for path in possible_json_paths:
+        if os.path.isfile(path):
+            json_path = path
+            break
+
+    if json_path:
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                loaded_data = json.load(f)
+
+            # Variante 1: JSON-Datei ist direkt eine Liste
+            # [
+            #   {...},
+            #   {...}
+            # ]
+            if isinstance(loaded_data, list):
+                changelog_data = loaded_data
+
+            # Variante 2: JSON-Datei enthält ein Objekt mit "changelog"
+            # {
+            #   "changelog": [...]
+            # }
+            elif isinstance(loaded_data, dict) and isinstance(loaded_data.get("changelog"), list):
+                changelog_data = loaded_data["changelog"]
+
+            else:
+                print("changelog.json wurde gefunden, hat aber kein gültiges Format.")
+                print("Erwartet wird entweder eine Liste oder ein Objekt mit dem Key 'changelog'.")
+
+            print(f"Changelog geladen: {json_path}")
+            print(f"Einträge gefunden: {len(changelog_data)}")
+
+        except json.JSONDecodeError as e:
+            print(f"Fehler: changelog.json ist kein gültiges JSON.")
+            print(f"Datei: {json_path}")
+            print(f"Details: {e}")
+
+        except Exception as e:
+            print(f"Fehler beim Laden der Changelog-Daten: {e}")
+
+    else:
+        print("changelog.json wurde nicht gefunden.")
+        print("Geprüfte Pfade:")
+        for path in possible_json_paths:
+            print(f"- {path}")
+
+    # -------------------------------------------------
     # Roadmap-Daten
+    # -------------------------------------------------
     roadmap_data = [
         {
             "status": "in_progress",
@@ -10340,7 +10384,6 @@ def changelog():
         changelog=changelog_data,
         roadmap=roadmap_data,
     )
-
 
 
 # ==========================================
