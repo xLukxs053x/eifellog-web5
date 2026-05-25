@@ -1,14 +1,133 @@
 {% extends "base.html" %}
 
-{% block title %}EifelLog - Hub Access{% endblock %}
+{% block title %}
+    {% if wartung_active|default(false) %}
+        EifelLog - Wartungsmodus
+    {% else %}
+        EifelLog - Hub Access
+    {% endif %}
+{% endblock %}
 
 {% block content %}
+{% set w = wartung|default(wartung_config|default({}), true) %}
+{% set is_wartung = wartung_active|default(w.get('enabled', false)) or w.get('active', false) or w.get('aktiv', false) %}
+{% set login_allowed = wartung_login_allowed|default(w.get('allow_login_button', true)) %}
+{% set deadline_text = wartung_deadline_text|default(w.get('deadline_display', w.get('deadline', ''))) %}
+
 <section class="flex-grow flex items-center justify-center min-h-[70vh] py-12">
-    
+
+    {% if is_wartung %}
+
+    <!-- Wartungsmodus Card -->
+    <div class="glass-card p-10 md:p-14 max-w-2xl w-full relative overflow-hidden text-center z-10">
+
+        <!-- Background Ambient Glow -->
+        <div class="absolute -top-24 -right-24 w-72 h-72 bg-yellow-400 rounded-full mix-blend-screen filter blur-[90px] opacity-20 pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-[var(--brand-green)] rounded-full mix-blend-screen filter blur-[90px] opacity-15 pointer-events-none"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-red-500/5 pointer-events-none"></div>
+
+        <!-- Wartungs Icon -->
+        <div class="w-24 h-24 mx-auto rounded-full bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center mb-6 shadow-[0_0_35px_rgba(250,204,21,0.15)] relative z-10">
+            <svg class="w-12 h-12 text-yellow-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.121 2.121 0 01-3-3l5.653-4.655M15.17 11.42l3.03-2.496c.384-.317.626-.74.766-1.208l.78-2.702a.75.75 0 00-.927-.927l-2.702.78a2.25 2.25 0 00-1.208.766l-2.496 3.03M15.17 11.42L12.58 8.83M12.58 8.83L9.172 5.42a2.121 2.121 0 00-3 3l3.408 3.408"></path>
+            </svg>
+        </div>
+
+        <!-- Wartungs Tag -->
+        <div class="relative z-10 inline-flex items-center justify-center px-4 py-2 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 font-orbitron text-[10px] font-bold tracking-[0.2em] uppercase mb-6">
+            {{ w.get('tag', 'Geplante Wartung') }}
+        </div>
+
+        <!-- Titel -->
+        <h1 class="text-3xl md:text-4xl font-orbitron font-bold text-white mb-3 tracking-wide relative z-10">
+            {{ w.get('title', 'Wartungsarbeiten') }}
+        </h1>
+
+        <!-- Datum / Deadline -->
+        <div class="relative z-10 mb-8">
+            <p class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase mb-3">
+                {{ w.get('day', '') }}{% if w.get('day') and w.get('datum') %} • {% endif %}{{ w.get('datum', '') }}
+            </p>
+
+            {% if deadline_text %}
+            <div class="inline-flex flex-col md:flex-row items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10">
+                <span class="text-white/50 text-xs font-orbitron uppercase tracking-widest">
+                    {{ w.get('deadline_label', 'Voraussichtlich wieder online') }}
+                </span>
+                <span class="text-yellow-200 text-sm font-orbitron font-bold">
+                    {{ deadline_text }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Grund -->
+        <div class="relative z-10 text-left rounded-2xl bg-black/20 border border-white/10 p-6 mb-8">
+            <div class="flex items-start gap-4">
+                <div class="shrink-0 w-10 h-10 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m0 3.75h.007v.008H12v-.008zM10.29 3.86L1.82 18a2.25 2.25 0 001.93 3.375h16.5A2.25 2.25 0 0022.18 18L13.71 3.86a2.25 2.25 0 00-3.42 0z"></path>
+                    </svg>
+                </div>
+
+                <div>
+                    <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest mb-2">
+                        Warum ist der Hub gerade nicht erreichbar?
+                    </h2>
+                    <p class="text-sm text-white/70 font-inter leading-relaxed">
+                        {{ w.get('reason', 'Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.') }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nachricht -->
+        <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-8 relative z-10">
+            {{ w.get('message', 'Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.') }}
+        </p>
+
+        {% if login_allowed %}
+
+        <!-- Login Button während Wartung -->
+        <div class="relative z-10">
+            <a href="/login" class="flex items-center justify-center w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest transition-all duration-300 bg-[#5865F2]/10 border border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white hover:shadow-[0_0_25px_rgba(88,101,242,0.5)] hover:-translate-y-1">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" class="mr-3">
+                    <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
+                </svg>
+                Login für freigegebene Rollen
+            </a>
+
+            <p class="text-xs text-white/40 font-inter leading-relaxed mt-4">
+                Während der Wartung können sich nur Benutzer mit freigegebenen Discord-Rollen anmelden.
+            </p>
+        </div>
+
+        {% else %}
+
+        <!-- Login gesperrt -->
+        <div class="relative z-10">
+            <div class="flex items-center justify-center w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest bg-white/5 border border-white/10 text-white/30 cursor-not-allowed">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                </svg>
+                Anmeldung aktuell gesperrt
+            </div>
+
+            <p class="text-xs text-white/40 font-inter leading-relaxed mt-4">
+                Der Login wurde während der Wartungsarbeiten vollständig deaktiviert.
+            </p>
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    {% else %}
+
     <!-- Login Card -->
     <div class="glass-card p-10 md:p-14 max-w-lg w-full relative overflow-hidden text-center z-10">
-        
-        <!-- Background Ambient Glow (Discord Blue + Eifel Green) -->
+
+        <!-- Background Ambient Glow -->
         <div class="absolute -top-20 -right-20 w-64 h-64 bg-[#5865F2] rounded-full mix-blend-screen filter blur-[80px] opacity-20 pointer-events-none"></div>
         <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-[var(--brand-green)] rounded-full mix-blend-screen filter blur-[80px] opacity-15 pointer-events-none"></div>
 
@@ -18,17 +137,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
             </svg>
         </div>
-        
+
         <!-- Titel -->
         <h1 class="text-3xl font-orbitron font-bold text-white mb-2 tracking-wide relative z-10">
             Driver Hub <span class="text-[var(--brand-green)]">Access</span>
         </h1>
-        
+
         <!-- Untertitel / Info -->
         <p class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase mb-8 relative z-10">
             Restricted Area • Eifel LOG Personnel Only
         </p>
-        
+
         <!-- Beschreibung -->
         <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-10 relative z-10">
             Bitte authentifiziere dich über unseren Discord-Server, um Zugang zum internen Speditions-System zu erhalten.
@@ -37,7 +156,7 @@
                 Nach erfolgreicher Anmeldung wirst du automatisch auf dein persönliches <strong class="text-white">Dashboard</strong> weitergeleitet.
             </span>
         </p>
-        
+
         <!-- Discord Login Button -->
         <div class="relative z-10">
             <a href="/login" class="flex items-center justify-center w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest transition-all duration-300 bg-[#5865F2]/10 border border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white hover:shadow-[0_0_25px_rgba(88,101,242,0.5)] hover:-translate-y-1">
@@ -48,7 +167,10 @@
                 Discord Login
             </a>
         </div>
-        
+
     </div>
+
+    {% endif %}
+
 </section>
 {% endblock %}
