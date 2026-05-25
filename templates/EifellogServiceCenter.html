@@ -29,6 +29,12 @@
 {% set fahrerkarte_requested_at = fahrerkarte_requested_at|default('-', true) %}
 {% set fahrerkarte_issued_at = fahrerkarte_issued_at|default('-', true) %}
 {% set fahrerkarte_card_id = fahrerkarte_card_id|default('Wird nach Ausstellung erzeugt', true) %}
+{% set fahrerkarte_service_card_id = fahrerkarte_service_card_id|default('SC-' ~ current_user_id, true) %}
+{% set fahrerkarte_license_number = fahrerkarte_license_number|default('EL-FS-' ~ current_user_id, true) %}
+{% set fahrerkarte_birthdate = fahrerkarte_birthdate|default('-', true) %}
+{% set fahrerkarte_expiry_at = fahrerkarte_expiry_at|default('5 Jahre nach Ausstellung', true) %}
+{% set fahrerkarte_authority = fahrerkarte_authority|default('EifelLog ServiceCenter', true) %}
+{% set fahrerkarte_verify_url = fahrerkarte_verify_url|default('/servicecenter/fahrerkarte/verifizieren/' ~ fahrerkarte_card_id, true) %}
 {% set fahrerkarte_note = fahrerkarte_note|default('', true) %}
 {% set fahrerkarte_submit_url = fahrerkarte_submit_url|default('/servicecenter/fahrerkarte/beantragen', true) %}
 {% set fahrerkarte_download_url = fahrerkarte_download_url|default('/servicecenter/fahrerkarte', true) %}
@@ -678,6 +684,341 @@
         overflow-wrap: anywhere;
     }
 
+    .dual-card-preview-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.25rem;
+        align-items: stretch;
+    }
+
+    @media (min-width: 1180px) {
+        .dual-card-preview-grid {
+            grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.25fr);
+        }
+    }
+
+    .card-preview-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .card-preview-label span:first-child {
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.58);
+    }
+
+    .card-preview-label span:last-child {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.28rem 0.55rem;
+        border: 1px solid rgba(137, 190, 50, 0.25);
+        background: rgba(137, 190, 50, 0.09);
+        color: var(--brand-green);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.48rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .real-driver-card-wrap {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 0.15rem;
+    }
+
+    .real-driver-card {
+        position: relative;
+        isolation: isolate;
+        width: min(100%, 540px);
+        min-width: 320px;
+        aspect-ratio: 1.586 / 1;
+        overflow: hidden;
+        border-radius: 1.05rem;
+        border: 1px solid rgba(65, 91, 122, 0.34);
+        background:
+            repeating-linear-gradient(115deg, rgba(33, 91, 150, 0.035) 0 1px, transparent 1px 7px),
+            radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.85), transparent 30%),
+            linear-gradient(135deg, #f8fbff 0%, #e7f1fb 42%, #d7e9f7 100%);
+        color: #182f4f;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+        font-family: Arial, "DIN 1451 Mittelschrift", Inter, system-ui, sans-serif;
+    }
+
+    .real-driver-card::before {
+        content: "EIFELLOG EIFELLOG EIFELLOG EIFELLOG EIFELLOG";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotate(-24deg) scale(1.15);
+        color: rgba(37, 85, 130, 0.055);
+        font-size: clamp(1.7rem, 4vw, 3rem);
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+
+    .real-driver-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(100deg, transparent 0 38%, rgba(255, 255, 255, 0.26) 45%, transparent 54%),
+            radial-gradient(circle at 82% 72%, rgba(255, 255, 255, 0.55), transparent 18%);
+        mix-blend-mode: soft-light;
+        pointer-events: none;
+    }
+
+    .real-driver-head {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 0.7rem;
+        align-items: center;
+        padding: 0.72rem 0.85rem 0.5rem;
+        border-bottom: 1px solid rgba(56, 93, 131, 0.18);
+    }
+
+    .real-eu-mark {
+        width: 2.1rem;
+        height: 1.45rem;
+        border-radius: 0.2rem;
+        display: grid;
+        place-items: center;
+        background: #224b8f;
+        color: #ffdf45;
+        font-size: 0.42rem;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
+    }
+
+    .real-driver-title {
+        min-width: 0;
+        line-height: 1.05;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .real-driver-title strong {
+        display: block;
+        color: #17345f;
+        font-size: clamp(0.86rem, 2.5vw, 1.25rem);
+        font-weight: 900;
+    }
+
+    .real-driver-title span {
+        display: block;
+        margin-top: 0.16rem;
+        color: rgba(23, 52, 95, 0.70);
+        font-size: clamp(0.46rem, 1.2vw, 0.62rem);
+        font-weight: 800;
+        letter-spacing: 0.12em;
+    }
+
+    .real-driver-chip {
+        width: 2.35rem;
+        height: 1.72rem;
+        border-radius: 0.25rem;
+        border: 1px solid rgba(135, 112, 51, 0.45);
+        background:
+            linear-gradient(90deg, transparent 31%, rgba(128, 99, 35, 0.30) 32% 35%, transparent 36% 64%, rgba(128, 99, 35, 0.30) 65% 68%, transparent 69%),
+            linear-gradient(0deg, transparent 42%, rgba(128, 99, 35, 0.26) 43% 47%, transparent 48%),
+            linear-gradient(135deg, #e7d27b, #b99635);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+    }
+
+    .real-driver-body {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 6.7rem minmax(0, 1fr) 4.6rem;
+        gap: 0.72rem;
+        padding: 0.72rem 0.85rem 0.55rem;
+    }
+
+    .real-driver-photo {
+        width: 6.7rem;
+        height: 7.9rem;
+        border-radius: 0.25rem;
+        overflow: hidden;
+        border: 1px solid rgba(41, 74, 109, 0.45);
+        background: #dce9f3;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55);
+    }
+
+    .real-driver-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.92) contrast(0.96);
+    }
+
+    .real-driver-photo-fallback {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #bfd3e7, #eef6fc);
+        color: rgba(23, 52, 95, 0.52);
+    }
+
+    .real-driver-fields {
+        min-width: 0;
+        display: grid;
+        gap: 0.18rem;
+        align-content: start;
+        font-size: clamp(0.54rem, 1.3vw, 0.72rem);
+        line-height: 1.15;
+    }
+
+    .real-driver-field {
+        display: grid;
+        grid-template-columns: 1.45rem minmax(0, 1fr);
+        gap: 0.25rem;
+        min-width: 0;
+    }
+
+    .real-driver-field b {
+        color: rgba(23, 52, 95, 0.62);
+        font-weight: 900;
+    }
+
+    .real-driver-field span {
+        min-width: 0;
+        color: #142c4d;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+    }
+
+    .real-driver-name {
+        margin: 0.05rem 0 0.12rem;
+        color: #102946;
+        font-size: clamp(0.82rem, 2vw, 1.02rem);
+        line-height: 1.05;
+        font-weight: 900;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+        overflow-wrap: anywhere;
+    }
+
+    .real-driver-side {
+        display: grid;
+        gap: 0.38rem;
+        align-content: start;
+    }
+
+    .real-driver-holo {
+        position: relative;
+        width: 4.1rem;
+        height: 4.1rem;
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(88, 120, 150, 0.32);
+        background:
+            conic-gradient(from 20deg, rgba(255, 70, 130, 0.42), rgba(45, 180, 255, 0.45), rgba(255, 235, 95, 0.42), rgba(80, 230, 160, 0.38), rgba(255, 70, 130, 0.42));
+        opacity: 0.72;
+        mix-blend-mode: multiply;
+    }
+
+    .real-driver-holo::after {
+        content: "EL";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: rgba(255, 255, 255, 0.75);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        text-shadow: 0 1px 6px rgba(0,0,0,0.15);
+    }
+
+    .real-driver-qr {
+        width: 4.1rem;
+        height: 4.1rem;
+        border-radius: 0.15rem;
+        border: 1px solid rgba(23, 52, 95, 0.24);
+        background:
+            linear-gradient(90deg, #102946 10%, transparent 10% 20%, #102946 20% 30%, transparent 30% 45%, #102946 45% 55%, transparent 55% 68%, #102946 68% 78%, transparent 78%),
+            linear-gradient(0deg, transparent 10%, #102946 10% 20%, transparent 20% 34%, #102946 34% 44%, transparent 44% 58%, #102946 58% 68%, transparent 68%),
+            #f8fbff;
+        background-size: 1.05rem 1.05rem;
+        image-rendering: pixelated;
+        opacity: 0.86;
+    }
+
+    .real-driver-footer {
+        position: absolute;
+        left: 0.85rem;
+        right: 0.85rem;
+        bottom: 0.52rem;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.65rem;
+        align-items: end;
+        border-top: 1px solid rgba(56, 93, 131, 0.18);
+        padding-top: 0.38rem;
+    }
+
+    .real-driver-mrz {
+        min-width: 0;
+        color: rgba(16, 41, 70, 0.78);
+        font-family: "OCR A Std", "Courier New", monospace;
+        font-size: clamp(0.46rem, 1.1vw, 0.62rem);
+        line-height: 1.15;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+    }
+
+    .real-driver-valid {
+        color: rgba(23, 52, 95, 0.70);
+        font-size: 0.55rem;
+        line-height: 1.15;
+        text-align: right;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+    }
+
+    @media (max-width: 520px) {
+        .real-driver-card {
+            min-width: 360px;
+        }
+        .real-driver-body {
+            grid-template-columns: 5.25rem minmax(0, 1fr) 3.45rem;
+            gap: 0.55rem;
+        }
+        .real-driver-photo {
+            width: 5.25rem;
+            height: 6.55rem;
+        }
+        .real-driver-holo,
+        .real-driver-qr {
+            width: 3.35rem;
+            height: 3.35rem;
+        }
+    }
+
+
     .service-admin-card {
         position: relative;
         overflow: hidden;
@@ -984,14 +1325,17 @@
             {% if fahrerkarte_status == 'issued' %}
             <div class="glass-card p-6 relative overflow-hidden border border-[var(--brand-green)]/25">
                 <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/8 to-transparent pointer-events-none"></div>
-                <div class="relative z-10 flex flex-col lg:flex-row gap-6">
-                    <div class="flex-1">
-                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Aktive Fahrerkarte</span>
-                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Karte bereitgestellt</h2>
-                        <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
-                            Deine personalisierte Fahrerkarte ist im System aktiv. Avatar und PDF werden direkt aus der Datenbank geladen, damit der Tracker später keine PDF erneut hochladen muss.
-                        </p>
-                        <div class="mt-5 flex flex-wrap gap-3">
+                <div class="relative z-10">
+                    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
+                        <div class="min-w-0">
+                            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Aktive Karten</span>
+                            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Servicekarte & realitätsnahe Fahrerkarte bereitgestellt</h2>
+                            <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed max-w-3xl">
+                                Die bestehende moderne Karte bleibt als interne Servicekarte erhalten. Zusätzlich wird eine getrennte, realitätsnahe Fahrerkarte im amtlichen Dokumentstil angezeigt.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-3">
                             <a href="{{ fahrerkarte_download_url }}" download="{{ fahrerkarte_pdf_filename }}" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/30 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
                                 PDF herunterladen
                             </a>
@@ -1004,41 +1348,117 @@
                         </div>
                     </div>
 
-                    <div class="w-full lg:w-[360px]">
-                        <div class="fahrerkarte-id-card">
-                            <div class="fahrerkarte-id-head">
-                                <div class="fahrerkarte-id-logo">EL</div>
-                                <div class="fahrerkarte-id-title">
-                                    <strong>FAHRERKARTE</strong>
-                                    <span>Bundesrepublik EifelLog</span>
-                                </div>
-                                <span class="fahrerkarte-id-badge">Intern</span>
+                    <div class="dual-card-preview-grid">
+                        <section class="min-w-0">
+                            <div class="card-preview-label">
+                                <span>Servicekarte</span>
+                                <span>Intern aktiv</span>
                             </div>
-                            <div class="fahrerkarte-id-body">
-                                {% if fahrerkarte_avatar_url %}
-                                    <img class="fahrerkarte-id-avatar" src="{{ fahrerkarte_avatar_url }}" alt="Discord Avatar auf Fahrerkarte" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fahrerkarte-id-avatar-fallback',innerHTML:'<svg class=\'w-10 h-10 text-white\' fill=\'currentColor\' viewBox=\'0 0 24 24\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>'}));">
-                                {% else %}
-                                    <div class="fahrerkarte-id-avatar-fallback">
-                                        <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+
+                            <div class="fahrerkarte-id-card">
+                                <div class="fahrerkarte-id-head">
+                                    <div class="fahrerkarte-id-logo">EL</div>
+                                    <div class="fahrerkarte-id-title">
+                                        <strong>SERVICEKARTE</strong>
+                                        <span>EifelLog ServiceCenter</span>
                                     </div>
-                                {% endif %}
-                                <div class="fahrerkarte-id-fields">
-                                    <strong>{{ fahrerkarte_name }}</strong>
-                                    <p><b>1.</b> {{ fahrerkarte_role }}</p>
-                                    <p><b>2.</b> {{ current_user_id }}</p>
-                                    <p><b>3.</b> {{ fahrerkarte_issued_at }}</p>
-                                    <p><b>4a.</b> Web-ServiceCenter</p>
-                                    <p><b>4b.</b> Aktiv</p>
-                                    <p><b>5a.</b> {{ fahrerkarte_card_id }}</p>
-                                    <p><b>5b.</b> Digitale Ausgabe</p>
-                                    <div class="fahrerkarte-id-signature">{{ fahrerkarte_handler }}</div>
+                                    <span class="fahrerkarte-id-badge">Intern</span>
+                                </div>
+                                <div class="fahrerkarte-id-body">
+                                    {% if fahrerkarte_avatar_url %}
+                                        <img class="fahrerkarte-id-avatar" src="{{ fahrerkarte_avatar_url }}" alt="Discord Avatar auf Servicekarte" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fahrerkarte-id-avatar-fallback',innerHTML:'<svg class=\'w-10 h-10 text-white\' fill=\'currentColor\' viewBox=\'0 0 24 24\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>'}));">
+                                    {% else %}
+                                        <div class="fahrerkarte-id-avatar-fallback">
+                                            <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                        </div>
+                                    {% endif %}
+                                    <div class="fahrerkarte-id-fields">
+                                        <strong>{{ fahrerkarte_name }}</strong>
+                                        <p><b>1.</b> {{ fahrerkarte_role }}</p>
+                                        <p><b>2.</b> {{ current_user_id }}</p>
+                                        <p><b>3.</b> {{ fahrerkarte_issued_at }}</p>
+                                        <p><b>4a.</b> Web-ServiceCenter</p>
+                                        <p><b>4b.</b> Aktiv</p>
+                                        <p><b>5a.</b> {{ fahrerkarte_service_card_id }}</p>
+                                        <p><b>5b.</b> Interne digitale Ausgabe</p>
+                                        <div class="fahrerkarte-id-signature">{{ fahrerkarte_handler }}</div>
+                                    </div>
+                                </div>
+                                <div class="fahrerkarte-id-foot">
+                                    <span>Interne Servicekarte</span>
+                                    <span>Verknüpft mit Fahrerkarte</span>
                                 </div>
                             </div>
-                            <div class="fahrerkarte-id-foot">
-                                <span>Interne digitale Fahrerkarte</span>
-                                <span>Kein amtliches Dokument</span>
+                        </section>
+
+                        <section class="min-w-0">
+                            <div class="card-preview-label">
+                                <span>Realitätsnahe Fahrerkarte</span>
+                                <span>Dokumentenstil</span>
                             </div>
-                        </div>
+
+                            <div class="real-driver-card-wrap custom-scrollbar">
+                                <div class="real-driver-card" aria-label="Realitätsnahe digitale Fahrerkarte">
+                                    <div class="real-driver-head">
+                                        <div class="real-eu-mark">EU</div>
+                                        <div class="real-driver-title">
+                                            <strong>Fahrerkarte</strong>
+                                            <span>Driver Card · Bundesrepublik EifelLog</span>
+                                        </div>
+                                        <div class="real-driver-chip" aria-hidden="true"></div>
+                                    </div>
+
+                                    <div class="real-driver-body">
+                                        <div class="real-driver-photo">
+                                            {% if fahrerkarte_avatar_url %}
+                                                <img src="{{ fahrerkarte_avatar_url }}" alt="Passbild auf Fahrerkarte" onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
+                                                <div class="real-driver-photo-fallback hidden">
+                                                    <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                                </div>
+                                            {% else %}
+                                                <div class="real-driver-photo-fallback">
+                                                    <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="real-driver-fields">
+                                            <p class="real-driver-name">{{ fahrerkarte_name }}</p>
+                                            <div class="real-driver-field"><b>1.</b><span>{{ fahrerkarte_name }}</span></div>
+                                            <div class="real-driver-field"><b>2.</b><span>{{ fahrerkarte_role }}</span></div>
+                                            <div class="real-driver-field"><b>3.</b><span>{{ fahrerkarte_birthdate }}</span></div>
+                                            <div class="real-driver-field"><b>4a.</b><span>{{ fahrerkarte_issued_at }}</span></div>
+                                            <div class="real-driver-field"><b>4b.</b><span>{{ fahrerkarte_expiry_at }}</span></div>
+                                            <div class="real-driver-field"><b>4c.</b><span>{{ fahrerkarte_authority }}</span></div>
+                                            <div class="real-driver-field"><b>5a.</b><span>{{ fahrerkarte_card_id }}</span></div>
+                                            <div class="real-driver-field"><b>5b.</b><span>{{ fahrerkarte_license_number }}</span></div>
+                                            <div class="real-driver-field"><b>9.</b><span>Digitale Fahrerkarte · intern verifiziert</span></div>
+                                        </div>
+
+                                        <div class="real-driver-side">
+                                            <div class="real-driver-holo" title="Hologramm-Simulation"></div>
+                                            <a href="{{ fahrerkarte_verify_url }}" class="real-driver-qr" title="Fahrerkarte verifizieren" aria-label="Fahrerkarte verifizieren"></a>
+                                        </div>
+                                    </div>
+
+                                    <div class="real-driver-footer">
+                                        <div class="real-driver-mrz">
+                                            D&lt;&lt;{{ fahrerkarte_name|upper|replace(' ', '&lt;') }}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br>
+                                            EL{{ fahrerkarte_card_id|replace('-', '')|upper }}&lt;&lt;{{ current_user_id }}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+                                        </div>
+                                        <div class="real-driver-valid">
+                                            gültig<br>aktiv
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="mt-5 rounded-2xl bg-black/25 border border-white/10 p-4">
+                        <p class="text-xs text-[var(--muted)] font-inter leading-relaxed">
+                            Servicekarte und Fahrerkarte nutzen dieselben geprüften Stammdaten, sind aber visuell und funktional getrennt: Die Servicekarte ist für interne Portal-Zugriffe gedacht, die Fahrerkarte für realitätsnahe Kontrolle, PDF-Ausgabe und Verifikation.
+                        </p>
                     </div>
                 </div>
             </div>
