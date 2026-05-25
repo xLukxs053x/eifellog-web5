@@ -1455,16 +1455,32 @@ WARTUNG_JSON_PATH = os.path.join(BASE_DIR, "wartung.json")
 
 DEFAULT_WARTUNG_CONFIG = {
     "enabled": False,
+    "active": False,
+    "aktiv": False,
+
     "allow_login_button": True,
+    "login_button_allowed": True,
+    "login_button_enabled": True,
+    "anmelde_button_freigeben": True,
+
     "title": "Wartungsarbeiten",
     "tag": "Geplante Wartung",
     "day": "",
     "datum": "",
+
     "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.",
     "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.",
+
     "deadline": "",
+    "deadline_display": "",
     "deadline_label": "Voraussichtlich wieder online",
+
     "allowed_role_ids": [],
+    "erlaubte_role_ids": [],
+
+    "features": [],
+    "roadmap": [],
+
     "api_token": "",
     "updated_at": ""
 }
@@ -1487,6 +1503,8 @@ def normalize_wartung_config(config):
         normalized["allow_login_button"] = config.get("anmelde_button_freigeben")
     if "login_button_enabled" in config and "allow_login_button" not in config:
         normalized["allow_login_button"] = config.get("login_button_enabled")
+    if "login_button_allowed" in config and "allow_login_button" not in config:
+        normalized["allow_login_button"] = config.get("login_button_allowed")
 
     if "rolle_ids" in config and not config.get("allowed_role_ids"):
         normalized["allowed_role_ids"] = config.get("rolle_ids")
@@ -1506,15 +1524,29 @@ def normalize_wartung_config(config):
     if "day" not in config and "datum" in config:
         normalized["day"] = config.get("datum")
 
-    for key in ("title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_label", "api_token", "updated_at"):
+    for key in ("title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_display", "deadline_label", "api_token", "updated_at"):
         normalized[key] = safe_str(normalized.get(key), DEFAULT_WARTUNG_CONFIG.get(key, ""))
+
+    features = normalized.get("features") or []
+    if not isinstance(features, list):
+        features = []
+    normalized["features"] = [item for item in features if isinstance(item, dict)]
+
+    roadmap = normalized.get("roadmap") or []
+    if not isinstance(roadmap, list):
+        roadmap = []
+    normalized["roadmap"] = [item for item in roadmap if isinstance(item, dict)]
 
     # Aliasse zusätzlich ausgeben, damit hub.html später flexibel darauf zugreifen kann.
     normalized["active"] = normalized["enabled"]
     normalized["aktiv"] = normalized["enabled"]
     normalized["anmelde_button_freigeben"] = normalized["allow_login_button"]
+    normalized["login_button_allowed"] = normalized["allow_login_button"]
     normalized["login_button_enabled"] = normalized["allow_login_button"]
     normalized["erlaubte_role_ids"] = normalized["allowed_role_ids"]
+
+    if not normalized.get("deadline_display"):
+        normalized["deadline_display"] = format_wartung_deadline(normalized)
 
     return normalized
 
@@ -1594,10 +1626,14 @@ def format_wartung_deadline(config=None):
 
 
 def wartung_payload(config=None):
-    config = config or load_wartung_config()
+    config = normalize_wartung_config(config or load_wartung_config())
     payload = dict(config)
-    payload["deadline_display"] = format_wartung_deadline(config)
+    payload["deadline_display"] = safe_str(payload.get("deadline_display")) or format_wartung_deadline(config)
     payload["login_button_allowed"] = wartung_login_button_allowed(config)
+    payload["login_button_enabled"] = payload["login_button_allowed"]
+    payload["anmelde_button_freigeben"] = payload["login_button_allowed"]
+    payload["features"] = payload.get("features") or []
+    payload["roadmap"] = payload.get("roadmap") or []
     return payload
 
 
@@ -1738,9 +1774,9 @@ def api_wartungsarbeiten(state=None):
             return jsonify({"success": False, "message": "Wartungs-API-Token fehlt oder ist falsch."}), 403
 
         editable_fields = {
-            "allow_login_button", "anmelde_button_freigeben", "login_button_enabled",
-            "title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_label",
-            "allowed_role_ids", "erlaubte_role_ids", "rolle_ids", "api_token"
+            "allow_login_button", "login_button_allowed", "anmelde_button_freigeben", "login_button_enabled",
+            "title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_display", "deadline_label",
+            "allowed_role_ids", "erlaubte_role_ids", "rolle_ids", "features", "roadmap", "api_token"
         }
         for field in editable_fields:
             if field in body:
