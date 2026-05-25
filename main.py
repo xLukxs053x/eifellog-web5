@@ -4654,8 +4654,15 @@ def tracker_public_file_url(relative_path):
 
 
 def tracker_request_payload():
-    """Vereinheitlicht Tracker-Parameter aus JSON, Form-Daten und Query-String."""
+    """Vereinheitlicht Tracker-Parameter aus JSON, Form-Daten und Query-String.
+
+    Wichtig fuer WebView2/Tracker-Clients: Manche Clients senden nicht sauber
+    multipart/form-data, sondern Base64-JSON, eine rohe JSON-Zeichenkette oder
+    Formfelder mit Base64-Inhalt. Deshalb wird hier nichts verworfen, nur weil
+    es nicht exakt ein Dict ist.
+    """
     payload = {}
+
     try:
         if request.form:
             payload.update(request.form.to_dict(flat=True))
@@ -4665,6 +4672,8 @@ def tracker_request_payload():
     json_payload = request.get_json(silent=True)
     if isinstance(json_payload, dict):
         payload.update(json_payload)
+    elif json_payload not in (None, ""):
+        payload["_json_raw"] = json_payload
 
     try:
         if request.args:
@@ -4673,41 +4682,250 @@ def tracker_request_payload():
     except Exception:
         pass
 
+    # Fallback fuer Clients, die text/plain oder eine nackte JSON-/Base64-Zeichenkette senden.
+    # Bei Multipart wird der Body nicht manuell gelesen, damit Werkzeug die Uploads sauber parsen kann.
+    try:
+        content_type = safe_str(request.headers.get("Content-Type")).lower()
+        if not payload and not content_type.startswith("multipart/form-data"):
+            raw_text = request.get_data(cache=True, as_text=True) or ""
+            raw_text = raw_text.strip()
+            if raw_text:
+                try:
+                    decoded = json.loads(raw_text)
+                    if isinstance(decoded, dict):
+                        payload.update(decoded)
+                    else:
+                        payload["_raw_body"] = decoded
+                except Exception:
+                    payload["_raw_text"] = raw_text
+    except Exception:
+        pass
+
     return payload
 
 
 def tracker_decode_base64_pdf(value):
-    value = safe_str(value)
-    if not value:
+    """Dekodiert PDF-Daten aus Base64/Data-URL/Buffer-Array/Raw-Bytes.
+
+    Gibt b"" zurueck, wenn kein brauchbarer Byte-Stream gelesen werden konnte.
+    Die echte PDF-Pruefung erfolgt danach separat ueber tracker_pdf_bytes_look_valid().
+    """
+    if value is None:
         return b""
-    if "," in value and value.lower().startswith("data:"):
-        value = value.split(",", 1)[1]
-    value = re.sub(r"\s+", "", value)
+
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+
+    # Node/JS-Buffer aus JSON, z. B. {"type":"Buffer","data":[37,80,68,70,...]}
+    if isinstance(value, dict):
+        data = value.get("data")
+        if isinstance(data, list) and all(isinstance(item, int) for item in data):
+            try:
+                return bytes(item & 0xFF for item in data)
+            except Exception:
+                return b""
+
+        for key in (
+            "pdfBase64", "base64", "dataUrl", "data_url", "content", "body",
+            "value", "file", "pdf", "driverCardPdf", "fahrerkartePdf", "buffer"
+        ):
+            if key in value:
+                decoded = tracker_decode_base64_pdf(value.get(key))
+                if decoded:
+                    return decoded
+        return b""
+
+    if isinstance(value, (list, tuple)):
+        if value and all(isinstance(item, int) for item in value):
+            try:
+                return bytes(item & 0xFF for item in value)
+            except Exception:
+                return b""
+        for item in value:
+            decoded = tracker_decode_base64_pdf(item)
+            if decoded:
+                return decoded
+        return b""
+
+    text_value = safe_str(value)
+    if not text_value:
+        return b""
+
+    # Falls ein Client versehentlich den PDF-Text direkt sendet.
+    if text_value.lstrip().startswith("%PDF"):
+        return text_value.encode("latin-1", errors="ignore")
+
     try:
-        return base64.b64decode(value, validate=False)
+        from urllib.parse import unquote
+        text_value = unquote(text_value)
     except Exception:
+        pass
+
+    text_value = text_value.strip().strip('"').strip("'")
+    if "," in text_value and text_value.lower().startswith("data:"):
+        meta, encoded = text_value.split(",", 1)
+        # Nur PDF/Data-URLs oder generische Base64-Data-URLs akzeptieren.
+        if "base64" in meta.lower():
+            text_value = encoded
+
+    text_value = re.sub(r"\s+", "", text_value)
+    if not text_value:
         return b""
+
+    # Padding reparieren, weil einige Clients Base64 ohne '=' senden.
+    missing_padding = len(text_value) % 4
+    if missing_padding:
+        text_value += "=" * (4 - missing_padding)
+
+    for altchars in (None, b"-_"):
+        try:
+            if altchars is None:
+                return base64.b64decode(text_value, validate=False)
+            return base64.b64decode(text_value, altchars=altchars, validate=False)
+        except Exception:
+            continue
+    return b""
 
 
 def tracker_pdf_bytes_look_valid(pdf_bytes):
     if not pdf_bytes:
         return False
-    return pdf_bytes[:8].lstrip().startswith(b"%PDF") or b"%PDF" in pdf_bytes[:32]
+    return pdf_bytes[:8].lstrip().startswith(b"%PDF") or b"%PDF" in pdf_bytes[:64]
+
+
+def tracker_collect_pdf_payload_candidates(value, path="payload", depth=0):
+    """Sammelt moegliche PDF/Base64-Werte rekursiv aus JSON/Form-Payloads."""
+    if depth > 5 or value is None:
+        return []
+
+    candidates = []
+
+    if isinstance(value, (bytes, bytearray)):
+        return [(path, value)]
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        # Nicht jeden kurzen Text testen, aber Data-URLs, Raw-PDFs und typische Base64-Laengen.
+        if stripped.startswith("data:") or stripped.lstrip().startswith("%PDF") or len(stripped) >= 40:
+            return [(path, value)]
+        return []
+
+    if isinstance(value, (list, tuple)):
+        if value and all(isinstance(item, int) for item in value):
+            return [(path, value)]
+        for index, item in enumerate(value[:20]):
+            candidates.extend(tracker_collect_pdf_payload_candidates(item, f"{path}[{index}]", depth + 1))
+        return candidates
+
+    if isinstance(value, dict):
+        preferred_keys = (
+            "pdfBase64", "driverCardPdfBase64", "driver_card_pdf_base64",
+            "fahrerkartePdfBase64", "fahrerkarte_pdf_base64", "fileBase64",
+            "file_base64", "base64", "dataUrl", "data_url", "pdf", "file",
+            "driverCardPdf", "driver_card_pdf", "fahrerkartePdf", "fahrerkarte_pdf",
+            "document", "upload", "content", "body", "value", "buffer", "data"
+        )
+
+        seen = set()
+        ordered_keys = []
+        for key in preferred_keys:
+            if key in value and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in value.keys():
+            key_lc = safe_str(key).lower()
+            if key not in seen and any(marker in key_lc for marker in ("pdf", "file", "base64", "data", "content", "body", "upload", "karte")):
+                ordered_keys.append(key)
+                seen.add(key)
+
+        for key in ordered_keys:
+            candidates.extend(tracker_collect_pdf_payload_candidates(value.get(key), f"{path}.{key}", depth + 1))
+        return candidates
+
+    return []
+
+
+def tracker_guess_upload_filename(payload=None, candidate_path=""):
+    payload = payload or {}
+    filename_keys = (
+        "fileName", "filename", "originalFilename", "original_file_name",
+        "name", "pdfName", "pdfFilename", "driverCardPdfName", "fahrerkartePdfName"
+    )
+
+    def scan(value, depth=0):
+        if depth > 4 or value is None:
+            return ""
+        if isinstance(value, dict):
+            for key in filename_keys:
+                candidate = safe_str(value.get(key))
+                if candidate:
+                    return candidate
+            for nested_key in ("file", "pdf", "driverCard", "driver_card", "card", "fahrerkarte", "document", "upload"):
+                if nested_key in value:
+                    candidate = scan(value.get(nested_key), depth + 1)
+                    if candidate:
+                        return candidate
+        if isinstance(value, (list, tuple)):
+            for item in value[:10]:
+                candidate = scan(item, depth + 1)
+                if candidate:
+                    return candidate
+        return ""
+
+    guessed = scan(payload)
+    if not guessed:
+        # Aus Pfaden wie payload.file.name wird kein Dateiname gebaut; fallback bleibt sauber.
+        guessed = "fahrerkarte.pdf"
+
+    guessed = secure_filename(guessed) or "fahrerkarte.pdf"
+    if "." not in guessed:
+        guessed = f"{guessed}.pdf"
+    if not tracker_allowed_driver_card_file(guessed):
+        guessed = "fahrerkarte.pdf"
+    return guessed
+
+
+def tracker_upload_debug_context(payload=None):
+    payload = payload or {}
+    try:
+        file_fields = list(request.files.keys())
+    except Exception:
+        file_fields = []
+    try:
+        form_fields = list(request.form.keys())
+    except Exception:
+        form_fields = []
+    try:
+        json_fields = list(payload.keys()) if isinstance(payload, dict) else []
+    except Exception:
+        json_fields = []
+
+    return {
+        "contentType": safe_str(request.headers.get("Content-Type")),
+        "fileFields": file_fields,
+        "formFields": form_fields,
+        "payloadFields": json_fields,
+    }
 
 
 def tracker_extract_driver_card_upload(payload=None):
     """Liest eine Fahrerkarte-PDF robust aus Multipart, JSON/Base64 oder Raw-PDF-Body.
 
-    Der alte Endpoint hat nur request.files['file'|'pdf'|'driverCardPdf'] akzeptiert.
-    Einige Tracker/WebView-Versionen senden die Datei aber als anderes Feld, als Base64-JSON
-    oder direkt als application/pdf. Dadurch kam fälschlich: 'Keine PDF-Datei erhalten.'.
+    Akzeptiert jetzt bewusst mehrere Client-Varianten:
+    - multipart/form-data mit beliebigem Dateifeld
+    - JSON/Form-Base64 unter pdfBase64, pdf, file, driverCardPdf, dataUrl, usw.
+    - verschachtelte Objekte wie driverCard.pdfBase64 oder file.data
+    - Node-Buffer-JSON {type:"Buffer", data:[...]}
+    - application/pdf oder octet-stream als Raw-Body
     """
     payload = payload or tracker_request_payload()
 
     preferred_file_fields = (
         "file", "pdf", "driverCardPdf", "driver_card_pdf", "driverCard",
         "fahrerkarte", "fahrerkartePdf", "fahrerkarte_pdf", "cardPdf",
-        "document", "upload", "data", "files", "files[]"
+        "document", "upload", "data", "files", "files[]", "pdfFile", "card_pdf"
     )
 
     file_candidates = []
@@ -4727,9 +4945,7 @@ def tracker_extract_driver_card_upload(payload=None):
     for field_name, uploaded_file in file_candidates:
         original_filename = secure_filename(uploaded_file.filename or "")
         if not original_filename:
-            original_filename = secure_filename(safe_str(payload.get("fileName") or payload.get("filename") or payload.get("originalFilename")))
-        if not original_filename:
-            original_filename = "fahrerkarte.pdf"
+            original_filename = tracker_guess_upload_filename(payload)
         if "." not in original_filename:
             original_filename = f"{original_filename}.pdf"
 
@@ -4748,24 +4964,19 @@ def tracker_extract_driver_card_upload(payload=None):
 
         return original_filename, pdf_bytes, f"multipart:{field_name}"
 
-    base64_fields = (
-        "pdfBase64", "driverCardPdfBase64", "driver_card_pdf_base64",
-        "fahrerkartePdfBase64", "fahrerkarte_pdf_base64", "fileBase64",
-        "file_base64", "base64", "dataUrl", "data_url"
-    )
-    for field_name in base64_fields:
-        pdf_bytes = tracker_decode_base64_pdf(payload.get(field_name))
-        if pdf_bytes:
-            original_filename = secure_filename(safe_str(payload.get("fileName") or payload.get("filename") or payload.get("originalFilename"))) or "fahrerkarte.pdf"
-            if "." not in original_filename:
-                original_filename = f"{original_filename}.pdf"
-            if not tracker_allowed_driver_card_file(original_filename):
-                original_filename = "fahrerkarte.pdf"
-            if not tracker_pdf_bytes_look_valid(pdf_bytes):
-                return None, None, "Die Base64-Datei ist keine gültige PDF-Datei."
-            return original_filename, pdf_bytes, f"json:{field_name}"
+    # JSON/Form-Base64: rekursiv suchen, damit auch {driverCard:{pdf:'...'}} oder {file:{data:[...]}}
+    # funktioniert. Vorherige Version hat z. B. JSON-Feld 'pdf' als Base64 nicht akzeptiert.
+    for candidate_path, candidate_value in tracker_collect_pdf_payload_candidates(payload):
+        pdf_bytes = tracker_decode_base64_pdf(candidate_value)
+        if not pdf_bytes:
+            continue
+        if not tracker_pdf_bytes_look_valid(pdf_bytes):
+            continue
+        original_filename = tracker_guess_upload_filename(payload, candidate_path=candidate_path)
+        return original_filename, pdf_bytes, f"payload:{candidate_path}"
 
-    content_type = safe_str(request.headers.get("Content-Type")).split(";", 1)[0].lower()
+    content_type_header = safe_str(request.headers.get("Content-Type"))
+    content_type = content_type_header.split(";", 1)[0].lower()
     if content_type in {"application/pdf", "application/octet-stream", "binary/octet-stream"}:
         raw_bytes = request.get_data(cache=True) or b""
         if raw_bytes:
@@ -4783,8 +4994,13 @@ def tracker_extract_driver_card_upload(payload=None):
                 return None, None, "Der Request-Body ist keine gültige PDF-Datei."
             return original_filename, raw_bytes, "raw-body"
 
-    return None, None, "Keine PDF-Datei erhalten. Sende multipart/form-data mit Feld 'file' oder JSON mit 'pdfBase64'."
+    if content_type == "multipart/form-data" and "boundary=" not in content_type_header.lower():
+        return None, None, (
+            "Multipart-Upload ist fehlerhaft: Content-Type wurde ohne boundary gesendet. "
+            "Im Client FormData verwenden und den Content-Type nicht manuell setzen."
+        )
 
+    return None, None, "Keine PDF-Datei erhalten. Sende multipart/form-data mit Feld 'file' oder JSON mit 'pdfBase64', 'pdf' oder 'file'."
 
 def tracker_resolve_driver_card_pdf_path(card_doc):
     card_doc = card_doc or {}
@@ -10126,6 +10342,9 @@ def tracker_driver_card():
 
 
 @app.route("/api/tracker/driver-card/upload", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/upload", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/pdf/upload", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/file", methods=["POST", "OPTIONS"])
 def tracker_driver_card_upload():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -10137,7 +10356,11 @@ def tracker_driver_card_upload():
 
     original_filename, pdf_bytes, upload_source_or_error = tracker_extract_driver_card_upload(payload)
     if not pdf_bytes:
-        return jsonify({"success": False, "error": upload_source_or_error or "Keine PDF-Datei erhalten."}), 400
+        return jsonify({
+            "success": False,
+            "error": upload_source_or_error or "Keine PDF-Datei erhalten.",
+            "debug": tracker_upload_debug_context(payload),
+        }), 400
 
     original_filename = secure_filename(original_filename or "fahrerkarte.pdf")
     if "." not in original_filename:
