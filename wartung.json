@@ -1,0 +1,18 @@
+{
+  "enabled": false,
+  "allow_login_button": true,
+  "title": "Wartungsarbeiten",
+  "tag": "Geplante Wartung",
+  "day": "Dienstag",
+  "datum": "26.05.2026",
+  "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.",
+  "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.",
+  "deadline": "2026-05-26 17:00",
+  "deadline_label": "Voraussichtlich wieder online",
+  "allowed_role_ids": [
+    "1473721587122438322",
+    "1473721587122438321"
+  ],
+  "api_token": "",
+  "updated_at": ""
+}
