@@ -14,9 +14,9 @@
   "day": "Montag",
   "datum": "25.05.2026",
 
-  "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.",
+  "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch. Dabei werden zentrale Bereiche des Systems überarbeitet, Fehler behoben und neue Verbesserungen vorbereitet.",
 
-  "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.",
+  "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich. Wir arbeiten an ServiceCenter, interner Kommunikation, PDF-Uploads, Serverstabilität und weiteren Systemverbesserungen.",
 
   "deadline": "2026-05-26 17:00",
   "deadline_display": "26.05.2026 17:00",
@@ -30,6 +30,104 @@
   "erlaubte_role_ids": [
     "1473721587122438322",
     "1473721587122438321"
+  ],
+
+  "features": [
+    {
+      "title": "ServiceCenter Überarbeitung",
+      "description": "Das ServiceCenter wird technisch und optisch überarbeitet, damit Anträge, Fahrerkarte-Prozesse und interne Bearbeitungen stabiler laufen.",
+      "status": "In Arbeit"
+    },
+    {
+      "title": "Interne Kommunikation",
+      "description": "Die interne Kommunikation im Hub wird verbessert, damit Nachrichten, Hinweise und Systemmeldungen klarer und zuverlässiger angezeigt werden.",
+      "status": "In Arbeit"
+    },
+    {
+      "title": "PDF-Upload Fehlerbehebung",
+      "description": "Fehler beim Hochladen und Verarbeiten von PDF-Dateien werden behoben. Dazu gehören Upload-Abbrüche, ungültige Rückmeldungen und Probleme bei der Speicherung.",
+      "status": "Fehlerbehebung"
+    },
+    {
+      "title": "Interner Serverfehler Behebung",
+      "description": "Mehrere Ursachen für interne Serverfehler werden geprüft und behoben, damit der Hub stabiler und zuverlässiger erreichbar bleibt.",
+      "status": "Fehlerbehebung"
+    },
+    {
+      "title": "Login- und Rollenprüfung",
+      "description": "Die Anmeldung über Discord sowie die Rollenfreigabe während Wartungsarbeiten werden weiter abgesichert und sauberer geprüft.",
+      "status": "Überarbeitung"
+    },
+    {
+      "title": "Dashboard Stabilität",
+      "description": "Das Dashboard wird auf Ladefehler, fehlerhafte Datenanzeigen und Performance-Probleme überprüft und optimiert.",
+      "status": "Optimierung"
+    },
+    {
+      "title": "Systemdokumente und Benachrichtigungen",
+      "description": "Systemdokumente, Hinweise und wichtige Benachrichtigungen werden verbessert, damit Nutzer relevante Informationen schneller finden.",
+      "status": "Verbesserung"
+    },
+    {
+      "title": "Sicherheits- und Session-Handling",
+      "description": "Bestehende Sitzungen, Wartungsfreigaben und geschützte Bereiche werden serverseitig geprüft, damit der Wartungsmodus global zuverlässig greift.",
+      "status": "Sicherheitsupdate"
+    },
+    {
+      "title": "Performance Updates",
+      "description": "Mehrere Bereiche des Hubs werden optimiert, damit Seiten schneller laden und API-Anfragen stabiler verarbeitet werden.",
+      "status": "Optimierung"
+    },
+    {
+      "title": "Weitere Systemverbesserungen",
+      "description": "Zusätzlich werden kleinere Fehler, Layout-Probleme und interne Abläufe überarbeitet.",
+      "status": "Geplant"
+    }
+  ],
+
+  "roadmap": [
+    {
+      "title": "Wartungsmodus aktivieren",
+      "description": "Der Hub wird global in den Wartungsmodus gesetzt, damit keine normalen Nutzer während der Arbeiten auf interne Bereiche zugreifen.",
+      "status": "Erledigt",
+      "eta": "Phase 1"
+    },
+    {
+      "title": "ServiceCenter prüfen und überarbeiten",
+      "description": "ServiceCenter-Funktionen, Antragsprozesse und Bearbeitungsansichten werden kontrolliert und verbessert.",
+      "status": "In Arbeit",
+      "eta": "Phase 2"
+    },
+    {
+      "title": "PDF-Upload und Dateiverarbeitung reparieren",
+      "description": "PDF-Uploads, Speicherlogik und Serverantworten werden geprüft, damit Uploads wieder zuverlässig funktionieren.",
+      "status": "In Arbeit",
+      "eta": "Phase 2"
+    },
+    {
+      "title": "Interne Kommunikation verbessern",
+      "description": "Nachrichten, Hinweise und interne Systemmeldungen werden überarbeitet und stabiler angebunden.",
+      "status": "Geplant",
+      "eta": "Phase 3"
+    },
+    {
+      "title": "Interne Serverfehler beheben",
+      "description": "Fehlerquellen im Backend werden analysiert und korrigiert, um 500-Fehler und unerwartete Abbrüche zu reduzieren.",
+      "status": "In Arbeit",
+      "eta": "Phase 3"
+    },
+    {
+      "title": "Dashboard und Hub testen",
+      "description": "Nach den Änderungen werden Dashboard, Login, ServiceCenter, Dokumente und Uploads getestet.",
+      "status": "Geplant",
+      "eta": "Phase 4"
+    },
+    {
+      "title": "System wieder freigeben",
+      "description": "Nach erfolgreichem Test wird der Wartungsmodus deaktiviert und der Hub wieder für alle berechtigten Nutzer geöffnet.",
+      "status": "Geplant",
+      "eta": "Phase 5"
+    }
   ],
 
   "api_token": "",

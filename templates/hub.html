@@ -13,13 +13,16 @@
 {% set is_wartung = wartung_active|default(w.get('enabled', false)) or w.get('active', false) or w.get('aktiv', false) %}
 {% set login_allowed = wartung_login_allowed|default(w.get('allow_login_button', true)) %}
 {% set deadline_text = wartung_deadline_text|default(w.get('deadline_display', w.get('deadline', ''))) %}
+{% set deadline_raw = w.get('deadline', '') %}
+{% set features = w.get('features', w.get('neue_features', w.get('updates', []))) %}
+{% set roadmap = w.get('roadmap', w.get('roadmap_items', [])) %}
 
-<section class="flex-grow flex items-center justify-center min-h-[70vh] py-12">
+<section class="flex-grow flex items-center justify-center min-h-[70vh] py-12 px-4">
 
     {% if is_wartung %}
 
     <!-- Wartungsmodus Card -->
-    <div class="glass-card p-10 md:p-14 max-w-2xl w-full relative overflow-hidden text-center z-10">
+    <div class="glass-card p-8 md:p-12 max-w-5xl w-full relative overflow-hidden text-center z-10">
 
         <!-- Background Ambient Glow -->
         <div class="absolute -top-24 -right-24 w-72 h-72 bg-yellow-400 rounded-full mix-blend-screen filter blur-[90px] opacity-20 pointer-events-none"></div>
@@ -61,6 +64,50 @@
             {% endif %}
         </div>
 
+        <!-- Countdown -->
+        {% if deadline_raw %}
+        <div class="relative z-10 mb-8">
+            <div class="rounded-2xl bg-black/25 border border-yellow-400/20 p-5 md:p-6 shadow-[0_0_30px_rgba(250,204,21,0.06)]">
+                <div class="flex items-center justify-center gap-3 mb-5">
+                    <div class="w-9 h-9 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest">
+                        Verbleibende Wartungszeit
+                    </h2>
+                </div>
+
+                <div id="maintenanceCountdown" data-deadline="{{ deadline_raw|e }}" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <div id="countDays" class="text-3xl md:text-4xl font-orbitron font-bold text-yellow-200">--</div>
+                        <div class="text-[10px] font-orbitron uppercase tracking-[0.2em] text-white/40 mt-1">Tage</div>
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <div id="countHours" class="text-3xl md:text-4xl font-orbitron font-bold text-yellow-200">--</div>
+                        <div class="text-[10px] font-orbitron uppercase tracking-[0.2em] text-white/40 mt-1">Stunden</div>
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <div id="countMinutes" class="text-3xl md:text-4xl font-orbitron font-bold text-yellow-200">--</div>
+                        <div class="text-[10px] font-orbitron uppercase tracking-[0.2em] text-white/40 mt-1">Minuten</div>
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <div id="countSeconds" class="text-3xl md:text-4xl font-orbitron font-bold text-yellow-200">--</div>
+                        <div class="text-[10px] font-orbitron uppercase tracking-[0.2em] text-white/40 mt-1">Sekunden</div>
+                    </div>
+                </div>
+
+                <p id="countdownStatus" class="text-xs text-white/40 font-inter mt-4">
+                    Die Anzeige aktualisiert sich automatisch.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Grund -->
         <div class="relative z-10 text-left rounded-2xl bg-black/20 border border-white/10 p-6 mb-8">
             <div class="flex items-start gap-4">
@@ -85,6 +132,142 @@
         <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-8 relative z-10">
             {{ w.get('message', 'Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.') }}
         </p>
+
+        <!-- Features -->
+        {% if features and features|length > 0 %}
+        <div class="relative z-10 mb-8 text-left">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-9 h-9 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+
+                <div>
+                    <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest">
+                        Neue Features
+                    </h2>
+                    <p class="text-xs text-white/40 font-inter">
+                        Diese Punkte werden während der Wartung verbessert oder neu eingebaut.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                {% for feature in features %}
+                    {% if feature is mapping %}
+                    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 flex items-center justify-center mt-0.5">
+                                <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+
+                            <div>
+                                <h3 class="text-white font-orbitron text-sm font-bold mb-1">
+                                    {{ feature.get('title', feature.get('name', 'Feature')) }}
+                                </h3>
+                                <p class="text-sm text-white/60 font-inter leading-relaxed">
+                                    {{ feature.get('description', feature.get('text', 'Dieses Feature wird aktuell überarbeitet.')) }}
+                                </p>
+
+                                {% if feature.get('status') %}
+                                <span class="inline-flex mt-3 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-orbitron uppercase tracking-widest text-white/45">
+                                    {{ feature.get('status') }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 flex items-center justify-center mt-0.5">
+                                <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+
+                            <p class="text-sm text-white/70 font-inter leading-relaxed">
+                                {{ feature }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Roadmap -->
+        {% if roadmap and roadmap|length > 0 %}
+        <div class="relative z-10 mb-8 text-left">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-9 h-9 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 6.75V15m0 0l-3-3m3 3l3-3m6-6v8.25m0 0l-3-3m3 3l3-3M4.5 19.5h15"></path>
+                    </svg>
+                </div>
+
+                <div>
+                    <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest">
+                        Wartungs-Roadmap
+                    </h2>
+                    <p class="text-xs text-white/40 font-inter">
+                        Aktuelle Arbeiten, Umbauten und geplante Verbesserungen.
+                    </p>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-black/20 border border-white/10 p-5">
+                <div class="space-y-4">
+                    {% for step in roadmap %}
+                        {% if step is mapping %}
+                        <div class="relative pl-8 pb-4 border-l border-white/10 last:pb-0">
+                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-[#5865F2] shadow-[0_0_18px_rgba(88,101,242,0.6)]"></div>
+
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+                                <div>
+                                    <h3 class="text-white font-orbitron text-sm font-bold">
+                                        {{ step.get('title', step.get('name', 'Roadmap Punkt')) }}
+                                    </h3>
+
+                                    {% if step.get('description') or step.get('text') %}
+                                    <p class="text-sm text-white/60 font-inter leading-relaxed mt-1">
+                                        {{ step.get('description', step.get('text')) }}
+                                    </p>
+                                    {% endif %}
+                                </div>
+
+                                <div class="flex flex-wrap gap-2 md:justify-end">
+                                    {% if step.get('status') %}
+                                    <span class="inline-flex px-3 py-1 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#9ca3ff] text-[10px] font-orbitron uppercase tracking-widest">
+                                        {{ step.get('status') }}
+                                    </span>
+                                    {% endif %}
+
+                                    {% if step.get('eta') %}
+                                    <span class="inline-flex px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                        {{ step.get('eta') }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="relative pl-8 pb-4 border-l border-white/10 last:pb-0">
+                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-[#5865F2] shadow-[0_0_18px_rgba(88,101,242,0.6)]"></div>
+                            <p class="text-sm text-white/70 font-inter leading-relaxed">
+                                {{ step }}
+                            </p>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         {% if login_allowed %}
 
@@ -173,4 +356,82 @@
     {% endif %}
 
 </section>
+
+{% if is_wartung and deadline_raw %}
+<script>
+(function () {
+    const countdown = document.getElementById("maintenanceCountdown");
+    if (!countdown) return;
+
+    const rawDeadline = countdown.dataset.deadline;
+    if (!rawDeadline) return;
+
+    const normalizedDeadline = rawDeadline.trim().replace(" ", "T");
+    const targetDate = new Date(normalizedDeadline);
+
+    const daysElement = document.getElementById("countDays");
+    const hoursElement = document.getElementById("countHours");
+    const minutesElement = document.getElementById("countMinutes");
+    const secondsElement = document.getElementById("countSeconds");
+    const statusElement = document.getElementById("countdownStatus");
+
+    function pad(value) {
+        return String(value).padStart(2, "0");
+    }
+
+    function setValue(element, value) {
+        if (element) element.textContent = value;
+    }
+
+    function updateCountdown() {
+        if (Number.isNaN(targetDate.getTime())) {
+            setValue(daysElement, "--");
+            setValue(hoursElement, "--");
+            setValue(minutesElement, "--");
+            setValue(secondsElement, "--");
+
+            if (statusElement) {
+                statusElement.textContent = "Countdown konnte nicht geladen werden. Bitte Deadline in wartung.json prüfen.";
+            }
+
+            return;
+        }
+
+        const now = new Date();
+        const diff = targetDate.getTime() - now.getTime();
+
+        if (diff <= 0) {
+            setValue(daysElement, "00");
+            setValue(hoursElement, "00");
+            setValue(minutesElement, "00");
+            setValue(secondsElement, "00");
+
+            if (statusElement) {
+                statusElement.textContent = "Die angegebene Wartungszeit ist erreicht. Der Hub wird in Kürze wieder freigegeben.";
+            }
+
+            return;
+        }
+
+        const totalSeconds = Math.floor(diff / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        setValue(daysElement, pad(days));
+        setValue(hoursElement, pad(hours));
+        setValue(minutesElement, pad(minutes));
+        setValue(secondsElement, pad(seconds));
+
+        if (statusElement) {
+            statusElement.textContent = "Noch so lange dauern die geplanten Wartungsarbeiten voraussichtlich.";
+        }
+    }
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+})();
+</script>
+{% endif %}
 {% endblock %}
