@@ -1,6 +1,6 @@
 [
   {
-    "version": "v1.2.0",
+    "version": "v1.2.6",
     "tag": "Update",
     "is_latest": true,
     "date": "19. Mai 2026, 02:00 Uhr",
@@ -26,29 +26,6 @@
     ]
   },
   {
-    "version": "Servicecenter v1.0.0",
-    "tag": "Update",
-    "is_latest": false,
-    "date": "19. Mai 2026, 00:51 Uhr",
-    "added": [
-      "Servicecenter Version 1.0.0 hinzugefügt.",
-      "Fahrerkarten-System erweitert und implementiert.",
-      "Tour-Start erweitert: Touren können nun korrekt gestartet und gefahren werden.",
-      "Tourenbeleg im Discord wieder direkt im Embed hinterlegt.",
-      "Abrechnungssystem verbessert: Touren können nun sauber und korrekt abgerechnet werden.",
-      "Disposition für die EifelLog Edition am 18. Mai 2026 hinzugefügt."
-    ],
-    "changed": [
-      "HR-Controlling befindet sich weiterhin in Arbeit.",
-      "Personalakten-Anlage befindet sich weiterhin in Arbeit.",
-      "Protokolle über Sheets befinden sich weiterhin in Arbeit."
-    ],
-    "fixed": [
-      "Fehler behoben, durch den Touren nicht korrekt gefahren werden konnten.",
-      "Fehler behoben, durch den Tourenbelege im Discord nicht korrekt im Embed hinterlegt wurden."
-    ]
-  },
-  {
     "version": "v1.1.0",
     "tag": "Update",
     "is_latest": false,
@@ -70,7 +47,6 @@
       "Zugang zum Driver Hub hinzugefügt.",
       "Aufbau der grundlegenden technischen Infrastruktur und Datenbank."
     ],
-    
     "changed": [],
     "fixed": []
   }
