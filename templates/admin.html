@@ -608,6 +608,180 @@
             width: 100%;
         }
     }
+
+    /*
+     * Auto-Fit für SA_Template.jpg:
+     * Die Vorlage bleibt im festen Designformat 1080x1350 und wird per JS
+     * automatisch in Breite und sichtbare Höhe eingepasst. Dadurch muss nicht
+     * mehr manuell im Browser herausgezoomt werden.
+     */
+    .sa-stage {
+        overflow: hidden;
+    }
+
+    .sa-template-viewport {
+        --sa-scale: 1;
+        --sa-viewport-height: 720px;
+        position: relative;
+        width: 100%;
+        height: var(--sa-viewport-height);
+        min-height: 280px;
+        overflow: visible;
+        background:
+            radial-gradient(circle at 50% 10%, rgba(var(--brand-green-rgb), 0.08), transparent 36%),
+            rgba(0, 0, 0, 0.18);
+    }
+
+    .sa-template-viewport .sa-canvas {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 1080px;
+        height: 1350px;
+        min-height: 0;
+        aspect-ratio: auto;
+        transform: translateX(-50%) scale(var(--sa-scale));
+        transform-origin: top center;
+        border-radius: 24px;
+    }
+
+    .sa-template-viewport .sa-template-img {
+        object-fit: contain;
+        object-position: center;
+    }
+
+    .sa-template-viewport .sa-field {
+        transform: translateZ(0);
+    }
+
+    .sa-template-viewport .sa-badge {
+        top: 6.2%;
+        right: 7%;
+        left: auto;
+        width: auto;
+        max-width: 34%;
+        text-align: right;
+        font-size: 16px;
+    }
+
+    .sa-template-viewport .sa-kicker {
+        top: 15.5%;
+        left: 8%;
+        width: 52%;
+        font-size: 15px;
+    }
+
+    .sa-template-viewport .sa-title-field {
+        top: 19%;
+        left: 7.5%;
+        width: 84%;
+        font-size: 76px;
+        line-height: 0.95;
+    }
+
+    .sa-template-viewport .sa-location {
+        top: 35%;
+        left: 8%;
+        width: 36%;
+    }
+
+    .sa-template-viewport .sa-start {
+        top: 40%;
+        left: 8%;
+        width: 36%;
+    }
+
+    .sa-template-viewport .sa-team {
+        top: 45%;
+        left: 8%;
+        width: 40%;
+    }
+
+    .sa-template-viewport .sa-meta-field {
+        font-size: 18px;
+    }
+
+    .sa-template-viewport .sa-box-title {
+        font-size: 14px;
+    }
+
+    .sa-template-viewport .sa-box-title.benefits-title {
+        top: 53%;
+        left: 8%;
+    }
+
+    .sa-template-viewport .sa-box-title.tasks-title {
+        top: 53%;
+        left: 38%;
+    }
+
+    .sa-template-viewport .sa-box-title.profile-title {
+        top: 53%;
+        left: 68%;
+    }
+
+    .sa-template-viewport .sa-lines {
+        top: 57%;
+        width: 23%;
+        min-height: 150px;
+        font-size: 16px;
+        line-height: 1.35;
+    }
+
+    .sa-template-viewport .sa-benefits {
+        left: 7.5%;
+    }
+
+    .sa-template-viewport .sa-tasks {
+        left: 37.5%;
+    }
+
+    .sa-template-viewport .sa-profile {
+        left: 67.5%;
+    }
+
+    .sa-template-viewport .sa-contact-label {
+        bottom: 14.5%;
+        left: 8%;
+        width: 38%;
+        font-size: 13px;
+    }
+
+    .sa-template-viewport .sa-contact-name {
+        bottom: 10.5%;
+        left: 8%;
+        width: 38%;
+        font-size: 20px;
+    }
+
+    .sa-template-viewport .sa-contact-info {
+        bottom: 6.7%;
+        left: 8%;
+        width: 46%;
+        font-size: 17px;
+    }
+
+    .sa-template-viewport .sa-cta {
+        right: 7%;
+        bottom: 7%;
+        left: auto;
+        width: auto;
+        max-width: 32%;
+        text-align: right;
+        font-size: 18px;
+    }
+
+    @media (max-width: 640px) {
+        .sa-template-viewport {
+            min-height: 360px;
+        }
+
+        .sa-toolbar-actions button,
+        .sa-toolbar-actions a {
+            min-width: 100%;
+        }
+    }
+
 </style>
 
 <section class="relative w-full space-y-8">
@@ -740,6 +914,7 @@
                     </div>
 
                     <div class="sa-toolbar-actions">
+                        <button type="button" class="btn-secondary" id="fitJobTemplate">Ansicht einpassen</button>
                         <button type="button" class="btn-secondary" id="copyJobJson">JSON kopieren</button>
                         <button type="button" class="btn-secondary" id="fillJobExample">Beispiel einsetzen</button>
                         <button type="button" class="btn-danger" id="resetJobForm">Zurücksetzen</button>
@@ -751,8 +926,9 @@
                     <input type="hidden" name="job_payload" id="jobPayload">
                 </form>
 
-                <div class="sa-stage">
-                    <div class="sa-canvas" id="saPreviewCanvas">
+                <div class="sa-stage" id="saStage">
+                    <div class="sa-template-viewport" id="saTemplateViewport">
+                        <div class="sa-canvas" id="saPreviewCanvas">
                         <div class="sa-template-fallback" id="saTemplateFallback">
                             SA_Template.jpg wurde nicht geladen.<br>
                             Lege die Datei in /static/SA_Template.jpg ab.
@@ -874,6 +1050,7 @@ Interesse an ETS2 / ATS</div>
                             >Jetzt bewerben</div>
                         </div>
                     </div>
+                    </div>
 
                     <div class="sa-help">
                         <span>Direkt im Bild bearbeiten · Enter erzeugt bei Listen eine neue Zeile</span>
@@ -891,6 +1068,7 @@ Interesse an ETS2 / ATS</div>
     document.addEventListener('DOMContentLoaded', () => {
         initAdminTabs();
         initInlineJobAdEditor();
+        initTemplateAutoFit();
     });
 
     function initAdminTabs() {
@@ -1119,6 +1297,74 @@ Interesse an ETS2 / ATS</div>
         }
 
         updatePayload();
+    }
+
+
+    function initTemplateAutoFit() {
+        const viewport = document.getElementById('saTemplateViewport');
+        const canvas = document.getElementById('saPreviewCanvas');
+        const stage = document.getElementById('saStage') || (viewport ? viewport.closest('.sa-stage') : null);
+        const fitButton = document.getElementById('fitJobTemplate');
+
+        if (!viewport || !canvas || !stage) return;
+
+        const designWidth = 1080;
+        const designHeight = 1350;
+        let rafId = 0;
+
+        const applyFit = () => {
+            cancelAnimationFrame(rafId);
+
+            rafId = requestAnimationFrame(() => {
+                const viewportRect = viewport.getBoundingClientRect();
+                const help = stage.querySelector('.sa-help');
+                const helpHeight = help ? help.offsetHeight : 0;
+
+                const availableWidth = Math.max(280, stage.clientWidth);
+                const availableHeight = Math.max(
+                    360,
+                    window.innerHeight - viewportRect.top - helpHeight - 22
+                );
+
+                const widthScale = availableWidth / designWidth;
+                const heightScale = availableHeight / designHeight;
+                const scale = Math.max(0.24, Math.min(1, widthScale, heightScale));
+
+                viewport.style.setProperty('--sa-scale', scale.toFixed(4));
+                viewport.style.setProperty('--sa-viewport-height', `${Math.ceil(designHeight * scale)}px`);
+            });
+        };
+
+        window.addEventListener('resize', applyFit, { passive: true });
+        window.addEventListener('orientationchange', applyFit, { passive: true });
+
+        if (window.ResizeObserver) {
+            const observer = new ResizeObserver(applyFit);
+            observer.observe(stage);
+        }
+
+        document.querySelectorAll('[data-admin-tab]').forEach(button => {
+            button.addEventListener('click', () => {
+                setTimeout(applyFit, 80);
+            });
+        });
+
+        canvas.querySelectorAll('img').forEach(image => {
+            if (!image.complete) {
+                image.addEventListener('load', applyFit, { once: true });
+            }
+        });
+
+        if (fitButton) {
+            fitButton.addEventListener('click', () => {
+                applyFit();
+                showAdminToast('Template wurde automatisch eingepasst.');
+            });
+        }
+
+        applyFit();
+        setTimeout(applyFit, 120);
+        setTimeout(applyFit, 420);
     }
 
     function showAdminToast(message) {
