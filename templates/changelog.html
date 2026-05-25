@@ -3,8 +3,93 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+
+{#
+    Fallback-Daten direkt aus changelog.json.
+    Wenn dein Backend bereits "changelog" an das Template übergibt,
+    werden diese Fallback-Daten nicht verwendet.
+#}
+{% if changelog is not defined %}
+    {% set changelog = [
+        {
+            'version': 'v1.2.0',
+            'tag': 'Update',
+            'is_latest': true,
+            'date': '19. Mai 2026, 02:00 Uhr',
+            'added': [
+                'Dispo-Formular erweitert: Eingereichte Dokumente können nun direkt in der Disponenten-Ansicht geöffnet, geprüft und weiterverarbeitet werden.',
+                'Einreicher-Zuordnung hinzugefügt: User können im Dokument-Modal korrekt aus der Datenbank geladen und einem Beleg zugeordnet werden.',
+                'User-Auswahl für Disposition angebunden: Die User-Liste wird aus der EifelLog-Datenbank bereitgestellt.',
+                'Neue Backend-Routen für Dispo-Dokumentaktionen hinzugefügt: Bearbeiten, Einreicher zuordnen, Prüfen, Signieren und Weitergabe an die Geschäftsleitung.',
+                'JSON-Endpoint für Dispo-User hinzugefügt, damit die User-Auswahl dynamisch im Frontend geladen werden kann.',
+                'Digitaler Signatur-Workflow für eingereichte Dispo-Dokumente hinzugefügt.',
+                'Weitergabe-Workflow an die Geschäftsleitung für geprüfte Dokumente hinzugefügt.'
+            ],
+            'changed': [
+                'Dispo-Dokumentstatus erweitert und vereinheitlicht, damit Zustände wie geprüft, signiert, bei Geschäftsleitung und unvollständig korrekt verarbeitet werden.',
+                'Dispo-Dokumentprüfung wurde robuster an die bestehende Datenbank-Collection angebunden.'
+            ],
+            'fixed': [
+                'Fehlerhafte Not-Found-Routen im Dispo-Dokumentmodal behoben.',
+                'Fehlende Backend-Endpunkte für /dispo/form/documents/assign-user, /dispo/form/documents/sign, /dispo/form/documents/edit und /dispo/form/documents/forward-management ergänzt.',
+                'Fehlende Route für die Dokumentprüfung ergänzt.',
+                'Problem behoben, dass die User-Auswahl im Feld Einreicher zuordnen nicht korrekt aus der Datenbank geladen wurde.',
+                'Statuswerte wie verified, signed, management_pending und returned_incomplete fallen nicht mehr fälschlicherweise auf pending zurück.'
+            ]
+        },
+        {
+            'version': 'Servicecenter v1.0.0',
+            'tag': 'Update',
+            'is_latest': false,
+            'date': '19. Mai 2026, 00:51 Uhr',
+            'added': [
+                'Servicecenter Version 1.0.0 hinzugefügt.',
+                'Fahrerkarten-System erweitert und implementiert.',
+                'Tour-Start erweitert: Touren können nun korrekt gestartet und gefahren werden.',
+                'Tourenbeleg im Discord wieder direkt im Embed hinterlegt.',
+                'Abrechnungssystem verbessert: Touren können nun sauber und korrekt abgerechnet werden.',
+                'Disposition für die EifelLog Edition am 18. Mai 2026 hinzugefügt.'
+            ],
+            'changed': [
+                'HR-Controlling befindet sich weiterhin in Arbeit.',
+                'Personalakten-Anlage befindet sich weiterhin in Arbeit.',
+                'Protokolle über Sheets befinden sich weiterhin in Arbeit.'
+            ],
+            'fixed': [
+                'Fehler behoben, durch den Touren nicht korrekt gefahren werden konnten.',
+                'Fehler behoben, durch den Tourenbelege im Discord nicht korrekt im Embed hinterlegt wurden.'
+            ]
+        },
+        {
+            'version': 'v1.1.0',
+            'tag': 'Update',
+            'is_latest': false,
+            'date': '16. Mai 2026',
+            'added': [
+                'Rollenspezifische Dashboards implementiert: Jede Position im Unternehmen verfügt nun über ein eigenes, fest zugewiesenes Dashboard.'
+            ],
+            'changed': [],
+            'fixed': []
+        },
+        {
+            'version': 'v1.0.0',
+            'tag': 'Neuerungen',
+            'is_latest': false,
+            'date': '15. Mai 2026',
+            'added': [
+                'Offizieller Launch der <strong>Eifel LOG</strong> Webseite.',
+                'Initiale Implementierung des Dashboards.',
+                'Zugang zum Driver Hub hinzugefügt.',
+                'Aufbau der grundlegenden technischen Infrastruktur und Datenbank.'
+            ],
+            'changed': [],
+            'fixed': []
+        }
+    ] %}
+{% endif %}
+
 <div class="w-full max-w-[var(--site-max-width)] mx-auto flex flex-col gap-10">
-    
+
     <!-- Seiten-Header -->
     <div class="text-center mt-4 mb-4">
         <h1 class="text-3xl md:text-5xl font-orbitron font-bold text-[var(--text)] uppercase tracking-wider mb-3">
@@ -27,21 +112,20 @@
              LINKER BEREICH: CHANGELOG
         =========================================== -->
         <div class="lg:col-span-8 flex flex-col gap-8 relative">
-            
+
             <!-- Vertikale Timeline-Linie im Hintergrund -->
             <div class="hidden md:block absolute left-8 top-4 bottom-4 w-px bg-[var(--line)] z-0"></div>
 
             {% if changelog %}
                 {% for entry in changelog %}
-                    
+
                     <!-- Dynamische Farbzuweisung für Tags -->
                     {% set tag_color = 'var(--text)' %}
                     {% set tag_bg = 'rgba(255,255,255,0.05)' %}
                     {% set tag_border = 'rgba(255,255,255,0.1)' %}
                     {% set tag_shadow = 'none' %}
-                    
                     {% set tag_lower = entry.tag | lower %}
-                    
+
                     {% if tag_lower == 'hotfix' %}
                         {% set tag_color = 'var(--danger)' %}
                         {% set tag_bg = 'rgba(255,159,159,0.1)' %}
@@ -66,14 +150,14 @@
 
                     <!-- Changelog Karte -->
                     <div class="glass-card p-6 md:p-8 {% if entry.is_latest %}border-l-4 border-l-[var(--brand-green)]{% endif %} relative z-10 transition-transform duration-300 hover:-translate-y-1 {% if not entry.is_latest %}opacity-80 hover:opacity-100{% endif %}">
-                        
+
                         <!-- Header des Eintrags -->
                         <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 pb-4 border-b border-[var(--line)]">
                             <div class="flex flex-wrap items-center gap-4">
                                 <span class="text-2xl font-orbitron font-bold text-[var(--text)]">
                                     {{ entry.version }}
                                 </span>
-                                
+
                                 <!-- Typ-Tag -->
                                 <span class="px-3 py-1 rounded-lg text-[10px] font-orbitron tracking-widest uppercase"
                                       style="color: {{ tag_color }}; background-color: {{ tag_bg }}; border: 1px solid {{ tag_border }}; box-shadow: {{ tag_shadow }};">
@@ -95,7 +179,7 @@
 
                         <!-- Content des Eintrags -->
                         <div class="space-y-6 font-inter text-[var(--text)] text-sm md:text-base">
-                            
+
                             <!-- Added -->
                             {% if entry.added %}
                             <div>
@@ -183,7 +267,7 @@
         =========================================== -->
         <div class="lg:col-span-4">
             <div class="glass-card p-6 md:p-8 sticky top-28 z-20 overflow-hidden">
-                
+
                 <div class="flex items-center gap-3 mb-8 border-b border-[var(--line)] pb-4">
                     <div class="w-8 h-8 rounded-full bg-[var(--brand-yellow)]/10 flex items-center justify-center border border-[var(--brand-yellow)]/30 shrink-0">
                         <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,13 +286,12 @@
                 </div>
 
                 <!-- Roadmap Items -->
-                <!-- FIX: Timeline-Strich ist jetzt fest links bei den Status-Punkten ausgerichtet -->
                 <div class="relative space-y-6 before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-[var(--brand-yellow)] before:via-[var(--line)] before:to-transparent before:pointer-events-none">
-                    
+
                     {% if roadmap %}
                         {% for task in roadmap %}
                         <div class="relative flex items-start gap-4">
-                            
+
                             <!-- Status Indicator -->
                             <div class="relative z-10 w-5 h-5 flex items-center justify-center rounded-full shrink-0 mt-0.5 bg-[var(--bg-1)] border-2 {% if task.status == 'in_progress' %}border-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.35)]{% else %}border-[var(--line)]{% endif %}">
                                 {% if task.status == 'in_progress' %}
@@ -216,7 +299,7 @@
                                     <div class="relative w-1.5 h-1.5 bg-[var(--brand-yellow)] rounded-full"></div>
                                 {% endif %}
                             </div>
-                            
+
                             <!-- Task Content -->
                             <div class="flex-1 pb-2">
                                 <h4 class="font-orbitron text-[13px] font-bold text-[var(--text)] tracking-wider">
