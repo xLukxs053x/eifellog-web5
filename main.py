@@ -1448,6 +1448,284 @@ def load_json_file(path):
 
 
 # ==========================================
+# WARTUNGSMODUS / GLOBALER LOGIN-SPERRSCHALTER
+# ==========================================
+
+WARTUNG_JSON_PATH = os.path.join(BASE_DIR, "wartung.json")
+
+DEFAULT_WARTUNG_CONFIG = {
+    "enabled": False,
+    "allow_login_button": True,
+    "title": "Wartungsarbeiten",
+    "tag": "Geplante Wartung",
+    "day": "",
+    "datum": "",
+    "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.",
+    "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.",
+    "deadline": "",
+    "deadline_label": "Voraussichtlich wieder online",
+    "allowed_role_ids": [],
+    "api_token": "",
+    "updated_at": ""
+}
+
+
+def normalize_wartung_config(config):
+    """Normalisiert wartung.json und unterstützt deutsche sowie englische Feldnamen."""
+    if not isinstance(config, dict):
+        config = {}
+
+    normalized = dict(DEFAULT_WARTUNG_CONFIG)
+    normalized.update(config)
+
+    if "active" in config and "enabled" not in config:
+        normalized["enabled"] = config.get("active")
+    if "aktiv" in config and "enabled" not in config:
+        normalized["enabled"] = config.get("aktiv")
+
+    if "anmelde_button_freigeben" in config and "allow_login_button" not in config:
+        normalized["allow_login_button"] = config.get("anmelde_button_freigeben")
+    if "login_button_enabled" in config and "allow_login_button" not in config:
+        normalized["allow_login_button"] = config.get("login_button_enabled")
+
+    if "rolle_ids" in config and not config.get("allowed_role_ids"):
+        normalized["allowed_role_ids"] = config.get("rolle_ids")
+    if "erlaubte_role_ids" in config and not config.get("allowed_role_ids"):
+        normalized["allowed_role_ids"] = config.get("erlaubte_role_ids")
+
+    normalized["enabled"] = str(normalized.get("enabled")).lower() in {"1", "true", "yes", "ja", "on", "aktiv"} if isinstance(normalized.get("enabled"), str) else bool(normalized.get("enabled"))
+    normalized["allow_login_button"] = str(normalized.get("allow_login_button")).lower() in {"1", "true", "yes", "ja", "on", "aktiv"} if isinstance(normalized.get("allow_login_button"), str) else bool(normalized.get("allow_login_button"))
+
+    role_ids = normalized.get("allowed_role_ids") or []
+    if isinstance(role_ids, str):
+        role_ids = [item.strip() for item in role_ids.replace(";", ",").split(",")]
+    normalized["allowed_role_ids"] = [str(role_id).strip() for role_id in role_ids if str(role_id).strip()]
+
+    if "tag" not in config and "day" in config:
+        normalized["tag"] = config.get("day")
+    if "day" not in config and "datum" in config:
+        normalized["day"] = config.get("datum")
+
+    for key in ("title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_label", "api_token", "updated_at"):
+        normalized[key] = safe_str(normalized.get(key), DEFAULT_WARTUNG_CONFIG.get(key, ""))
+
+    # Aliasse zusätzlich ausgeben, damit hub.html später flexibel darauf zugreifen kann.
+    normalized["active"] = normalized["enabled"]
+    normalized["aktiv"] = normalized["enabled"]
+    normalized["anmelde_button_freigeben"] = normalized["allow_login_button"]
+    normalized["login_button_enabled"] = normalized["allow_login_button"]
+    normalized["erlaubte_role_ids"] = normalized["allowed_role_ids"]
+
+    return normalized
+
+
+def load_wartung_config():
+    try:
+        if not os.path.exists(WARTUNG_JSON_PATH):
+            save_wartung_config(dict(DEFAULT_WARTUNG_CONFIG))
+        with open(WARTUNG_JSON_PATH, "r", encoding="utf-8") as file:
+            return normalize_wartung_config(json.load(file))
+    except Exception as error:
+        print(f"Fehler beim Laden von wartung.json: {error}")
+        return normalize_wartung_config(DEFAULT_WARTUNG_CONFIG)
+
+
+def save_wartung_config(config):
+    normalized = normalize_wartung_config(config)
+    normalized["updated_at"] = now_utc().isoformat() + "Z"
+    os.makedirs(os.path.dirname(WARTUNG_JSON_PATH), exist_ok=True)
+    with open(WARTUNG_JSON_PATH, "w", encoding="utf-8") as file:
+        json.dump(normalized, file, ensure_ascii=False, indent=2)
+    return normalized
+
+
+def parse_wartung_bool(value, fallback=None):
+    if value is None or value == "":
+        return fallback
+    if isinstance(value, bool):
+        return value
+    value = str(value).strip().lower()
+    if value in {"1", "true", "yes", "ja", "on", "aktiv", "enable", "enabled"}:
+        return True
+    if value in {"0", "false", "no", "nein", "off", "inaktiv", "disable", "disabled"}:
+        return False
+    return fallback
+
+
+def is_wartung_enabled(config=None):
+    config = config or load_wartung_config()
+    return bool(config.get("enabled"))
+
+
+def wartung_login_button_allowed(config=None):
+    config = config or load_wartung_config()
+    return bool(config.get("allow_login_button"))
+
+
+def user_has_wartung_access(user_roles, config=None):
+    config = config or load_wartung_config()
+    allowed_roles = set(clean_roles(config.get("allowed_role_ids") or []))
+    if not allowed_roles:
+        return False
+    return bool(set(clean_roles(user_roles or [])).intersection(allowed_roles))
+
+
+def current_session_has_wartung_access(config=None):
+    user = session.get("user") or {}
+    if not isinstance(user, dict):
+        return False
+    return user_has_wartung_access(user.get("roles", []), config=config)
+
+
+def format_wartung_deadline(config=None):
+    config = config or load_wartung_config()
+    deadline = safe_str(config.get("deadline"))
+    if not deadline:
+        return ""
+
+    candidates = [deadline, deadline.replace("Z", "+00:00")]
+    for candidate in candidates:
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            return parsed.strftime("%d.%m.%Y %H:%M")
+        except Exception:
+            pass
+    return deadline
+
+
+def wartung_payload(config=None):
+    config = config or load_wartung_config()
+    payload = dict(config)
+    payload["deadline_display"] = format_wartung_deadline(config)
+    payload["login_button_allowed"] = wartung_login_button_allowed(config)
+    return payload
+
+
+def wartung_api_token_matches(config=None):
+    config = config or load_wartung_config()
+    expected_token = safe_str(config.get("api_token"))
+    if not expected_token:
+        return True
+
+    provided_token = safe_str(
+        request.headers.get("X-Wartung-Token")
+        or request.headers.get("X-Maintenance-Token")
+        or request.args.get("token")
+        or (request.get_json(silent=True) or {}).get("token")
+    )
+    return bool(provided_token and hmac.compare_digest(provided_token, expected_token))
+
+
+def maintenance_block_response(config=None, status_code=503):
+    config = config or load_wartung_config()
+    session.pop("user", None)
+    session.pop("workspace_account_id", None)
+
+    if is_api_like_request_path():
+        return jsonify({
+            "success": False,
+            "maintenance": True,
+            "message": config.get("message") or config.get("reason") or "Wartungsarbeiten aktiv.",
+            "reason": config.get("reason"),
+            "tag": config.get("tag"),
+            "deadline": config.get("deadline"),
+            "deadline_display": format_wartung_deadline(config),
+        }), status_code
+
+    flash(config.get("message") or "Der Hub ist aktuell wegen Wartungsarbeiten gesperrt.", "error")
+    return redirect(url_for("hub"))
+
+
+@app.context_processor
+def inject_wartung_template_context():
+    config = load_wartung_config()
+    return {
+        "wartung_active": is_wartung_enabled(config),
+        "wartung": wartung_payload(config),
+        "wartung_config": wartung_payload(config),
+        "wartung_login_allowed": wartung_login_button_allowed(config),
+        "wartung_deadline_text": format_wartung_deadline(config),
+    }
+
+
+@app.before_request
+def enforce_global_wartungsmodus():
+    path = request.path or ""
+    endpoint = request.endpoint or ""
+
+    if request.method == "OPTIONS":
+        return None
+    if endpoint == "static" or path.startswith("/static/") or path in {"/favicon.ico", "/robots.txt"}:
+        return None
+
+    config = load_wartung_config()
+    if not is_wartung_enabled(config):
+        return None
+
+    allowed_endpoints = {"hub", "login", "callback", "logout", "api_wartungsarbeiten"}
+    if endpoint in allowed_endpoints:
+        if endpoint in {"login", "callback"} and not wartung_login_button_allowed(config):
+            return maintenance_block_response(config)
+        return None
+
+    if current_session_has_wartung_access(config):
+        return None
+
+    return maintenance_block_response(config)
+
+
+@app.route("/api/wartungsarbeiten", methods=["GET", "POST"])
+@app.route("/api/wartungsarbeiten/<state>", methods=["GET", "POST"])
+def api_wartungsarbeiten(state=None):
+    config = load_wartung_config()
+
+    requested_state = parse_wartung_bool(state, fallback=None)
+    if requested_state is None:
+        requested_state = parse_wartung_bool(
+            request.args.get("active")
+            or request.args.get("enabled")
+            or request.args.get("aktiv"),
+            fallback=None
+        )
+
+    body = request.get_json(silent=True) or {}
+    if requested_state is None and "enabled" in body:
+        requested_state = parse_wartung_bool(body.get("enabled"), fallback=None)
+    if requested_state is None and "active" in body:
+        requested_state = parse_wartung_bool(body.get("active"), fallback=None)
+    if requested_state is None and "aktiv" in body:
+        requested_state = parse_wartung_bool(body.get("aktiv"), fallback=None)
+
+    if requested_state is not None or request.method == "POST":
+        if not wartung_api_token_matches(config):
+            return jsonify({"success": False, "message": "Wartungs-API-Token fehlt oder ist falsch."}), 403
+
+        editable_fields = {
+            "allow_login_button", "anmelde_button_freigeben", "login_button_enabled",
+            "title", "tag", "day", "datum", "reason", "message", "deadline", "deadline_label",
+            "allowed_role_ids", "erlaubte_role_ids", "rolle_ids", "api_token"
+        }
+        for field in editable_fields:
+            if field in body:
+                config[field] = body.get(field)
+
+        if requested_state is not None:
+            config["enabled"] = requested_state
+
+        config = save_wartung_config(config)
+
+    return jsonify({
+        "success": True,
+        "maintenance": is_wartung_enabled(config),
+        "wartung": wartung_payload(config),
+        "links": {
+            "aktivieren": "/api/wartungsarbeiten/true",
+            "deaktivieren": "/api/wartungsarbeiten/false"
+        }
+    })
+
+
+# ==========================================
 # SYSTEM-DOKUMENTE / FAHRER-REGISTRIERUNG
 # ==========================================
 
@@ -9995,6 +10273,11 @@ def changelog():
 
 @app.route("/login")
 def login():
+    wartung_config = load_wartung_config()
+    if is_wartung_enabled(wartung_config) and not wartung_login_button_allowed(wartung_config):
+        flash("Die Anmeldung ist wegen Wartungsarbeiten aktuell deaktiviert.", "error")
+        return redirect(url_for("hub"))
+
     auth_url = (
         f"{OAUTH_URL}?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds%20guilds.members.read"
     )
@@ -10047,6 +10330,13 @@ def callback():
 
     member_data = member_response.json()
     user_roles = member_data.get("roles", [])
+
+    wartung_config = load_wartung_config()
+    if is_wartung_enabled(wartung_config) and not user_has_wartung_access(user_roles, wartung_config):
+        session.pop("user", None)
+        session.pop("workspace_account_id", None)
+        flash("Der Hub ist aktuell im Wartungsmodus. Deine Rolle ist währenddessen nicht für den Login freigegeben.", "error")
+        return redirect(url_for("hub"))
 
     discord_id = str(user_data["id"])
     discord_username = user_data.get("username", "driver")
@@ -11330,8 +11620,33 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
 @app.route("/hub")
 def hub():
-    if "user" in session: return redirect(url_for("dashboard"))
-    return render_template("hub.html")
+    wartung_config = load_wartung_config()
+
+    if is_wartung_enabled(wartung_config):
+        if current_session_has_wartung_access(wartung_config):
+            return redirect(url_for("dashboard"))
+
+        session.pop("user", None)
+        session.pop("workspace_account_id", None)
+        return render_template(
+            "hub.html",
+            wartung_active=True,
+            wartung=wartung_payload(wartung_config),
+            wartung_config=wartung_payload(wartung_config),
+            wartung_login_allowed=wartung_login_button_allowed(wartung_config),
+            wartung_deadline_text=format_wartung_deadline(wartung_config),
+        )
+
+    if "user" in session:
+        return redirect(url_for("dashboard"))
+    return render_template(
+        "hub.html",
+        wartung_active=False,
+        wartung=wartung_payload(wartung_config),
+        wartung_config=wartung_payload(wartung_config),
+        wartung_login_allowed=True,
+        wartung_deadline_text=format_wartung_deadline(wartung_config),
+    )
 
 @app.route("/dashboard")
 def dashboard():
