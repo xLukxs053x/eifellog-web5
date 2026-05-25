@@ -2,36 +2,27 @@
   "enabled": false,
   "active": false,
   "aktiv": false,
-
   "allow_login_button": true,
   "login_button_allowed": true,
   "login_button_enabled": true,
   "anmelde_button_freigeben": true,
-
   "title": "Wartungsarbeiten",
   "tag": "Geplante Wartung",
-
   "day": "Montag",
   "datum": "25.05.2026",
-
   "reason": "Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch. Dabei werden zentrale Bereiche des Systems überarbeitet, Fehler behoben und neue Verbesserungen vorbereitet.",
-
   "message": "Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich. Wir arbeiten an ServiceCenter, interner Kommunikation, PDF-Uploads, Serverstabilität und weiteren Systemverbesserungen.",
-
   "deadline": "2026-05-26 17:00",
   "deadline_display": "26.05.2026 17:00",
   "deadline_label": "Voraussichtlich wieder online",
-
   "allowed_role_ids": [
     "1473721587122438322",
     "1473721587122438321"
   ],
-
   "erlaubte_role_ids": [
     "1473721587122438322",
     "1473721587122438321"
   ],
-
   "features": [
     {
       "title": "ServiceCenter Überarbeitung",
@@ -84,7 +75,6 @@
       "status": "Geplant"
     }
   ],
-
   "roadmap": [
     {
       "title": "Wartungsmodus aktivieren",
@@ -129,8 +119,7 @@
       "eta": "Phase 5"
     }
   ],
-
+  
   "api_token": "",
-
-  "updated_at": ""
+  "updated_at": "2026-05-25T14:47:17Z"
 }
