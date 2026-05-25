@@ -576,6 +576,7 @@ ROLE_BUCHHALTUNG = os.getenv("ROLE_BUCHHALTUNG")
 ROLE_HR_CONTROLLING = env_first("ROLE_HR_CONTROLLING", "HR_CONTROLLING_ROLE_ID", default="1473726292963885188")
 ROLE_DISPOSITION = os.getenv("ROLE_DISPOSITION")
 ROLE_PERSONALMANAGEMENT = os.getenv("ROLE_PERSONALMANAGEMENT")
+ROLE_PROBEFAHRER = os.getenv("ROLE_PROBEFAHRER")
 
 # Hardcoded Rollen IDs basierend auf Vorgaben
 ROLE_PERSONALABTEILUNG_ID = "1473725287505072174"
@@ -584,6 +585,7 @@ ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
 ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
 ROLE_BUCHHALTUNG_ID = "1473730533593845951"
 ROLE_FAHRER_ID = env_first("ROLE_FAHRER_ID", "FAHRER_ROLE_ID", default=ROLE_FAHRER or "1473721587101339681")
+ROLE_PROBEFAHRER_ID = env_first("ROLE_PROBEFAHRER_ID", "PROBEFAHRER_ROLE_ID", default=ROLE_PROBEFAHRER or "1508193258214265003")
 ROLE_FUHRPARKMANAGEMENT_ID = env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMANAGEMENT_ROLE_ID", "FUHRPARK_ROLE_ID", default=ROLE_FUHRPARKMANAGEMENT or "")
 ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
@@ -620,6 +622,8 @@ SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW = env_first(
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
     ROLE_FAHRER_ID,
+    ROLE_PROBEFAHRER,
+    ROLE_PROBEFAHRER_ID,
     ROLE_GESCHAEFTSLEITUNG,
     ROLE_GESCHAEFTSFUEHRUNG_ID,
     ROLE_PROJEKTLEITUNG,
@@ -886,6 +890,7 @@ def get_primary_role_name(user_roles):
     if "HR-Controlling" in clean_user_roles or "HR Controlling" in clean_user_roles: return "HR-Controlling"
     if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles or str(ROLE_BUCHHALTUNG_ID).strip() in clean_user_roles: return "Buchhaltung"
     if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles or str(ROLE_FUHRPARKMANAGEMENT_ID).strip() in clean_user_roles: return "Fuhrparkmanagement"
+    if str(ROLE_PROBEFAHRER).strip() in clean_user_roles or str(ROLE_PROBEFAHRER_ID).strip() in clean_user_roles or "Probefahrer" in clean_user_roles or "probefahrer" in clean_user_roles: return "Probefahrer"
     if str(ROLE_FAHRER).strip() in clean_user_roles or str(ROLE_FAHRER_ID).strip() in clean_user_roles: return "Fahrer"
 
     return "Fahrer"
