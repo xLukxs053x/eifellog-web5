@@ -1616,6 +1616,39 @@ def wartung_api_token_matches(config=None):
     return bool(provided_token and hmac.compare_digest(provided_token, expected_token))
 
 
+# Öffentliche Seiten, die auch während aktiver Wartungsarbeiten erreichbar bleiben sollen.
+# Die eigentlichen Hub-/Dashboard-/API-Bereiche bleiben weiterhin gesperrt, sofern die
+# eingeloggte Person keine freigegebene Wartungs-Rolle besitzt.
+WARTUNG_PUBLIC_ENDPOINTS = {
+    "home",
+    "about",
+    "team",
+    "changelog",
+    "fuhrpark",
+}
+
+WARTUNG_PUBLIC_PATHS = {
+    "/",
+    "/index.html",
+    "/about",
+    "/about.html",
+    "/team",
+    "/team.html",
+    "/changelog",
+    "/changelog.html",
+    "/fuhrpark",
+    "/fuhrpark.html",
+}
+
+WARTUNG_AUTH_ENDPOINTS = {
+    "hub",
+    "login",
+    "callback",
+    "logout",
+    "api_wartungsarbeiten",
+}
+
+
 def maintenance_block_response(config=None, status_code=503):
     config = config or load_wartung_config()
     session.pop("user", None)
@@ -1662,10 +1695,14 @@ def enforce_global_wartungsmodus():
     if not is_wartung_enabled(config):
         return None
 
-    allowed_endpoints = {"hub", "login", "callback", "logout", "api_wartungsarbeiten"}
-    if endpoint in allowed_endpoints:
-        if endpoint in {"login", "callback"} and not wartung_login_button_allowed(config):
-            return maintenance_block_response(config)
+    # Diese Marketing-/Info-Seiten bleiben trotz Wartungsmodus erreichbar.
+    # So funktionieren sowohl /about als auch /about.html usw.
+    if endpoint in WARTUNG_PUBLIC_ENDPOINTS or path in WARTUNG_PUBLIC_PATHS:
+        return None
+
+    # Login und Callback müssen erreichbar bleiben, damit Discord-Rollen überhaupt
+    # geprüft werden können. Nicht freigegebene Rollen werden im callback() abgewiesen.
+    if endpoint in WARTUNG_AUTH_ENDPOINTS:
         return None
 
     if current_session_has_wartung_access(config):
@@ -10178,6 +10215,7 @@ def tracker_feierabend():
 # ==========================================
 
 @app.route("/")
+@app.route("/index.html")
 def home():
     title = "Eifel LOG - Virtuelle Spedition"
 
@@ -10194,12 +10232,14 @@ def home():
     )
 
 @app.route("/about")
+@app.route("/about.html")
 def about():
     title = "Über Eifel LOG - Virtuelle Spedition"
     description = ("Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.")
     return render_template("about.html", title=title, description=description)
 
 @app.route("/changelog")
+@app.route("/changelog.html")
 def changelog():
     title = "Changelog - Eifel LOG"
 
@@ -10273,11 +10313,9 @@ def changelog():
 
 @app.route("/login")
 def login():
-    wartung_config = load_wartung_config()
-    if is_wartung_enabled(wartung_config) and not wartung_login_button_allowed(wartung_config):
-        flash("Die Anmeldung ist wegen Wartungsarbeiten aktuell deaktiviert.", "error")
-        return redirect(url_for("hub"))
-
+    # Auch im Wartungsmodus muss /login erreichbar bleiben, damit Discord nach dem
+    # OAuth-Callback die Rollen prüfen kann. Nicht freigegebene Rollen werden in
+    # callback() sauber blockiert.
     auth_url = (
         f"{OAUTH_URL}?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds%20guilds.members.read"
     )
@@ -12206,6 +12244,7 @@ def downloads():
     )
 
 @app.route("/fuhrpark")
+@app.route("/fuhrpark.html")
 def fuhrpark():
     title = "Fuhrpark - Eifel LOG"
 
@@ -12233,6 +12272,7 @@ def impressum():
 
  
 @app.route("/team")
+@app.route("/team.html")
 def team():
     title = "Team - Eifel LOG"
 
