@@ -147,53 +147,6 @@
         margin-top: 8px;
     }
 
-    .admin-input,
-    .admin-textarea,
-    .admin-select {
-        width: 100%;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        background: rgba(0, 0, 0, 0.30);
-        color: var(--text);
-        outline: none;
-        padding: 13px 14px;
-        font-size: 13px;
-        transition: all 0.22s ease;
-    }
-
-    .admin-textarea {
-        min-height: 116px;
-        resize: vertical;
-        line-height: 1.55;
-    }
-
-    .admin-input:focus,
-    .admin-textarea:focus,
-    .admin-select:focus {
-        border-color: rgba(var(--brand-green-rgb), 0.62);
-        box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.10);
-        background: rgba(0, 0, 0, 0.42);
-    }
-
-    .admin-label {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 8px;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--muted);
-    }
-
-    .admin-label span:last-child {
-        color: rgba(var(--brand-green-rgb), 0.92);
-        letter-spacing: 0.12em;
-    }
-
     .admin-chip {
         font-family: 'Orbitron', sans-serif;
         font-size: 9px;
@@ -207,31 +160,44 @@
         background: rgba(var(--brand-green-rgb), 0.10);
     }
 
-    .sa-preview-frame {
-        position: sticky;
-        top: 8.5rem;
-        border-radius: 28px;
+    .sa-editor-shell {
+        max-width: 1120px;
+        margin: 0 auto;
+    }
+
+    .sa-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        border-radius: 24px;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(0, 0, 0, 0.32);
+        background: rgba(0, 0, 0, 0.26);
+        margin-bottom: 18px;
+    }
+
+    .sa-toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+
+    .sa-stage {
+        position: relative;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(0, 0, 0, 0.34);
         overflow: hidden;
         box-shadow: 0 34px 90px rgba(0, 0, 0, 0.46);
     }
 
-    .sa-preview-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-        padding: 15px 17px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(0, 0, 0, 0.24);
-    }
-
     .sa-canvas {
         position: relative;
-        aspect-ratio: 4 / 5;
         width: 100%;
-        min-height: 560px;
+        aspect-ratio: 4 / 5;
+        min-height: 720px;
         overflow: hidden;
         background:
             radial-gradient(circle at 50% 20%, rgba(var(--brand-green-rgb), 0.18), transparent 30%),
@@ -245,8 +211,10 @@
         height: 100%;
         object-fit: cover;
         object-position: center;
-        opacity: 0.92;
+        opacity: 1;
         z-index: 1;
+        user-select: none;
+        pointer-events: none;
     }
 
     .sa-template-fallback {
@@ -265,207 +233,209 @@
         text-transform: uppercase;
     }
 
-    .sa-preview-content {
+    .sa-edit-layer {
         position: absolute;
         inset: 0;
         z-index: 2;
-        padding: clamp(24px, 5.2vw, 54px);
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        background:
-            linear-gradient(180deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.28)),
-            radial-gradient(circle at 16% 12%, rgba(var(--brand-green-rgb), 0.13), transparent 26%);
     }
 
-    .sa-preview-topline {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 18px;
+    .sa-field {
+        position: absolute;
+        z-index: 3;
+        min-height: 28px;
+        padding: 6px 8px;
+        border: 1px dashed transparent;
+        border-radius: 10px;
+        outline: none;
+        color: #fff;
+        background: transparent;
+        text-shadow:
+            0 2px 14px rgba(0, 0, 0, 0.95),
+            0 0 22px rgba(0, 0, 0, 0.75);
+        transition: all 0.18s ease;
+        cursor: text;
     }
 
-    .sa-preview-brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        border-radius: 999px;
-        padding: 9px 12px;
-        background: rgba(0, 0, 0, 0.42);
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        backdrop-filter: blur(12px);
+    .sa-field:hover,
+    .sa-field:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.62);
+        background: rgba(0, 0, 0, 0.26);
+        box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.10);
+        backdrop-filter: blur(6px);
     }
 
-    .sa-preview-brand-dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        background: var(--brand-green);
-        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.85);
+    .sa-field:empty::before {
+        content: attr(data-placeholder);
+        color: rgba(255, 255, 255, 0.45);
     }
 
-    .sa-preview-brand span {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--text);
-    }
-
-    .sa-preview-badge {
-        border-radius: 999px;
-        padding: 9px 12px;
-        background: rgba(var(--brand-green-rgb), 0.17);
-        border: 1px solid rgba(var(--brand-green-rgb), 0.42);
-        color: var(--brand-green);
-        font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
+    .sa-badge {
+        top: 6.2%;
+        right: 7%;
+        max-width: 34%;
         text-align: right;
-        backdrop-filter: blur(12px);
-    }
-
-    .sa-preview-main {
-        margin-top: auto;
-        border-radius: 26px;
-        background: linear-gradient(135deg, rgba(0, 0, 0, 0.76), rgba(9, 18, 12, 0.70));
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
-        backdrop-filter: blur(16px);
-        padding: clamp(22px, 4.2vw, 42px);
-    }
-
-    .sa-preview-kicker {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(9px, 1.15vw, 12px);
+        font-size: clamp(9px, 1.3vw, 14px);
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--brand-green);
+    }
+
+    .sa-kicker {
+        top: 15.5%;
+        left: 8%;
+        width: 52%;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(9px, 1.2vw, 13px);
         font-weight: 800;
         letter-spacing: 0.24em;
         text-transform: uppercase;
         color: var(--brand-yellow);
     }
 
-    .sa-preview-title {
+    .sa-title-field {
+        top: 19%;
+        left: 7.5%;
+        width: 84%;
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(28px, 4.8vw, 58px);
-        line-height: 0.96;
-        font-weight: 800;
-        letter-spacing: 0.04em;
+        font-size: clamp(28px, 6.4vw, 76px);
+        line-height: 0.95;
+        font-weight: 900;
+        letter-spacing: 0.035em;
         text-transform: uppercase;
-        color: #fff;
-        margin: 12px 0 14px;
-        text-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.18);
         overflow-wrap: anywhere;
     }
 
-    .sa-preview-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 18px;
+    .sa-location {
+        top: 35%;
+        left: 8%;
+        width: 36%;
     }
 
-    .sa-preview-meta span {
-        border-radius: 999px;
-        padding: 8px 10px;
-        background: rgba(255, 255, 255, 0.07);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        color: rgba(237, 243, 255, 0.88);
-        font-size: clamp(10px, 1.2vw, 12px);
+    .sa-start {
+        top: 40%;
+        left: 8%;
+        width: 36%;
     }
 
-    .sa-preview-columns {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
+    .sa-team {
+        top: 45%;
+        left: 8%;
+        width: 40%;
     }
 
-    .sa-preview-box {
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.045);
-        padding: 14px;
-        min-height: 158px;
+    .sa-meta-field {
+        font-size: clamp(11px, 1.7vw, 17px);
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.92);
     }
 
-    .sa-preview-box h3 {
+    .sa-box-title {
+        position: absolute;
+        z-index: 3;
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(8px, 0.95vw, 10px);
-        font-weight: 800;
-        letter-spacing: 0.16em;
+        font-size: clamp(8px, 1.1vw, 12px);
+        font-weight: 900;
+        letter-spacing: 0.15em;
         text-transform: uppercase;
         color: var(--brand-green);
-        margin: 0 0 9px;
+        text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95);
     }
 
-    .sa-preview-box ul {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        display: grid;
-        gap: 7px;
+    .sa-box-title.benefits-title {
+        top: 53%;
+        left: 8%;
     }
 
-    .sa-preview-box li {
-        position: relative;
-        padding-left: 13px;
-        color: rgba(237, 243, 255, 0.86);
-        font-size: clamp(9px, 1vw, 12px);
-        line-height: 1.32;
+    .sa-box-title.tasks-title {
+        top: 53%;
+        left: 38%;
     }
 
-    .sa-preview-box li::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0.54em;
-        width: 5px;
-        height: 5px;
-        border-radius: 999px;
-        background: var(--brand-yellow);
-        box-shadow: 0 0 10px rgba(220, 226, 38, 0.45);
+    .sa-box-title.profile-title {
+        top: 53%;
+        left: 68%;
     }
 
-    .sa-preview-footer {
+    .sa-lines {
+        top: 57%;
+        width: 23%;
+        min-height: 150px;
+        white-space: pre-line;
+        font-size: clamp(10px, 1.35vw, 15px);
+        line-height: 1.35;
+        font-weight: 600;
+    }
+
+    .sa-lines::first-line {
+        color: #fff;
+    }
+
+    .sa-benefits {
+        left: 7.5%;
+    }
+
+    .sa-tasks {
+        left: 37.5%;
+    }
+
+    .sa-profile {
+        left: 67.5%;
+    }
+
+    .sa-contact-label {
+        bottom: 14.5%;
+        left: 8%;
+        width: 38%;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(8px, 1.1vw, 12px);
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--brand-yellow);
+    }
+
+    .sa-contact-name {
+        bottom: 10.5%;
+        left: 8%;
+        width: 38%;
+        font-size: clamp(13px, 1.8vw, 19px);
+        font-weight: 800;
+    }
+
+    .sa-contact-info {
+        bottom: 6.7%;
+        left: 8%;
+        width: 46%;
+        font-size: clamp(11px, 1.55vw, 16px);
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .sa-cta {
+        right: 7%;
+        bottom: 7%;
+        max-width: 32%;
+        text-align: right;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(10px, 1.5vw, 17px);
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--brand-green);
+    }
+
+    .sa-help {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
-        margin-top: 18px;
-        border-top: 1px solid rgba(255, 255, 255, 0.09);
-        padding-top: 16px;
-    }
-
-    .sa-preview-contact {
-        color: rgba(237, 243, 255, 0.88);
-        font-size: clamp(10px, 1.15vw, 12px);
-        line-height: 1.45;
-    }
-
-    .sa-preview-contact strong {
-        display: block;
-        font-family: 'Orbitron', sans-serif;
-        font-size: clamp(9px, 1vw, 11px);
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
-        color: #fff;
-        margin-bottom: 2px;
-    }
-
-    .sa-preview-cta {
-        border-radius: 999px;
-        padding: 10px 13px;
-        background: rgba(var(--brand-green-rgb), 0.18);
-        border: 1px solid rgba(var(--brand-green-rgb), 0.46);
-        color: var(--brand-green);
-        font-family: 'Orbitron', sans-serif;
-        font-size: clamp(8px, 1vw, 10px);
-        font-weight: 800;
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
-        white-space: nowrap;
+        gap: 14px;
+        padding: 13px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--muted);
+        font-size: 12px;
     }
 
     .admin-toast {
@@ -491,39 +461,147 @@
         transform: translateY(0);
     }
 
-    @media (max-width: 1180px) {
-        .sa-preview-frame {
-            position: relative;
-            top: auto;
+    @media (max-width: 900px) {
+        .sa-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
         }
 
-        .sa-preview-columns {
-            grid-template-columns: 1fr;
+        .sa-toolbar-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
+
+        .sa-toolbar-actions button,
+        .sa-toolbar-actions a {
+            flex: 1;
+            min-width: 150px;
         }
 
         .sa-canvas {
-            min-height: 780px;
+            min-height: 820px;
+        }
+
+        .sa-title-field {
+            font-size: clamp(30px, 8vw, 64px);
+        }
+
+        .sa-lines {
+            width: 26%;
+            font-size: 12px;
+        }
+
+        .sa-benefits {
+            left: 6%;
+        }
+
+        .sa-tasks {
+            left: 37%;
+        }
+
+        .sa-profile {
+            left: 68%;
         }
     }
 
-    @media (max-width: 700px) {
+    @media (max-width: 640px) {
         .sa-canvas {
             aspect-ratio: auto;
             min-height: 980px;
         }
 
-        .sa-preview-content {
-            padding: 20px;
+        .sa-badge {
+            top: 4.5%;
+            right: 5%;
+            max-width: 58%;
         }
 
-        .sa-preview-topline,
-        .sa-preview-footer {
-            align-items: flex-start;
-            flex-direction: column;
+        .sa-kicker {
+            top: 12%;
+            left: 5%;
+            width: 85%;
         }
 
-        .sa-preview-main {
-            padding: 20px;
+        .sa-title-field {
+            top: 16%;
+            left: 4.5%;
+            width: 91%;
+            font-size: 38px;
+        }
+
+        .sa-location {
+            top: 31%;
+            left: 5%;
+            width: 82%;
+        }
+
+        .sa-start {
+            top: 35.2%;
+            left: 5%;
+            width: 82%;
+        }
+
+        .sa-team {
+            top: 39.4%;
+            left: 5%;
+            width: 82%;
+        }
+
+        .sa-box-title.benefits-title {
+            top: 47%;
+            left: 5%;
+        }
+
+        .sa-box-title.tasks-title {
+            top: 59%;
+            left: 5%;
+        }
+
+        .sa-box-title.profile-title {
+            top: 71%;
+            left: 5%;
+        }
+
+        .sa-lines {
+            left: 5%;
+            width: 88%;
+            min-height: 82px;
+        }
+
+        .sa-benefits {
+            top: 49.5%;
+        }
+
+        .sa-tasks {
+            top: 61.5%;
+        }
+
+        .sa-profile {
+            top: 73.5%;
+        }
+
+        .sa-contact-label {
+            bottom: 13.5%;
+            left: 5%;
+            width: 88%;
+        }
+
+        .sa-contact-name {
+            bottom: 10.2%;
+            left: 5%;
+            width: 88%;
+        }
+
+        .sa-contact-info {
+            bottom: 7%;
+            left: 5%;
+            width: 88%;
+        }
+
+        .sa-cta {
+            right: 5%;
+            bottom: 3.2%;
+            max-width: 70%;
         }
 
         .admin-tab {
@@ -536,48 +614,59 @@
     {% if not current_user %}
         <div class="glass-card relative overflow-hidden p-8 md:p-12 text-center max-w-3xl mx-auto">
             <div class="admin-grid-glow"></div>
+
             <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--brand-green)]/40 bg-[var(--brand-green)]/10 flex items-center justify-center shadow-[0_0_30px_rgba(137,190,50,0.18)]">
                 <svg class="w-8 h-8 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                 </svg>
             </div>
+
             <p class="admin-kicker mb-3">Admin Node gesperrt</p>
             <h1 class="admin-title text-3xl md:text-5xl mb-5">Login erforderlich</h1>
+
             <p class="admin-muted max-w-xl mx-auto leading-relaxed mb-8">
                 Bitte melde dich zuerst an. Der Zugriff auf diese Admin-Area ist nur für Personalabteilung und Geschäftsleitung freigegeben.
             </p>
+
             <a href="/hub" class="btn-primary">Zum Driver Hub</a>
         </div>
     {% elif not admin_access.ok %}
         <div class="glass-card glass-card-danger relative overflow-hidden p-8 md:p-12 text-center max-w-3xl mx-auto">
             <div class="absolute -inset-8 bg-[var(--danger)]/10 blur-3xl rounded-full z-[-1]"></div>
+
             <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--danger)]/50 bg-[var(--danger)]/10 flex items-center justify-center text-[var(--danger)] shadow-[0_0_30px_rgba(255,159,159,0.20)]">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                 </svg>
             </div>
+
             <p class="admin-kicker mb-3" style="color: var(--danger);">Access denied</p>
             <h1 class="admin-title text-3xl md:text-5xl mb-5">Keine Berechtigung</h1>
+
             <p class="admin-muted max-w-xl mx-auto leading-relaxed mb-8">
                 Diese Admin-Area ist ausschließlich für die Rollen Personalabteilung und Geschäftsleitung freigegeben.
             </p>
+
             <div class="flex flex-wrap justify-center gap-3 mb-8">
                 <span class="admin-chip">Personalabteilung · 1473721587122438321</span>
                 <span class="admin-chip">Geschäftsleitung · 1473721587122438322</span>
             </div>
+
             <a href="/dashboard" class="btn-secondary">Zurück zum Dashboard</a>
         </div>
     {% else %}
         <div class="glass-card relative overflow-hidden p-6 md:p-8">
             <div class="admin-grid-glow"></div>
+
             <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
                 <div>
                     <p class="admin-kicker mb-3">Eifel LOG Admin-Area</p>
                     <h1 class="admin-title text-3xl md:text-5xl leading-tight">Kontrollzentrum</h1>
                     <p class="admin-muted max-w-3xl mt-4 leading-relaxed">
-                        Verwaltung für interne Inhalte. Der neue Bereich „Stellenausschreibungen“ nutzt ein festes Template mit Live-Vorschau, damit das Design gleich bleibt und nur die Inhalte dynamisch gepflegt werden.
+                        Verwaltung für interne Inhalte. Im Bereich „Stellenausschreibungen“ wird direkt auf dem Template-Bild geschrieben.
                     </p>
                 </div>
+
                 <div class="flex flex-wrap gap-3 xl:justify-end">
                     <span class="admin-chip">Personalabteilung</span>
                     <span class="admin-chip">Geschäftsleitung</span>
@@ -598,7 +687,7 @@
 
                     <button type="button" class="admin-tab is-active" data-admin-tab="jobs">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 01112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
                         Stellenausschreibungen
                     </button>
@@ -616,10 +705,12 @@
                     <p class="admin-stat-label">Admin Status</p>
                     <p class="admin-stat-value">Aktiv</p>
                 </div>
+
                 <div class="admin-stat-card">
                     <p class="admin-stat-label">Berechtigte Rollen</p>
                     <p class="admin-stat-value">2</p>
                 </div>
+
                 <div class="admin-stat-card">
                     <p class="admin-stat-label">Aktiver Tab</p>
                     <p class="admin-stat-value">Jobs</p>
@@ -628,28 +719,45 @@
 
             <div class="glass-card mt-6 p-6 md:p-8">
                 <p class="admin-kicker mb-3">Systemhinweis</p>
-                <h2 class="admin-title text-2xl md:text-3xl mb-4">Stellenausschreibungen sind vorbereitet</h2>
+                <h2 class="admin-title text-2xl md:text-3xl mb-4">Direktbearbeitung aktiv</h2>
                 <p class="admin-muted leading-relaxed max-w-4xl">
-                    Der Tab erzeugt eine feste Stellenanzeigen-Vorschau auf Basis von <span class="text-[var(--brand-green)] font-semibold">SA_Template.jpg</span>. Inhalte werden rechts gepflegt und links sofort aktualisiert. Für echte Veröffentlichung muss dein Flask-Backend den POST-Endpunkt <span class="text-[var(--brand-yellow)] font-semibold">/admin/stellenausschreibungen</span> verarbeiten.
+                    Die Stellenanzeige wird direkt auf <span class="text-[var(--brand-green)] font-semibold">SA_Template.jpg</span> bearbeitet.
+                    Es gibt keine separate Formularspalte mehr. Beim Speichern wird der Inhalt als JSON im Feld
+                    <span class="text-[var(--brand-yellow)] font-semibold">job_payload</span> an
+                    <span class="text-[var(--brand-yellow)] font-semibold">/admin/stellenausschreibungen</span> gesendet.
                 </p>
             </div>
         </div>
 
         <div id="admin-panel-jobs" class="admin-panel is-active">
-            <div class="grid xl:grid-cols-[minmax(0,1.06fr)_minmax(420px,0.94fr)] gap-6 items-start">
-                <div class="sa-preview-frame">
-                    <div class="sa-preview-toolbar">
-                        <div>
-                            <p class="admin-kicker">Live-Vorschau</p>
-                            <p class="text-xs text-[var(--muted)] mt-1">Template: SA_Template.jpg</p>
-                        </div>
-                        <span class="admin-chip">Realtime</span>
+            <div class="sa-editor-shell">
+                <div class="sa-toolbar">
+                    <div>
+                        <p class="admin-kicker">Live-Template</p>
+                        <p class="text-xs text-[var(--muted)] mt-1">
+                            Klicke direkt auf einen Text im Bild und schreibe los.
+                        </p>
                     </div>
 
+                    <div class="sa-toolbar-actions">
+                        <button type="button" class="btn-secondary" id="copyJobJson">JSON kopieren</button>
+                        <button type="button" class="btn-secondary" id="fillJobExample">Beispiel einsetzen</button>
+                        <button type="button" class="btn-danger" id="resetJobForm">Zurücksetzen</button>
+                        <button type="submit" form="jobAdHiddenForm" class="btn-primary">Speichern / Veröffentlichen</button>
+                    </div>
+                </div>
+
+                <form id="jobAdHiddenForm" method="POST" action="/admin/stellenausschreibungen">
+                    <input type="hidden" name="job_payload" id="jobPayload">
+                </form>
+
+                <div class="sa-stage">
                     <div class="sa-canvas" id="saPreviewCanvas">
                         <div class="sa-template-fallback" id="saTemplateFallback">
-                            SA_Template.jpg wurde nicht geladen.<br>Lege die Datei in /static/SA_Template.jpg ab.
+                            SA_Template.jpg wurde nicht geladen.<br>
+                            Lege die Datei in /static/SA_Template.jpg ab.
                         </div>
+
                         <img
                             class="sa-template-img"
                             src="{{ url_for('static', filename='SA_Template.jpg') }}"
@@ -657,149 +765,121 @@
                             onerror="this.style.display='none'; document.getElementById('saTemplateFallback').style.zIndex='1';"
                         >
 
-                        <div class="sa-preview-content">
-                            <div class="sa-preview-topline">
-                                <div class="sa-preview-brand">
-                                    <i class="sa-preview-brand-dot"></i>
-                                    <span>Eifel LOG</span>
-                                </div>
-                                <div class="sa-preview-badge" id="previewEmployment">Stellenausschreibung</div>
-                            </div>
+                        <div class="sa-edit-layer">
+                            <div
+                                class="sa-field sa-badge sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="employment_type"
+                                data-placeholder="Art"
+                            >Stellenausschreibung</div>
 
-                            <div class="sa-preview-main">
-                                <div class="sa-preview-kicker">Wir suchen dich als</div>
-                                <h2 class="sa-preview-title" id="previewTitle">Fahrer/in im Fernverkehr</h2>
+                            <div
+                                class="sa-field sa-kicker sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="kicker"
+                                data-placeholder="Kicker"
+                            >Wir suchen dich als</div>
 
-                                <div class="sa-preview-meta">
-                                    <span id="previewLocation">Eifel LOG Network</span>
-                                    <span id="previewStart">Start: ab sofort</span>
-                                    <span id="previewTeam">Team: Personalabteilung</span>
-                                </div>
+                            <div
+                                class="sa-field sa-title-field sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="title"
+                                data-placeholder="Titel"
+                            >Fahrer/in im Fernverkehr</div>
 
-                                <div class="sa-preview-columns">
-                                    <div class="sa-preview-box">
-                                        <h3>Das bieten wir</h3>
-                                        <ul id="previewBenefits"></ul>
-                                    </div>
-                                    <div class="sa-preview-box">
-                                        <h3>Das erwartet dich</h3>
-                                        <ul id="previewTasks"></ul>
-                                    </div>
-                                    <div class="sa-preview-box">
-                                        <h3>Dein Profil</h3>
-                                        <ul id="previewProfile"></ul>
-                                    </div>
-                                </div>
+                            <div
+                                class="sa-field sa-meta-field sa-location sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="location"
+                                data-placeholder="Standort"
+                            >Eifel LOG Network</div>
 
-                                <div class="sa-preview-footer">
-                                    <div class="sa-preview-contact">
-                                        <strong>Ansprechpartner</strong>
-                                        <span id="previewContactName">Max Mustermann</span><br>
-                                        <span id="previewContactInfo">bewerbung@eifellog.de</span>
-                                    </div>
-                                    <div class="sa-preview-cta" id="previewCta">Jetzt bewerben</div>
-                                </div>
-                            </div>
+                            <div
+                                class="sa-field sa-meta-field sa-start sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="start"
+                                data-placeholder="Start"
+                            >Start: ab sofort</div>
+
+                            <div
+                                class="sa-field sa-meta-field sa-team sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="team"
+                                data-placeholder="Team"
+                            >Team: Personalabteilung</div>
+
+                            <div class="sa-box-title benefits-title">Das bieten wir</div>
+                            <div
+                                class="sa-field sa-lines sa-benefits sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="benefits"
+                                data-placeholder="1 Punkt pro Zeile"
+                            >Familiäre Community
+Strukturierte Einarbeitung
+Moderne virtuelle Spedition</div>
+
+                            <div class="sa-box-title tasks-title">Das erwartet dich</div>
+                            <div
+                                class="sa-field sa-lines sa-tasks sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="tasks"
+                                data-placeholder="1 Punkt pro Zeile"
+                            >Touren fahren und dokumentieren
+Aktive Teilnahme im Discord
+Zuverlässige Kommunikation</div>
+
+                            <div class="sa-box-title profile-title">Dein Profil</div>
+                            <div
+                                class="sa-field sa-lines sa-profile sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="profile"
+                                data-placeholder="1 Punkt pro Zeile"
+                            >Mindestens 16 Jahre alt
+Freundliches Auftreten
+Interesse an ETS2 / ATS</div>
+
+                            <div class="sa-field sa-contact-label">Ansprechpartner</div>
+
+                            <div
+                                class="sa-field sa-contact-name sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="contact_name"
+                                data-placeholder="Name"
+                            >Max Mustermann</div>
+
+                            <div
+                                class="sa-field sa-contact-info sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="contact_info"
+                                data-placeholder="Kontakt"
+                            >bewerbung@eifellog.de</div>
+
+                            <div
+                                class="sa-field sa-cta sa-editable"
+                                contenteditable="true"
+                                spellcheck="false"
+                                data-sa-field="cta"
+                                data-placeholder="CTA"
+                            >Jetzt bewerben</div>
                         </div>
+                    </div>
+
+                    <div class="sa-help">
+                        <span>Direkt im Bild bearbeiten · Enter erzeugt bei Listen eine neue Zeile</span>
+                        <span class="admin-chip">Realtime</span>
                     </div>
                 </div>
-
-                <form id="jobAdForm" class="glass-card p-6 md:p-7 space-y-6" method="POST" action="/admin/stellenausschreibungen">
-                    <input type="hidden" name="job_payload" id="jobPayload">
-
-                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div>
-                            <p class="admin-kicker mb-2">Editor</p>
-                            <h2 class="admin-title text-2xl md:text-3xl">Stellenanzeige</h2>
-                            <p class="admin-muted text-sm mt-2">Jede Änderung wird direkt links in der Vorschau angezeigt.</p>
-                        </div>
-                        <span class="admin-chip">SA Template</span>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="admin-label" for="jobTitle">Titel <span>Pflicht</span></label>
-                            <input class="admin-input" id="jobTitle" name="title" type="text" maxlength="72" value="Fahrer/in im Fernverkehr" placeholder="z. B. Fahrer/in im Fernverkehr">
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobEmployment">Art <span>Status</span></label>
-                            <select class="admin-select" id="jobEmployment" name="employment_type">
-                                <option value="Stellenausschreibung" selected>Stellenausschreibung</option>
-                                <option value="Vollzeit">Vollzeit</option>
-                                <option value="Teilzeit">Teilzeit</option>
-                                <option value="Ehrenamtlich">Ehrenamtlich</option>
-                                <option value="Intern">Intern</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobLocation">Standort <span>Meta</span></label>
-                            <input class="admin-input" id="jobLocation" name="location" type="text" maxlength="56" value="Eifel LOG Network" placeholder="z. B. Deutschland / ETS2 / Discord">
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobStart">Start <span>Meta</span></label>
-                            <input class="admin-input" id="jobStart" name="start" type="text" maxlength="42" value="ab sofort" placeholder="z. B. ab sofort">
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobTeam">Team / Bereich <span>Meta</span></label>
-                            <input class="admin-input" id="jobTeam" name="team" type="text" maxlength="46" value="Personalabteilung" placeholder="z. B. Personalabteilung">
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobCta">Call-to-Action <span>Button</span></label>
-                            <input class="admin-input" id="jobCta" name="cta" type="text" maxlength="32" value="Jetzt bewerben" placeholder="z. B. Jetzt bewerben">
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4">
-                        <div>
-                            <label class="admin-label" for="jobBenefits">Das bieten wir <span>1 Punkt pro Zeile</span></label>
-                            <textarea class="admin-textarea" id="jobBenefits" name="benefits" placeholder="Familiäre Community&#10;Strukturierte Einarbeitung&#10;Moderne virtuelle Spedition">Familiäre Community
-Strukturierte Einarbeitung
-Moderne virtuelle Spedition</textarea>
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobTasks">Das erwartet dich <span>1 Punkt pro Zeile</span></label>
-                            <textarea class="admin-textarea" id="jobTasks" name="tasks" placeholder="Touren fahren und dokumentieren&#10;Aktive Teilnahme im Discord&#10;Zuverlässige Kommunikation">Touren fahren und dokumentieren
-Aktive Teilnahme im Discord
-Zuverlässige Kommunikation</textarea>
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobProfile">Dein Profil <span>1 Punkt pro Zeile</span></label>
-                            <textarea class="admin-textarea" id="jobProfile" name="profile" placeholder="Mindestens 16 Jahre alt&#10;Freundliches Auftreten&#10;Interesse an ETS2 / ATS">Mindestens 16 Jahre alt
-Freundliches Auftreten
-Interesse an ETS2 / ATS</textarea>
-                        </div>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="admin-label" for="jobContactName">Ansprechpartner <span>Name</span></label>
-                            <input class="admin-input" id="jobContactName" name="contact_name" type="text" maxlength="54" value="Max Mustermann" placeholder="Name der Kontaktperson">
-                        </div>
-
-                        <div>
-                            <label class="admin-label" for="jobContactInfo">Kontakt <span>Mail / Discord</span></label>
-                            <input class="admin-input" id="jobContactInfo" name="contact_info" type="text" maxlength="74" value="bewerbung@eifellog.de" placeholder="bewerbung@eifellog.de oder Discord">
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                        <button type="submit" class="btn-primary flex-1">Speichern / Veröffentlichen</button>
-                        <button type="button" class="btn-secondary flex-1" id="copyJobJson">JSON kopieren</button>
-                        <button type="button" class="btn-secondary flex-1" id="fillJobExample">Beispiel einsetzen</button>
-                        <button type="button" class="btn-danger flex-1" id="resetJobForm">Zurücksetzen</button>
-                    </div>
-
-                    <p class="text-[11px] leading-relaxed text-[var(--muted)]">
-                        Hinweis: Dieses Template sendet die Inhalte als Formular und zusätzlich als JSON im Feld <span class="text-[var(--brand-green)]">job_payload</span>. Der echte Datenbank-Save muss serverseitig im Backend umgesetzt werden.
-                    </p>
-                </form>
             </div>
         </div>
     {% endif %}
@@ -810,7 +890,7 @@ Interesse an ETS2 / ATS</textarea>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         initAdminTabs();
-        initJobAdEditor();
+        initInlineJobAdEditor();
     });
 
     function initAdminTabs() {
@@ -837,34 +917,24 @@ Interesse an ETS2 / ATS</textarea>
         });
     }
 
-    function initJobAdEditor() {
-        const form = document.getElementById('jobAdForm');
-        if (!form) return;
+    function initInlineJobAdEditor() {
+        const hiddenForm = document.getElementById('jobAdHiddenForm');
+        const payloadInput = document.getElementById('jobPayload');
+        const editables = document.querySelectorAll('[data-sa-field]');
 
-        const fields = [
-            'jobTitle',
-            'jobEmployment',
-            'jobLocation',
-            'jobStart',
-            'jobTeam',
-            'jobCta',
-            'jobBenefits',
-            'jobTasks',
-            'jobProfile',
-            'jobContactName',
-            'jobContactInfo'
-        ];
+        if (!hiddenForm || !payloadInput || !editables.length) return;
 
         const defaults = {
             title: 'Fahrer/in im Fernverkehr',
             employment_type: 'Stellenausschreibung',
+            kicker: 'Wir suchen dich als',
             location: 'Eifel LOG Network',
-            start: 'ab sofort',
-            team: 'Personalabteilung',
+            start: 'Start: ab sofort',
+            team: 'Team: Personalabteilung',
             cta: 'Jetzt bewerben',
-            benefits: ['Familiäre Community', 'Strukturierte Einarbeitung', 'Moderne virtuelle Spedition'],
-            tasks: ['Touren fahren und dokumentieren', 'Aktive Teilnahme im Discord', 'Zuverlässige Kommunikation'],
-            profile: ['Mindestens 16 Jahre alt', 'Freundliches Auftreten', 'Interesse an ETS2 / ATS'],
+            benefits: 'Familiäre Community\nStrukturierte Einarbeitung\nModerne virtuelle Spedition',
+            tasks: 'Touren fahren und dokumentieren\nAktive Teilnahme im Discord\nZuverlässige Kommunikation',
+            profile: 'Mindestens 16 Jahre alt\nFreundliches Auftreten\nInteresse an ETS2 / ATS',
             contact_name: 'Max Mustermann',
             contact_info: 'bewerbung@eifellog.de'
         };
@@ -872,22 +942,40 @@ Interesse an ETS2 / ATS</textarea>
         const example = {
             title: 'Recruiter/in',
             employment_type: 'Intern',
+            kicker: 'Wir suchen dich als',
             location: 'Discord / Eifel LOG',
-            start: 'ab sofort',
-            team: 'Personalabteilung',
+            start: 'Start: ab sofort',
+            team: 'Team: Personalabteilung',
             cta: 'Jetzt melden',
-            benefits: ['Klares Team-System', 'Direkter Draht zur Leitung', 'Mitgestaltung im Bewerbungsprozess'],
-            tasks: ['Bewerbungen prüfen', 'Erstgespräche koordinieren', 'Neue Mitglieder begleiten'],
-            profile: ['Kommunikationsstark', 'Diskret und zuverlässig', 'Freude an Organisation'],
+            benefits: 'Klares Team-System\nDirekter Draht zur Leitung\nMitgestaltung im Bewerbungsprozess',
+            tasks: 'Bewerbungen prüfen\nErstgespräche koordinieren\nNeue Mitglieder begleiten',
+            profile: 'Kommunikationsstark\nDiskret und zuverlässig\nFreude an Organisation',
             contact_name: 'Personalabteilung',
             contact_info: 'Ticket im Discord eröffnen'
         };
 
-        fields.forEach(id => {
-            const element = document.getElementById(id);
-            if (!element) return;
-            element.addEventListener('input', updatePreview);
-            element.addEventListener('change', updatePreview);
+        editables.forEach(element => {
+            element.addEventListener('input', updatePayload);
+            element.addEventListener('blur', () => {
+                normalizeEditable(element);
+                updatePayload();
+            });
+
+            element.addEventListener('paste', event => {
+                event.preventDefault();
+
+                const text = (event.clipboardData || window.clipboardData).getData('text/plain');
+                document.execCommand('insertText', false, text);
+            });
+
+            element.addEventListener('keydown', event => {
+                const isMultiline = element.classList.contains('sa-lines');
+
+                if (event.key === 'Enter' && !isMultiline) {
+                    event.preventDefault();
+                    element.blur();
+                }
+            });
         });
 
         const copyButton = document.getElementById('copyJobJson');
@@ -916,126 +1004,121 @@ Interesse an ETS2 / ATS</textarea>
         if (exampleButton) {
             exampleButton.addEventListener('click', () => {
                 applyPreset(example);
-                showAdminToast('Beispiel wurde eingesetzt.');
+                showAdminToast('Beispiel wurde direkt ins Template gesetzt.');
             });
         }
 
         if (resetButton) {
             resetButton.addEventListener('click', () => {
                 applyPreset(defaults);
-                showAdminToast('Formular wurde zurückgesetzt.');
+                showAdminToast('Template wurde zurückgesetzt.');
             });
         }
 
-        form.addEventListener('submit', () => {
-            const payloadInput = document.getElementById('jobPayload');
-            if (payloadInput) {
-                payloadInput.value = JSON.stringify(buildPayload());
-            }
+        hiddenForm.addEventListener('submit', () => {
+            updatePayload();
         });
 
-        function valueOf(id, fallback = '') {
-            const element = document.getElementById(id);
+        document.addEventListener('keydown', event => {
+            const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's';
+
+            if (!isSaveShortcut) return;
+
+            event.preventDefault();
+            updatePayload();
+            hiddenForm.requestSubmit();
+        });
+
+        function normalizeEditable(element) {
+            const text = getEditableText(element).trim();
+
+            if (!text) {
+                element.innerHTML = '';
+                return;
+            }
+
+            element.textContent = text;
+        }
+
+        function getEditableText(element) {
+            return String(element.innerText || element.textContent || '')
+                .replace(/\u00A0/g, ' ')
+                .replace(/[ \t]+\n/g, '\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        function getField(name, fallback = '') {
+            const element = document.querySelector(`[data-sa-field="${name}"]`);
             if (!element) return fallback;
-            const value = String(element.value || '').trim();
+
+            const value = getEditableText(element);
             return value || fallback;
         }
 
-        function linesOf(id, fallback = []) {
-            const element = document.getElementById(id);
-            const raw = element ? String(element.value || '') : '';
-            const lines = raw
+        function getLines(name, fallback = '') {
+            return getField(name, fallback)
                 .split('\n')
                 .map(line => line.trim())
                 .filter(Boolean)
-                .slice(0, 6);
-
-            return lines.length ? lines : fallback;
+                .slice(0, 8);
         }
 
-        function setText(id, value) {
-            const element = document.getElementById(id);
-            if (!element) return;
-            element.textContent = value;
-        }
+        function cleanPrefixedValue(value, prefix) {
+            const normalized = String(value || '').trim();
 
-        function setList(id, items) {
-            const list = document.getElementById(id);
-            if (!list) return;
-            list.innerHTML = '';
+            if (!normalized) return '';
 
-            items.forEach(item => {
-                const li = document.createElement('li');
-                li.textContent = item;
-                list.appendChild(li);
-            });
+            if (normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
+                return normalized.slice(prefix.length).trim();
+            }
+
+            return normalized;
         }
 
         function buildPayload() {
+            const startRaw = getField('start', defaults.start);
+            const teamRaw = getField('team', defaults.team);
+
             return {
-                title: valueOf('jobTitle', defaults.title),
-                employment_type: valueOf('jobEmployment', defaults.employment_type),
-                location: valueOf('jobLocation', defaults.location),
-                start: valueOf('jobStart', defaults.start),
-                team: valueOf('jobTeam', defaults.team),
-                cta: valueOf('jobCta', defaults.cta),
-                benefits: linesOf('jobBenefits', defaults.benefits),
-                tasks: linesOf('jobTasks', defaults.tasks),
-                profile: linesOf('jobProfile', defaults.profile),
-                contact_name: valueOf('jobContactName', defaults.contact_name),
-                contact_info: valueOf('jobContactInfo', defaults.contact_info),
+                title: getField('title', defaults.title),
+                employment_type: getField('employment_type', defaults.employment_type),
+                kicker: getField('kicker', defaults.kicker),
+                location: getField('location', defaults.location),
+                start: cleanPrefixedValue(startRaw, 'Start:'),
+                team: cleanPrefixedValue(teamRaw, 'Team:'),
+                cta: getField('cta', defaults.cta),
+                benefits: getLines('benefits', defaults.benefits),
+                tasks: getLines('tasks', defaults.tasks),
+                profile: getLines('profile', defaults.profile),
+                contact_name: getField('contact_name', defaults.contact_name),
+                contact_info: getField('contact_info', defaults.contact_info),
                 template: 'SA_Template.jpg',
+                editor_mode: 'inline_on_template',
                 updated_at: new Date().toISOString()
             };
         }
 
-        function updatePreview() {
-            const payload = buildPayload();
+        function updatePayload() {
+            payloadInput.value = JSON.stringify(buildPayload());
+        }
 
-            setText('previewTitle', payload.title);
-            setText('previewEmployment', payload.employment_type);
-            setText('previewLocation', payload.location);
-            setText('previewStart', `Start: ${payload.start}`);
-            setText('previewTeam', `Team: ${payload.team}`);
-            setText('previewContactName', payload.contact_name);
-            setText('previewContactInfo', payload.contact_info);
-            setText('previewCta', payload.cta);
+        function setField(name, value) {
+            const element = document.querySelector(`[data-sa-field="${name}"]`);
+            if (!element) return;
 
-            setList('previewBenefits', payload.benefits);
-            setList('previewTasks', payload.tasks);
-            setList('previewProfile', payload.profile);
-
-            const payloadInput = document.getElementById('jobPayload');
-            if (payloadInput) {
-                payloadInput.value = JSON.stringify(payload);
-            }
+            element.textContent = value;
         }
 
         function applyPreset(preset) {
-            const mapping = {
-                jobTitle: preset.title,
-                jobEmployment: preset.employment_type,
-                jobLocation: preset.location,
-                jobStart: preset.start,
-                jobTeam: preset.team,
-                jobCta: preset.cta,
-                jobBenefits: preset.benefits.join('\n'),
-                jobTasks: preset.tasks.join('\n'),
-                jobProfile: preset.profile.join('\n'),
-                jobContactName: preset.contact_name,
-                jobContactInfo: preset.contact_info
-            };
-
-            Object.entries(mapping).forEach(([id, value]) => {
-                const element = document.getElementById(id);
-                if (!element) return;
-                element.value = value;
+            Object.entries(preset).forEach(([name, value]) => {
+                setField(name, value);
             });
 
-            updatePreview();
+            updatePayload();
         }
 
-        updatePreview();
+        updatePayload();
     }
 
     function showAdminToast(message) {
