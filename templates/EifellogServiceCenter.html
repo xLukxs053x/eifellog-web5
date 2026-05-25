@@ -685,121 +685,10 @@
     }
 
     .issued-card-preview-stack {
-        position: relative;
-        width: 100%;
-        min-width: 0;
-    }
-
-    .issued-card-preview-stack::before,
-    .issued-card-preview-stack::after {
-        content: "";
-        position: absolute;
-        top: 3.1rem;
-        bottom: 2rem;
-        z-index: 2;
-        width: 2rem;
-        pointer-events: none;
-        opacity: 0.9;
-    }
-
-    .issued-card-preview-stack::before {
-        left: -0.15rem;
-        background: linear-gradient(90deg, rgba(10, 12, 9, 0.72), transparent);
-    }
-
-    .issued-card-preview-stack::after {
-        right: -0.15rem;
-        background: linear-gradient(270deg, rgba(10, 12, 9, 0.72), transparent);
-    }
-
-    .cards-swipe-hint {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.55rem;
-        margin: 0 0 0.9rem;
-        color: rgba(255, 255, 255, 0.52);
-        font-family: Orbitron, Inter, system-ui, sans-serif;
-        font-size: 0.58rem;
-        font-weight: 900;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        text-align: center;
-    }
-
-    .cards-swipe-hint svg {
-        width: 1rem;
-        height: 1rem;
-        color: var(--brand-green);
-        filter: drop-shadow(0 0 10px rgba(137, 190, 50, 0.35));
-        flex: 0 0 auto;
-    }
-
-    .issued-card-carousel {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        gap: 1rem;
-        width: 100%;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        scroll-padding-inline: 0.25rem;
-        overscroll-behavior-x: contain;
-        -webkit-overflow-scrolling: touch;
-        padding: 0.15rem 0.25rem 0.95rem;
-        cursor: grab;
-        touch-action: pan-x;
-    }
-
-    .issued-card-carousel:active {
-        cursor: grabbing;
-    }
-
-    .issued-card-carousel:focus-visible {
-        outline: 2px solid rgba(137, 190, 50, 0.55);
-        outline-offset: 0.35rem;
-        border-radius: 1.25rem;
-    }
-
-    .issued-card-carousel::-webkit-scrollbar {
-        height: 8px;
-    }
-
-    .issued-card-carousel::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.18);
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
-    }
-
-    .issued-card-carousel::-webkit-scrollbar-thumb {
-        background: linear-gradient(90deg, rgba(137, 190, 50, 0.48), rgba(255, 202, 40, 0.30));
-        border-radius: 999px;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
-    }
-
-    .issued-card-carousel::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(90deg, rgba(137, 190, 50, 0.68), rgba(255, 202, 40, 0.45));
-    }
-
-    .issued-card-slide {
-        flex: 0 0 100%;
-        min-width: 0;
-        scroll-snap-align: center;
-        scroll-snap-stop: always;
         display: grid;
-        align-content: start;
-    }
-
-    .issued-card-slide-inner {
-        width: min(100%, 560px);
-        min-width: 0;
-        margin-inline: auto;
-    }
-
-    .issued-card-slide-inner-servicecenter {
-        width: min(100%, 430px);
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.15rem;
+        align-items: start;
     }
 
     .issued-driver-card-stage {
@@ -811,51 +700,89 @@
         margin-inline: auto;
     }
 
-    .issued-card-carousel .real-driver-card-wrap {
-        overflow-x: visible;
-        padding-bottom: 0;
+    .servicecenter-card-toggle {
+        width: 100%;
+        min-width: 0;
     }
 
-    .card-carousel-status {
-        display: flex;
+    .servicecenter-card-toggle > summary {
+        list-style: none;
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 auto;
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.45rem;
-        margin-top: 0.15rem;
-    }
-
-    .card-carousel-status span {
-        width: 0.48rem;
-        height: 0.48rem;
+        gap: 0.55rem;
+        padding: 0.82rem 1.05rem;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.055);
         border: 1px solid rgba(255, 255, 255, 0.12);
-        transition: width 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+        color: var(--muted);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        transition: transform 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
     }
 
-    .card-carousel-status span.is-active {
-        width: 1.35rem;
-        background: rgba(137, 190, 50, 0.82);
-        border-color: rgba(137, 190, 50, 0.42);
-        box-shadow: 0 0 14px rgba(137, 190, 50, 0.34);
+    .servicecenter-card-toggle > summary::-webkit-details-marker {
+        display: none;
     }
 
-    @media (max-width: 420px) {
-        .issued-card-carousel {
-            gap: 0.85rem;
-            padding-inline: 0.1rem;
-        }
-
-        .issued-card-carousel .real-driver-card {
-            min-width: 320px;
-        }
-
-        .cards-swipe-hint {
-            font-size: 0.52rem;
-            letter-spacing: 0.10em;
-        }
+    .servicecenter-card-toggle > summary:hover {
+        transform: translateY(-1px);
+        background: rgba(137, 190, 50, 0.12);
+        border-color: rgba(137, 190, 50, 0.35);
+        color: #fff;
     }
 
+    .servicecenter-card-toggle-icon {
+        width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-green);
+        background: rgba(137, 190, 50, 0.10);
+        border: 1px solid rgba(137, 190, 50, 0.24);
+        flex: 0 0 auto;
+    }
+
+    .servicecenter-card-toggle .toggle-open-text {
+        display: none;
+    }
+
+    .servicecenter-card-toggle[open] .toggle-closed-text {
+        display: none;
+    }
+
+    .servicecenter-card-toggle[open] .toggle-open-text {
+        display: inline;
+    }
+
+    .servicecenter-card-toggle[open] > summary {
+        background: rgba(137, 190, 50, 0.13);
+        border-color: rgba(137, 190, 50, 0.38);
+        color: #fff;
+    }
+
+    .servicecenter-card-toggle[open] .servicecenter-card-toggle-icon svg {
+        transform: rotate(180deg);
+    }
+
+    .servicecenter-card-toggle-icon svg {
+        transition: transform 180ms ease;
+    }
+
+    .servicecenter-card-panel {
+        width: min(100%, 430px);
+        margin: 1rem auto 0;
+    }
 
     .card-preview-label {
         display: flex;
@@ -1491,7 +1418,7 @@
                             <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Aktive Karten</span>
                             <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Realitätsnahe Fahrerkarte bereitgestellt</h2>
                             <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed max-w-3xl">
-                                Die Fahrerkarte wird zuerst angezeigt. Wische oder scrolle horizontal, um direkt zwischen Fahrerkarte und interner ServiceCenter-Karte zu blättern - ohne zusätzlichen Aufklapp-Button.
+                                Die Fahrerkarte wird zuerst angezeigt. Die interne ServiceCenter-Karte bleibt verfügbar und kann bei Bedarf über den Button unterhalb der Fahrerkarte eingeblendet werden.
                             </p>
                         </div>
 
@@ -1508,17 +1435,8 @@
                         </div>
                     </div>
 
-                    <div class="issued-card-preview-stack" aria-label="Kartenbereich">
-                        <div class="cards-swipe-hint" aria-hidden="true">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7l-5 5m0 0l5 5m-5-5h18m-5-5l5 5m0 0l-5 5"></path>
-                            </svg>
-                            Zur Seite wischen oder horizontal scrollen
-                        </div>
-
-                        <div class="issued-card-carousel custom-scrollbar" data-card-carousel tabindex="0" aria-label="Zwischen Fahrerkarte und ServiceCenter-Karte blättern">
-                            <section class="issued-card-slide issued-driver-card-stage min-w-0" data-card-slide aria-label="Fahrerkarte">
-                                <div class="issued-card-slide-inner">
+                    <div class="issued-card-preview-stack">
+                        <section class="issued-driver-card-stage min-w-0">
                             <div class="card-preview-label">
                                 <span>Fahrerkarte</span>
                                 <span>Aktiv</span>
@@ -1579,11 +1497,21 @@
                                     </div>
                                 </div>
                             </div>
-                                </div>
-                            </section>
+                        </section>
 
-                            <section class="issued-card-slide min-w-0" data-card-slide aria-label="ServiceCenter Karte">
-                                <div class="issued-card-slide-inner issued-card-slide-inner-servicecenter">
+                        <details class="servicecenter-card-toggle">
+                            <summary role="button" aria-label="ServiceCenter Karte ansehen">
+                                <span class="servicecenter-card-toggle-icon" aria-hidden="true">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </span>
+                                <span class="toggle-closed-text">ServiceCenter Karte ansehen</span>
+                                <span class="toggle-open-text">ServiceCenter Karte ausblenden</span>
+                            </summary>
+
+                            <div class="servicecenter-card-panel">
+                                <section class="min-w-0">
                                 <div class="card-preview-label">
                                     <span>ServiceCenter Karte</span>
                                     <span>Intern aktiv</span>
@@ -1623,16 +1551,9 @@
                                         <span>Verknüpft mit Fahrerkarte</span>
                                     </div>
                                 </div>
-                                </div>
                             </section>
-
-                        </div>
-
-                        <div class="card-carousel-status" aria-hidden="true">
-                            <span class="is-active" data-card-indicator></span>
-                            <span data-card-indicator></span>
-                        </div>
-                    </div>
+                            </div>
+                        </details>
                     </div>
 
                     <div class="mt-5 rounded-2xl bg-black/25 border border-white/10 p-4">
@@ -1973,43 +1894,6 @@
 </div>
 
 <script>
-(function () {
-    const carousel = document.querySelector('[data-card-carousel]');
-    if (!carousel) return;
-
-    const slides = Array.from(carousel.querySelectorAll('[data-card-slide]'));
-    const indicators = Array.from(document.querySelectorAll('[data-card-indicator]'));
-    if (!slides.length || !indicators.length) return;
-
-    let rafId = null;
-
-    function updateCardIndicator() {
-        const center = carousel.scrollLeft + (carousel.clientWidth / 2);
-        let activeIndex = 0;
-        let activeDistance = Infinity;
-
-        slides.forEach((slide, index) => {
-            const slideCenter = slide.offsetLeft + (slide.offsetWidth / 2);
-            const distance = Math.abs(center - slideCenter);
-            if (distance < activeDistance) {
-                activeDistance = distance;
-                activeIndex = index;
-            }
-        });
-
-        indicators.forEach((indicator, index) => {
-            indicator.classList.toggle('is-active', index === activeIndex);
-        });
-    }
-
-    carousel.addEventListener('scroll', () => {
-        if (rafId) window.cancelAnimationFrame(rafId);
-        rafId = window.requestAnimationFrame(updateCardIndicator);
-    }, { passive: true });
-
-    window.addEventListener('resize', updateCardIndicator, { passive: true });
-    updateCardIndicator();
-})();
 (function () {
     const form = document.getElementById('fahrerkarte-application-form');
     if (!form) return;
