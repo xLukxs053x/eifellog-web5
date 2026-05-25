@@ -10288,55 +10288,100 @@ def changelog():
     # -------------------------------------------------
     # Changelog JSON laden
     # -------------------------------------------------
+    # Unterstützte Speicherorte:
+    # 1) Projekt-Root:        ./changelog.json
+    # 2) Static-Ordner:       ./static/changelog.json
+    # 3) Data-Ordner:         ./data/changelog.json
+    # 4) Aktuelles Arbeitsverzeichnis, falls Gunicorn aus einem anderen Pfad startet
     changelog_data = []
 
+    possible_json_paths = []
+    for base_path in {BASE_DIR, app.root_path, os.getcwd()}:
+        if not base_path:
+            continue
+        possible_json_paths.extend([
+            os.path.join(base_path, "changelog.json"),
+            os.path.join(base_path, "static", "changelog.json"),
+            os.path.join(base_path, "data", "changelog.json"),
+        ])
+
+    # Doppelte Pfade entfernen, Reihenfolge behalten
+    seen_paths = set()
     possible_json_paths = [
-        os.path.join(current_app.root_path, "changelog.json"),
-        os.path.join(current_app.root_path, "static", "changelog.json"),
-        os.path.join(current_app.root_path, "data", "changelog.json"),
+        path for path in possible_json_paths
+        if not (path in seen_paths or seen_paths.add(path))
     ]
 
-    json_path = None
+    json_path = next((path for path in possible_json_paths if os.path.isfile(path)), None)
 
-    for path in possible_json_paths:
-        if os.path.isfile(path):
-            json_path = path
-            break
+    def normalize_changelog_entries(raw_data):
+        """Akzeptiert mehrere JSON-Formate und gibt immer eine saubere Liste zurück."""
+        if isinstance(raw_data, list):
+            entries = raw_data
+        elif isinstance(raw_data, dict):
+            entries = (
+                raw_data.get("changelog")
+                or raw_data.get("entries")
+                or raw_data.get("updates")
+                or raw_data.get("versions")
+                or []
+            )
+        else:
+            entries = []
+
+        if not isinstance(entries, list):
+            return []
+
+        normalized_entries = []
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+
+            normalized_entry = dict(entry)
+            normalized_entry["version"] = safe_str(normalized_entry.get("version"), "Unversioniert")
+            normalized_entry["tag"] = safe_str(normalized_entry.get("tag"), "Update")
+            normalized_entry["date"] = safe_str(normalized_entry.get("date"), "")
+
+            # Falls kein Eintrag als latest markiert wurde, wird der erste Eintrag als aktuell behandelt.
+            if "is_latest" not in normalized_entry:
+                normalized_entry["is_latest"] = index == 0
+            else:
+                normalized_entry["is_latest"] = bool(normalized_entry.get("is_latest"))
+
+            for key in ("added", "changed", "fixed"):
+                value = normalized_entry.get(key)
+                if isinstance(value, list):
+                    normalized_entry[key] = [safe_str(item) for item in value if safe_str(item)]
+                elif value:
+                    normalized_entry[key] = [safe_str(value)]
+                else:
+                    normalized_entry[key] = []
+
+            normalized_entries.append(normalized_entry)
+
+        return normalized_entries
 
     if json_path:
         try:
-            with open(json_path, "r", encoding="utf-8") as f:
-                loaded_data = json.load(f)
+            with open(json_path, "r", encoding="utf-8-sig") as file:
+                loaded_data = json.load(file)
 
-            # Variante 1: JSON-Datei ist direkt eine Liste
-            # [
-            #   {...},
-            #   {...}
-            # ]
-            if isinstance(loaded_data, list):
-                changelog_data = loaded_data
+            changelog_data = normalize_changelog_entries(loaded_data)
 
-            # Variante 2: JSON-Datei enthält ein Objekt mit "changelog"
-            # {
-            #   "changelog": [...]
-            # }
-            elif isinstance(loaded_data, dict) and isinstance(loaded_data.get("changelog"), list):
-                changelog_data = loaded_data["changelog"]
-
+            if changelog_data:
+                print(f"Changelog geladen: {json_path}")
+                print(f"Changelog-Einträge gefunden: {len(changelog_data)}")
             else:
-                print("changelog.json wurde gefunden, hat aber kein gültiges Format.")
-                print("Erwartet wird entweder eine Liste oder ein Objekt mit dem Key 'changelog'.")
+                print(f"changelog.json wurde gefunden, enthält aber keine gültigen Changelog-Einträge: {json_path}")
+                print("Erlaubte Formate: direkte Liste oder Objekt mit 'changelog', 'entries', 'updates' oder 'versions'.")
 
-            print(f"Changelog geladen: {json_path}")
-            print(f"Einträge gefunden: {len(changelog_data)}")
-
-        except json.JSONDecodeError as e:
-            print(f"Fehler: changelog.json ist kein gültiges JSON.")
+        except json.JSONDecodeError as error:
+            print("Fehler: changelog.json ist kein gültiges JSON.")
             print(f"Datei: {json_path}")
-            print(f"Details: {e}")
+            print(f"Details: {error}")
 
-        except Exception as e:
-            print(f"Fehler beim Laden der Changelog-Daten: {e}")
+        except Exception as error:
+            print(f"Fehler beim Laden der Changelog-Daten aus {json_path}: {error}")
 
     else:
         print("changelog.json wurde nicht gefunden.")
@@ -10385,10 +10430,6 @@ def changelog():
         roadmap=roadmap_data,
     )
 
-
-# ==========================================
-# AUTHENTIFIZIERUNG
-# ==========================================
 
 @app.route("/login")
 def login():
