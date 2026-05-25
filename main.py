@@ -2,6 +2,7 @@ import eventlet
 eventlet.monkey_patch()
 
 import os
+import base64
 import re
 import json
 import time
@@ -590,6 +591,14 @@ ROLE_FUHRPARKMANAGEMENT_ID = env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMA
 ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
+# Admin-Area: Zugriff ausschließlich fuer die von dir vorgegebenen Discord-Rollen.
+ADMIN_AREA_PERSONALABTEILUNG_ROLE_ID = "1473721587122438321"
+ADMIN_AREA_GESCHAEFTSLEITUNG_ROLE_ID = "1473721587122438322"
+ADMIN_AREA_ALLOWED_ROLE_IDS = {
+    ADMIN_AREA_PERSONALABTEILUNG_ROLE_ID,
+    ADMIN_AREA_GESCHAEFTSLEITUNG_ROLE_ID,
+}
+
 # ==========================================
 # SERVICECENTER / WEB-ONLY FAHRERKARTE
 # ==========================================
@@ -848,6 +857,13 @@ def has_geschaeftsleitung_permission(user_roles):
 
     primary_role_name = get_primary_role_name(user_roles)
     return primary_role_name in {"Geschäftsleitung", "Geschäftsführung", "Projektleitung"}
+
+
+def has_admin_area_permission(user_roles):
+    """Admin-Area nur fuer die explizit erlaubten Discord-Rollen-IDs freigeben."""
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_allowed_roles = set(clean_roles(ADMIN_AREA_ALLOWED_ROLE_IDS))
+    return bool(clean_user_roles.intersection(clean_allowed_roles))
 
 
 def has_dispo_form_access(user_roles):
@@ -4637,6 +4653,152 @@ def tracker_public_file_url(relative_path):
     return make_external_url(relative_path)
 
 
+def tracker_request_payload():
+    """Vereinheitlicht Tracker-Parameter aus JSON, Form-Daten und Query-String."""
+    payload = {}
+    try:
+        if request.form:
+            payload.update(request.form.to_dict(flat=True))
+    except Exception:
+        pass
+
+    json_payload = request.get_json(silent=True)
+    if isinstance(json_payload, dict):
+        payload.update(json_payload)
+
+    try:
+        if request.args:
+            for key, value in request.args.to_dict(flat=True).items():
+                payload.setdefault(key, value)
+    except Exception:
+        pass
+
+    return payload
+
+
+def tracker_decode_base64_pdf(value):
+    value = safe_str(value)
+    if not value:
+        return b""
+    if "," in value and value.lower().startswith("data:"):
+        value = value.split(",", 1)[1]
+    value = re.sub(r"\s+", "", value)
+    try:
+        return base64.b64decode(value, validate=False)
+    except Exception:
+        return b""
+
+
+def tracker_pdf_bytes_look_valid(pdf_bytes):
+    if not pdf_bytes:
+        return False
+    return pdf_bytes[:8].lstrip().startswith(b"%PDF") or b"%PDF" in pdf_bytes[:32]
+
+
+def tracker_extract_driver_card_upload(payload=None):
+    """Liest eine Fahrerkarte-PDF robust aus Multipart, JSON/Base64 oder Raw-PDF-Body.
+
+    Der alte Endpoint hat nur request.files['file'|'pdf'|'driverCardPdf'] akzeptiert.
+    Einige Tracker/WebView-Versionen senden die Datei aber als anderes Feld, als Base64-JSON
+    oder direkt als application/pdf. Dadurch kam fälschlich: 'Keine PDF-Datei erhalten.'.
+    """
+    payload = payload or tracker_request_payload()
+
+    preferred_file_fields = (
+        "file", "pdf", "driverCardPdf", "driver_card_pdf", "driverCard",
+        "fahrerkarte", "fahrerkartePdf", "fahrerkarte_pdf", "cardPdf",
+        "document", "upload", "data", "files", "files[]"
+    )
+
+    file_candidates = []
+    try:
+        for field_name in preferred_file_fields:
+            uploaded_file = request.files.get(field_name)
+            if uploaded_file:
+                file_candidates.append((field_name, uploaded_file))
+        if not file_candidates:
+            for field_name in request.files:
+                uploaded_file = request.files.get(field_name)
+                if uploaded_file:
+                    file_candidates.append((field_name, uploaded_file))
+    except Exception:
+        file_candidates = []
+
+    for field_name, uploaded_file in file_candidates:
+        original_filename = secure_filename(uploaded_file.filename or "")
+        if not original_filename:
+            original_filename = secure_filename(safe_str(payload.get("fileName") or payload.get("filename") or payload.get("originalFilename")))
+        if not original_filename:
+            original_filename = "fahrerkarte.pdf"
+        if "." not in original_filename:
+            original_filename = f"{original_filename}.pdf"
+
+        if not tracker_allowed_driver_card_file(original_filename):
+            continue
+
+        try:
+            pdf_bytes = uploaded_file.read()
+        except Exception:
+            pdf_bytes = b""
+
+        if not pdf_bytes:
+            return None, None, "Die hochgeladene PDF-Datei ist leer."
+        if not tracker_pdf_bytes_look_valid(pdf_bytes):
+            return None, None, "Die hochgeladene Datei ist keine gültige PDF-Datei."
+
+        return original_filename, pdf_bytes, f"multipart:{field_name}"
+
+    base64_fields = (
+        "pdfBase64", "driverCardPdfBase64", "driver_card_pdf_base64",
+        "fahrerkartePdfBase64", "fahrerkarte_pdf_base64", "fileBase64",
+        "file_base64", "base64", "dataUrl", "data_url"
+    )
+    for field_name in base64_fields:
+        pdf_bytes = tracker_decode_base64_pdf(payload.get(field_name))
+        if pdf_bytes:
+            original_filename = secure_filename(safe_str(payload.get("fileName") or payload.get("filename") or payload.get("originalFilename"))) or "fahrerkarte.pdf"
+            if "." not in original_filename:
+                original_filename = f"{original_filename}.pdf"
+            if not tracker_allowed_driver_card_file(original_filename):
+                original_filename = "fahrerkarte.pdf"
+            if not tracker_pdf_bytes_look_valid(pdf_bytes):
+                return None, None, "Die Base64-Datei ist keine gültige PDF-Datei."
+            return original_filename, pdf_bytes, f"json:{field_name}"
+
+    content_type = safe_str(request.headers.get("Content-Type")).split(";", 1)[0].lower()
+    if content_type in {"application/pdf", "application/octet-stream", "binary/octet-stream"}:
+        raw_bytes = request.get_data(cache=True) or b""
+        if raw_bytes:
+            original_filename = secure_filename(
+                safe_str(request.headers.get("X-Filename"))
+                or safe_str(request.headers.get("X-File-Name"))
+                or safe_str(payload.get("fileName") or payload.get("filename") or payload.get("originalFilename"))
+                or "fahrerkarte.pdf"
+            )
+            if "." not in original_filename:
+                original_filename = f"{original_filename}.pdf"
+            if not tracker_allowed_driver_card_file(original_filename):
+                original_filename = "fahrerkarte.pdf"
+            if not tracker_pdf_bytes_look_valid(raw_bytes):
+                return None, None, "Der Request-Body ist keine gültige PDF-Datei."
+            return original_filename, raw_bytes, "raw-body"
+
+    return None, None, "Keine PDF-Datei erhalten. Sende multipart/form-data mit Feld 'file' oder JSON mit 'pdfBase64'."
+
+
+def tracker_resolve_driver_card_pdf_path(card_doc):
+    card_doc = card_doc or {}
+    pdf_path = safe_str(
+        card_doc.get("file_relative_path")
+        or card_doc.get("pdf_relative_path")
+        or card_doc.get("pdf_path")
+        or card_doc.get("file_path")
+    )
+    if not pdf_path:
+        return ""
+    return resolve_fahrerkarte_pdf_path(pdf_path)
+
+
 def tracker_first_user_value(user_doc, *keys, fallback=""):
     user_doc = user_doc or {}
     for key in keys:
@@ -4788,6 +4950,7 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
     if download_url:
         download_url = make_external_url(download_url)
+    api_download_url = make_external_url(f"/api/tracker/driver-card/pdf/{card_id}") if card_id else make_external_url("/api/tracker/driver-card/pdf")
     avatar_url = (
         safe_str(card_doc.get("avatar_url") or card_doc.get("avatarUrl") or card_doc.get("discord_avatar_url"))
         or get_fahrerkarte_avatar_url(user_doc=user_doc or {}, request_doc=card_doc, size=256)
@@ -4833,6 +4996,14 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "download_url": download_url,
         "pdfUrl": download_url,
         "pdf_url": download_url,
+        "apiDownloadUrl": api_download_url,
+        "downloadApiUrl": api_download_url,
+        "pdfDownloadApiUrl": api_download_url,
+        "authenticatedDownloadUrl": api_download_url,
+        "fileRelativePath": file_relative_path,
+        "pdfRelativePath": file_relative_path,
+        "hasPdf": bool(download_url or file_relative_path),
+        "has_pdf": bool(download_url or file_relative_path),
         "servicecenterDownloadUrl": safe_str(card_doc.get("servicecenter_download_url")) or download_url,
         "sourceRequestId": safe_str(card_doc.get("source_request_id") or card_doc.get("servicecenter_request_id")),
         "manualUploadRequired": bool(card_doc.get("manual_upload_required", False)),
@@ -4916,6 +5087,49 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     if not discord_id:
         return None
 
+    # Zuerst immer die aktive, direkt dem User zugeordnete Tracker-Fahrerkarte laden.
+    # Dadurch bekommt jeder Fahrer exakt seine eigene PDF aus tracker_driver_cards.
+    card_doc = tracker_driver_cards_collection.find_one(
+        {"discord_id": discord_id, "archived": {"$ne": True}, "active": {"$ne": False}},
+        sort=[("updated_at", DESCENDING), ("uploaded_at", DESCENDING), ("created_at", DESCENDING)]
+    )
+    if card_doc:
+        return card_doc
+
+    # Fallback: ältere Datensätze ohne active-Flag.
+    card_doc = tracker_driver_cards_collection.find_one(
+        {"discord_id": discord_id, "archived": {"$ne": True}},
+        sort=[("updated_at", DESCENDING), ("uploaded_at", DESCENDING), ("created_at", DESCENDING)]
+    )
+    if card_doc:
+        return card_doc
+
+    # Fallback aus dem User-Dokument, falls die PDF dort schon gespeichert ist,
+    # aber die Tracker-Collection noch keinen synchronisierten Datensatz besitzt.
+    user_pdf_path = safe_str(user_doc.get("fahrerkarte_pdf_relative_path") or user_doc.get("driver_card_pdf_relative_path"))
+    user_download_url = safe_str(user_doc.get("fahrerkarte_download_url") or user_doc.get("driver_card_download_url"))
+    user_card_id = safe_str(user_doc.get("fahrerkarte_card_id") or user_doc.get("personalisierte_fahrerkarte_card_id") or user_doc.get("driver_card_id"))
+    if user_pdf_path or user_download_url or user_card_id:
+        extra = {
+            "cardId": user_card_id or generate_fahrerkarte_card_id(discord_id, "user-doc"),
+            "fileRelativePath": user_pdf_path,
+            "fileName": safe_str(user_doc.get("fahrerkarte_pdf_filename") or user_doc.get("driver_card_pdf_filename") or "fahrerkarte.pdf"),
+            "downloadUrl": user_download_url or tracker_public_file_url(user_pdf_path),
+            "status": "Aktiv",
+            "uploadedAt": user_doc.get("tracker_driver_card_uploaded_at") if isinstance(user_doc.get("tracker_driver_card_uploaded_at"), datetime) else now_utc(),
+        }
+        card_doc = tracker_build_driver_card_doc(user_doc, source_request={}, source="users_db_fallback", extra=extra)
+        tracker_driver_cards_collection.update_one(
+            {"discord_id": discord_id, "card_id": card_doc["card_id"]},
+            mongo_upsert_set_preserve_created_at(card_doc),
+            upsert=True
+        )
+        return tracker_driver_cards_collection.find_one(
+            {"discord_id": discord_id, "card_id": card_doc["card_id"], "archived": {"$ne": True}},
+            sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+        )
+
+    # Letzter Fallback: ausgestellte Fahrerkarte aus dem ServiceCenter synchronisieren.
     source_request = tracker_latest_issued_fahrerkarte_request(user_doc) if create_from_servicecenter else None
     if source_request:
         servicecenter_card = sync_tracker_driver_card_from_fahrerkarte(
@@ -4926,13 +5140,6 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
         )
         if servicecenter_card:
             return servicecenter_card
-
-    card_doc = tracker_driver_cards_collection.find_one(
-        {"discord_id": discord_id, "archived": {"$ne": True}},
-        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
-    )
-    if card_doc:
-        return card_doc
 
     return None
 
@@ -9923,28 +10130,30 @@ def tracker_driver_card_upload():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    form_payload = request.form or {}
-    user_doc, client_token, error_response = tracker_auth_user_from_payload(form_payload)
+    payload = tracker_request_payload()
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(payload)
     if error_response:
         return error_response
 
-    upload = request.files.get("file") or request.files.get("pdf") or request.files.get("driverCardPdf")
-    if not upload or not upload.filename:
-        return jsonify({"success": False, "error": "Keine PDF-Datei erhalten."}), 400
+    original_filename, pdf_bytes, upload_source_or_error = tracker_extract_driver_card_upload(payload)
+    if not pdf_bytes:
+        return jsonify({"success": False, "error": upload_source_or_error or "Keine PDF-Datei erhalten."}), 400
 
-    if not tracker_allowed_driver_card_file(upload.filename):
+    original_filename = secure_filename(original_filename or "fahrerkarte.pdf")
+    if "." not in original_filename:
+        original_filename = f"{original_filename}.pdf"
+    if not tracker_allowed_driver_card_file(original_filename):
         return jsonify({"success": False, "error": "Nur PDF-Dateien sind als Fahrerkarte erlaubt."}), 400
 
-    os.makedirs(TRACKER_DRIVER_CARD_UPLOAD_FOLDER, exist_ok=True)
-
-    original_filename = secure_filename(upload.filename) or "fahrerkarte.pdf"
     extension = original_filename.rsplit(".", 1)[1].lower()
     discord_id = safe_str(user_doc.get("discord_id"))
     unique_filename = f"{discord_id or 'driver'}_{now_utc().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:10]}.{extension}"
     relative_path = tracker_driver_card_upload_relative_path(unique_filename)
-    absolute_path = os.path.join(BASE_DIR, relative_path)
+    absolute_path = resolve_fahrerkarte_pdf_path(relative_path)
     os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-    upload.save(absolute_path)
+
+    with open(absolute_path, "wb") as file:
+        file.write(pdf_bytes)
 
     latest_request = tracker_latest_issued_fahrerkarte_request(user_doc)
     extra = {
@@ -9962,7 +10171,7 @@ def tracker_driver_card_upload():
         {"$set": {"archived": True, "archived_at": now_utc(), "active": False}}
     )
     tracker_driver_cards_collection.update_one(
-        {"discord_id": discord_id, "card_id": card_doc["card_id"], "file_relative_path": relative_path},
+        {"discord_id": discord_id, "card_id": card_doc["card_id"]},
         mongo_upsert_set_preserve_created_at(card_doc),
         upsert=True
     )
@@ -9978,13 +10187,14 @@ def tracker_driver_card_upload():
             "fahrerkarte_download_url": card_doc.get("download_url"),
             "tracker_driver_card_uploaded_at": now_utc(),
             "tracker_driver_card_active": True,
+            "tracker_driver_card_upload_source": upload_source_or_error,
         }}
     )
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
     fresh_card = tracker_driver_cards_collection.find_one(
         {"discord_id": discord_id, "card_id": card_doc["card_id"], "archived": {"$ne": True}},
-        sort=[("updated_at", DESCENDING)]
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
     ) or tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
     driver_card_payload = tracker_prepare_driver_card_payload(fresh_card, user_doc=fresh_user)
 
@@ -9997,6 +10207,60 @@ def tracker_driver_card_upload():
         "fahrerkarte": driver_card_payload,
         "profile": tracker_profile_payload(fresh_user),
     })
+
+
+@app.route("/api/tracker/driver-card/pdf", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/pdf/<card_id>", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/download", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/download/<card_id>", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/pdf", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/pdf/<card_id>", methods=["GET", "POST", "OPTIONS"])
+def tracker_driver_card_pdf_download(card_id=""):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    payload = tracker_request_payload()
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(payload)
+    if error_response:
+        return error_response
+
+    discord_id = safe_str(user_doc.get("discord_id"))
+    card_id = safe_str(card_id or payload.get("cardId") or payload.get("card_id") or payload.get("driverCardId"))
+
+    if card_id:
+        card_doc = tracker_driver_cards_collection.find_one(
+            {"discord_id": discord_id, "card_id": card_id, "archived": {"$ne": True}},
+            sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+        )
+    else:
+        card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+
+    if not card_doc:
+        return jsonify({"success": False, "error": "Keine Fahrerkarte für diesen User gefunden."}), 404
+
+    resolved_path = tracker_resolve_driver_card_pdf_path(card_doc)
+
+    # Falls die Karte aus dem ServiceCenter stammt und die PDF noch nicht auf Platte liegt, neu erzeugen.
+    if (not resolved_path or not os.path.exists(resolved_path)) and safe_str(card_doc.get("source_request_id") or card_doc.get("servicecenter_request_id")):
+        request_doc = find_fahrerkarte_request(card_doc.get("source_request_id") or card_doc.get("servicecenter_request_id"))
+        if request_doc and safe_str(request_doc.get("discord_id") or request_doc.get("user_id")) == discord_id:
+            file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(request_doc, user_doc=user_doc, actor=request_doc.get("issued_by") or {}, force=True)
+            fahrerkarte_requests_collection.update_one(
+                {"_id": request_doc["_id"]},
+                {"$set": {"pdf_path": file_path, "pdf_relative_path": relative_path, "pdf_filename": filename, "updated_at": now_utc()}}
+            )
+            tracker_driver_cards_collection.update_one(
+                {"_id": card_doc["_id"]},
+                {"$set": {"file_relative_path": relative_path, "pdf_relative_path": relative_path, "file_name": filename, "download_url": tracker_public_file_url(relative_path), "updated_at": now_utc()}}
+            )
+            resolved_path = file_path
+            card_doc["file_name"] = filename
+
+    if not resolved_path or not os.path.exists(resolved_path):
+        return jsonify({"success": False, "error": "Fahrerkarte-PDF wurde in der Datenbank gefunden, aber die Datei existiert nicht auf dem Server."}), 404
+
+    download_name = safe_str(card_doc.get("file_name") or card_doc.get("original_filename") or f"fahrerkarte_{discord_id}.pdf")
+    return send_file(resolved_path, mimetype="application/pdf", as_attachment=True, download_name=download_name)
 
 
 @app.route("/api/tracker/work-session", methods=["GET", "POST", "OPTIONS"])
@@ -10904,6 +11168,36 @@ def dashboard():
         loa_upcoming_items=loa_upcoming_items,
         **registration_context,
         **driver_dashboard_context
+    )
+
+
+@app.route("/admin", methods=["GET"])
+@app.route("/admin.html", methods=["GET"])
+def admin():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    session_user = session.get("user") or {}
+    user_roles = session_user.get("roles", [])
+
+    if not has_admin_area_permission(user_roles):
+        flash("Zugriff verweigert. Die Admin-Area ist nur fuer Personalabteilung und Geschäftsleitung freigegeben.", "error")
+        return redirect(url_for("dashboard"))
+
+    db_user = get_current_user() or {}
+    current_user = db_user or session_user
+
+    return render_template(
+        "admin.html",
+        title="Admin-Area - Eifel LOG",
+        description="Admin-Area für Eifel LOG Verwaltung, Stellenausschreibungen und interne Systeme.",
+        current_user=current_user,
+        user=current_user,
+        primary_role_name=get_primary_role_name(user_roles),
+        admin_allowed_role_ids=sorted(ADMIN_AREA_ALLOWED_ROLE_IDS),
+        admin_tabs=["stellenausschreibungen"],
+        stellenausschreibungen_template_image=url_for("static", filename="SA_Template.jpg"),
     )
 
 
