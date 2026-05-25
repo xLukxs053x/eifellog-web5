@@ -2441,6 +2441,28 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
     if not card_id:
         card_id = "Wird nach Ausstellung erzeugt"
 
+    system_id = safe_str(user_doc.get("id") or user_doc.get("discord_id"), "-")
+    service_card_id = safe_str(
+        user_doc.get("fahrerkarte_service_card_id")
+        or user_doc.get("service_card_id")
+        or (f"SC-{system_id}" if system_id and system_id != "-" else "SC")
+    )
+    license_number = safe_str(
+        user_doc.get("fahrerkarte_license_number")
+        or user_doc.get("license_number")
+        or (f"EL-FS-{system_id}" if system_id and system_id != "-" else "EL-FS")
+    )
+    birthdate = safe_str(
+        user_doc.get("fahrerkarte_birthdate")
+        or user_doc.get("birthdate")
+        or user_doc.get("birthday"),
+        "-"
+    )
+    expiry_at = safe_str(user_doc.get("fahrerkarte_expiry_at"), "5 Jahre nach Ausstellung")
+    authority = safe_str(user_doc.get("fahrerkarte_authority"), "EifelLog ServiceCenter")
+    verify_url = f"/servicecenter/fahrerkarte/verifizieren/{card_id}" if card_id and "Wird" not in card_id else "/servicecenter/fahrerkarte"
+    has_issued_cards = status == "issued"
+
     return {
         "personalisierte_fahrerkarte_status": status,
         "fahrerkarte_name": name,
@@ -2449,6 +2471,15 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
         "fahrerkarte_requested_at": requested_at,
         "fahrerkarte_issued_at": issued_at,
         "fahrerkarte_card_id": card_id,
+        "fahrerkarte_service_card_id": service_card_id,
+        "fahrerkarte_license_number": license_number,
+        "fahrerkarte_birthdate": birthdate,
+        "fahrerkarte_expiry_at": expiry_at,
+        "fahrerkarte_authority": authority,
+        "fahrerkarte_verify_url": verify_url,
+        "fahrerkarte_has_driver_card": has_issued_cards,
+        "fahrerkarte_has_servicecenter_card": has_issued_cards,
+        "fahrerkarte_primary_preview_card": "fahrerkarte",
         "fahrerkarte_note": note,
         "fahrerkarte_pdf_download_url": pdf_download_url,
         "fahrerkarte_pdf_filename": pdf_filename,
@@ -3399,9 +3430,19 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
     now = now_utc()
     card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(discord_id, request_doc.get("request_id"))
 
+    service_card_id = safe_str(request_doc.get("service_card_id") or request_doc.get("fahrerkarte_service_card_id") or f"SC-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
+    license_number = safe_str(request_doc.get("license_number") or request_doc.get("fahrerkarte_license_number") or request_doc.get("driver_number") or f"EL-FS-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
+
     pre_update = {
         "status": "issued",
         "card_id": card_id,
+        "service_card_id": service_card_id,
+        "fahrerkarte_service_card_id": service_card_id,
+        "license_number": license_number,
+        "fahrerkarte_license_number": license_number,
+        "has_driver_card": True,
+        "has_servicecenter_card": True,
+        "primary_preview_card": "fahrerkarte",
         "claimed_by": request_doc.get("claimed_by") or actor,
         "claimed_at": request_doc.get("claimed_at") or now,
         "approved_by": request_doc.get("approved_by") or actor,
@@ -3505,6 +3546,27 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["system_id"] = item.get("system_id") or item.get("discord_id") or "-"
     item["driver_number"] = item.get("driver_number") or ""
     item["card_id"] = item.get("card_id") or ""
+    service_seed = safe_str(item.get("system_id") or item.get("discord_id") or item.get("user_id") or item["request_id"], "-")
+    item["service_card_id"] = safe_str(
+        item.get("service_card_id")
+        or item.get("fahrerkarte_service_card_id")
+        or (f"SC-{service_seed}" if service_seed and service_seed != "-" else "SC")
+    )
+    item["fahrerkarte_service_card_id"] = item["service_card_id"]
+    item["license_number"] = safe_str(
+        item.get("license_number")
+        or item.get("fahrerkarte_license_number")
+        or item.get("driver_number")
+        or (f"EL-FS-{service_seed}" if service_seed and service_seed != "-" else "EL-FS")
+    )
+    item["fahrerkarte_license_number"] = item["license_number"]
+    item["birthdate"] = safe_str(item.get("birthdate") or item.get("birthday") or item.get("fahrerkarte_birthdate"), "-")
+    item["expiry_at"] = safe_str(item.get("expiry_at") or item.get("fahrerkarte_expiry_at"), "5 Jahre nach Ausstellung")
+    item["authority"] = safe_str(item.get("authority") or item.get("fahrerkarte_authority"), "EifelLog ServiceCenter")
+    item["verify_url"] = safe_str(item.get("verify_url") or item.get("fahrerkarte_verify_url") or f"/servicecenter/fahrerkarte/verifizieren/{item['card_id']}") if item["card_id"] else ""
+    item["has_driver_card"] = item["status"] == "issued" or bool(item["card_id"])
+    item["has_servicecenter_card"] = item["status"] == "issued"
+    item["primary_preview_card"] = "fahrerkarte"
     item["pdf_filename"] = item.get("pdf_filename") or item.get("file_name") or ""
     item["pdf_relative_path"] = item.get("pdf_relative_path") or item.get("pdf_path") or ""
     item["download_url"] = servicecenter_fahrerkarte_download_url(item["request_id"]) if item["pdf_relative_path"] else ""
@@ -15726,37 +15788,335 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ServiceCenter Fahrerkarte</title>
   <style>
-    :root { --blue:#17345f; --line:#9bb5cf; --bg:#eef5fb; --green:#27d263; --red:#b3261e; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, Arial, sans-serif; background:linear-gradient(135deg,#eef5fb,#d9e9f6); color:#112; }
-    header { background:#17345f; color:white; padding:24px 32px; display:flex; justify-content:space-between; gap:16px; align-items:center; }
+    :root {
+      --blue:#17345f;
+      --blue-2:#244878;
+      --line:#9bb5cf;
+      --bg:#eef5fb;
+      --green:#27d263;
+      --green-dark:#146c2e;
+      --red:#b3261e;
+      --yellow:#b88709;
+      --muted:#52697f;
+      --shadow:0 18px 38px rgba(23,52,95,.12);
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      margin:0;
+      font-family:Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(39,210,99,.13), transparent 28%),
+        radial-gradient(circle at 100% 0%, rgba(23,52,95,.18), transparent 30%),
+        linear-gradient(135deg,#eef5fb,#d9e9f6);
+      color:#112;
+      min-height:100vh;
+    }
+    header {
+      background:linear-gradient(135deg,#17345f,#102946);
+      color:white;
+      padding:24px 32px;
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:center;
+      box-shadow:0 18px 45px rgba(7,18,31,.22);
+    }
     header h1 { margin:0; font-size:24px; letter-spacing:.08em; text-transform:uppercase; }
-    header p { margin:6px 0 0; color:#d8e8f7; }
-    main { max-width:1220px; margin:0 auto; padding:28px; }
-    .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:22px; }
-    button, select, input, textarea { border-radius:12px; border:1px solid #a8bfd7; padding:11px 13px; font:inherit; }
-    button { cursor:pointer; background:#17345f; color:white; font-weight:800; text-transform:uppercase; letter-spacing:.06em; border-color:#17345f; }
+    header p { margin:6px 0 0; color:#d8e8f7; line-height:1.45; }
+    header a { color:white; font-weight:900; text-decoration:none; border-bottom:1px solid rgba(255,255,255,.35); }
+    main { max-width:1280px; margin:0 auto; padding:28px; }
+    .toolbar {
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      margin-bottom:22px;
+      background:rgba(255,255,255,.62);
+      border:1px solid rgba(155,181,207,.78);
+      padding:14px;
+      border-radius:20px;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(12px);
+    }
+    button, select, input, textarea {
+      border-radius:12px;
+      border:1px solid #a8bfd7;
+      padding:11px 13px;
+      font:inherit;
+      outline:none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color:rgba(20,108,46,.65);
+      box-shadow:0 0 0 3px rgba(39,210,99,.12);
+    }
+    button {
+      cursor:pointer;
+      background:#17345f;
+      color:white;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      border-color:#17345f;
+      transition:transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    button:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 10px 22px rgba(23,52,95,.18); }
     button.secondary { background:white; color:#17345f; }
     button.success { background:#146c2e; border-color:#146c2e; }
     button.danger { background:#9f1d17; border-color:#9f1d17; }
-    button:disabled { opacity:.55; cursor:not-allowed; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:18px; }
-    .case { background:rgba(255,255,255,.92); border:1px solid #b5c9dd; border-radius:22px; overflow:hidden; box-shadow:0 18px 38px rgba(23,52,95,.12); }
-    .card { margin:16px; border-radius:18px; border:1px solid #668bb2; background:#dcecf8; overflow:hidden; position:relative; }
-    .card-head { height:44px; background:#bcd5eb; display:flex; align-items:center; gap:12px; padding:0 14px; color:#17345f; font-weight:900; letter-spacing:.08em; }
-    .eu { width:54px; height:30px; background:#17345f; color:white; display:grid; place-items:center; border-radius:4px; font-weight:900; }
-    .not-official { margin-left:auto; color:#a32017; font-size:10px; }
-    .card-body { display:grid; grid-template-columns:112px 1fr; gap:16px; padding:16px; }
-    .avatar { width:108px; height:126px; border:1px solid #668bb2; background:white; object-fit:cover; }
-    .fields p { margin:0 0 9px; font-size:13px; }
-    .fields strong { font-size:18px; }
-    .meta { padding:0 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; color:#26394c; }
+    button.ghost { background:rgba(255,255,255,.72); color:#17345f; border-color:#b8cbe0; }
+    button:disabled { opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(390px,1fr)); gap:18px; align-items:start; }
+    .case {
+      background:rgba(255,255,255,.94);
+      border:1px solid #b5c9dd;
+      border-radius:24px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+    .preview-shell { padding:16px 16px 0; }
+    .preview-title {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:0 0 10px;
+      color:#17345f;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .preview-title span:last-child {
+      border:1px solid rgba(20,108,46,.22);
+      color:#146c2e;
+      background:#e9f9ee;
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:10px;
+      letter-spacing:.08em;
+      white-space:nowrap;
+    }
+    .driver-card-wrap { overflow-x:auto; padding-bottom:2px; }
+    .driver-card {
+      position:relative;
+      isolation:isolate;
+      min-width:350px;
+      width:100%;
+      aspect-ratio:1.586 / 1;
+      border-radius:18px;
+      border:1px solid rgba(65,91,122,.34);
+      overflow:hidden;
+      background:
+        repeating-linear-gradient(115deg, rgba(33,91,150,.035) 0 1px, transparent 1px 7px),
+        radial-gradient(circle at 80% 18%, rgba(255,255,255,.85), transparent 30%),
+        linear-gradient(135deg,#f8fbff 0%,#e7f1fb 42%,#d7e9f7 100%);
+      color:#182f4f;
+      box-shadow:0 18px 35px rgba(23,52,95,.16);
+      font-family:Arial, Inter, system-ui, sans-serif;
+    }
+    .driver-card::before {
+      content:"EIFELLOG EIFELLOG EIFELLOG EIFELLOG";
+      position:absolute;
+      inset:0;
+      z-index:-1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform:rotate(-24deg) scale(1.10);
+      color:rgba(37,85,130,.055);
+      font-size:28px;
+      font-weight:900;
+      letter-spacing:.18em;
+      white-space:nowrap;
+      pointer-events:none;
+    }
+    .driver-head {
+      position:relative;
+      z-index:1;
+      display:grid;
+      grid-template-columns:auto minmax(0,1fr) auto;
+      gap:10px;
+      align-items:center;
+      padding:12px 14px 9px;
+      border-bottom:1px solid rgba(56,93,131,.18);
+    }
+    .eu {
+      width:42px;
+      height:29px;
+      background:#224b8f;
+      color:#ffdf45;
+      display:grid;
+      place-items:center;
+      border-radius:4px;
+      font-weight:900;
+      font-size:12px;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+    }
+    .driver-title { min-width:0; text-transform:uppercase; line-height:1.05; letter-spacing:.08em; }
+    .driver-title strong { display:block; color:#17345f; font-size:18px; font-weight:900; }
+    .driver-title span { display:block; margin-top:3px; color:rgba(23,52,95,.70); font-size:9px; font-weight:800; letter-spacing:.12em; }
+    .chip {
+      width:38px;
+      height:28px;
+      border-radius:5px;
+      border:1px solid rgba(135,112,51,.45);
+      background:
+        linear-gradient(90deg, transparent 31%, rgba(128,99,35,.30) 32% 35%, transparent 36% 64%, rgba(128,99,35,.30) 65% 68%, transparent 69%),
+        linear-gradient(0deg, transparent 42%, rgba(128,99,35,.26) 43% 47%, transparent 48%),
+        linear-gradient(135deg,#e7d27b,#b99635);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
+    }
+    .driver-body {
+      position:relative;
+      z-index:1;
+      display:grid;
+      grid-template-columns:88px minmax(0,1fr) 62px;
+      gap:12px;
+      padding:12px 14px 9px;
+    }
+    .avatar {
+      width:88px;
+      height:104px;
+      border:1px solid rgba(41,74,109,.45);
+      background:#dce9f3;
+      object-fit:cover;
+      border-radius:5px;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.55);
+    }
+    .driver-fields { min-width:0; display:grid; gap:3px; align-content:start; font-size:11px; line-height:1.13; }
+    .driver-name { margin:0 0 3px; color:#102946; font-size:15px; line-height:1.05; font-weight:900; text-transform:uppercase; overflow-wrap:anywhere; }
+    .driver-field { display:grid; grid-template-columns:22px minmax(0,1fr); gap:4px; min-width:0; }
+    .driver-field b { color:rgba(23,52,95,.62); font-weight:900; }
+    .driver-field span { min-width:0; color:#142c4d; font-weight:800; overflow-wrap:anywhere; }
+    .driver-side { display:grid; gap:7px; align-content:start; }
+    .holo {
+      width:54px;
+      height:54px;
+      border-radius:999px;
+      overflow:hidden;
+      border:1px solid rgba(88,120,150,.32);
+      background:conic-gradient(from 20deg, rgba(255,70,130,.42), rgba(45,180,255,.45), rgba(255,235,95,.42), rgba(80,230,160,.38), rgba(255,70,130,.42));
+      opacity:.72;
+      mix-blend-mode:multiply;
+      display:grid;
+      place-items:center;
+      color:white;
+      font-weight:900;
+    }
+    .qr {
+      width:54px;
+      height:54px;
+      border-radius:3px;
+      border:1px solid rgba(23,52,95,.24);
+      background:
+        linear-gradient(90deg,#102946 10%,transparent 10% 20%,#102946 20% 30%,transparent 30% 45%,#102946 45% 55%,transparent 55% 68%,#102946 68% 78%,transparent 78%),
+        linear-gradient(0deg,transparent 10%,#102946 10% 20%,transparent 20% 34%,#102946 34% 44%,transparent 44% 58%,#102946 58% 68%,transparent 68%),
+        #f8fbff;
+      background-size:13px 13px;
+      opacity:.86;
+    }
+    .driver-footer {
+      position:absolute;
+      left:14px;
+      right:14px;
+      bottom:8px;
+      z-index:1;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:10px;
+      align-items:end;
+      border-top:1px solid rgba(56,93,131,.18);
+      padding-top:5px;
+    }
+    .mrz {
+      min-width:0;
+      color:rgba(16,41,70,.78);
+      font-family:"Courier New", monospace;
+      font-size:8px;
+      line-height:1.12;
+      letter-spacing:.06em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:clip;
+    }
+    .valid { color:rgba(23,52,95,.70); font-size:8px; line-height:1.15; text-align:right; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+    .service-toggle-row {
+      display:flex;
+      justify-content:center;
+      padding:13px 0 0;
+    }
+    .service-toggle-row button { width:100%; max-width:310px; }
+    .service-card-panel { display:none; margin-top:14px; }
+    .service-card-panel.is-open { display:block; }
+    .service-card {
+      border-radius:18px;
+      border:1px solid rgba(83,124,165,.58);
+      background:
+        radial-gradient(circle at 78% 22%, rgba(255,255,255,.55), transparent 34%),
+        linear-gradient(135deg,#eef8ff 0%,#d9edf9 48%,#c7e2f4 100%);
+      color:#17345f;
+      overflow:hidden;
+      box-shadow:0 16px 32px rgba(9,30,66,.18);
+    }
+    .service-head {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-height:48px;
+      padding:10px 12px;
+      background:linear-gradient(90deg,rgba(36,72,123,.18),rgba(255,255,255,.28));
+      border-bottom:1px solid rgba(83,124,165,.22);
+    }
+    .service-logo {
+      width:55px;
+      height:32px;
+      border-radius:6px;
+      display:grid;
+      place-items:center;
+      background:#17345f;
+      color:#fff;
+      font-weight:900;
+      letter-spacing:.08em;
+    }
+    .service-head strong { display:block; color:#244878; font-size:14px; letter-spacing:.08em; text-transform:uppercase; }
+    .service-head span { display:block; color:rgba(36,72,120,.72); font-size:9px; letter-spacing:.15em; text-transform:uppercase; margin-top:2px; }
+    .service-badge {
+      margin-left:auto;
+      border:1px solid rgba(163,32,23,.25);
+      color:#a32017;
+      background:rgba(255,255,255,.42);
+      border-radius:999px;
+      padding:4px 7px;
+      font-size:9px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+    .service-body { display:grid; grid-template-columns:88px minmax(0,1fr); gap:12px; padding:14px; }
+    .service-fields { min-width:0; display:grid; gap:5px; align-content:start; font-size:12px; line-height:1.2; }
+    .service-fields strong { display:block; color:#102d52; font-size:16px; overflow-wrap:anywhere; }
+    .service-fields p { margin:0; }
+    .service-fields b { display:inline-block; min-width:24px; color:rgba(23,52,95,.68); font-weight:900; }
+    .service-foot { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 14px 14px; color:rgba(23,52,95,.70); font-size:11px; }
+    .meta { padding:12px 16px 0; display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; color:#26394c; }
     .status { display:inline-flex; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:900; background:#e9f9ee; color:#146c2e; border:1px solid #9edbb0; }
-    .actions { border-top:1px solid #dde8f1; padding:16px; display:grid; gap:10px; }
+    .status.pending, .status.open, .status.claimed, .status.approved, .status.postponed { background:#fff7e4; color:#8a5a00; border-color:#edcd84; }
+    .status.rejected { background:#ffe9e7; color:#9f1d17; border-color:#e6a09a; }
+    .actions { border-top:1px solid #dde8f1; padding:16px; display:grid; gap:10px; margin-top:16px; }
     .signature { display:grid; gap:8px; background:#f5f9fc; border:1px dashed #9bb5cf; padding:12px; border-radius:16px; }
     .row { display:flex; gap:8px; flex-wrap:wrap; }
-    .msg { margin:0 0 14px; min-height:20px; font-weight:700; }
-    .small { font-size:12px; color:#475b70; }
+    .msg { margin:0 0 14px; min-height:20px; font-weight:800; }
+    .small { font-size:12px; color:#475b70; line-height:1.45; }
+    .hidden { display:none !important; }
+    @media (max-width:620px) {
+      header { padding:20px; align-items:flex-start; flex-direction:column; }
+      main { padding:18px; }
+      .grid { grid-template-columns:1fr; }
+      .case { border-radius:20px; }
+      .driver-card { min-width:360px; }
+    }
   </style>
 </head>
 <body>
@@ -15765,7 +16125,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
     <h1>ServiceCenter Fahrerkarte</h1>
     <p>Web-only: claimen, genehmigen, signieren, ausstellen und PDF im User-Postfach bereitstellen.</p>
   </div>
-  <a href="{{ personal_url }}" style="color:white;font-weight:800">Zur Personalabteilung</a>
+  <a href="{{ personal_url }}">Zur Personalabteilung</a>
 </header>
 <main>
   <div class="toolbar">
@@ -15779,7 +16139,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
       <option value="rejected">Abgelehnt</option>
     </select>
     <button onclick="loadCases()">Aktualisieren</button>
-    <span class="small">Sachbearbeiter-Signatur: exakt dein eingeloggter Anzeigename/Username.</span>
+    <span class="small">Bei ausgestellten Datensätzen wird zuerst nur die Fahrerkarte angezeigt. Die interne ServiceCenter-Karte öffnet sich erst über den Button unter der Fahrerkarte.</span>
   </div>
   <p id="msg" class="msg"></p>
   <section id="cases" class="grid"></section>
@@ -15791,6 +16151,9 @@ const casesEl = document.getElementById('cases');
 const msgEl = document.getElementById('msg');
 function setMsg(text, error=false){ msgEl.textContent = text || ''; msgEl.style.color = error ? '#9f1d17' : '#146c2e'; }
 function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+function cleanId(v){ return String(v ?? '').replace(/[^a-zA-Z0-9_-]/g, '_'); }
+function statusClass(v){ return esc(String(v || 'pending').toLowerCase()); }
+function upperCompact(v){ return String(v || '').toUpperCase().replace(/\s+/g, '<').replace(/[^A-Z0-9<ÄÖÜẞ-]/g, ''); }
 async function api(url, payload){
   const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload || {})});
   const data = await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
@@ -15801,34 +16164,120 @@ async function loadCases(){
   const status = document.getElementById('status').value;
   const url = actions.list + (status ? ('?status=' + encodeURIComponent(status)) : '');
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await res.json().catch(()=>({success:false,requests:[],message:'Ungültige Serverantwort'}));
+  if(data.success === false){ setMsg(data.message || 'Anträge konnten nicht geladen werden.', true); return; }
   const items = data.requests || data.items || [];
   casesEl.innerHTML = items.map(renderCase).join('') || '<p>Keine Fahrerkarte-Anträge gefunden.</p>';
   setMsg(items.length + ' Antrag/Anträge geladen.');
 }
+function renderDriverCard(item, id){
+  const avatar = esc(item.avatar_url || '/static/eifellog.jpg');
+  const cardId = esc(item.card_id || 'Wird bei Ausstellung erzeugt');
+  const issuedAt = esc(item.issued_at || item.created_at || '-');
+  const expiry = esc(item.expiry_at || '5 Jahre nach Ausstellung');
+  const authority = esc(item.authority || 'EifelLog ServiceCenter');
+  const licenseNumber = esc(item.license_number || ('EL-FS-' + (item.system_id || id)));
+  const name = esc(item.display_name || item.name || 'Unbekannter User');
+  const role = esc(item.role || item.role_name || 'Fahrer');
+  const birthdate = esc(item.birthdate || '-');
+  const mrzName = esc(upperCompact(item.display_name || item.name || 'USER'));
+  const mrzCard = esc(String(item.card_id || id).replace(/-/g, '').toUpperCase());
+  return `
+    <div class="driver-card-wrap">
+      <div class="driver-card" aria-label="Fahrerkarte Vorschau">
+        <div class="driver-head">
+          <div class="eu">EU</div>
+          <div class="driver-title">
+            <strong>Fahrerkarte</strong>
+            <span>Driver Card · Bundesrepublik EifelLog</span>
+          </div>
+          <div class="chip" aria-hidden="true"></div>
+        </div>
+        <div class="driver-body">
+          <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='/static/eifellog.jpg'">
+          <div class="driver-fields">
+            <p class="driver-name">${name}</p>
+            <div class="driver-field"><b>1.</b><span>${name}</span></div>
+            <div class="driver-field"><b>2.</b><span>${role}</span></div>
+            <div class="driver-field"><b>3.</b><span>${birthdate}</span></div>
+            <div class="driver-field"><b>4a.</b><span>${issuedAt}</span></div>
+            <div class="driver-field"><b>4b.</b><span>${expiry}</span></div>
+            <div class="driver-field"><b>4c.</b><span>${authority}</span></div>
+            <div class="driver-field"><b>5a.</b><span>${cardId}</span></div>
+            <div class="driver-field"><b>5b.</b><span>${licenseNumber}</span></div>
+            <div class="driver-field"><b>9.</b><span>Digitale Fahrerkarte · intern verifiziert</span></div>
+          </div>
+          <div class="driver-side">
+            <div class="holo">EL</div>
+            <a href="${esc(item.verify_url || '#')}" class="qr" title="Fahrerkarte verifizieren" aria-label="Fahrerkarte verifizieren"></a>
+          </div>
+        </div>
+        <div class="driver-footer">
+          <div class="mrz">D&lt;&lt;${mrzName}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br>EL${mrzCard}&lt;&lt;${esc(item.system_id || '-')}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+          <div class="valid">gültig<br>${esc(item.status_label || item.status || 'aktiv')}</div>
+        </div>
+      </div>
+    </div>`;
+}
+function renderServiceCard(item, id){
+  const avatar = esc(item.avatar_url || '/static/eifellog.jpg');
+  const name = esc(item.display_name || item.name || 'Unbekannter User');
+  const role = esc(item.role || item.role_name || 'Fahrer');
+  const serviceCardId = esc(item.service_card_id || item.fahrerkarte_service_card_id || ('SC-' + (item.system_id || id)));
+  return `
+    <div id="service-card-${cleanId(id)}" class="service-card-panel" aria-hidden="true">
+      <div class="preview-title"><span>ServiceCenter Karte</span><span>Intern aktiv</span></div>
+      <div class="service-card">
+        <div class="service-head">
+          <div class="service-logo">EL</div>
+          <div>
+            <strong>Servicekarte</strong>
+            <span>EifelLog ServiceCenter</span>
+          </div>
+          <div class="service-badge">Intern</div>
+        </div>
+        <div class="service-body">
+          <img class="avatar" src="${avatar}" alt="ServiceCenter Avatar" onerror="this.src='/static/eifellog.jpg'">
+          <div class="service-fields">
+            <strong>${name}</strong>
+            <p><b>1.</b> ${role}</p>
+            <p><b>2.</b> ${esc(item.system_id || '-')}</p>
+            <p><b>3.</b> ${esc(item.issued_at || item.created_at || '-')}</p>
+            <p><b>4a.</b> Web-ServiceCenter</p>
+            <p><b>4b.</b> Aktiv</p>
+            <p><b>5a.</b> ${serviceCardId}</p>
+            <p><b>5b.</b> Interne digitale Ausgabe</p>
+          </div>
+        </div>
+        <div class="service-foot">
+          <span>Interne Servicekarte</span>
+          <span>Verknüpft mit Fahrerkarte</span>
+        </div>
+      </div>
+    </div>`;
+}
 function renderCase(item){
   const id = esc(item.request_id || item.id);
-  const avatar = esc(item.avatar_url || '/static/eifellog.jpg');
+  const safeId = cleanId(item.request_id || item.id);
   const canClaim = ['pending','open','postponed','approved'].includes(item.status);
   const canApprove = item.status === 'claimed';
   const canIssue = ['claimed','approved'].includes(item.status);
+  const twoCardsAvailable = item.status === 'issued' && item.has_servicecenter_card !== false;
   const download = item.download_url ? `<a href="${esc(item.download_url)}" download><button class="success" type="button">PDF herunterladen</button></a>` : '';
+  const serviceButton = twoCardsAvailable ? `<div class="service-toggle-row"><button class="ghost" type="button" onclick="toggleServiceCard('${safeId}', this)">ServiceCenter Karte ansehen</button></div>` : '';
   return `
-  <article class="case" id="case-${id}">
-    <div class="card">
-      <div class="card-head"><span class="eu">EL</span><span>FAHRERKARTE</span><span class="not-official">KEIN AMTLICHES DOKUMENT</span></div>
-      <div class="card-body">
-        <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='/static/eifellog.jpg'">
-        <div class="fields">
-          <p><strong>${esc(item.display_name || item.name)}</strong></p>
-          <p>2. ${esc(item.role || item.role_name)}</p>
-          <p>3. Beantragt: ${esc(item.created_at || item.requested_at)}</p>
-          <p>4a Status: <span class="status">${esc(item.status_label || item.status)}</span></p>
-          <p>5a System-ID: ${esc(item.system_id)}</p>
-          <p>5b Karten-ID: ${esc(item.card_id || 'Wird bei Ausstellung erzeugt')}</p>
-        </div>
-      </div>
-      <div class="meta"><span>Grund: ${esc(item.reason_label)}</span><span>Sachbearbeiter: ${esc(item.sachbearbeiter_name)}</span></div>
+  <article class="case" id="case-${safeId}">
+    <div class="preview-shell">
+      <div class="preview-title"><span>Fahrerkarte</span><span>Erste Karte</span></div>
+      ${renderDriverCard(item, id)}
+      ${serviceButton}
+      ${twoCardsAvailable ? renderServiceCard(item, id) : ''}
+    </div>
+    <div class="meta">
+      <span>Status: <span class="status ${statusClass(item.status)}">${esc(item.status_label || item.status)}</span></span>
+      <span>Sachbearbeiter: ${esc(item.sachbearbeiter_name)}</span>
+      <span>Grund: ${esc(item.reason_label)}</span>
+      <span>Antrag: ${esc(item.created_at || item.requested_at)}</span>
     </div>
     <div class="actions">
       <div class="row">
@@ -15838,10 +16287,10 @@ function renderCase(item){
       </div>
       <div class="signature">
         <label>Digitale Signatur des Sachbearbeiters</label>
-        <input id="sig-${id}" value="${esc(staffName)}" placeholder="${esc(staffName)}">
-        <textarea id="note-${id}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde im EifelLog Web-ServiceCenter ausgestellt.</textarea>
-        <label class="small"><input id="confirm-${id}" type="checkbox"> Ich bestätige die korrekte Web-Signatur und Ausstellung.</label>
-        <button class="success" ${canIssue?'':'disabled'} onclick="issueCase('${id}')">Signieren & ausstellen</button>
+        <input id="sig-${safeId}" value="${esc(staffName)}" placeholder="${esc(staffName)}">
+        <textarea id="note-${safeId}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde im EifelLog Web-ServiceCenter ausgestellt.</textarea>
+        <label class="small"><input id="confirm-${safeId}" type="checkbox"> Ich bestätige die korrekte Web-Signatur und Ausstellung.</label>
+        <button class="success" ${canIssue?'':'disabled'} onclick="issueCase('${id}', '${safeId}')">Signieren & ausstellen</button>
       </div>
       <div class="row">
         <button class="danger" onclick="rejectCase('${id}')">Ablehnen</button>
@@ -15850,13 +16299,20 @@ function renderCase(item){
     </div>
   </article>`;
 }
+function toggleServiceCard(safeId, button){
+  const panel = document.getElementById('service-card-' + safeId);
+  if(!panel) return;
+  const open = panel.classList.toggle('is-open');
+  panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+  button.textContent = open ? 'ServiceCenter Karte ausblenden' : 'ServiceCenter Karte ansehen';
+}
 async function claimCase(id){ try{ const d=await api(actions.claim,{requestId:id}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
 async function approveCase(id){ try{ const note=prompt('Genehmigungsvermerk','Fahrerkarte geprüft und genehmigt.')||''; const d=await api(actions.approve,{requestId:id,note}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
-async function issueCase(id){
+async function issueCase(id, safeId){
   try{
-    const signature = document.getElementById('sig-'+id).value;
-    const issueNote = document.getElementById('note-'+id).value;
-    const signatureConfirmed = document.getElementById('confirm-'+id).checked;
+    const signature = document.getElementById('sig-'+safeId).value;
+    const issueNote = document.getElementById('note-'+safeId).value;
+    const signatureConfirmed = document.getElementById('confirm-'+safeId).checked;
     const d = await api(actions.issue,{requestId:id,signature,signatureConfirmed,issueNote,force:true});
     setMsg(d.message);
     if(d.downloadUrl) window.open(d.downloadUrl,'_blank');
@@ -17288,10 +17744,19 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
     now = now_utc()
     handler_name = actor.get("display_name") or "Personalabteilung"
     card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_doc.get("request_id"))
+    service_card_id = safe_str(request_doc.get("service_card_id") or request_doc.get("fahrerkarte_service_card_id") or f"SC-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
+    license_number = safe_str(request_doc.get("license_number") or request_doc.get("fahrerkarte_license_number") or request_doc.get("driver_number") or f"EL-FS-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
 
     pre_update = {
         "status": "issued",
         "card_id": card_id,
+        "service_card_id": service_card_id,
+        "fahrerkarte_service_card_id": service_card_id,
+        "license_number": license_number,
+        "fahrerkarte_license_number": license_number,
+        "has_driver_card": True,
+        "has_servicecenter_card": True,
+        "primary_preview_card": "fahrerkarte",
         "approved_by": request_doc.get("approved_by") or actor,
         "approved_at": request_doc.get("approved_at") or now,
         "issued_by": actor,
