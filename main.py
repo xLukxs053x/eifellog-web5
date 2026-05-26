@@ -14382,34 +14382,152 @@ def api_dashboard_loa_detail(record_id):
     return jsonify({"success": True, "item": item})
 
 
-@app.route("/dashboard/detail")
-def dashboard_detail():
-    if "user" not in session:
-        flash("Bitte logge dich zuerst ein.", "error")
-        return redirect(url_for("hub"))
+def parse_dashboard_entry_date(value):
+    """Robuster Datumsparser fuer Dashboard-Detailseiten."""
+    if isinstance(value, datetime):
+        return value
 
-    user = session["user"]
+    text = safe_str(value)
+    if not text or text == "-":
+        return None
+
+    candidates = [
+        text,
+        text.replace("Z", "+00:00"),
+        text[:10],
+    ]
+    formats = [
+        "%d.%m.%Y",
+        "%Y-%m-%d",
+        "%d.%m.%y",
+        "%d/%m/%Y",
+        "%Y/%m/%d",
+    ]
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            return datetime.fromisoformat(candidate).replace(tzinfo=None)
+        except Exception:
+            pass
+        for date_format in formats:
+            try:
+                return datetime.strptime(candidate, date_format)
+            except Exception:
+                pass
+    return None
+
+
+def summarize_dashboard_entries(fahrtenbuch_entries):
+    """Summen fuer KM-, Konto- und Touren-Detailseiten aus den Logbook-Eintraegen."""
+    entries = fahrtenbuch_entries or []
+    now = now_utc()
+    week_start = now - timedelta(days=7)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    week_km = 0.0
+    month_km = 0.0
+    completed_km = 0.0
+    completed_earnings = 0.0
+    transactions = []
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+
+        distance = parse_number(entry.get("distance") or entry.get("km") or entry.get("last_trip_distance"), 0)
+        earnings = parse_number(
+            entry.get("earnings")
+            or entry.get("income")
+            or entry.get("revenue")
+            or entry.get("einnahmen"),
+            0,
+        )
+        completed_km += distance
+        completed_earnings += earnings
+
+        entry_date = parse_dashboard_entry_date(
+            entry.get("date")
+            or entry.get("datum")
+            or entry.get("created_at")
+            or entry.get("submitted_at")
+        )
+        if isinstance(entry_date, datetime):
+            if entry_date >= week_start:
+                week_km += distance
+            if entry_date >= month_start:
+                month_km += distance
+
+        route = safe_str(entry.get("route"), "Tour")
+        cargo = safe_str(entry.get("cargo") or entry.get("fracht"), "")
+        title = route if not cargo or cargo == "-" else f"{route} · {cargo}"
+        transactions.append({
+            "date": entry.get("date") or entry.get("datum") or "-",
+            "title": title,
+            "description": title,
+            "amount": round(earnings, 2),
+            "value": round(earnings, 2),
+            "type": "tour_income",
+        })
+
+    return {
+        "week_km": round(week_km, 1),
+        "month_km": round(month_km, 1),
+        "completed_km": round(completed_km, 1),
+        "completed_earnings": round(completed_earnings, 2),
+        "transactions": transactions,
+        "konto_transactions": transactions,
+        "balance_transactions": transactions,
+    }
+
+
+def build_dashboard_detail_context(logbook_limit=50):
+    """Gemeinsamer Template-Kontext fuer alle Dashboard-Detailseiten."""
+    user = session.get("user") or {}
     user_roles = user.get("roles", [])
+    discord_id = safe_str(user.get("id"))
 
-    if not has_dashboard_permission(user_roles):
-        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen.", "error")
-        return redirect(url_for("home"))
-
-    db_user = users_collection.find_one({"discord_id": str(user["id"])})
+    db_user = users_collection.find_one({"discord_id": discord_id}) if discord_id else None
     if not db_user:
         db_user = {
-            "discord_id": str(user["id"]),
+            "discord_id": discord_id,
             "username": user.get("username"),
             "discord_username": user.get("discord_username"),
             "display_name": user.get("username"),
             "avatar": user.get("avatar"),
-            "roles": user_roles
+            "roles": user_roles,
         }
 
-    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(db_user, limit=50)
-    detail_query_id = safe_str(request.args.get("trip_id"))
-    selected_trip = {}
+    driver_dashboard_context = prepare_driver_dashboard_context(db_user)
+    fahrtenbuch_entries = get_user_logbook_entries_for_dashboard(db_user, limit=logbook_limit)
+    driver_dashboard_context["fahrtenbuch_entries"] = fahrtenbuch_entries
 
+    driver_stats = dict(driver_dashboard_context.get("driver_stats") or {})
+    summary_context = summarize_dashboard_entries(fahrtenbuch_entries)
+
+    total_km = parse_number(driver_stats.get("total_km"), summary_context.get("completed_km", 0))
+    completed_trips = parse_int(driver_stats.get("completed_trips"), len(fahrtenbuch_entries))
+    account_balance = parse_number(driver_stats.get("balance"), summary_context.get("completed_earnings", 0))
+    xp_value = parse_int(driver_stats.get("xp"), 0)
+    level_value = driver_stats.get("level")
+    level_number, calculated_xp, level_progress = calculate_driver_level(total_km, completed_trips, xp_value if xp_value else None)
+
+    if not xp_value:
+        xp_value = calculated_xp
+        driver_stats["xp"] = xp_value
+    if not driver_stats.get("level_progress"):
+        driver_stats["level_progress"] = level_progress
+    if level_value in [None, ""]:
+        level_value = level_number
+        driver_stats["level"] = level_value
+
+    next_rank_level = max(2, (xp_value // 1000) + 2)
+    next_rank_xp = (next_rank_level - 1) * 1000
+    next_rank_km = max(10000, ((int(total_km) // 10000) + 1) * 10000)
+
+    selected_trip = {}
+    detail_query_id = safe_str(request.args.get("trip_id"))
     if fahrtenbuch_entries:
         selected_trip = fahrtenbuch_entries[0]
         if detail_query_id:
@@ -14425,16 +14543,118 @@ def dashboard_detail():
                     selected_trip = item
                     break
 
-    return render_template_string(
-        DASHBOARD_DETAIL_TEMPLATE,
-        current_user=user,
-        primary_role_name=get_primary_role_name(user_roles),
-        fahrtenbuch_entries=fahrtenbuch_entries,
-        driver_trips=fahrtenbuch_entries,
-        selected_trip=selected_trip,
-        detail_trip=selected_trip,
-        ets2_map_image_url='/static/ets2_map.jpg'
+    context = {
+        "current_user": user,
+        "user": user,
+        "db_user": db_user,
+        "user_doc": db_user,
+        "primary_role_name": get_primary_role_name(user_roles),
+        "fahrer_role_name": get_primary_role_name(user_roles),
+        "driver_stats": driver_stats,
+        "fahrtenbuch_entries": fahrtenbuch_entries,
+        "driver_trips": fahrtenbuch_entries,
+        "selected_trip": selected_trip,
+        "detail_trip": selected_trip,
+        "driver_total_km": round(total_km, 1),
+        "total_driven_km": round(total_km, 1),
+        "driver_last_trip_distance": driver_stats.get("last_trip_distance", 0),
+        "last_trip_distance": driver_stats.get("last_trip_distance", 0),
+        "driver_account_balance": round(account_balance, 2),
+        "account_balance": round(account_balance, 2),
+        "kontostand": round(account_balance, 2),
+        "driver_completed_trips": completed_trips,
+        "completed_trips": completed_trips,
+        "abgeschlossen_trips": completed_trips,
+        "driver_level_name": level_value,
+        "driver_level": level_value,
+        "driver_xp_value": xp_value,
+        "driver_xp": xp_value,
+        "driver_level_progress": driver_stats.get("level_progress", 0),
+        "next_rank": f"Level {next_rank_level}",
+        "next_rank_xp": next_rank_xp,
+        "next_rank_km": next_rank_km,
+        "pending_balance": 0,
+        "paid_balance": round(account_balance, 2),
+        "detail_back_url": url_for("dashboard"),
+        "ets2_map_image_url": ETS2_MAP_IMAGE_URL,
+    }
+    context.update(driver_dashboard_context)
+    context.update(summary_context)
+    return context
+
+
+def require_dashboard_detail_access(error_message="Zugriff verweigert! Du benötigst eine anerkannte Rolle, um diese Detailseite zu öffnen."):
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        flash(error_message, "error")
+        return redirect(url_for("home"))
+    return None
+
+
+@app.route("/dashboard/detail", methods=["GET"])
+@app.route("/dashboard/detail.html", methods=["GET"])
+def dashboard_detail():
+    denied_response = require_dashboard_detail_access(
+        "Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen."
     )
+    if denied_response:
+        return denied_response
+
+    return render_template("dashboard_detail.html", **build_dashboard_detail_context(logbook_limit=50))
+
+
+@app.route("/dashboard/gefahrene-km", methods=["GET"])
+@app.route("/dashboard/gefahrene-km/details", methods=["GET"])
+@app.route("/dashboard/gefahrene-km-details", methods=["GET"])
+@app.route("/dashboard/gefahrene_km_details.html", methods=["GET"])
+def dashboard_gefahrene_km_details():
+    denied_response = require_dashboard_detail_access()
+    if denied_response:
+        return denied_response
+
+    return render_template("gefahrene_km_details.html", **build_dashboard_detail_context(logbook_limit=100))
+
+
+@app.route("/dashboard/kontostand", methods=["GET"])
+@app.route("/dashboard/kontostand/details", methods=["GET"])
+@app.route("/dashboard/kontostand-details", methods=["GET"])
+@app.route("/dashboard/kontostand_details.html", methods=["GET"])
+def dashboard_kontostand_details():
+    denied_response = require_dashboard_detail_access()
+    if denied_response:
+        return denied_response
+
+    return render_template("kontostand_details.html", **build_dashboard_detail_context(logbook_limit=100))
+
+
+@app.route("/dashboard/fahrer-level", methods=["GET"])
+@app.route("/dashboard/fahrer-level/details", methods=["GET"])
+@app.route("/dashboard/fahrer-level-details", methods=["GET"])
+@app.route("/dashboard/fahrer_level_details.html", methods=["GET"])
+def dashboard_fahrer_level_details():
+    denied_response = require_dashboard_detail_access()
+    if denied_response:
+        return denied_response
+
+    return render_template("fahrer_level_details.html", **build_dashboard_detail_context(logbook_limit=100))
+
+
+@app.route("/dashboard/abgeschlossen", methods=["GET"])
+@app.route("/dashboard/abgeschlossene-touren", methods=["GET"])
+@app.route("/dashboard/abgeschlossene-touren/details", methods=["GET"])
+@app.route("/dashboard/abgeschlossene-touren-details", methods=["GET"])
+@app.route("/dashboard/abgeschlossene_touren_details.html", methods=["GET"])
+def dashboard_abgeschlossene_touren_details():
+    denied_response = require_dashboard_detail_access()
+    if denied_response:
+        return denied_response
+
+    return render_template("abgeschlossene_touren_details.html", **build_dashboard_detail_context(logbook_limit=100))
 
 
 @app.route("/servicecenter", methods=["GET"])

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Fahrer Level Details{% endblock %}
+
+{% block content %}
+{% set driver_stats = driver_stats|default({}, true) %}
+{% set level_name = driver_level_name|default(driver_stats.level|default(driver_level|default('-', true), true), true) %}
+{% set xp_value = driver_xp_value|default(driver_stats.xp|default(driver_xp|default(0, true), true), true) %}
+{% set level_progress = driver_level_progress|default(driver_stats.level_progress|default(driver_level_progress|default(0, true), true), true) %}
+{% set next_rank_name = next_rank|default(driver_stats.next_rank|default('Nächster Rang', true), true) %}
+{% set next_rank_xp = next_rank_xp|default(driver_stats.next_rank_xp|default(1000, true), true) %}
+{% set missing_xp = (next_rank_xp|int - xp_value|int) if (next_rank_xp|int > xp_value|int) else 0 %}
+
+<style>
+    .level-shell { width: 100%; max-width: 100%; }
+    .level-hero {
+        border-radius: clamp(1rem, 1.2vw, 1.5rem);
+        border: 1px solid rgba(137,190,50,.22);
+        background:
+            radial-gradient(circle at 12% 0%, rgba(137,190,50,.16), transparent 34%),
+            radial-gradient(circle at 90% 20%, rgba(220,226,38,.13), transparent 38%),
+            rgba(0,0,0,.42);
+        padding: clamp(1rem, 1.6vw, 1.75rem);
+        backdrop-filter: blur(18px);
+        overflow: hidden;
+    }
+    .rank-card {
+        border-radius: 1.35rem;
+        border: 1px solid rgba(255,255,255,.10);
+        background: rgba(255,255,255,.045);
+        padding: 1.15rem;
+    }
+    .level-big {
+        display: flex;
+        align-items: baseline;
+        gap: .7rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+    }
+    .level-big strong {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.2rem, 5.5vw, 4.6rem);
+        line-height: .95;
+        color: #fff;
+        letter-spacing: -.04em;
+    }
+    .level-big span {
+        color: var(--brand-green);
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        font-weight: 900;
+    }
+    .progress-shell {
+        height: .8rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.08);
+    }
+    .progress-fill {
+        height: 100%;
+        width: {{ level_progress|int }}%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand-green), var(--brand-yellow));
+        box-shadow: 0 0 22px rgba(137,190,50,.35);
+    }
+    .level-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .9rem;
+    }
+    .level-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: .56rem;
+        font-weight: 900;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: .45rem;
+    }
+    .level-value {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 900;
+    }
+    .small-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.35rem;
+        padding: .7rem 1rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(137,190,50,.30);
+        background: rgba(137,190,50,.10);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: .62rem;
+        font-weight: 900;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        transition: all 180ms ease;
+    }
+    .small-action:hover {
+        color: #fff;
+        background: rgba(137,190,50,.18);
+        transform: translateY(-1px);
+    }
+    @media (max-width: 760px) { .level-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="level-shell space-y-6">
+    <section class="level-hero">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div>
+                <span class="font-orbitron text-[10px] font-black text-[var(--brand-green)] uppercase tracking-[0.22em]">Fahrer-Level</span>
+                <h1 class="font-orbitron text-2xl md:text-3xl font-black text-white mt-2">Rang Details</h1>
+                <div class="level-big">
+                    <strong>{{ level_name }}</strong>
+                    <span>{{ xp_value|int }} XP</span>
+                </div>
+                <p class="text-sm text-[var(--muted)] max-w-2xl mt-4">
+                    Aktueller Rang, XP und nächster Rang sind getrennt dargestellt, damit der Fortschritt sofort erkennbar ist.
+                </p>
+            </div>
+            <a href="/dashboard" class="small-action">← Dashboard</a>
+        </div>
+
+        <div class="rank-card mt-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div>
+                    <span class="level-label">Nächster Rang</span>
+                    <strong class="text-white font-orbitron text-xl">{{ next_rank_name }}</strong>
+                </div>
+                <span class="font-orbitron text-[var(--brand-yellow)] font-black">{{ level_progress|int }}%</span>
+            </div>
+            <div class="progress-shell">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="level-grid mt-4">
+            <div class="rank-card">
+                <span class="level-label">Aktuelle XP</span>
+                <span class="level-value">{{ xp_value|int }} XP</span>
+            </div>
+            <div class="rank-card">
+                <span class="level-label">Benötigt</span>
+                <span class="level-value">{{ next_rank_xp|int }} XP</span>
+            </div>
+            <div class="rank-card">
+                <span class="level-label">Fehlen noch</span>
+                <span class="level-value">{{ missing_xp|int }} XP</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-5 md:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h2 class="font-orbitron text-lg font-black text-white">Level-Aktionen</h2>
+                <p class="text-xs text-[var(--muted)] mt-1">Klein gehalten, damit der obere Bereich sauber bleibt.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="/dashboard/detail" class="small-action">Fahrtenbuch</a>
+                <a href="/dashboard/gefahrene-km" class="small-action">KM Details</a>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

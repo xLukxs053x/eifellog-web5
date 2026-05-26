@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Abgeschlossene Touren Details{% endblock %}
+
+{% block content %}
+{% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
+{% set completed_count = driver_completed_trips|default(completed_trips|default(abgeschlossen_trips|default(safe_fahrtenbuch_entries|length, true), true), true) %}
+{% set completed_earnings = completed_earnings|default(0, true) %}
+{% set completed_km = completed_km|default(total_driven_km|default(0, true), true) %}
+
+<style>
+    .completed-shell { width: 100%; max-width: 100%; }
+    .completed-hero {
+        border-radius: clamp(1rem, 1.2vw, 1.5rem);
+        border: 1px solid rgba(88,101,242,.24);
+        background:
+            radial-gradient(circle at 10% 0%, rgba(88,101,242,.16), transparent 34%),
+            radial-gradient(circle at 90% 20%, rgba(137,190,50,.10), transparent 36%),
+            rgba(0,0,0,.42);
+        padding: clamp(1rem, 1.6vw, 1.75rem);
+        backdrop-filter: blur(18px);
+        overflow: hidden;
+    }
+    .completed-number {
+        display: flex;
+        align-items: baseline;
+        gap: .65rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+    }
+    .completed-number strong {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.4rem, 6vw, 4.8rem);
+        line-height: .95;
+        color: #fff;
+        letter-spacing: -.04em;
+    }
+    .completed-number span {
+        color: #8ea0ff;
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        font-weight: 900;
+    }
+    .completed-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .9rem;
+    }
+    .completed-tile, .completed-row {
+        border-radius: 1.15rem;
+        border: 1px solid rgba(255,255,255,.09);
+        background: rgba(255,255,255,.045);
+        padding: 1rem;
+    }
+    .completed-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: .56rem;
+        font-weight: 900;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: .45rem;
+    }
+    .completed-value {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 900;
+    }
+    .small-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.35rem;
+        padding: .7rem 1rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(88,101,242,.34);
+        background: rgba(88,101,242,.12);
+        color: #aab6ff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: .62rem;
+        font-weight: 900;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        transition: all 180ms ease;
+    }
+    .small-action:hover { color: #fff; background: rgba(88,101,242,.18); transform: translateY(-1px); }
+    @media (max-width: 760px) { .completed-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="completed-shell space-y-6">
+    <section class="completed-hero">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div>
+                <span class="font-orbitron text-[10px] font-black text-[#aab6ff] uppercase tracking-[0.22em]">Tourenstatus</span>
+                <h1 class="font-orbitron text-2xl md:text-3xl font-black text-white mt-2">Abgeschlossene Touren</h1>
+                <div class="completed-number">
+                    <strong>{{ completed_count|int }}</strong>
+                    <span>Touren</span>
+                </div>
+                <p class="text-sm text-[var(--muted)] max-w-2xl mt-4">
+                    Diese Detailseite trennt Anzahl, Kilometer und Einnahmen, damit die wichtigsten Werte eindeutig bleiben.
+                </p>
+            </div>
+            <a href="/dashboard" class="small-action">← Dashboard</a>
+        </div>
+
+        <div class="completed-grid mt-6">
+            <div class="completed-tile">
+                <span class="completed-label">Touren</span>
+                <span class="completed-value">{{ completed_count|int }}</span>
+            </div>
+            <div class="completed-tile">
+                <span class="completed-label">KM abgeschlossen</span>
+                <span class="completed-value">{{ ('%.1f'|format(completed_km|float))|replace('.', ',') }} km</span>
+            </div>
+            <div class="completed-tile">
+                <span class="completed-label">Einnahmen</span>
+                <span class="completed-value">{{ ('%.2f'|format(completed_earnings|float))|replace('.', ',') }} €</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-5 md:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <div>
+                <h2 class="font-orbitron text-lg font-black text-white">Letzte abgeschlossene Fahrten</h2>
+                <p class="text-xs text-[var(--muted)] mt-1">Direkt aus `fahrtenbuch_entries` / `driver_trips`.</p>
+            </div>
+            <a href="/dashboard/detail" class="small-action">Alle anzeigen</a>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3">
+            {% if safe_fahrtenbuch_entries %}
+                {% for trip in safe_fahrtenbuch_entries[:8] %}
+                    {% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
+                    {% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default('-', true), true), true) %}
+                    {% set trip_to = trip.to_city|default(trip.destination|default(trip.target|default(trip.ziel|default('-', true), true), true), true) %}
+                    {% set trip_distance = trip.distance|default(trip.km|default(0, true), true) %}
+                    {% set trip_earnings = trip.earnings|default(trip.income|default(trip.einnahmen|default(0, true), true), true) %}
+                    <div class="completed-row flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div class="min-w-0">
+                            <span class="completed-label">{{ trip_date }}</span>
+                            <strong class="text-white">{{ trip_from }} → {{ trip_to }}</strong>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs font-orbitron font-bold">
+                            <span class="px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)]">{{ ('%.1f'|format(trip_distance|float))|replace('.', ',') }} km</span>
+                            <span class="px-3 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 text-[var(--brand-yellow)]">{{ ('%.2f'|format(trip_earnings|float))|replace('.', ',') }} €</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="completed-row text-center">
+                    <p class="font-orbitron text-white font-bold">Noch keine Touren vorhanden</p>
+                    <p class="text-sm text-[var(--muted)] mt-2">Sobald Touren übergeben werden, erscheinen sie hier automatisch.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

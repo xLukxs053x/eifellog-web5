@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Gefahrene KM Details{% endblock %}
+
+{% block content %}
+{% set driver_stats = driver_stats|default({}, true) %}
+{% set km_total = driver_total_km|default(driver_stats.total_km|default(total_driven_km|default(0, true), true), true) %}
+{% set km_last = driver_last_trip_distance|default(driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true), true) %}
+{% set km_week = driver_stats.week_km|default(week_km|default(0, true), true) %}
+{% set km_month = driver_stats.month_km|default(month_km|default(0, true), true) %}
+{% set km_rank_target = next_rank_km|default(driver_stats.next_rank_km|default(10000, true), true) %}
+{% set km_progress = ((km_total|float / km_rank_target|float) * 100) if (km_rank_target|float) > 0 else 0 %}
+{% if km_progress > 100 %}{% set km_progress = 100 %}{% endif %}
+
+<style>
+    .metric-detail-shell { width: 100%; max-width: 100%; }
+    .metric-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: clamp(1rem, 1.2vw, 1.5rem);
+        border: 1px solid rgba(137,190,50,.22);
+        background:
+            radial-gradient(circle at 8% 0%, rgba(137,190,50,.18), transparent 36%),
+            radial-gradient(circle at 92% 14%, rgba(220,226,38,.09), transparent 34%),
+            rgba(0,0,0,.42);
+        padding: clamp(1rem, 1.6vw, 1.75rem);
+        backdrop-filter: blur(18px);
+    }
+    .metric-topline {
+        font-family: 'Orbitron', sans-serif;
+        font-size: .62rem;
+        font-weight: 900;
+        letter-spacing: .22em;
+        color: var(--brand-green);
+        text-transform: uppercase;
+    }
+    .metric-big-number {
+        display: flex;
+        align-items: baseline;
+        gap: .65rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+    }
+    .metric-big-number strong {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.4rem, 6vw, 5rem);
+        line-height: .95;
+        color: #fff;
+        letter-spacing: -.04em;
+    }
+    .metric-big-number span {
+        font-size: clamp(1rem, 1.6vw, 1.35rem);
+        font-weight: 800;
+        color: var(--brand-green);
+    }
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .9rem;
+    }
+    .metric-tile {
+        border-radius: 1.15rem;
+        border: 1px solid rgba(255,255,255,.09);
+        background: rgba(255,255,255,.045);
+        padding: 1rem;
+        min-width: 0;
+    }
+    .metric-tile label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: .56rem;
+        font-weight: 900;
+        letter-spacing: .16em;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: .45rem;
+    }
+    .metric-tile strong {
+        display: block;
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 900;
+    }
+    .progress-shell {
+        height: .65rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.08);
+    }
+    .progress-fill {
+        height: 100%;
+        width: {{ km_progress|round(0, 'floor') }}%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand-green), var(--brand-yellow));
+        box-shadow: 0 0 22px rgba(137,190,50,.35);
+    }
+    .small-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.35rem;
+        padding: .7rem 1rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(137,190,50,.30);
+        background: rgba(137,190,50,.10);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: .62rem;
+        font-weight: 900;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        transition: all 180ms ease;
+    }
+    .small-action:hover {
+        color: #fff;
+        background: rgba(137,190,50,.18);
+        transform: translateY(-1px);
+    }
+    @media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .metric-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="metric-detail-shell space-y-6">
+    <section class="metric-hero">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div class="min-w-0">
+                <span class="metric-topline">Gefahrene Kilometer</span>
+                <h1 class="font-orbitron text-2xl md:text-3xl font-black text-white mt-2">KM-Details</h1>
+                <div class="metric-big-number">
+                    <strong>{{ ('%.1f'|format(km_total|float))|replace('.', ',') }}</strong>
+                    <span>km gesamt</span>
+                </div>
+                <p class="text-sm text-[var(--muted)] max-w-2xl mt-4">
+                    Die Zahl wird bewusst groß und mit Abstand zur Einheit dargestellt, damit Gesamt-KM und letzte Fahrt nicht verwechselt werden.
+                </p>
+            </div>
+            <a href="/dashboard" class="small-action">← Dashboard</a>
+        </div>
+
+        <div class="metric-grid mt-6">
+            <div class="metric-tile">
+                <label>Letzte Fahrt</label>
+                <strong>{{ ('%.1f'|format(km_last|float))|replace('.', ',') }} km</strong>
+            </div>
+            <div class="metric-tile">
+                <label>Diese Woche</label>
+                <strong>{{ ('%.1f'|format(km_week|float))|replace('.', ',') }} km</strong>
+            </div>
+            <div class="metric-tile">
+                <label>Dieser Monat</label>
+                <strong>{{ ('%.1f'|format(km_month|float))|replace('.', ',') }} km</strong>
+            </div>
+            <div class="metric-tile">
+                <label>Nächster Rang bei</label>
+                <strong>{{ ('%.0f'|format(km_rank_target|float))|replace('.', ',') }} km</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-5 md:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+                <h2 class="font-orbitron text-lg font-black text-white">Fortschritt zum nächsten Rang</h2>
+                <p class="text-xs text-[var(--muted)] mt-1">{{ km_progress|round(0, 'floor') }}% erreicht</p>
+            </div>
+            <a href="/dashboard/detail" class="small-action">Fahrtenbuch öffnen</a>
+        </div>
+        <div class="progress-shell">
+            <div class="progress-fill"></div>
+        </div>
+    </section>
+</div>
+{% endblock %}

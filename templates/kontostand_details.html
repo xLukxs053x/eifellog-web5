@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Kontostand Details{% endblock %}
+
+{% block content %}
+{% set driver_stats = driver_stats|default({}, true) %}
+{% set balance_total = driver_account_balance|default(driver_stats.balance|default(account_balance|default(kontostand|default(0, true), true), true), true) %}
+{% set balance_pending = pending_balance|default(driver_stats.pending_balance|default(0, true), true) %}
+{% set balance_paid = paid_balance|default(driver_stats.paid_balance|default(0, true), true) %}
+{% set safe_transactions = transactions|default(konto_transactions|default(balance_transactions|default([], true), true), true) %}
+
+<style>
+    .konto-shell { width: 100%; max-width: 100%; }
+    .konto-hero {
+        border-radius: clamp(1rem, 1.2vw, 1.5rem);
+        border: 1px solid rgba(220,226,38,.24);
+        background:
+            radial-gradient(circle at 10% 0%, rgba(220,226,38,.14), transparent 34%),
+            radial-gradient(circle at 95% 22%, rgba(137,190,50,.10), transparent 36%),
+            rgba(0,0,0,.42);
+        padding: clamp(1rem, 1.6vw, 1.75rem);
+        backdrop-filter: blur(18px);
+        overflow: hidden;
+    }
+    .konto-balance {
+        display: flex;
+        align-items: baseline;
+        gap: .65rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+    }
+    .konto-balance strong {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.3rem, 6vw, 4.8rem);
+        line-height: .95;
+        color: #fff;
+        letter-spacing: -.04em;
+    }
+    .konto-balance span {
+        color: var(--brand-yellow);
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        font-weight: 900;
+    }
+    .konto-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .9rem;
+    }
+    .konto-tile, .konto-row {
+        border-radius: 1.15rem;
+        border: 1px solid rgba(255,255,255,.09);
+        background: rgba(255,255,255,.045);
+        padding: 1rem;
+    }
+    .konto-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: .56rem;
+        font-weight: 900;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: .45rem;
+    }
+    .konto-value {
+        display: block;
+        color: #fff;
+        font-size: 1.25rem;
+        font-weight: 900;
+    }
+    .small-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.35rem;
+        padding: .7rem 1rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(220,226,38,.30);
+        background: rgba(220,226,38,.10);
+        color: var(--brand-yellow);
+        font-family: 'Orbitron', sans-serif;
+        font-size: .62rem;
+        font-weight: 900;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        transition: all 180ms ease;
+    }
+    .small-action:hover {
+        color: #fff;
+        background: rgba(220,226,38,.16);
+        transform: translateY(-1px);
+    }
+    .transaction-list { display: grid; gap: .75rem; }
+    .transaction-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 1rem;
+    }
+    @media (max-width: 760px) { .konto-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="konto-shell space-y-6">
+    <section class="konto-hero">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div>
+                <span class="font-orbitron text-[10px] font-black text-[var(--brand-yellow)] uppercase tracking-[0.22em]">Fahrer-Konto</span>
+                <h1 class="font-orbitron text-2xl md:text-3xl font-black text-white mt-2">Kontostand Details</h1>
+                <div class="konto-balance">
+                    <strong>{{ ('%.2f'|format(balance_total|float))|replace('.', ',') }}</strong>
+                    <span>€ verfügbar</span>
+                </div>
+                <p class="text-sm text-[var(--muted)] max-w-2xl mt-4">
+                    Betrag, offene Zahlungen und ausgezahlte Einnahmen sind getrennt, damit die Werte nicht miteinander verwechselt werden.
+                </p>
+            </div>
+            <a href="/dashboard" class="small-action">← Dashboard</a>
+        </div>
+
+        <div class="konto-grid mt-6">
+            <div class="konto-tile">
+                <span class="konto-label">Verfügbar</span>
+                <span class="konto-value">{{ ('%.2f'|format(balance_total|float))|replace('.', ',') }} €</span>
+            </div>
+            <div class="konto-tile">
+                <span class="konto-label">Offen</span>
+                <span class="konto-value">{{ ('%.2f'|format(balance_pending|float))|replace('.', ',') }} €</span>
+            </div>
+            <div class="konto-tile">
+                <span class="konto-label">Ausgezahlt</span>
+                <span class="konto-value">{{ ('%.2f'|format(balance_paid|float))|replace('.', ',') }} €</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="glass-card p-5 md:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <div>
+                <h2 class="font-orbitron text-lg font-black text-white">Buchungen</h2>
+                <p class="text-xs text-[var(--muted)] mt-1">Letzte Konto-Bewegungen aus `transactions` / `konto_transactions`.</p>
+            </div>
+        </div>
+
+        <div class="transaction-list">
+            {% if safe_transactions %}
+                {% for item in safe_transactions %}
+                    {% set item_title = item.title|default(item.description|default(item.text|default('Buchung', true), true), true) %}
+                    {% set item_date = item.date|default(item.created_at|default('-', true), true) %}
+                    {% set item_amount = item.amount|default(item.value|default(0, true), true) %}
+                    <div class="konto-row transaction-row">
+                        <div class="min-w-0">
+                            <span class="konto-label">{{ item_date }}</span>
+                            <strong class="block text-white truncate">{{ item_title }}</strong>
+                        </div>
+                        <span class="font-orbitron font-black {% if item_amount|float >= 0 %}text-[var(--brand-green)]{% else %}text-[var(--danger)]{% endif %}">
+                            {{ ('%.2f'|format(item_amount|float))|replace('.', ',') }} €
+                        </span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="konto-row text-center">
+                    <p class="font-orbitron text-white font-bold">Noch keine Buchungen vorhanden</p>
+                    <p class="text-sm text-[var(--muted)] mt-2">Sobald Buchungen übergeben werden, erscheinen sie hier automatisch.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}
