@@ -4952,6 +4952,7 @@ def get_client_token_from_request(data=None):
         or safe_str(request.headers.get("X-Tracker-Token"))
         or safe_str(request.headers.get("X-Tracker-Client-Token"))
         or safe_str(request.headers.get("X-Client-Token"))
+        or safe_str(request.headers.get("X-Tracker-Code"))
         or authorization
         or safe_str(request.args.get("clientToken"))
         or safe_str(request.args.get("trackerClientToken"))
@@ -9122,7 +9123,7 @@ def complete_tracker_tour_from_request():
     if request.method == "GET":
         return jsonify({"success": False, "message": "Method not allowed"}), 200
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
     if not isinstance(data, dict):
         data = {}
 
@@ -10357,7 +10358,7 @@ def tracker_local_webhook():
             "handles": ["tour_started", "tour_completed_with_pdf"]
         })
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
     payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
 
     if not payload:
@@ -10428,7 +10429,7 @@ def tracker_feierabend():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
     if error_response:
         return error_response
@@ -10976,7 +10977,7 @@ def tracker_driver_card():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
     if error_response:
         return error_response
@@ -11169,7 +11170,7 @@ def tracker_work_session():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
     if error_response:
         return error_response
@@ -11197,7 +11198,11 @@ def tracker_work_session():
 
 @app.route("/api/tracker/jobs/start", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/job/start", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/jobs/started", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/job/started", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/start-job", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/tour/start", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/tour/started", methods=["GET", "POST", "OPTIONS"])
 def tracker_jobs_start():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -11210,7 +11215,7 @@ def tracker_jobs_start():
             "method": "POST"
         })
 
-    data = request.get_json(silent=True) or {}
+    data = tracker_request_payload()
 
     # Verbindung zur WPF/C#-App:
     # Der normale Tracker-Start kommt mit clientToken. Falls der C#-Webhook aber
@@ -11374,6 +11379,7 @@ def tracker_jobs_start():
 
 @app.route("/api/tracker/tour/submit", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/tour/complete", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/tour/completed", methods=["GET", "POST", "OPTIONS"])
 def tracker_tour_submit():
     return complete_tracker_tour_from_request()
 
@@ -11383,6 +11389,8 @@ def tracker_tour_submit():
 @app.route("/api/tracker/job/finish", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/jobs/finish", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/job/completed", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/jobs/completed", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/complete-job", methods=["GET", "POST", "OPTIONS"])
 def tracker_job_complete():
     return complete_tracker_tour_from_request()
 
@@ -20647,7 +20655,7 @@ def health_check():
             "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
             "/api/tracker/work-session", "/api/tracker/jobs/start",
             TRACKER_JOB_START_PUBLIC_URL,
-            "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout",
+            "/api/tracker/tour/start", "/api/tracker/tour/submit", "/api/tracker/tour/complete", "/api/tracker/job/complete", "/api/tracker/jobs/completed", "/api/tracker/logout",
             "/api/hr/driver_card_log/<discord_id>/<date_str>",
             "/api/hr/driver-card/pdf/<user_id>/<date_str>",
             "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
