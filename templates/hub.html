@@ -17,6 +17,52 @@
 {% set features = w.get('features', w.get('neue_features', w.get('updates', []))) %}
 {% set roadmap = w.get('roadmap', w.get('roadmap_items', [])) %}
 
+{% macro status_badge(text, extra_classes='') -%}
+    {% set value = text|default('', true) %}
+    {% set normalized = value|lower|trim %}
+
+    {% if normalized in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/35 text-emerald-200 text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-2 shadow-[0_0_12px_rgba(110,231,183,0.8)]"></span>
+            {{ value }}
+        </span>
+    {% elif normalized in ['in arbeit', 'bearbeitung', 'überarbeitung', 'optimierung', 'verbesserung'] %}
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#9ca3ff] text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#9ca3ff] mr-2 shadow-[0_0_12px_rgba(156,163,255,0.7)]"></span>
+            {{ value }}
+        </span>
+    {% elif normalized in ['fehlerbehebung', 'wartung', 'geplante wartung', 'sicherheitsupdate'] %}
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-yellow-300 mr-2 shadow-[0_0_12px_rgba(253,224,71,0.7)]"></span>
+            {{ value }}
+        </span>
+    {% elif normalized in ['geplant', 'offen', 'pending'] %}
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/45 text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-white/35 mr-2"></span>
+            {{ value }}
+        </span>
+    {% else %}
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/50 text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
+            {{ value }}
+        </span>
+    {% endif %}
+{%- endmacro %}
+
+{% macro roadmap_dot(status) -%}
+    {% set value = status|default('', true) %}
+    {% set normalized = value|lower|trim %}
+
+    {% if normalized in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+        <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-emerald-400 border-4 border-black/60 shadow-[0_0_20px_rgba(52,211,153,0.75)]"></div>
+    {% elif normalized in ['in arbeit', 'bearbeitung', 'überarbeitung', 'optimierung', 'verbesserung'] %}
+        <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-[#5865F2] border-4 border-black/60 shadow-[0_0_20px_rgba(88,101,242,0.75)]"></div>
+    {% elif normalized in ['fehlerbehebung', 'wartung', 'geplante wartung', 'sicherheitsupdate'] %}
+        <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-yellow-300 border-4 border-black/60 shadow-[0_0_20px_rgba(253,224,71,0.75)]"></div>
+    {% else %}
+        <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-white/30 border-4 border-black/60 shadow-[0_0_16px_rgba(255,255,255,0.2)]"></div>
+    {% endif %}
+{%- endmacro %}
+
 <section class="flex-grow flex items-center justify-center min-h-[70vh] py-12 px-4">
 
     {% if is_wartung %}
@@ -37,8 +83,8 @@
         </div>
 
         <!-- Wartungs Tag -->
-        <div class="relative z-10 inline-flex items-center justify-center px-4 py-2 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 font-orbitron text-[10px] font-bold tracking-[0.2em] uppercase mb-6">
-            {{ w.get('tag', 'Geplante Wartung') }}
+        <div class="relative z-10 mb-6">
+            {{ status_badge(w.get('tag', 'Geplante Wartung'), 'px-4 py-2 text-[10px] tracking-[0.2em]') }}
         </div>
 
         <!-- Titel -->
@@ -145,10 +191,10 @@
 
                 <div>
                     <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest">
-                        Neue Features
+                        Neue Features & Fehlerbehebungen
                     </h2>
                     <p class="text-xs text-white/40 font-inter">
-                        Diese Punkte werden während der Wartung verbessert oder neu eingebaut.
+                        Diese Punkte werden während der Wartung verbessert, neu eingebaut oder wurden bereits behoben.
                     </p>
                 </div>
             </div>
@@ -156,27 +202,53 @@
             <div class="grid md:grid-cols-2 gap-4">
                 {% for feature in features %}
                     {% if feature is mapping %}
-                    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+                    {% set feature_status = feature.get('status', '') %}
+                    {% set feature_status_norm = feature_status|lower|trim %}
+
+                    <div class="rounded-2xl bg-white/5 border {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}border-emerald-400/25 shadow-[0_0_24px_rgba(52,211,153,0.06)]{% else %}border-white/10{% endif %} p-5">
                         <div class="flex items-start gap-3">
-                            <div class="shrink-0 w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 flex items-center justify-center mt-0.5">
+                            <div class="shrink-0 w-8 h-8 rounded-lg {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}bg-emerald-400/10 border border-emerald-400/25{% else %}bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20{% endif %} flex items-center justify-center mt-0.5">
+                                {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+                                <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 12.75l6 6 9-13.5"></path>
+                                </svg>
+                                {% else %}
                                 <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                 </svg>
+                                {% endif %}
                             </div>
 
-                            <div>
+                            <div class="min-w-0">
                                 <h3 class="text-white font-orbitron text-sm font-bold mb-1">
                                     {{ feature.get('title', feature.get('name', 'Feature')) }}
                                 </h3>
+
                                 <p class="text-sm text-white/60 font-inter leading-relaxed">
                                     {{ feature.get('description', feature.get('text', 'Dieses Feature wird aktuell überarbeitet.')) }}
                                 </p>
 
-                                {% if feature.get('status') %}
-                                <span class="inline-flex mt-3 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-orbitron uppercase tracking-widest text-white/45">
-                                    {{ feature.get('status') }}
-                                </span>
-                                {% endif %}
+                                <div class="flex flex-wrap gap-2 mt-3">
+                                    {% if feature.get('status') %}
+                                        {{ status_badge(feature.get('status')) }}
+                                    {% endif %}
+
+                                    {% if feature.get('version') %}
+                                    <span class="inline-flex px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/45 text-[10px] font-orbitron uppercase tracking-widest">
+                                        Version {{ feature.get('version') }}
+                                    </span>
+                                    {% endif %}
+
+                                    {% if feature.get('fixed_at_display') %}
+                                    <span class="inline-flex px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                        Behoben am {{ feature.get('fixed_at_display') }}
+                                    </span>
+                                    {% elif feature.get('fixed_at') %}
+                                    <span class="inline-flex px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                        Behoben am {{ feature.get('fixed_at') }}
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -205,7 +277,7 @@
         <div class="relative z-10 mb-8 text-left">
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-9 h-9 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 text-[#9ca3ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 6.75V15m0 0l-3-3m3 3l3-3m6-6v8.25m0 0l-3-3m3 3l3-3M4.5 19.5h15"></path>
                     </svg>
                 </div>
@@ -215,52 +287,87 @@
                         Wartungs-Roadmap
                     </h2>
                     <p class="text-xs text-white/40 font-inter">
-                        Aktuelle Arbeiten, Umbauten und geplante Verbesserungen.
+                        Fortschritt, behobene Punkte, laufende Arbeiten und nächste Schritte.
                     </p>
                 </div>
             </div>
 
-            <div class="rounded-2xl bg-black/20 border border-white/10 p-5">
-                <div class="space-y-4">
+            <div class="rounded-2xl bg-black/20 border border-white/10 p-5 md:p-6">
+                <div class="space-y-5">
                     {% for step in roadmap %}
                         {% if step is mapping %}
-                        <div class="relative pl-8 pb-4 border-l border-white/10 last:pb-0">
-                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-[#5865F2] shadow-[0_0_18px_rgba(88,101,242,0.6)]"></div>
+                        {% set step_status = step.get('status', '') %}
+                        {% set step_status_norm = step_status|lower|trim %}
 
-                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-                                <div>
-                                    <h3 class="text-white font-orbitron text-sm font-bold">
-                                        {{ step.get('title', step.get('name', 'Roadmap Punkt')) }}
-                                    </h3>
+                        <div class="relative pl-9 pb-5 border-l {% if step_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}border-emerald-400/25{% else %}border-white/10{% endif %} last:pb-0">
 
-                                    {% if step.get('description') or step.get('text') %}
-                                    <p class="text-sm text-white/60 font-inter leading-relaxed mt-1">
-                                        {{ step.get('description', step.get('text')) }}
-                                    </p>
-                                    {% endif %}
-                                </div>
+                            {{ roadmap_dot(step_status) }}
 
-                                <div class="flex flex-wrap gap-2 md:justify-end">
-                                    {% if step.get('status') %}
-                                    <span class="inline-flex px-3 py-1 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#9ca3ff] text-[10px] font-orbitron uppercase tracking-widest">
-                                        {{ step.get('status') }}
-                                    </span>
-                                    {% endif %}
+                            <div class="rounded-2xl {% if step_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}bg-emerald-400/[0.04] border border-emerald-400/20{% else %}bg-white/[0.03] border border-white/10{% endif %} p-4">
+                                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/45 text-[10px] font-orbitron font-bold">
+                                                {{ loop.index }}
+                                            </span>
 
-                                    {% if step.get('eta') %}
-                                    <span class="inline-flex px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 text-[10px] font-orbitron uppercase tracking-widest">
-                                        {{ step.get('eta') }}
-                                    </span>
-                                    {% endif %}
+                                            <h3 class="text-white font-orbitron text-sm font-bold">
+                                                {{ step.get('title', step.get('name', 'Roadmap Punkt')) }}
+                                            </h3>
+                                        </div>
+
+                                        {% if step.get('description') or step.get('text') %}
+                                        <p class="text-sm text-white/60 font-inter leading-relaxed">
+                                            {{ step.get('description', step.get('text')) }}
+                                        </p>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="flex flex-wrap gap-2 md:justify-end md:max-w-[45%]">
+                                        {% if step.get('status') %}
+                                            {{ status_badge(step.get('status')) }}
+                                        {% endif %}
+
+                                        {% if step.get('version') %}
+                                        <span class="inline-flex px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/45 text-[10px] font-orbitron uppercase tracking-widest">
+                                            Version {{ step.get('version') }}
+                                        </span>
+                                        {% endif %}
+
+                                        {% if step.get('fixed_at_display') %}
+                                        <span class="inline-flex px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                            {{ step.get('fixed_at_display') }}
+                                        </span>
+                                        {% elif step.get('fixed_at') %}
+                                        <span class="inline-flex px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                            {{ step.get('fixed_at') }}
+                                        </span>
+                                        {% endif %}
+
+                                        {% if step.get('eta') %}
+                                        <span class="inline-flex px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 text-[10px] font-orbitron uppercase tracking-widest">
+                                            {{ step.get('eta') }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         {% else %}
-                        <div class="relative pl-8 pb-4 border-l border-white/10 last:pb-0">
-                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-[#5865F2] shadow-[0_0_18px_rgba(88,101,242,0.6)]"></div>
-                            <p class="text-sm text-white/70 font-inter leading-relaxed">
-                                {{ step }}
-                            </p>
+                        <div class="relative pl-9 pb-5 border-l border-white/10 last:pb-0">
+                            <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-white/30 border-4 border-black/60 shadow-[0_0_16px_rgba(255,255,255,0.2)]"></div>
+
+                            <div class="rounded-2xl bg-white/[0.03] border border-white/10 p-4">
+                                <div class="flex items-start gap-3">
+                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-white/45 text-[10px] font-orbitron font-bold">
+                                        {{ loop.index }}
+                                    </span>
+
+                                    <p class="text-sm text-white/70 font-inter leading-relaxed">
+                                        {{ step }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         {% endif %}
                     {% endfor %}
