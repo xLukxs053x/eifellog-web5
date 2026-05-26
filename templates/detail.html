@@ -45,6 +45,16 @@
 
 {% set trip = selected.trip|default({}, true) %}
 
+{# DEVELOPMENT-ZUGRIFF: Seite ist bis zum Release nur für diese ID sichtbar. #}
+{% set development_allowed_id = '499690831070887936' %}
+{% set development_release_date = '14.06.2026' %}
+{% set development_status_text = 'Derzeit im Development Status' %}
+{% set viewer_development_id = '' %}
+{% if current_user is defined %}
+    {% set viewer_development_id = current_user.discord_id|default(current_user.discord_user_id|default(current_user.user_id|default(current_user.id|default('', true), true), true), true) %}
+{% endif %}
+{% set development_access_allowed = viewer_development_id|string == development_allowed_id|string %}
+
 {% set trip_id = trip.id|default(trip.trip_id|default(trip.fahrt_id|default(trip.auftrag_id|default(detail_query_id|default('-', true), true), true), true), true) %}
 {% set trip_date = trip.date|default(trip.datum|default('-', true), true) %}
 {% set trip_from = trip.from_city|default(trip.start|default(trip.origin|default(trip.start_city|default('-', true), true), true), true) %}
@@ -496,8 +506,157 @@
             padding: 0.54rem 0.62rem;
         }
     }
+
+    .development-lock-shell {
+        width: min(980px, calc(100% - 2rem));
+        margin: 3rem auto;
+        border: 1px solid rgba(220, 226, 38, 0.22);
+        border-radius: 1.65rem;
+        background:
+            radial-gradient(circle at 12% 0%, rgba(137, 190, 50, 0.14), transparent 34%),
+            radial-gradient(circle at 92% 12%, rgba(220, 226, 38, 0.10), transparent 34%),
+            rgba(8, 10, 8, 0.82);
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(18px);
+        padding: clamp(1.35rem, 3vw, 2.4rem);
+        text-align: center;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .development-lock-shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.12;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+        pointer-events: none;
+    }
+
+    .development-lock-content {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 1rem;
+        justify-items: center;
+    }
+
+    .development-lock-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid rgba(220,226,38,0.30);
+        border-radius: 999px;
+        background: rgba(220,226,38,0.10);
+        color: var(--brand-yellow);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .development-lock-kicker::before {
+        content: "";
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: var(--brand-yellow);
+        box-shadow: 0 0 14px rgba(220,226,38,0.62);
+    }
+
+    .development-lock-title {
+        margin: 0;
+        color: #fff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.7rem, 4vw, 3rem);
+        font-weight: 800;
+        line-height: 1.08;
+    }
+
+    .development-lock-text {
+        max-width: 660px;
+        margin: 0;
+        color: var(--muted);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.98rem;
+        line-height: 1.75;
+    }
+
+    .development-lock-grid {
+        width: min(720px, 100%);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+        margin-top: 0.55rem;
+    }
+
+    .development-lock-info {
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: 1.1rem;
+        background: rgba(255, 255, 255, 0.045);
+        padding: 1rem;
+        text-align: left;
+    }
+
+    .development-lock-info span {
+        display: block;
+        color: var(--muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.58rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .development-lock-info strong {
+        display: block;
+        margin-top: 0.42rem;
+        color: rgba(255, 255, 255, 0.94);
+        font-size: 0.95rem;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .development-lock-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 0.7rem;
+        padding: 0.9rem 1.2rem;
+        border: 1px solid rgba(137, 190, 50, 0.30);
+        border-radius: 999px;
+        background: rgba(137, 190, 50, 0.10);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        transition: all 160ms ease;
+    }
+
+    .development-lock-action:hover {
+        border-color: rgba(137, 190, 50, 0.52);
+        background: rgba(137, 190, 50, 0.18);
+        color: #fff;
+    }
+
+    @media (max-width: 640px) {
+        .development-lock-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
 </style>
 
+{% if development_access_allowed %}
 <div class="detail-shell">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
@@ -554,7 +713,7 @@
                         <div class="ets2-map-badge">
                             <span class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.22em] text-[var(--brand-green)]">ETS2-Karte</span>
                             <strong class="block text-white text-sm md:text-base mt-1">{{ trip_from }} → {{ trip_to }}</strong>
-                            <span class="ets2-development-note" title="Diese Kartenfunktion befindet sich noch in Entwicklung.">Development Progress Beta</span>
+                            <span class="ets2-development-note" title="{{ development_status_text }} · Release {{ development_release_date }}">Development Status · Release {{ development_release_date }}</span>
                         </div>
 
                         <div class="ets2-map-controls" aria-label="Kartensteuerung">
@@ -1074,4 +1233,30 @@
     });
 })();
 </script>
+{% else %}
+<div class="development-lock-shell" role="status" aria-live="polite">
+    <div class="development-lock-content">
+        <span class="development-lock-kicker">{{ development_status_text }}</span>
+        <h1 class="development-lock-title">Seite aktuell nicht verfügbar</h1>
+        <p class="development-lock-text">
+            Diese Seite kann aktuell nicht betreten werden. Der Zugriff ist bis zum Release nur für die freigegebene ID
+            <strong class="text-white">{{ development_allowed_id }}</strong>
+            erlaubt.
+        </p>
+
+        <div class="development-lock-grid">
+            <div class="development-lock-info">
+                <span>Status</span>
+                <strong>{{ development_status_text }}</strong>
+            </div>
+            <div class="development-lock-info">
+                <span>Release</span>
+                <strong>{{ development_release_date }}</strong>
+            </div>
+        </div>
+
+        <a href="/dashboard" class="development-lock-action">Zurück zum Dashboard</a>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
