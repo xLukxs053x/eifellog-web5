@@ -6261,6 +6261,32 @@ def first_route_city_value(source, *keys, fallback="-"):
     return fallback
 
 
+def clean_company_value(value, fallback="-"):
+    value = safe_str(value)
+    if not value:
+        return fallback
+
+    normalized = value.strip().lower()
+    if normalized in {"", "-", "none", "null", "undefined", "unbekannt", "unknown"}:
+        return fallback
+    if is_tracker_meta_source_value(value):
+        return fallback
+    return value
+
+
+def first_company_value(source, *keys, fallback="-"):
+    source = source or {}
+    if not isinstance(source, dict):
+        return fallback
+
+    for key in keys:
+        value = clean_company_value(source.get(key), fallback="")
+        if value:
+            return value
+
+    return fallback
+
+
 def first_present_payload_number(source, *keys):
     source = source or {}
     if not isinstance(source, dict):
@@ -6468,6 +6494,18 @@ def normalize_telemetry_payload(raw):
         "truck": s("truck", "truckName", "truckModel", "truck_model", "driverTruckModel", fallback="-"),
         "sourceCity": s("sourceCity", "source_city", "source", "from", "routeOrigin", "jobSourceCity", fallback="-"),
         "destinationCity": s("destinationCity", "destination_city", "destination", "to", "targetCity", "routeDestination", "activeDestination", "jobDestinationCity", fallback="-"),
+        "sourceCompany": s(
+            "sourceCompany", "source_company", "pickupCompany", "pickup_company", "loadingCompany", "loading_company",
+            "senderCompany", "shipperCompany", "sourceCompanyName", "companySource",
+            "auftraggeber", "auftragGeber", "auftraggeberFirma", "auftraggeber_firma",
+            fallback="-"
+        ),
+        "destinationCompany": s(
+            "destinationCompany", "destination_company", "deliveryCompany", "delivery_company", "unloadingCompany", "unloading_company",
+            "receiverCompany", "consigneeCompany", "destinationCompanyName", "targetCompany", "companyDestination",
+            "kunde", "kundenFirma", "kundeFirma", "kunden_firma", "kunde_firma",
+            fallback="-"
+        ),
         "cargo": s("cargo", "cargoName", "freight", "jobCargo", fallback="-"),
         "jobId": s("jobId", "jobID", "job_id", "id", "deliveryId", "delivery_id", "auftragId", "auftragID", fallback=""),
         "eta": s("eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback="-"),
@@ -6499,7 +6537,13 @@ def normalize_telemetry_payload(raw):
         "activeJobKey", "jobKey", "tourKey", "currentJobKey", "jobStartKey",
         "startedAtUtc", "jobStartedAtUtc", "tourStartedAtUtc", "startTimestampUtc",
         "jobStartTimestampUtc", "startTimeUtc", "completedAtUtc", "jobCompletedAtUtc",
-        "tourCompletedAtUtc", "receiptNumber", "receipt_number"
+        "tourCompletedAtUtc", "receiptNumber", "receipt_number",
+        "sourceCompany", "source_company", "pickupCompany", "pickup_company", "loadingCompany", "loading_company",
+        "senderCompany", "shipperCompany", "sourceCompanyName", "companySource",
+        "destinationCompany", "destination_company", "deliveryCompany", "delivery_company", "unloadingCompany", "unloading_company",
+        "receiverCompany", "consigneeCompany", "destinationCompanyName", "targetCompany", "companyDestination",
+        "auftraggeber", "auftragGeber", "auftraggeberFirma", "auftraggeber_firma",
+        "kunde", "kundenFirma", "kundeFirma", "kunden_firma", "kunde_firma"
     ):
         value = safe_str(raw.get(key))
         if value:
@@ -6515,6 +6559,13 @@ def normalize_telemetry_payload(raw):
 
     for key in ["sourceCity", "destinationCity"]:
         value = clean_route_city_value(clean.get(key), "-")
+        if safe_str(value).lower() in no_job_values:
+            clean[key] = "-"
+        else:
+            clean[key] = value
+
+    for key in ["sourceCompany", "destinationCompany"]:
+        value = clean_company_value(clean.get(key), "-")
         if safe_str(value).lower() in no_job_values:
             clean[key] = "-"
         else:
@@ -6551,6 +6602,18 @@ def current_job_from_live(live):
 
     destination = clean_route_city_value(live.get("destinationCity"), "-")
     source = clean_route_city_value(live.get("sourceCity"), "-")
+    source_company = first_company_value(
+        live,
+        "sourceCompany", "source_company", "pickupCompany", "loadingCompany",
+        "senderCompany", "shipperCompany", "auftraggeber", "auftraggeberFirma",
+        fallback="-"
+    )
+    destination_company = first_company_value(
+        live,
+        "destinationCompany", "destination_company", "deliveryCompany", "unloadingCompany",
+        "receiverCompany", "consigneeCompany", "kunde", "kundeFirma", "kundenFirma",
+        fallback="-"
+    )
     cargo = safe_str(live.get("cargo"), "-")
     job_id = safe_str(live.get("jobId"))
 
@@ -6577,6 +6640,10 @@ def current_job_from_live(live):
         "jobId": job_id,
         "sourceCity": source,
         "destinationCity": destination,
+        "sourceCompany": source_company,
+        "destinationCompany": destination_company,
+        "auftraggeber": source_company,
+        "kunde": destination_company,
         "cargo": cargo,
         "truck": live.get("truck") or "-",
         "fuelPercent": parse_number(live.get("fuelPercent"), 0),
@@ -6602,6 +6669,10 @@ def tracker_completed_live_state(now=None, game="ETS2/ATS"):
         "truck": "-",
         "sourceCity": "-",
         "destinationCity": "-",
+        "sourceCompany": "-",
+        "destinationCompany": "-",
+        "auftraggeber": "-",
+        "kunde": "-",
         "cargo": "-",
         "jobId": "",
         "eta": "-",
@@ -8542,6 +8613,8 @@ def build_accounting_relevant_receipt_sections(receipt_doc):
 
     tour_rows = [
         ("Route", route),
+        ("Auftraggeber", tour.get("source_company") or tour.get("auftraggeber") or "-"),
+        ("Kunde", tour.get("destination_company") or tour.get("kunde") or "-"),
         ("Fracht", tour.get("cargo") or "-"),
         ("Gefahrene Strecke", format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))),
     ]
@@ -9054,6 +9127,8 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     job_id = safe_str(receipt_doc.get("job_id"), "-")
     receipt_number = safe_str(receipt_doc.get("receipt_number"), "-")
     route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
+    source_company = safe_str(tour.get("source_company") or tour.get("auftraggeber"), "-")
+    destination_company = safe_str(tour.get("destination_company") or tour.get("kunde"), "-")
     total_amount = format_money(billing.get("total_amount"), billing.get("currency"))
     distance = format_km(tour.get("driven_distance_km") or receipt_doc.get("distanceKm"))
 
@@ -9071,6 +9146,8 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
                     discord_field("📄 Belegnummer", f"`{discord_text(receipt_number, '-', 120)}`", True),
 
                     discord_field("📍 Route", route, False),
+                    discord_field("🏭 Auftraggeber", source_company, True),
+                    discord_field("🏢 Kunde", destination_company, True),
                     discord_field("📦 Fracht", tour.get("cargo") or "-", True),
                     discord_field("📊 Strecke", distance, True),
                     discord_field("💶 Gesamtbetrag", total_amount, True),
@@ -9141,6 +9218,28 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             telemetry,
             "destinationCity", "destination_city", "destination", "to", "targetCity", "routeDestination", "jobDestinationCity",
             fallback=clean_route_city_value(active_job.get("destinationCity") or live_state.get("destinationCity"), "-")
+        )
+    )
+    source_company = first_company_value(
+        payload,
+        "sourceCompany", "source_company", "pickupCompany", "pickup_company", "loadingCompany", "loading_company",
+        "senderCompany", "shipperCompany", "auftraggeber", "auftragGeber", "auftraggeberFirma", "auftraggeber_firma",
+        fallback=first_company_value(
+            telemetry,
+            "sourceCompany", "source_company", "pickupCompany", "pickup_company", "loadingCompany", "loading_company",
+            "senderCompany", "shipperCompany", "auftraggeber", "auftragGeber", "auftraggeberFirma", "auftraggeber_firma",
+            fallback=clean_company_value(active_job.get("sourceCompany") or active_job.get("auftraggeber") or live_state.get("sourceCompany"), "-")
+        )
+    )
+    destination_company = first_company_value(
+        payload,
+        "destinationCompany", "destination_company", "deliveryCompany", "delivery_company", "unloadingCompany", "unloading_company",
+        "receiverCompany", "consigneeCompany", "kunde", "kundeFirma", "kundenFirma", "kunde_firma", "kunden_firma",
+        fallback=first_company_value(
+            telemetry,
+            "destinationCompany", "destination_company", "deliveryCompany", "delivery_company", "unloadingCompany", "unloading_company",
+            "receiverCompany", "consigneeCompany", "kunde", "kundeFirma", "kundenFirma", "kunde_firma", "kunden_firma",
+            fallback=clean_company_value(active_job.get("destinationCompany") or active_job.get("kunde") or live_state.get("destinationCompany"), "-")
         )
     )
     cargo = safe_str(
@@ -9238,7 +9337,11 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     for key, value in payload.items():
         if key not in {
             "clientToken", "jobId", "job_id", "id", "driverName", "sourceCity", "source_city",
-            "destinationCity", "destination_city", "cargo", "game", "truck", "plannedDistanceKm",
+            "destinationCity", "destination_city", "sourceCompany", "source_company", "pickupCompany", "pickup_company",
+            "loadingCompany", "loading_company", "senderCompany", "shipperCompany", "auftraggeber", "auftragGeber",
+            "auftraggeberFirma", "auftraggeber_firma", "destinationCompany", "destination_company", "deliveryCompany",
+            "delivery_company", "unloadingCompany", "unloading_company", "receiverCompany", "consigneeCompany",
+            "kunde", "kundeFirma", "kundenFirma", "kunde_firma", "kunden_firma", "cargo", "game", "truck", "plannedDistanceKm",
             "planned_distance_km", "completedDistanceKm", "completed_distance_km", "drivenDistanceKm",
             "driven_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", "distance",
             "remainingDistanceKm", "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
@@ -9272,6 +9375,10 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "truck": truck,
             "source_city": source_city,
             "destination_city": destination_city,
+            "source_company": source_company,
+            "destination_company": destination_company,
+            "auftraggeber": source_company,
+            "kunde": destination_company,
             "cargo": cargo,
             "eta": eta,
             "planned_distance_km": planned_distance,
@@ -9430,7 +9537,7 @@ def complete_tracker_tour_from_request():
         status_code = 200 if success else 409
         if "Kein Fahrer/User" in safe_str(database_result.get("reason")):
             status_code = 404
-        if database_result.get("notAtDestination"):
+        if database_result.get("notAtDestination") or database_result.get("notCurrentTour"):
             status_code = 409
 
         return jsonify({
@@ -9489,7 +9596,7 @@ def complete_tracker_tour_from_request():
             "database": database_result,
             "discord": discord_result,
             "state": tracker_state_payload(user_doc)
-        }), 409 if database_result.get("notAtDestination") else 400
+        }), 409 if (database_result.get("notAtDestination") or database_result.get("notCurrentTour")) else 400
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
     company_all_time = get_company_all_time_stats()
@@ -9688,10 +9795,40 @@ def build_tour_start_discord_payload(user_doc, telemetry):
     truck = payload_lookup_value(telemetry, "truck", "truckName", "truckModel", "truck_model", fallback=safe_str(active_job.get("truck"), "-"))
     source = first_route_city_value(telemetry, "sourceCity", "source_city", "source", "from", "routeOrigin", fallback=clean_route_city_value(active_job.get("sourceCity"), "-"))
     destination = first_route_city_value(telemetry, "destinationCity", "destination_city", "destination", "to", "routeDestination", fallback=clean_route_city_value(active_job.get("destinationCity"), "-"))
+    source_company = first_company_value(
+        telemetry,
+        "sourceCompany", "source_company", "pickupCompany", "pickup_company", "loadingCompany", "loading_company",
+        "senderCompany", "shipperCompany", "auftraggeber", "auftraggeberFirma", "auftraggeber_firma",
+        fallback=clean_company_value(active_job.get("sourceCompany") or active_job.get("auftraggeber"), "-")
+    )
+    destination_company = first_company_value(
+        telemetry,
+        "destinationCompany", "destination_company", "deliveryCompany", "delivery_company", "unloadingCompany", "unloading_company",
+        "receiverCompany", "consigneeCompany", "kunde", "kundeFirma", "kundenFirma", "kunde_firma", "kunden_firma",
+        fallback=clean_company_value(active_job.get("destinationCompany") or active_job.get("kunde"), "-")
+    )
     cargo = payload_lookup_value(telemetry, "cargo", "freight", "cargoName", "jobCargo", fallback=safe_str(active_job.get("cargo"), "-"))
     game = payload_lookup_value(telemetry, "game", "gameCode", "gameName", fallback=safe_str((user_doc.get("tracker_live") or {}).get("game"), "ETS2/ATS"))
     eta = payload_lookup_value(telemetry, "eta", "etaText", "eta_text", "remainingTime", "navigationTime", fallback=safe_str(active_job.get("eta"), "-"))
     rpm = first_payload_number(telemetry, "rpm", "engineRpm", "engineRPM", fallback=0)
+
+    planned_distance = first_payload_number(
+        telemetry,
+        "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm",
+        fallback=parse_number(active_job.get("distanceKm"), 0)
+    )
+    driven_distance = first_payload_number(
+        telemetry,
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km", "tripDistanceKm",
+        fallback=0
+    )
+    remaining_distance = first_payload_number(
+        telemetry,
+        "remainingDistanceKm", "remaining_distance_km", "navigationDistanceKm", "navigation_distance_km", "routeRemainingDistance",
+        fallback=parse_number(active_job.get("remainingDistanceKm"), 0)
+    )
+    if driven_distance <= 0 and planned_distance > 0 and remaining_distance > 0:
+        driven_distance = max(planned_distance - remaining_distance, 0)
 
     job_id = (
         payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
@@ -9716,10 +9853,10 @@ def build_tour_start_discord_payload(user_doc, telemetry):
         "allowed_mentions": {"parse": []},
         "embeds": [
             {
-                "title": "🟢 Tour gestartet",
+                "title": "🟢 Auftrag gestartet",
                 "description": (
                     f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** ({discord_text(username_display, '@fahrer', 80)}) "
-                    f"hat eine neue Tour gestartet."
+                    f"hat eine neue Tour gestartet. Alle Daten werden live für diese aktive Tour geführt."
                 ),
                 "color": 5763719,
                 "fields": [
@@ -9728,9 +9865,14 @@ def build_tour_start_discord_payload(user_doc, telemetry):
                     discord_field("🎮 Spiel", game, True),
 
                     discord_field("📍 Route", route_line, False),
-                    discord_field("🚛 LKW", truck, True),
+                    discord_field("🏭 Auftraggeber", source_company, True),
+                    discord_field("🏢 Kunde", destination_company, True),
                     discord_field("📦 Fracht", cargo, True),
-                    discord_field("🛣️ Strecke", f"{round(first_payload_number(telemetry, 'plannedDistanceKm', 'routeDistanceKm', 'distanceKm', fallback=0), 1)} km", True),
+
+                    discord_field("🚛 LKW", truck, True),
+                    discord_field("🛣️ Gesamtstrecke", format_km(planned_distance), True),
+                    discord_field("🚚 Bereits gefahren", format_km(driven_distance), True),
+                    discord_field("⏳ Reststrecke", format_km(remaining_distance), True),
 
                     discord_field("🕒 Startzeit", start_time, True),
                     discord_field("🧭 ETA", eta, True),
@@ -9738,7 +9880,7 @@ def build_tour_start_discord_payload(user_doc, telemetry):
 
                     discord_field("🧾 Job-ID", f"`{discord_text(job_id, '-', 180)}`", False),
                 ],
-                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tour-Start"},
+                "footer": {"text": f"{TOUR_RECEIPT_COMPANY_NAME} • Tour-Start / Live-Übersicht"},
                 "timestamp": now_utc().isoformat() + "Z"
             }
         ]
@@ -10503,6 +10645,168 @@ def stable_webhook_job_id(payload):
 
 
 
+def tracker_job_key_without_started_token(value):
+    value = normalize_tracker_key_token(value)
+    if not value:
+        return ""
+    return re.sub(r"\|started:[^|]+", "", value, flags=re.IGNORECASE).strip()
+
+
+def tracker_job_keys_match(expected, candidate):
+    expected = normalize_tracker_key_token(expected)
+    candidate = normalize_tracker_key_token(candidate)
+    if not expected or not candidate:
+        return False
+    if expected == candidate:
+        return True
+
+    expected_base = tracker_job_key_without_started_token(expected)
+    candidate_base = tracker_job_key_without_started_token(candidate)
+    if expected_base and candidate_base and expected_base == candidate_base:
+        return True
+
+    return expected.startswith(candidate + "|started:") or candidate.startswith(expected + "|started:")
+
+
+def latest_active_tracker_job_start(user_doc):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return None
+
+    return tracker_job_starts_collection.find_one(
+        {
+            "discord_id": discord_id,
+            "status": {"$in": ["started", "active"]},
+        },
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+    )
+
+
+def tracker_completion_payload_job_id(payload):
+    return safe_str(payload_lookup_value(
+        payload or {},
+        "jobId", "jobID", "job_id", "id", "deliveryId", "delivery_id",
+        "auftragId", "auftragID", "orderId", "tourId", "tour_id",
+        fallback=""
+    ))
+
+
+def tracker_payload_has_auth_token(payload):
+    return bool(first_payload_value(
+        payload or {},
+        "clientToken", "trackerClientToken", "tracker_token", "token",
+        fallback=""
+    ))
+
+
+def tracker_completion_current_tour_guard(user_doc, payload):
+    """
+    Harte Sicherheitsprüfung für Tour-Belege.
+
+    Ein PDF/Discord-Beleg wird nur erzeugt, wenn es für den Fahrer genau eine
+    aktuell offene Tour gibt und die Abschlussmeldung zu dieser offenen Tour passt.
+    Alte Webhooks, alte Discord-Embeds oder leere Abschluss-Payloads ohne aktive
+    Tour werden dadurch blockiert.
+    """
+    user_doc = user_doc or {}
+    payload = payload or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+
+    if not discord_id:
+        return False, {"reason": "User-Dokument ohne Discord-ID. Tourbeleg blockiert."}
+
+    active_doc = latest_active_tracker_job_start(user_doc)
+    active_key = safe_str((active_doc or {}).get("job_start_key") or user_doc.get("tracker_current_job_key"))
+    active_job_id = safe_str(
+        (active_doc or {}).get("job_id")
+        or ((active_doc or {}).get("current_job") or {}).get("jobId")
+        or ((active_doc or {}).get("telemetry") or {}).get("jobId")
+        or ((user_doc.get("tracker_current_job") or {}).get("jobId"))
+    )
+
+    if not active_key and not active_job_id:
+        return False, {
+            "reason": "Kein aktuell offener Auftrag gefunden. Es wurde kein alter Tourbeleg erzeugt.",
+            "event": "tour_completion_blocked",
+        }
+
+    payload_key = tracker_payload_explicit_job_key(payload) or tracker_current_job_key(payload, {"discord_id": discord_id})
+    payload_job_id = tracker_completion_payload_job_id(payload)
+    authenticated_submit = tracker_payload_has_auth_token(payload)
+
+    if payload_key and active_key and not tracker_job_keys_match(active_key, payload_key):
+        return False, {
+            "reason": "Abschluss gehört nicht zur aktuell offenen Tour. Alter/falscher Tourbeleg wurde blockiert.",
+            "activeJobStartKey": active_key,
+            "payloadJobStartKey": payload_key,
+            "event": "tour_completion_blocked",
+        }
+
+    if payload_job_id and active_job_id and payload_job_id != active_job_id:
+        return False, {
+            "reason": "Job-ID des Abschlusses passt nicht zum aktuell offenen Auftrag. Alter/falscher Tourbeleg wurde blockiert.",
+            "activeJobId": active_job_id,
+            "payloadJobId": payload_job_id,
+            "event": "tour_completion_blocked",
+        }
+
+    if not payload_key and not payload_job_id and not authenticated_submit:
+        return False, {
+            "reason": "Abschluss-Payload enthält keinen stabilen Tour-Key und keinen authentifizierten Client-Token. Tourbeleg blockiert.",
+            "activeJobStartKey": active_key,
+            "event": "tour_completion_blocked",
+        }
+
+    return True, {
+        "activeJobStart": active_doc,
+        "activeJobStartKey": active_key,
+        "activeJobId": active_job_id,
+        "payloadJobStartKey": payload_key,
+        "payloadJobId": payload_job_id,
+    }
+
+
+def merge_completion_payload_with_active_tour(payload, user_doc, active_doc=None):
+    """
+    Ergänzt eine direkte Abgabe mit Daten aus der aktuell offenen Tour.
+    Payload-Werte haben Vorrang; alte User-Live-Daten werden nur genutzt, wenn
+    sie zur offenen Tour gehören.
+    """
+    payload = dict(payload or {})
+    user_doc = user_doc or {}
+    active_doc = active_doc or latest_active_tracker_job_start(user_doc) or {}
+
+    active_key = safe_str(active_doc.get("job_start_key") or user_doc.get("tracker_current_job_key"))
+    active_job_id = safe_str(
+        active_doc.get("job_id")
+        or ((active_doc.get("current_job") or {}).get("jobId"))
+        or ((active_doc.get("telemetry") or {}).get("jobId"))
+    )
+
+    for source in (
+        active_doc.get("telemetry") or {},
+        active_doc.get("current_job") or {},
+        user_doc.get("tracker_current_job") or {},
+        user_doc.get("tracker_live") or {},
+    ):
+        if not isinstance(source, dict):
+            continue
+        for key, value in source.items():
+            if key not in payload or payload.get(key) in (None, "", "-"):
+                payload[key] = value
+
+    if active_key:
+        payload["jobStartKey"] = active_key
+        payload["job_start_key"] = active_key
+        payload["activeJobKey"] = active_key
+    if active_job_id and not tracker_completion_payload_job_id(payload):
+        payload["jobId"] = active_job_id
+
+    return payload
+
+
+
 def store_tracker_webhook_completed_job(payload):
     payload = payload or {}
 
@@ -10512,6 +10816,26 @@ def store_tracker_webhook_completed_job(payload):
     user_doc = resolve_tracker_webhook_user(payload)
     if not user_doc:
         return {"stored": False, "skipped": True, "reason": "Kein Fahrer/User zum Webhook-Payload gefunden."}
+
+    current_tour_ok, current_tour_info = tracker_completion_current_tour_guard(user_doc, payload)
+    if not current_tour_ok:
+        return {
+            "stored": False,
+            "skipped": True,
+            "notCurrentTour": True,
+            "reason": current_tour_info.get("reason") or "Tourbeleg wurde blockiert, weil es nicht die aktuell offene Tour ist.",
+            "event": "tour_completion_blocked",
+            "activeJobStartKey": current_tour_info.get("activeJobStartKey"),
+            "payloadJobStartKey": current_tour_info.get("payloadJobStartKey"),
+            "activeJobId": current_tour_info.get("activeJobId"),
+            "payloadJobId": current_tour_info.get("payloadJobId"),
+        }
+
+    payload = merge_completion_payload_with_active_tour(
+        payload,
+        user_doc,
+        active_doc=current_tour_info.get("activeJobStart")
+    )
 
     allowed, allowed_reason = tracker_completion_allowed(payload, user_doc=user_doc)
     if not allowed:
@@ -10533,7 +10857,11 @@ def store_tracker_webhook_completed_job(payload):
     distance = round(max(0.0, distance), 1)
 
     payload_for_db = dict(payload)
-    current_job_key = tracker_current_job_key(payload_for_db, user_doc) or safe_str(user_doc.get("tracker_current_job_key"))
+    current_job_key = (
+        safe_str(current_tour_info.get("activeJobStartKey"))
+        or tracker_current_job_key(payload_for_db, user_doc)
+        or safe_str(user_doc.get("tracker_current_job_key"))
+    )
     if current_job_key:
         payload_for_db["jobStartKey"] = current_job_key
         payload_for_db["job_start_key"] = current_job_key
