@@ -11,7 +11,7 @@
 
     WICHTIG FÜR KORREKTE ETS2-ROUTEN:
     - Hinterlege die aktuelle ETS2-Karte als lokales Bild:
-      /static/img/ets2/ets2-official-map-current.jpg
+      /static/ets2_map.jpg
 
     - Pro Fahrt sollten echte Kartenpunkte übergeben werden, z. B.:
       ets2_route_points: [
@@ -71,7 +71,7 @@
 {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
 
 {# Kartenbild: bevorzugt pro Fahrt, sonst globale Einstellung, sonst lokaler Standardpfad #}
-{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.official_ets2_map_url|default(ets2_map_image_url|default('/static/img/ets2/ets2-official-map-current.jpg', true), true), true) %}
+{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.official_ets2_map_url|default(ets2_map_image_url|default('/static/ets2_map.jpg', true), true), true) %}
 
 {# Routepunkte: korrekt nur aus Daten, keine Fake-Route #}
 {% set trip_route_points = trip.ets2_route_points|default(trip.map_points|default(trip.route_points|default(trip.waypoints|default(trip.zwischenstopps|default([], true), true), true), true), true) %}
@@ -574,7 +574,7 @@
                     <div class="ets2-map-error" data-map-error hidden>
                         <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--danger)]">Karte nicht gefunden</span>
                         <strong class="block text-white mt-2">Das ETS2-Kartenbild konnte nicht geladen werden.</strong>
-                        <p class="text-sm text-[var(--muted)] mt-2">Lege die aktuelle offizielle ETS2-Karte unter <code class="text-white/80">/static/img/ets2/ets2-official-map-current.jpg</code> ab oder übergib <code class="text-white/80">ets2_map_image_url</code>.</p>
+                        <p class="text-sm text-[var(--muted)] mt-2">Lege die aktuelle offizielle ETS2-Karte unter <code class="text-white/80">/static/ets2_map.jpg</code> ab oder übergib <code class="text-white/80">ets2_map_image_url</code>.</p>
                     </div>
                 </div>
             </div>
