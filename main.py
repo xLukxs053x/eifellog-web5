@@ -6738,12 +6738,7 @@ def normalize_logbook_entry(entry, user_doc=None):
 # ETS2-KARTENROUTEN FÜR FAHRTENBUCH-DETAIL
 # ==========================================
 
-ETS2_MAP_IMAGE_URL = env_first(
-    "ETS2_MAP_IMAGE_URL",
-    "ETS2_OFFICIAL_MAP_IMAGE_URL",
-    "OFFICIAL_ETS2_MAP_IMAGE_URL",
-    default="/static/ets2_map.png",
-)
+ETS2_MAP_IMAGE_URL = "/static/ets2_map.jpg"
 
 ETS2_CITY_COORDINATES_PATH = env_first(
     "ETS2_CITY_COORDINATES_PATH",
@@ -7771,13 +7766,7 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
             "avg_speed": safe_str(raw_entry.get("avg_speed") or raw_entry.get("average_speed") or raw_entry.get("durchschnitt"), "-"),
             "note": safe_str(raw_entry.get("note") or raw_entry.get("notes") or raw_entry.get("bemerkung"), ""),
             "map_embed_url": safe_str(raw_entry.get("map_embed_url") or raw_entry.get("map_url") or raw_entry.get("route_map_url"), ""),
-            "ets2_map_image_url": safe_str(
-                raw_entry.get("ets2_map_image_url")
-                or raw_entry.get("official_ets2_map_url")
-                or raw_entry.get("map_image_url")
-                or ETS2_MAP_IMAGE_URL,
-                ETS2_MAP_IMAGE_URL
-            ),
+            "ets2_map_image_url": ETS2_MAP_IMAGE_URL,
             "waypoints": raw_entry.get("waypoints") or raw_entry.get("route_points") or raw_entry.get("zwischenstopps") or [],
             "route_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
             "map_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
@@ -12678,7 +12667,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
     WICHTIG FÜR KORREKTE ETS2-ROUTEN:
     - Hinterlege die aktuelle ETS2-Karte als lokales Bild:
-      /static/img/ets2/ets2-official-map-current.jpg
+      /static/ets2_map.jpg
 
     - Pro Fahrt sollten echte Kartenpunkte übergeben werden, z. B.:
       ets2_route_points: [
@@ -12738,7 +12727,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
 
 {# Kartenbild: bevorzugt pro Fahrt, sonst globale Einstellung, sonst lokaler Standardpfad #}
-{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.official_ets2_map_url|default(ets2_map_image_url|default('/static/img/ets2/ets2-official-map-current.jpg', true), true), true) %}
+{% set trip_ets2_map_image_url = '/static/ets2_map.jpg' %}
 
 {# Routepunkte: korrekt nur aus Daten, keine Fake-Route #}
 {% set trip_route_points = trip.ets2_route_points|default(trip.map_points|default(trip.route_points|default(trip.waypoints|default(trip.zwischenstopps|default([], true), true), true), true), true) %}
@@ -13241,7 +13230,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
                     <div class="ets2-map-error" data-map-error hidden>
                         <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--danger)]">Karte nicht gefunden</span>
                         <strong class="block text-white mt-2">Das ETS2-Kartenbild konnte nicht geladen werden.</strong>
-                        <p class="text-sm text-[var(--muted)] mt-2">Lege die aktuelle offizielle ETS2-Karte unter <code class="text-white/80">/static/img/ets2/ets2-official-map-current.jpg</code> ab oder übergib <code class="text-white/80">ets2_map_image_url</code>.</p>
+                        <p class="text-sm text-[var(--muted)] mt-2">Lege die aktuelle offizielle ETS2-Karte unter <code class="text-white/80">/static/ets2_map.jpg</code> ab oder übergib <code class="text-white/80">ets2_map_image_url</code>.</p>
                     </div>
                 </div>
             </div>
@@ -13405,6 +13394,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
 <script>
 (function () {
+    const FIXED_ETS2_MAP_SRC = '/static/ets2_map.jpg';
     const map = document.getElementById('ets2RouteMap');
     if (!map) return;
 
@@ -13417,6 +13407,11 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
     const markerLayer = map.querySelector('[data-marker-layer]');
     const emptyBox = map.querySelector('[data-map-empty]');
     const errorBox = map.querySelector('[data-map-error]');
+
+    if (image) {
+        image.src = FIXED_ETS2_MAP_SRC;
+    }
+    map.dataset.mapSrc = FIXED_ETS2_MAP_SRC;
 
     let baseScale = 1;
     let userScale = 1;
@@ -13893,7 +13888,7 @@ def dashboard_detail():
         driver_trips=fahrtenbuch_entries,
         selected_trip=selected_trip,
         detail_trip=selected_trip,
-        ets2_map_image_url=ETS2_MAP_IMAGE_URL
+        ets2_map_image_url='/static/ets2_map.jpg'
     )
 
 
