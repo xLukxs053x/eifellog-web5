@@ -151,6 +151,35 @@
         pointer-events: auto;
     }
 
+    .ets2-development-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        width: fit-content;
+        margin-top: 0.55rem;
+        padding: 0.38rem 0.62rem;
+        border: 1px solid rgba(220,226,38,0.28);
+        border-radius: 999px;
+        background: rgba(220,226,38,0.10);
+        color: var(--brand-yellow);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.58rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        box-shadow: 0 0 22px rgba(220,226,38,0.08);
+    }
+
+    .ets2-development-note::before {
+        content: "";
+        width: 0.44rem;
+        height: 0.44rem;
+        border-radius: 999px;
+        background: var(--brand-yellow);
+        box-shadow: 0 0 12px rgba(220,226,38,0.58);
+    }
+
     .ets2-map-controls {
         display: flex;
         align-items: center;
@@ -525,7 +554,7 @@
                         <div class="ets2-map-badge">
                             <span class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.22em] text-[var(--brand-green)]">ETS2-Karte</span>
                             <strong class="block text-white text-sm md:text-base mt-1">{{ trip_from }} → {{ trip_to }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">Aktuelles lokales Kartenbild: /static/ets2_map.jpg</span>
+                            <span class="ets2-development-note" title="Diese Kartenfunktion befindet sich noch in Entwicklung.">Development Progress Beta</span>
                         </div>
 
                         <div class="ets2-map-controls" aria-label="Kartensteuerung">
@@ -576,9 +605,7 @@
                         <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--danger)]">Karte nicht gefunden</span>
                         <strong class="block text-white mt-2">Das ETS2-Kartenbild konnte nicht geladen werden.</strong>
                         <p class="text-sm text-[var(--muted)] mt-2">
-                            Lege die ETS2-Karte direkt unter
-                            <code class="text-white/80">/static/ets2_map.jpg</code>
-                            ab.
+                            Die Kartenfunktion befindet sich noch in Entwicklung. Bitte prüfe, ob das Kartenbild im Projekt korrekt hinterlegt ist.
                         </p>
                     </div>
                 </div>
