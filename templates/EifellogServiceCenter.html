@@ -1139,30 +1139,72 @@
         }
     }
 
-    /* FIX: Modal bleibt immer im sichtbaren Viewport.
-       Vorher wurde der body beim Öffnen auf position:fixed + top:-scrollY gesetzt.
-       Dadurch wurde das fixed Modal nach oben verschoben, wenn man weiter unten auf "Beantragen" klickt. */
+    /* FIX: Bestätigungs-Modal bleibt bei 100% Browser-Zoom sauber im sichtbaren Viewport.
+       Wichtig: Das Modal wird per JS als Portal direkt in <body> verschoben.
+       Dadurch ist es nicht mehr von transformierten/scalenden Dashboard-Containern abhängig. */
+    :root {
+        --service-modal-vh: 1vh;
+    }
+
     #fahrerkarte-confirm-modal {
         position: fixed !important;
         inset: 0 !important;
-        width: 100dvw;
-        min-height: 100dvh;
-        max-height: 100dvh;
-        overflow-y: auto;
+        z-index: 999999 !important;
+        width: 100vw !important;
+        min-width: 100vw !important;
+        height: calc(var(--service-modal-vh, 1vh) * 100) !important;
+        min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
+        margin: 0 !important;
+        padding: clamp(0.75rem, 2vw, 1.5rem) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
         overscroll-behavior: contain;
-        align-items: center;
-        justify-content: center;
+        align-items: center !important;
+        justify-content: center !important;
+        transform: none !important;
+        isolation: isolate;
+        box-sizing: border-box;
+    }
+
+    #fahrerkarte-confirm-modal.hidden {
+        display: none !important;
+    }
+
+    #fahrerkarte-confirm-modal.flex,
+    #fahrerkarte-confirm-modal.service-modal-open {
+        display: flex !important;
     }
 
     #fahrerkarte-confirm-panel {
-        max-height: calc(100dvh - 2rem);
-        overflow-y: auto;
+        width: min(100%, 34rem) !important;
+        max-width: min(34rem, calc(100vw - 1.5rem)) !important;
+        max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.5rem) !important;
+        margin: auto !important;
+        overflow-y: auto !important;
+        transform: none !important;
+        flex: 0 1 auto;
+        box-sizing: border-box;
+    }
+
+    @supports (height: 100dvh) {
+        #fahrerkarte-confirm-modal {
+            height: 100dvh !important;
+            min-height: 100dvh !important;
+        }
+
+        #fahrerkarte-confirm-panel {
+            max-height: calc(100dvh - 1.5rem) !important;
+        }
     }
 
     html.service-modal-locked,
     body.service-modal-locked {
         overflow: hidden !important;
-        overscroll-behavior: none;
+        overscroll-behavior: none !important;
+    }
+
+    body.service-modal-locked {
+        touch-action: none;
     }
 
     @media (min-width: 1280px) {
@@ -1200,8 +1242,8 @@
 
         #fahrerkarte-confirm-panel {
             width: 100% !important;
-            max-width: 100% !important;
-            max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
+            max-width: calc(100vw - 1rem) !important;
+            max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1rem) !important;
             border-radius: 1.25rem !important;
         }
 
@@ -1872,7 +1914,7 @@
     </div>
 </div>
 
-<div id="fahrerkarte-confirm-modal" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
     <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
@@ -1884,7 +1926,7 @@
 
                 <div class="min-w-0">
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Beantragung vorbereitet</span>
-                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Fahrerkarte wird beantragt</h2>
+                    <h2 id="fahrerkarte-confirm-title" class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Fahrerkarte wird beantragt</h2>
                     <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
                         Deine Angaben sind vollständig. Nach dem Absenden wird die Beantragung im ServiceCenter als offen hinterlegt.
                     </p>
@@ -1922,6 +1964,16 @@
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
+    let modalResizeHandler = null;
+
+    function setModalViewportHeight() {
+        document.documentElement.style.setProperty('--service-modal-vh', `${window.innerHeight * 0.01}px`);
+    }
+
+    function moveModalToBody() {
+        if (!modal || modal.parentElement === document.body) return;
+        document.body.appendChild(modal);
+    }
 
     function isFormValid() {
         const requiredFields = Array.from(form.querySelectorAll('[required]')).filter((field) => !field.disabled);
@@ -1940,24 +1992,48 @@
 
     function lockScroll() {
         scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
+        setModalViewportHeight();
+
+        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+        if (scrollbarWidth > 0) {
+            document.body.style.paddingRight = `${scrollbarWidth}px`;
+        }
+
         document.documentElement.classList.add('service-modal-locked');
         document.body.classList.add('service-modal-locked');
+
+        if (!modalResizeHandler) {
+            modalResizeHandler = setModalViewportHeight;
+            window.addEventListener('resize', modalResizeHandler, { passive: true });
+            window.addEventListener('orientationchange', modalResizeHandler, { passive: true });
+        }
     }
 
     function unlockScroll() {
         document.documentElement.classList.remove('service-modal-locked');
         document.body.classList.remove('service-modal-locked');
-        window.scrollTo(0, scrollYBeforeLock);
+        document.body.style.paddingRight = '';
+
+        if (modalResizeHandler) {
+            window.removeEventListener('resize', modalResizeHandler);
+            window.removeEventListener('orientationchange', modalResizeHandler);
+            modalResizeHandler = null;
+        }
+
+        window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
     }
 
     function openModal() {
         if (!modal) return;
+        moveModalToBody();
+        setModalViewportHeight();
         modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.classList.add('flex', 'service-modal-open');
         lockScroll();
         requestAnimationFrame(() => {
             modal.classList.remove('opacity-0');
             modal.setAttribute('aria-hidden', 'false');
+            if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
         });
     }
 
@@ -1967,7 +2043,7 @@
         modal.setAttribute('aria-hidden', 'true');
         window.setTimeout(() => {
             modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            modal.classList.remove('flex', 'service-modal-open');
             unlockScroll();
         }, 220);
     }
