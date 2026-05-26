@@ -569,6 +569,253 @@
         min-width: min(9.5rem, 100%) !important;
     }
 
+
+    /* ---------------------------------------------------------
+       Fahrer-Kennzahlen / Dashboard-Stats
+       - Klarere Trennung von Zahl, Einheit und Kurzinfo.
+       - Kleine Footer-Aktion pro Karte für Details / nächsten Rang.
+       - Verhindert, dass KM, Euro, Touren und Level optisch verwechselt werden.
+    --------------------------------------------------------- */
+    .driver-stats-grid {
+        align-items: stretch;
+    }
+
+    .driver-stat-card {
+        position: relative;
+        isolation: isolate;
+        min-height: 13.5rem;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.095) !important;
+        background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028)),
+            rgba(4, 6, 5, 0.72) !important;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    }
+
+    .driver-stat-card::before {
+        content: "";
+        position: absolute;
+        inset: -42% -26% auto auto;
+        width: 10rem;
+        height: 10rem;
+        border-radius: 9999px;
+        background: radial-gradient(circle, var(--driver-stat-accent-soft), transparent 68%);
+        opacity: 0.92;
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    .driver-stat-card::after {
+        content: "";
+        position: absolute;
+        left: 1rem;
+        right: 1rem;
+        bottom: 3.2rem;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.11), transparent);
+        pointer-events: none;
+    }
+
+    .driver-stat-card--green {
+        --driver-stat-accent: var(--brand-green);
+        --driver-stat-accent-rgb: 137, 190, 50;
+        --driver-stat-accent-soft: rgba(137, 190, 50, 0.22);
+    }
+
+    .driver-stat-card--yellow {
+        --driver-stat-accent: var(--brand-yellow);
+        --driver-stat-accent-rgb: 220, 226, 38;
+        --driver-stat-accent-soft: rgba(220, 226, 38, 0.22);
+    }
+
+    .driver-stat-card--blue {
+        --driver-stat-accent: #8ea2ff;
+        --driver-stat-accent-rgb: 142, 162, 255;
+        --driver-stat-accent-soft: rgba(88, 101, 242, 0.24);
+    }
+
+    .driver-stat-card--level {
+        --driver-stat-accent: #ffffff;
+        --driver-stat-accent-rgb: 255, 255, 255;
+        --driver-stat-accent-soft: rgba(137, 190, 50, 0.20);
+    }
+
+    .driver-stat-head {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .driver-stat-icon {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        color: var(--driver-stat-accent);
+        border: 1px solid rgba(var(--driver-stat-accent-rgb), 0.28);
+        background: rgba(var(--driver-stat-accent-rgb), 0.11);
+        box-shadow: 0 0 20px rgba(var(--driver-stat-accent-rgb), 0.10);
+    }
+
+    .driver-stat-kicker {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.56rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--driver-stat-accent);
+        opacity: 0.9;
+        white-space: nowrap;
+    }
+
+    .driver-stat-head h3 {
+        margin: 0.12rem 0 0;
+        color: rgba(255, 255, 255, 0.94);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .driver-stat-value-wrap {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.55rem;
+        margin-top: 1.15rem;
+        min-width: 0;
+    }
+
+    .driver-stat-value {
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.55rem, 2.1vw, 2.2rem);
+        font-weight: 900;
+        line-height: 0.95;
+        letter-spacing: -0.045em;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 18px rgba(var(--driver-stat-accent-rgb), 0.11);
+        overflow-wrap: anywhere;
+    }
+
+    .driver-stat-unit {
+        margin-bottom: 0.1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.55rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(var(--driver-stat-accent-rgb), 0.28);
+        background: rgba(var(--driver-stat-accent-rgb), 0.10);
+        color: var(--driver-stat-accent);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.64rem;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .driver-stat-value-wrap--level {
+        align-items: center;
+    }
+
+    .driver-stat-value--level {
+        max-width: 100%;
+        font-size: clamp(1.25rem, 1.65vw, 1.75rem);
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .driver-stat-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        padding: 0.72rem 0.78rem;
+        border-radius: 1rem;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.72rem;
+        line-height: 1.25;
+    }
+
+    .driver-stat-meta span {
+        color: rgba(255, 255, 255, 0.45);
+        white-space: nowrap;
+    }
+
+    .driver-stat-meta strong {
+        color: rgba(255, 255, 255, 0.92);
+        font-weight: 800;
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .driver-level-progress {
+        position: relative;
+        height: 0.42rem;
+        margin-top: 0.9rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.055);
+    }
+
+    .driver-level-progress-bar {
+        height: 100%;
+        min-width: 0.25rem;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand-green), var(--brand-yellow));
+        box-shadow: 0 0 14px rgba(137,190,50,0.42);
+    }
+
+    .driver-stat-footer {
+        margin-top: 1rem;
+        min-height: 2.25rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0.65rem 0.78rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(var(--driver-stat-accent-rgb), 0.24);
+        background: rgba(var(--driver-stat-accent-rgb), 0.075);
+        color: var(--driver-stat-accent);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
+    }
+
+    .driver-stat-footer:hover,
+    .driver-stat-footer:focus-visible {
+        transform: translateY(-1px);
+        background: rgba(var(--driver-stat-accent-rgb), 0.15);
+        border-color: rgba(var(--driver-stat-accent-rgb), 0.42);
+        color: #ffffff;
+        outline: none;
+    }
+
     .dashboard-responsive-shell .w-16.h-16 {
         width: clamp(3.1rem, 3.8vw, 4rem) !important;
         height: clamp(3.1rem, 3.8vw, 4rem) !important;
@@ -1100,64 +1347,133 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 relative z-10">
-    <div class="glass-card p-6 flex flex-col justify-center">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+<div class="driver-stats-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 relative z-10">
+    <div class="glass-card driver-stat-card driver-stat-card--green p-6">
+        <div class="driver-stat-head">
+            <span class="driver-stat-icon">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <span class="driver-stat-kicker">Gesamtstrecke</span>
+                <h3>Gefahrene KM</h3>
+            </div>
+        </div>
+
+        <div class="driver-stat-value-wrap">
+            <span class="driver-stat-value">{{ ('%.1f'|format(driver_total_km|float))|replace('.', ',') }}</span>
+            <span class="driver-stat-unit">km</span>
+        </div>
+
+        <div class="driver-stat-meta">
+            <span>Letzte Fahrt</span>
+            <strong>{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }} km</strong>
+        </div>
+
+        <a href="/dashboard/detail" class="driver-stat-footer" aria-label="Fahrten-Details öffnen">
+            <span>Details öffnen</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
-            Gefahrene KM
-        </h3>
-        <p class="text-3xl font-bold text-white mt-1">
-            {{ ('%.1f'|format(driver_total_km|float))|replace('.', ',') }}
-            <span class="text-sm text-[var(--brand-green)] font-normal">km</span>
-        </p>
-        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">
-            Letzte Fahrt: <span class="text-white/80">{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }} km</span>
-        </p>
+        </a>
     </div>
 
-    <div class="glass-card p-6 flex flex-col justify-center">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    <div class="glass-card driver-stat-card driver-stat-card--yellow p-6">
+        <div class="driver-stat-head">
+            <span class="driver-stat-icon">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <span class="driver-stat-kicker">Fahrerprofil</span>
+                <h3>Kontostand</h3>
+            </div>
+        </div>
+
+        <div class="driver-stat-value-wrap">
+            <span class="driver-stat-value">{{ ('%.2f'|format(driver_account_balance|float))|replace('.', ',') }}</span>
+            <span class="driver-stat-unit">€</span>
+        </div>
+
+        <div class="driver-stat-meta">
+            <span>Status</span>
+            <strong>Live synchronisiert</strong>
+        </div>
+
+        <a href="{{ url_for('profile', username=current_user.username) }}" class="driver-stat-footer" aria-label="Kontostand-Details öffnen">
+            <span>Details öffnen</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
-            Kontostand
-        </h3>
-        <p class="text-3xl font-bold text-white mt-1">
-            {{ ('%.2f'|format(driver_account_balance|float))|replace('.', ',') }}
-            <span class="text-sm text-[var(--brand-yellow)] font-normal">€</span>
-        </p>
-        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Live aus deinem Fahrerprofil</p>
+        </a>
     </div>
 
-    <div class="glass-card p-6 flex flex-col justify-center">
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+    <div class="glass-card driver-stat-card driver-stat-card--blue p-6">
+        <div class="driver-stat-head">
+            <span class="driver-stat-icon">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <span class="driver-stat-kicker">Touren</span>
+                <h3>Abgeschlossen</h3>
+            </div>
+        </div>
+
+        <div class="driver-stat-value-wrap">
+            <span class="driver-stat-value">{{ driver_completed_trips|int }}</span>
+            <span class="driver-stat-unit">Touren</span>
+        </div>
+
+        <div class="driver-stat-meta">
+            <span>Ergebnis</span>
+            <strong>Erfolgreich beendet</strong>
+        </div>
+
+        <a href="/dashboard/detail" class="driver-stat-footer" aria-label="Abgeschlossene Touren öffnen">
+            <span>Fahrtenbuch öffnen</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
-            Abgeschlossen
-        </h3>
-        <p class="text-3xl font-bold text-white mt-1">
-            {{ driver_completed_trips|int }}
-            <span class="text-sm text-[var(--muted)] font-normal">Touren</span>
-        </p>
-        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Erfolgreich beendete Fahrten</p>
+        </a>
     </div>
 
-    <div class="glass-card p-6 flex flex-col justify-center relative overflow-hidden">
-        <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)]" style="width: {{ driver_level_progress|int }}%;"></div>
-        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+    <div class="glass-card driver-stat-card driver-stat-card--level p-6">
+        <div class="driver-stat-head">
+            <span class="driver-stat-icon">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <span class="driver-stat-kicker">Rangsystem</span>
+                <h3>Fahrer Level</h3>
+            </div>
+        </div>
+
+        <div class="driver-stat-value-wrap driver-stat-value-wrap--level">
+            <span class="driver-stat-value driver-stat-value--level">{{ driver_level_name }}</span>
+            <span class="driver-stat-unit">{{ driver_xp_value|int }} XP</span>
+        </div>
+
+        <div class="driver-level-progress" aria-label="Level Fortschritt {{ driver_level_progress|int }} Prozent">
+            <div class="driver-level-progress-bar" style="width: {{ driver_level_progress|int }}%;"></div>
+        </div>
+
+        <div class="driver-stat-meta">
+            <span>Fortschritt</span>
+            <strong>{{ driver_level_progress|int }}% bis zum nächsten Rang</strong>
+        </div>
+
+        <a href="/dashboard/detail#fahrer-level" class="driver-stat-footer" aria-label="Nächsten Rang anzeigen">
+            <span>Nächster Rang</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
-            Fahrer Level
-        </h3>
-        <p class="text-3xl font-bold text-white mt-1">
-            {{ driver_level_name }}
-            <span class="text-sm text-[var(--brand-green)] font-normal">{{ driver_xp_value|int }} XP</span>
-        </p>
-        <p class="text-[10px] text-[var(--muted)] font-inter mt-2">Fortschritt: {{ driver_level_progress|int }}%</p>
+        </a>
     </div>
 </div>
 
