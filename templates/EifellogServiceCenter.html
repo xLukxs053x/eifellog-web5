@@ -1139,13 +1139,14 @@
         }
     }
 
-    /* FIX: Bestätigungs-Modal
-       Modal erscheint jetzt immer im aktuell sichtbaren Browserbereich.
-       Die Lösung nutzt <dialog>.showModal() als echte Browser-Top-Layer-Ebene.
-       Dadurch wird es nicht mehr oben am Dokument/Formular-Wrapper platziert,
-       sondern direkt über der Stelle, an der der User gerade geklickt hat. */
+    /* Clean Fade-In/Fade-Out: Bestätigungs-Modal
+       Das Modal bleibt als echtes <dialog> im Browser-Top-Layer,
+       bekommt aber saubere State-Klassen für Öffnen und Schließen.
+       Dadurch animieren Overlay und Panel kontrolliert ein und aus. */
     :root {
         --service-modal-vh: 1vh;
+        --service-modal-duration: 240ms;
+        --service-modal-easing: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     #fahrerkarte-confirm-modal {
@@ -1175,38 +1176,52 @@
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         isolation: isolate !important;
-        transition: opacity 180ms ease !important;
+        transition: opacity var(--service-modal-duration) var(--service-modal-easing) !important;
+        will-change: opacity;
     }
 
     #fahrerkarte-confirm-modal:not([open]) {
         display: none !important;
     }
 
-    #fahrerkarte-confirm-modal[open],
-    #fahrerkarte-confirm-modal.service-modal-open {
+    #fahrerkarte-confirm-modal[open] {
         display: flex !important;
+    }
+
+    #fahrerkarte-confirm-modal[open].service-modal-visible {
         opacity: 1 !important;
         pointer-events: auto !important;
     }
 
-    #fahrerkarte-confirm-modal.hidden {
-        display: none !important;
+    #fahrerkarte-confirm-modal[open].service-modal-closing {
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
 
-    #fahrerkarte-confirm-modal[open].hidden {
-        display: flex !important;
+    #fahrerkarte-confirm-modal.hidden:not([open]) {
+        display: none !important;
     }
 
     #fahrerkarte-confirm-modal::backdrop {
         background:
             radial-gradient(circle at 50% 42%, rgba(137, 190, 50, 0.10), transparent 34%),
             rgba(2, 6, 4, 0.74);
+        opacity: 0;
         backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
         -webkit-backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
+        transition: opacity var(--service-modal-duration) var(--service-modal-easing);
+    }
+
+    #fahrerkarte-confirm-modal.service-modal-visible::backdrop {
+        opacity: 1;
+    }
+
+    #fahrerkarte-confirm-modal.service-modal-closing::backdrop {
+        opacity: 0;
     }
 
     /* Fallback-Overlay, falls ein Browser <dialog>::backdrop nicht sauber rendert. */
-    #fahrerkarte-confirm-modal.service-modal-open::before {
+    #fahrerkarte-confirm-modal[open]::before {
         content: "";
         position: fixed;
         inset: 0;
@@ -1214,7 +1229,17 @@
         background:
             radial-gradient(circle at 50% 42%, rgba(137, 190, 50, 0.08), transparent 34%),
             rgba(2, 6, 4, 0.34);
+        opacity: 0;
         pointer-events: none;
+        transition: opacity var(--service-modal-duration) var(--service-modal-easing);
+    }
+
+    #fahrerkarte-confirm-modal[open].service-modal-visible::before {
+        opacity: 1;
+    }
+
+    #fahrerkarte-confirm-modal[open].service-modal-closing::before {
+        opacity: 0;
     }
 
     #fahrerkarte-confirm-panel {
@@ -1227,17 +1252,41 @@
         overflow-y: auto !important;
         box-sizing: border-box !important;
         flex: 0 1 auto !important;
+        opacity: 0 !important;
         filter: none !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        transform: translateY(10px) scale(0.985) !important;
+        transform: translateY(14px) scale(0.975) !important;
         transform-origin: center center !important;
-        transition: transform 180ms ease !important;
+        transition:
+            opacity var(--service-modal-duration) var(--service-modal-easing),
+            transform var(--service-modal-duration) var(--service-modal-easing) !important;
+        will-change: opacity, transform;
     }
 
-    #fahrerkarte-confirm-modal.service-modal-open #fahrerkarte-confirm-panel,
-    #fahrerkarte-confirm-modal[open] #fahrerkarte-confirm-panel {
+    #fahrerkarte-confirm-modal[open].service-modal-visible #fahrerkarte-confirm-panel {
+        opacity: 1 !important;
         transform: translateY(0) scale(1) !important;
+    }
+
+    #fahrerkarte-confirm-modal[open].service-modal-closing #fahrerkarte-confirm-panel {
+        opacity: 0 !important;
+        transform: translateY(10px) scale(0.985) !important;
+    }
+
+    @starting-style {
+        #fahrerkarte-confirm-modal[open].service-modal-visible {
+            opacity: 0 !important;
+        }
+
+        #fahrerkarte-confirm-modal[open].service-modal-visible #fahrerkarte-confirm-panel {
+            opacity: 0 !important;
+            transform: translateY(14px) scale(0.975) !important;
+        }
+
+        #fahrerkarte-confirm-modal.service-modal-visible::backdrop {
+            opacity: 0;
+        }
     }
 
     #fahrerkarte-confirm-panel::-webkit-scrollbar {
@@ -1273,6 +1322,15 @@
 
     body.service-modal-locked {
         touch-action: none !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        #fahrerkarte-confirm-modal,
+        #fahrerkarte-confirm-modal::backdrop,
+        #fahrerkarte-confirm-modal::before,
+        #fahrerkarte-confirm-panel {
+            transition-duration: 1ms !important;
+        }
     }
 
     @media (max-width: 640px) {
@@ -2035,11 +2093,13 @@
     const cancelSubmit = document.getElementById('fahrerkarte-cancel-submit');
     const shell = document.getElementById('servicecenter-shell');
     const supportsNativeDialog = !!(modal && typeof modal.showModal === 'function');
+    const modalAnimationMs = 240;
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
     let previousActiveElement = null;
     let modalResizeHandler = null;
+    let modalCloseTimer = null;
 
     function setModalViewportHeight() {
         document.documentElement.style.setProperty('--service-modal-vh', `${window.innerHeight * 0.01}px`);
@@ -2055,7 +2115,7 @@
     moveModalToBody();
 
     function isModalOpen() {
-        return !!modal && modal.classList.contains('service-modal-open') && !modal.classList.contains('hidden');
+        return !!modal && modal.hasAttribute('open') && modal.classList.contains('service-modal-visible') && !modal.classList.contains('service-modal-closing');
     }
 
     function isFormValid() {
@@ -2123,18 +2183,19 @@
     function openModal() {
         if (!modal) return;
 
+        if (modalCloseTimer) {
+            window.clearTimeout(modalCloseTimer);
+            modalCloseTimer = null;
+        }
+
         moveModalToBody();
         previousActiveElement = document.activeElement;
         scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
         setModalViewportHeight();
 
-        modal.classList.remove('hidden', 'opacity-0');
-        modal.classList.add('service-modal-open');
+        modal.classList.remove('hidden', 'opacity-0', 'service-modal-closing');
+        modal.classList.remove('service-modal-visible');
         modal.setAttribute('aria-hidden', 'false');
-
-        if (shell) {
-            shell.setAttribute('aria-hidden', 'true');
-        }
 
         if (supportsNativeDialog) {
             try {
@@ -2143,50 +2204,55 @@
                 modal.setAttribute('open', '');
             }
         } else {
-            lockScroll();
+            modal.setAttribute('open', '');
             modal.style.display = 'flex';
-            modal.style.opacity = '1';
         }
 
+        lockScroll();
+
         requestAnimationFrame(() => {
-            setModalViewportHeight();
-            modal.scrollTop = 0;
-            if (panel) panel.scrollTop = 0;
-            if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
-            window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
+            requestAnimationFrame(() => {
+                modal.classList.add('service-modal-visible');
+                setModalViewportHeight();
+                modal.scrollTop = 0;
+                if (panel) panel.scrollTop = 0;
+                if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
+                window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
+            });
         });
     }
 
     function closeModal(options = {}) {
-        if (!modal || !isModalOpen()) return;
+        if (!modal || !modal.hasAttribute('open') || modal.classList.contains('service-modal-closing')) return;
 
-        modal.classList.add('opacity-0');
-        modal.style.opacity = '0';
-        modal.classList.remove('service-modal-open');
+        modal.classList.remove('service-modal-visible');
+        modal.classList.add('service-modal-closing');
         modal.setAttribute('aria-hidden', 'true');
 
-        window.setTimeout(() => {
+        modalCloseTimer = window.setTimeout(() => {
+            modalCloseTimer = null;
+
             if (supportsNativeDialog && modal.open) {
                 modal.close();
-            } else if (supportsNativeDialog) {
+            } else {
                 modal.removeAttribute('open');
             }
 
+            modal.classList.remove('service-modal-closing', 'service-modal-visible', 'opacity-0');
             modal.classList.add('hidden');
             modal.style.display = '';
             modal.style.opacity = '';
 
-            if (!supportsNativeDialog) {
-                unlockScroll();
-            } else {
-                if (shell) shell.removeAttribute('aria-hidden');
-                window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
-            }
+            unlockScroll();
 
             if (!options.skipFocusRestore && previousActiveElement && typeof previousActiveElement.focus === 'function') {
                 previousActiveElement.focus({ preventScroll: true });
             }
-        }, 180);
+
+            if (typeof options.afterClose === 'function') {
+                options.afterClose();
+            }
+        }, modalAnimationMs);
     }
 
     if (locked) {
@@ -2217,13 +2283,18 @@
 
     if (confirmSubmit) {
         confirmSubmit.addEventListener('click', () => {
+            confirmSubmit.disabled = true;
             shouldSubmitDirectly = true;
-            closeModal({ skipFocusRestore: true });
-            window.setTimeout(() => form.submit(), 60);
+            closeModal({
+                skipFocusRestore: true,
+                afterClose: () => form.submit()
+            });
         });
     }
 
-    if (cancelSubmit) cancelSubmit.addEventListener('click', () => closeModal());
+    if (cancelSubmit) {
+        cancelSubmit.addEventListener('click', () => closeModal());
+    }
 
     if (modal) {
         modal.addEventListener('click', (event) => {
