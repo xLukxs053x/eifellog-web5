@@ -10702,8 +10702,9 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
             },
             "$setOnInsert": {
                 "created_at": now,
-                "start_request_count": 0,
             },
+            # MongoDB darf denselben Feldpfad nicht gleichzeitig in $setOnInsert und $inc aktualisieren.
+            # $inc legt start_request_count bei neuen Dokumenten automatisch mit 1 an.
             "$inc": {"start_request_count": 1},
         },
         upsert=True,
@@ -11258,8 +11259,9 @@ def store_tracker_webhook_start_job(payload, raw_data=None):
             },
             "$setOnInsert": {
                 "created_at": now,
-                "start_request_count": 0,
             },
+            # MongoDB darf denselben Feldpfad nicht gleichzeitig in $setOnInsert und $inc aktualisieren.
+            # $inc legt start_request_count bei neuen Dokumenten automatisch mit 1 an.
             "$inc": {"start_request_count": 1},
         },
         upsert=True,
