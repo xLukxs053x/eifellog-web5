@@ -71,7 +71,7 @@
 {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
 
 {# Kartenbild: bevorzugt pro Fahrt, sonst globale Einstellung, sonst lokaler Standardpfad #}
-{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.official_ets2_map_url|default(ets2_map_image_url|default('/static/ets2_map.jpg', true), true), true) %}
+{% set trip_ets2_map_image_url = '/static/ets2_map.jpg' %}
 
 {# Routepunkte: korrekt nur aus Daten, keine Fake-Route #}
 {% set trip_route_points = trip.ets2_route_points|default(trip.map_points|default(trip.route_points|default(trip.waypoints|default(trip.zwischenstopps|default([], true), true), true), true), true) %}
