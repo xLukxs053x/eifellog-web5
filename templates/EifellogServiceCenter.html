@@ -1139,65 +1139,39 @@
         }
     }
 
-    /* FIX: Bestätigungs-Modal bleibt immer im sichtbaren Viewport.
-       Der Dialog wird per JS auf die Y-Höhe des grünen Buttons gesetzt,
-       aber nicht über Margin/Flex nach unten geschoben. Dadurch muss man
-       nicht auf 80% herauszoomen oder im Overlay suchen. */
-    :root {
-        --service-modal-vh: 1vh;
-        --service-modal-panel-top: 1rem;
-    }
-
+    /* FIX: Bestätigungs-Modal zentriert sich automatisch via Flexbox. 
+       Kein manuelles JS-Positionieren oder Rauszoomen mehr nötig! */
     #fahrerkarte-confirm-modal {
         position: fixed !important;
         inset: 0 !important;
         z-index: 999999 !important;
         width: 100vw !important;
-        min-width: 100vw !important;
-        height: calc(var(--service-modal-vh, 1vh) * 100) !important;
-        min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
+        height: 100vh !important;
+        height: 100dvh !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 1rem !important;
+        box-sizing: border-box;
         overflow: hidden !important;
         overscroll-behavior: contain;
-        align-items: initial !important;
-        justify-content: initial !important;
-        transform: none !important;
-        isolation: isolate;
-        box-sizing: border-box;
-    }
-
-    #fahrerkarte-confirm-modal.hidden {
         display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     #fahrerkarte-confirm-modal.flex,
     #fahrerkarte-confirm-modal.service-modal-open {
-        display: block !important;
+        display: flex !important;
     }
 
     #fahrerkarte-confirm-panel {
-        position: fixed !important;
-        top: var(--service-modal-panel-top) !important;
-        left: 50% !important;
-        width: min(100%, 34rem) !important;
-        max-width: min(34rem, calc(100vw - 1.5rem)) !important;
-        max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.5rem) !important;
+        position: relative !important;
+        width: 100% !important;
+        max-width: 34rem !important;
+        max-height: calc(100vh - 2rem) !important;
+        max-height: calc(100dvh - 2rem) !important;
         margin: 0 !important;
         overflow-y: auto !important;
-        transform: translateX(-50%) !important;
         box-sizing: border-box;
-    }
-
-    @supports (height: 100dvh) {
-        #fahrerkarte-confirm-modal {
-            height: 100dvh !important;
-            min-height: 100dvh !important;
-        }
-
-        #fahrerkarte-confirm-panel {
-            max-height: calc(100dvh - 1.5rem) !important;
-        }
     }
 
     html.service-modal-locked,
@@ -1239,21 +1213,16 @@
 
     @media (max-width: 640px) {
         #fahrerkarte-confirm-modal {
-            padding: 0 0.5rem 0.5rem !important;
-            align-items: flex-start !important;
+            padding: 1rem !important;
         }
 
         #fahrerkarte-confirm-panel {
-            width: 100% !important;
-            max-width: calc(100vw - 1rem) !important;
-            max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1rem) !important;
-            margin-top: var(--service-modal-panel-top) !important;
             border-radius: 1.25rem !important;
         }
 
         #fahrerkarte-confirm-panel .p-6,
         #fahrerkarte-confirm-panel .p-7 {
-            padding: 1rem !important;
+            padding: 1.25rem !important;
         }
     }
 </style>
@@ -1918,8 +1887,8 @@
     </div>
 </div>
 
-<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
-    <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
+<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="transition-opacity duration-300 opacity-0">
+    <div id="fahrerkarte-confirm-panel" class="relative z-10 mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
                 <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.1)]">
@@ -1968,44 +1937,10 @@
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
-    let modalResizeHandler = null;
-
-    function setModalViewportHeight() {
-        document.documentElement.style.setProperty('--service-modal-vh', `${window.innerHeight * 0.01}px`);
-    }
 
     function moveModalToBody() {
         if (!modal || modal.parentElement === document.body) return;
         document.body.appendChild(modal);
-    }
-
-    function clampNumber(value, min, max) {
-        return Math.min(Math.max(value, min), max);
-    }
-
-    function setModalAnchorPosition() {
-        if (!modal || !submitButton) return;
-
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-        const safeGap = window.matchMedia('(max-width: 640px)').matches ? 8 : 12;
-        const triggerRect = submitButton.getBoundingClientRect();
-        const panel = document.getElementById('fahrerkarte-confirm-panel');
-        const panelHeight = panel && panel.offsetHeight ? panel.offsetHeight : Math.min(360, viewportHeight - (safeGap * 2));
-
-        /* Ziel: Dialog optisch auf Höhe des grünen Buttons öffnen.
-           Wenn dafür nicht genug Platz ist, wird er automatisch so geklemmt,
-           dass er bei 100% Zoom komplett sichtbar bleibt. */
-        const triggerCenter = triggerRect.top + (triggerRect.height / 2);
-        const preferredTop = triggerCenter - (panelHeight / 2);
-        const maxTop = Math.max(safeGap, viewportHeight - panelHeight - safeGap);
-        const top = clampNumber(preferredTop, safeGap, maxTop);
-
-        modal.style.setProperty('--service-modal-panel-top', `${Math.round(top)}px`);
-    }
-
-    function updateOpenModalMetrics() {
-        setModalViewportHeight();
-        setModalAnchorPosition();
     }
 
     function isFormValid() {
@@ -2025,7 +1960,6 @@
 
     function lockScroll() {
         scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
-        setModalViewportHeight();
 
         const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
         if (scrollbarWidth > 0) {
@@ -2034,12 +1968,6 @@
 
         document.documentElement.classList.add('service-modal-locked');
         document.body.classList.add('service-modal-locked');
-
-        if (!modalResizeHandler) {
-            modalResizeHandler = updateOpenModalMetrics;
-            window.addEventListener('resize', modalResizeHandler, { passive: true });
-            window.addEventListener('orientationchange', modalResizeHandler, { passive: true });
-        }
     }
 
     function unlockScroll() {
@@ -2047,24 +1975,17 @@
         document.body.classList.remove('service-modal-locked');
         document.body.style.paddingRight = '';
 
-        if (modalResizeHandler) {
-            window.removeEventListener('resize', modalResizeHandler);
-            window.removeEventListener('orientationchange', modalResizeHandler);
-            modalResizeHandler = null;
-        }
-
         window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
     }
 
     function openModal() {
         if (!modal) return;
         moveModalToBody();
-        setModalViewportHeight();
         modal.classList.remove('hidden');
         modal.classList.add('flex', 'service-modal-open');
         lockScroll();
+        
         requestAnimationFrame(() => {
-            setModalAnchorPosition();
             modal.classList.remove('opacity-0');
             modal.setAttribute('aria-hidden', 'false');
             if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
