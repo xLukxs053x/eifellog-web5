@@ -6733,6 +6733,481 @@ def normalize_logbook_entry(entry, user_doc=None):
         "_sortDate": sort_date
     }
 
+
+# ==========================================
+# ETS2-KARTENROUTEN FÜR FAHRTENBUCH-DETAIL
+# ==========================================
+
+ETS2_MAP_IMAGE_URL = env_first(
+    "ETS2_MAP_IMAGE_URL",
+    "ETS2_OFFICIAL_MAP_IMAGE_URL",
+    "OFFICIAL_ETS2_MAP_IMAGE_URL",
+    default="/static/img/ets2/ets2-official-map-current.jpg",
+)
+
+ETS2_CITY_COORDINATES_PATH = env_first(
+    "ETS2_CITY_COORDINATES_PATH",
+    "ETS2_CITY_MAP_COORDINATES_PATH",
+    default=os.path.join(BASE_DIR, "ets2_city_map_coordinates.json"),
+)
+
+# Optionaler Fallback für häufige Städte. Für maximale Genauigkeit bitte die
+# Prozentkoordinaten der verwendeten aktuellen ETS2-Karte in
+# ets2_city_map_coordinates.json pflegen. Format:
+# {
+#   "Duisburg": {"x": 42.6, "y": 38.4},
+#   "Köln": {"x": 41.8, "y": 42.9}
+# }
+DEFAULT_ETS2_CITY_MAP_COORDINATES = {
+    # Deutschland / Benelux / DACH – bewusst konservativ als Fallback.
+    # Exakte Werte sollten projektspezifisch über ETS2_CITY_COORDINATES_PATH überschrieben werden.
+    "duisburg": {"x": 42.6, "y": 38.4},
+    "dusseldorf": {"x": 42.0, "y": 40.6},
+    "düsseldorf": {"x": 42.0, "y": 40.6},
+    "koln": {"x": 41.8, "y": 42.9},
+    "köln": {"x": 41.8, "y": 42.9},
+    "cologne": {"x": 41.8, "y": 42.9},
+    "dortmund": {"x": 44.0, "y": 39.7},
+    "osnabruck": {"x": 42.9, "y": 34.8},
+    "osnabrück": {"x": 42.9, "y": 34.8},
+    "hannover": {"x": 47.8, "y": 35.2},
+    "hamburg": {"x": 47.7, "y": 28.8},
+    "bremen": {"x": 43.4, "y": 31.4},
+    "kiel": {"x": 47.2, "y": 24.9},
+    "rostock": {"x": 52.8, "y": 25.9},
+    "berlin": {"x": 54.7, "y": 35.4},
+    "magdeburg": {"x": 51.0, "y": 37.2},
+    "erfurt": {"x": 49.7, "y": 43.8},
+    "dresden": {"x": 55.6, "y": 43.2},
+    "leipzig": {"x": 53.1, "y": 40.7},
+    "kassel": {"x": 46.0, "y": 42.4},
+    "frankfurt": {"x": 44.2, "y": 48.7},
+    "frankfurt am main": {"x": 44.2, "y": 48.7},
+    "mannheim": {"x": 43.3, "y": 52.3},
+    "stuttgart": {"x": 43.6, "y": 57.6},
+    "nurnberg": {"x": 49.9, "y": 55.0},
+    "nürnberg": {"x": 49.9, "y": 55.0},
+    "munchen": {"x": 49.3, "y": 62.4},
+    "münchen": {"x": 49.3, "y": 62.4},
+    "munich": {"x": 49.3, "y": 62.4},
+    "salzburg": {"x": 53.0, "y": 64.8},
+    "innsbruck": {"x": 48.3, "y": 67.6},
+    "linz": {"x": 56.9, "y": 64.4},
+    "wien": {"x": 61.8, "y": 66.2},
+    "vienna": {"x": 61.8, "y": 66.2},
+    "graz": {"x": 58.7, "y": 70.8},
+    "zurich": {"x": 40.7, "y": 64.0},
+    "zürich": {"x": 40.7, "y": 64.0},
+    "basel": {"x": 39.5, "y": 59.3},
+    "bern": {"x": 39.2, "y": 66.2},
+    "genf": {"x": 36.0, "y": 69.6},
+    "geneva": {"x": 36.0, "y": 69.6},
+    "amsterdam": {"x": 38.0, "y": 33.0},
+    "rotterdam": {"x": 36.9, "y": 36.0},
+    "brussel": {"x": 35.8, "y": 41.4},
+    "brüssel": {"x": 35.8, "y": 41.4},
+    "brussels": {"x": 35.8, "y": 41.4},
+    "luxembourg": {"x": 38.6, "y": 47.4},
+    "luxemburg": {"x": 38.6, "y": 47.4},
+    "liege": {"x": 38.1, "y": 42.7},
+    "liège": {"x": 38.1, "y": 42.7},
+    "calais": {"x": 29.8, "y": 41.5},
+    "lille": {"x": 32.1, "y": 43.0},
+    "paris": {"x": 31.1, "y": 50.2},
+    "reims": {"x": 34.6, "y": 49.2},
+    "metz": {"x": 38.3, "y": 50.6},
+    "strasbourg": {"x": 40.7, "y": 54.6},
+    "dijon": {"x": 35.9, "y": 58.4},
+    "lyon": {"x": 35.0, "y": 64.7},
+    "marseille": {"x": 34.4, "y": 75.2},
+    "nice": {"x": 39.1, "y": 76.8},
+    "bordeaux": {"x": 24.3, "y": 67.3},
+    "toulouse": {"x": 27.8, "y": 73.3},
+    "prague": {"x": 56.6, "y": 51.4},
+    "praha": {"x": 56.6, "y": 51.4},
+    "brno": {"x": 59.7, "y": 57.7},
+    "ostrava": {"x": 63.6, "y": 55.8},
+    "katowice": {"x": 66.5, "y": 52.9},
+    "krakow": {"x": 69.1, "y": 55.0},
+    "kraków": {"x": 69.1, "y": 55.0},
+    "wroclaw": {"x": 62.3, "y": 46.7},
+    "wrocław": {"x": 62.3, "y": 46.7},
+    "poznan": {"x": 61.4, "y": 40.4},
+    "poznań": {"x": 61.4, "y": 40.4},
+    "warszawa": {"x": 70.0, "y": 39.5},
+    "warsaw": {"x": 70.0, "y": 39.5},
+    "gdansk": {"x": 65.2, "y": 30.8},
+    "gdańsk": {"x": 65.2, "y": 30.8},
+    "szczecin": {"x": 56.8, "y": 31.7},
+    "bratislava": {"x": 62.8, "y": 64.7},
+    "budapest": {"x": 66.0, "y": 71.4},
+    "debrecen": {"x": 72.8, "y": 71.0},
+    "london": {"x": 20.7, "y": 43.6},
+    "dover": {"x": 27.0, "y": 43.7},
+    "felixstowe": {"x": 25.0, "y": 39.1},
+    "cambridge": {"x": 22.2, "y": 39.4},
+    "birmingham": {"x": 18.3, "y": 37.8},
+    "manchester": {"x": 16.7, "y": 34.2},
+    "liverpool": {"x": 14.7, "y": 34.8},
+    "edinburgh": {"x": 14.7, "y": 25.5},
+    "glasgow": {"x": 12.9, "y": 25.7},
+    "plymouth": {"x": 12.4, "y": 48.2},
+    "milano": {"x": 44.5, "y": 70.7},
+    "milan": {"x": 44.5, "y": 70.7},
+    "torino": {"x": 41.1, "y": 72.1},
+    "turin": {"x": 41.1, "y": 72.1},
+    "verona": {"x": 48.4, "y": 72.0},
+    "venezia": {"x": 51.3, "y": 72.8},
+    "venice": {"x": 51.3, "y": 72.8},
+    "bologna": {"x": 47.6, "y": 76.1},
+    "firenze": {"x": 47.0, "y": 80.2},
+    "rome": {"x": 49.8, "y": 87.2},
+    "roma": {"x": 49.8, "y": 87.2},
+    "napoli": {"x": 53.0, "y": 92.2},
+    "naples": {"x": 53.0, "y": 92.2},
+    "genova": {"x": 42.9, "y": 75.2},
+    "turku": {"x": 67.6, "y": 13.2},
+    "helsinki": {"x": 72.0, "y": 13.9},
+    "tallinn": {"x": 73.5, "y": 20.0},
+    "riga": {"x": 75.9, "y": 28.8},
+    "vilnius": {"x": 75.5, "y": 36.8},
+    "kaunas": {"x": 73.7, "y": 36.3},
+    "stockholm": {"x": 61.0, "y": 18.4},
+    "goteborg": {"x": 54.3, "y": 23.5},
+    "göteborg": {"x": 54.3, "y": 23.5},
+    "malmo": {"x": 55.3, "y": 29.0},
+    "malmö": {"x": 55.3, "y": 29.0},
+    "oslo": {"x": 51.6, "y": 17.3},
+    "bergen": {"x": 43.2, "y": 17.3},
+    "stavanger": {"x": 43.1, "y": 22.6},
+    "kristiansand": {"x": 47.6, "y": 24.2},
+    "aalborg": {"x": 50.4, "y": 25.7},
+    "esbjerg": {"x": 47.4, "y": 28.4},
+    "odense": {"x": 50.2, "y": 29.6},
+    "copenhagen": {"x": 53.8, "y": 29.6},
+    "kobenhavn": {"x": 53.8, "y": 29.6},
+    "københavn": {"x": 53.8, "y": 29.6},
+}
+
+_ETS2_CITY_COORDINATES_CACHE = None
+
+
+def normalize_ets2_city_key(value):
+    value = safe_str(value).lower()
+    if not value:
+        return ""
+    replacements = {
+        "ä": "a",
+        "ö": "o",
+        "ü": "u",
+        "ß": "ss",
+        "á": "a",
+        "à": "a",
+        "â": "a",
+        "é": "e",
+        "è": "e",
+        "ê": "e",
+        "í": "i",
+        "ì": "i",
+        "ó": "o",
+        "ò": "o",
+        "ú": "u",
+        "ù": "u",
+        "ń": "n",
+        "ł": "l",
+        "ø": "o",
+        "å": "a",
+    }
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def normalize_ets2_coordinate_pair(value):
+    if not isinstance(value, dict):
+        return None
+
+    x = (
+        value.get("x")
+        if value.get("x") is not None
+        else value.get("map_x")
+        if value.get("map_x") is not None
+        else value.get("percent_x")
+        if value.get("percent_x") is not None
+        else value.get("px")
+    )
+    y = (
+        value.get("y")
+        if value.get("y") is not None
+        else value.get("map_y")
+        if value.get("map_y") is not None
+        else value.get("percent_y")
+        if value.get("percent_y") is not None
+        else value.get("py")
+    )
+
+    x = parse_number(x, -1)
+    y = parse_number(y, -1)
+    if x < 0 or y < 0:
+        return None
+
+    return {
+        "x": round(max(0, min(100, x)), 3),
+        "y": round(max(0, min(100, y)), 3),
+    }
+
+
+def load_ets2_city_map_coordinates():
+    global _ETS2_CITY_COORDINATES_CACHE
+    if _ETS2_CITY_COORDINATES_CACHE is not None:
+        return _ETS2_CITY_COORDINATES_CACHE
+
+    coordinates = {}
+    for name, point in DEFAULT_ETS2_CITY_MAP_COORDINATES.items():
+        normalized = normalize_ets2_coordinate_pair(point)
+        if normalized:
+            coordinates[normalize_ets2_city_key(name)] = normalized
+
+    path = ETS2_CITY_COORDINATES_PATH
+    try:
+        if path and os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as file:
+                custom_data = json.load(file)
+
+            if isinstance(custom_data, dict):
+                iterable = custom_data.items()
+            elif isinstance(custom_data, list):
+                iterable = [
+                    (
+                        item.get("name") or item.get("city") or item.get("label"),
+                        item
+                    )
+                    for item in custom_data
+                    if isinstance(item, dict)
+                ]
+            else:
+                iterable = []
+
+            for city_name, point in iterable:
+                city_key = normalize_ets2_city_key(city_name)
+                normalized = normalize_ets2_coordinate_pair(point)
+                if city_key and normalized:
+                    coordinates[city_key] = normalized
+                    aliases = point.get("aliases") if isinstance(point, dict) else []
+                    if isinstance(aliases, str):
+                        aliases = [aliases]
+                    if isinstance(aliases, list):
+                        for alias in aliases:
+                            alias_key = normalize_ets2_city_key(alias)
+                            if alias_key:
+                                coordinates[alias_key] = normalized
+    except Exception as error:
+        app.logger.warning("ETS2-Stadtkoordinaten konnten nicht geladen werden: %s", error)
+
+    _ETS2_CITY_COORDINATES_CACHE = coordinates
+    return coordinates
+
+
+def find_ets2_city_coordinate(city_name):
+    city_key = normalize_ets2_city_key(city_name)
+    if not city_key:
+        return None
+
+    coordinates = load_ets2_city_map_coordinates()
+    if city_key in coordinates:
+        return dict(coordinates[city_key])
+
+    # Häufig sind Firmen-/Länderzusätze im Städtenamen enthalten. Daher
+    # vorsichtig Teiltreffer nutzen, aber nur ab 4 Zeichen.
+    for known_city, point in coordinates.items():
+        if len(known_city) >= 4 and (known_city in city_key or city_key in known_city):
+            return dict(point)
+    return None
+
+
+def first_present_value(source, *keys, fallback=""):
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) is not None and str(source.get(key)).strip():
+            return source.get(key)
+    return fallback
+
+
+def normalize_ets2_route_point(point, index=0, default_name="", default_kind="stop", default_time=""):
+    if not isinstance(point, dict):
+        city_name = safe_str(point or default_name)
+        coordinate = find_ets2_city_coordinate(city_name)
+        if not coordinate:
+            return None
+        return {
+            "name": city_name or default_name or f"Punkt {index + 1}",
+            "x": coordinate["x"],
+            "y": coordinate["y"],
+            "kind": default_kind,
+            "time": safe_str(default_time),
+        }
+
+    x = first_present_value(
+        point,
+        "x", "map_x", "percent_x", "px", "ets2_x", "mapX", "percentX", "route_x", "routeX",
+        fallback=None,
+    )
+    y = first_present_value(
+        point,
+        "y", "map_y", "percent_y", "py", "ets2_y", "mapY", "percentY", "route_y", "routeY",
+        fallback=None,
+    )
+
+    name = safe_str(
+        first_present_value(
+            point,
+            "name", "city", "label", "title", "ort", "stadt", "location",
+            fallback=default_name,
+        ),
+        default_name or f"Punkt {index + 1}"
+    )
+
+    if x is None or y is None:
+        coordinate = find_ets2_city_coordinate(name)
+        if coordinate:
+            x = coordinate["x"]
+            y = coordinate["y"]
+
+    x = parse_number(x, -1)
+    y = parse_number(y, -1)
+    if x < 0 or y < 0:
+        return None
+
+    kind = safe_str(first_present_value(point, "kind", "type", "role", fallback=default_kind), default_kind)
+    time_value = safe_str(first_present_value(point, "time", "eta", "arrival", "departure", "uhrzeit", fallback=default_time))
+
+    return {
+        "name": name,
+        "x": round(max(0, min(100, x)), 3),
+        "y": round(max(0, min(100, y)), 3),
+        "kind": kind,
+        "time": time_value,
+    }
+
+
+def collect_raw_route_points(raw_entry):
+    raw_entry = raw_entry or {}
+    candidates = [
+        raw_entry.get("ets2_route_points"),
+        raw_entry.get("map_points"),
+        raw_entry.get("route_points"),
+        raw_entry.get("waypoints"),
+        raw_entry.get("zwischenstopps"),
+        raw_entry.get("routeCoordinates"),
+        raw_entry.get("route_coordinates"),
+        raw_entry.get("routeNodes"),
+        raw_entry.get("route_nodes"),
+    ]
+
+    telemetry = raw_entry.get("telemetry") if isinstance(raw_entry.get("telemetry"), dict) else {}
+    active_job = raw_entry.get("current_job") if isinstance(raw_entry.get("current_job"), dict) else {}
+    for nested in (telemetry, active_job):
+        candidates.extend([
+            nested.get("ets2_route_points"),
+            nested.get("map_points"),
+            nested.get("route_points"),
+            nested.get("waypoints"),
+            nested.get("routeCoordinates"),
+            nested.get("route_coordinates"),
+        ])
+
+    for candidate in candidates:
+        if isinstance(candidate, list) and candidate:
+            return candidate
+    return []
+
+
+def build_ets2_route_points_for_logbook_entry(raw_entry, normalized=None, departure="-", arrival="-"):
+    raw_entry = raw_entry or {}
+    normalized = normalized or {}
+
+    source_city = safe_str(
+        normalized.get("sourceCity")
+        or raw_entry.get("sourceCity")
+        or raw_entry.get("source")
+        or raw_entry.get("from")
+        or raw_entry.get("routeOrigin"),
+        ""
+    )
+    destination_city = safe_str(
+        normalized.get("destinationCity")
+        or raw_entry.get("destinationCity")
+        or raw_entry.get("destination")
+        or raw_entry.get("to")
+        or raw_entry.get("routeDestination"),
+        ""
+    )
+
+    route_points = []
+    raw_points = collect_raw_route_points(raw_entry)
+    for index, raw_point in enumerate(raw_points):
+        default_kind = "start" if index == 0 else "end" if index == len(raw_points) - 1 else "stop"
+        point = normalize_ets2_route_point(raw_point, index=index, default_kind=default_kind)
+        if point:
+            route_points.append(point)
+
+    if len(route_points) >= 2:
+        if route_points[0].get("kind") in {"", "stop"}:
+            route_points[0]["kind"] = "start"
+        if route_points[-1].get("kind") in {"", "stop"}:
+            route_points[-1]["kind"] = "end"
+        return route_points
+
+    start_x = first_present_value(
+        raw_entry,
+        "start_map_x", "origin_map_x", "from_map_x", "source_map_x", "startX", "originX", "sourceX",
+        fallback=None
+    )
+    start_y = first_present_value(
+        raw_entry,
+        "start_map_y", "origin_map_y", "from_map_y", "source_map_y", "startY", "originY", "sourceY",
+        fallback=None
+    )
+    end_x = first_present_value(
+        raw_entry,
+        "end_map_x", "destination_map_x", "to_map_x", "target_map_x", "endX", "destinationX", "targetX",
+        fallback=None
+    )
+    end_y = first_present_value(
+        raw_entry,
+        "end_map_y", "destination_map_y", "to_map_y", "target_map_y", "endY", "destinationY", "targetY",
+        fallback=None
+    )
+
+    start_point = normalize_ets2_route_point(
+        {"name": source_city, "x": start_x, "y": start_y, "time": departure, "kind": "start"},
+        index=0,
+        default_name=source_city,
+        default_kind="start",
+        default_time=departure,
+    )
+    end_point = normalize_ets2_route_point(
+        {"name": destination_city, "x": end_x, "y": end_y, "time": arrival, "kind": "end"},
+        index=1,
+        default_name=destination_city,
+        default_kind="end",
+        default_time=arrival,
+    )
+
+    if not start_point:
+        start_point = normalize_ets2_route_point(source_city, index=0, default_name=source_city, default_kind="start", default_time=departure)
+    if not end_point:
+        end_point = normalize_ets2_route_point(destination_city, index=1, default_name=destination_city, default_kind="end", default_time=arrival)
+
+    route_points = [point for point in [start_point, end_point] if point]
+    if len(route_points) >= 2:
+        route_points[0]["kind"] = "start"
+        route_points[-1]["kind"] = "end"
+        return route_points
+    return []
+
+
 def build_active_driver_payload(user_doc):
     live = user_doc.get("tracker_live") or {}
     display_name = (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer")
@@ -7296,7 +7771,17 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
             "avg_speed": safe_str(raw_entry.get("avg_speed") or raw_entry.get("average_speed") or raw_entry.get("durchschnitt"), "-"),
             "note": safe_str(raw_entry.get("note") or raw_entry.get("notes") or raw_entry.get("bemerkung"), ""),
             "map_embed_url": safe_str(raw_entry.get("map_embed_url") or raw_entry.get("map_url") or raw_entry.get("route_map_url"), ""),
+            "ets2_map_image_url": safe_str(
+                raw_entry.get("ets2_map_image_url")
+                or raw_entry.get("official_ets2_map_url")
+                or raw_entry.get("map_image_url")
+                or ETS2_MAP_IMAGE_URL,
+                ETS2_MAP_IMAGE_URL
+            ),
             "waypoints": raw_entry.get("waypoints") or raw_entry.get("route_points") or raw_entry.get("zwischenstopps") or [],
+            "route_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
+            "map_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
+            "ets2_route_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
             "_sortDate": sort_date
         }
         entries.append(entry)
@@ -12183,12 +12668,32 @@ def profile(username):
 DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
 {#
-    Detailansicht Fahrtenbuch
+    Detailansicht Fahrtenbuch mit ETS2-Karte
     URL: /dashboard/detail
+
     Erwartete Backend-Variablen optional:
     - fahrtenbuch_entries oder driver_trips
     - detail_trip / selected_trip / driver_trip_detail / fahrt_detail für direkte Auswahl
     - optional query param: ?trip_id=<id>
+
+    WICHTIG FÜR KORREKTE ETS2-ROUTEN:
+    - Hinterlege die aktuelle ETS2-Karte als lokales Bild:
+      /static/img/ets2/ets2-official-map-current.jpg
+
+    - Pro Fahrt sollten echte Kartenpunkte übergeben werden, z. B.:
+      ets2_route_points: [
+        {"name":"Duisburg", "x":42.6, "y":38.4, "time":"12:10"},
+        {"name":"Köln", "x":41.8, "y":42.9, "time":"12:45"},
+        {"name":"Frankfurt am Main", "x":44.2, "y":48.7, "time":"14:05"}
+      ]
+
+      x/y sind Prozentwerte auf der Karten-Grafik von links/oben: 0 bis 100.
+      Dadurch bleibt die Route exakt auf dem ETS2-Kartenbild.
+
+    Unterstützte Punkt-Felder:
+    - route_points / ets2_route_points / map_points / waypoints
+    - x, y / map_x, map_y / px, py / percent_x, percent_y
+    - name / city / label
 #}
 
 {% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
@@ -12231,8 +12736,16 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 {% set trip_fuel = trip.fuel_used|default(trip.fuel|default(trip.diesel|default(trip.verbrauch|default('-', true), true), true), true) %}
 {% set trip_avg_speed = trip.avg_speed|default(trip.average_speed|default(trip.durchschnitt|default('-', true), true), true) %}
 {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
-{% set trip_map_embed_url = trip.map_embed_url|default(trip.map_url|default(trip.route_map_url|default('', true), true), true) %}
-{% set trip_waypoints = trip.waypoints|default(trip.route_points|default(trip.zwischenstopps|default([], true), true), true) %}
+
+{# Kartenbild: bevorzugt pro Fahrt, sonst globale Einstellung, sonst lokaler Standardpfad #}
+{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.official_ets2_map_url|default(ets2_map_image_url|default('/static/img/ets2/ets2-official-map-current.jpg', true), true), true) %}
+
+{# Routepunkte: korrekt nur aus Daten, keine Fake-Route #}
+{% set trip_route_points = trip.ets2_route_points|default(trip.map_points|default(trip.route_points|default(trip.waypoints|default(trip.zwischenstopps|default([], true), true), true), true), true) %}
+{% set trip_start_x = trip.start_map_x|default(trip.origin_map_x|default(trip.from_map_x|default('', true), true), true) %}
+{% set trip_start_y = trip.start_map_y|default(trip.origin_map_y|default(trip.from_map_y|default('', true), true), true) %}
+{% set trip_end_x = trip.end_map_x|default(trip.destination_map_x|default(trip.to_map_x|default('', true), true), true) %}
+{% set trip_end_y = trip.end_map_y|default(trip.destination_map_y|default(trip.to_map_y|default('', true), true), true) %}
 
 {% block title %}EifelLog - Fahrtenbuch Detail{% endblock %}
 
@@ -12260,61 +12773,257 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
         backdrop-filter: blur(18px);
     }
 
-    .detail-map {
-        min-height: 360px;
-        border-radius: 1.35rem;
-        border: 1px solid rgba(137, 190, 50, 0.18);
-        background:
-            linear-gradient(135deg, rgba(137, 190, 50, 0.08), transparent 38%),
-            radial-gradient(circle at 70% 35%, rgba(220, 226, 38, 0.08), transparent 28%),
-            rgba(0, 0, 0, 0.36);
-        overflow: hidden;
+    .ets2-map {
         position: relative;
+        min-height: 560px;
+        border-radius: 1.35rem;
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        overflow: hidden;
+        background:
+            linear-gradient(135deg, rgba(137, 190, 50, 0.10), transparent 38%),
+            radial-gradient(circle at 70% 35%, rgba(220, 226, 38, 0.10), transparent 28%),
+            #050705;
     }
 
-    .detail-map-grid {
+    .ets2-map::before {
+        content: "";
         position: absolute;
         inset: 0;
-        opacity: 0.14;
+        z-index: 0;
+        opacity: 0.16;
         background-image:
             linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
-        background-size: 32px 32px;
-        mask-image: radial-gradient(circle at center, black, transparent 75%);
+        background-size: 40px 40px;
+        mask-image: radial-gradient(circle at center, black, transparent 82%);
+        pointer-events: none;
     }
 
-    .route-svg {
+    .ets2-map-header {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        right: 1rem;
+        z-index: 20;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        pointer-events: none;
+    }
+
+    .ets2-map-badge {
+        max-width: min(560px, calc(100% - 7rem));
+        border: 1px solid rgba(255,255,255,0.13);
+        border-radius: 1rem;
+        background: rgba(0,0,0,0.68);
+        padding: 0.75rem 0.9rem;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.32);
+        backdrop-filter: blur(16px);
+        pointer-events: auto;
+    }
+
+    .ets2-map-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 999px;
+        background: rgba(0,0,0,0.66);
+        backdrop-filter: blur(14px);
+        pointer-events: auto;
+    }
+
+    .ets2-map-control-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.10);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.86);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 800;
+        transition: all 160ms ease;
+    }
+
+    .ets2-map-control-btn:hover {
+        background: rgba(137, 190, 50, 0.18);
+        border-color: rgba(137, 190, 50, 0.38);
+        color: #fff;
+    }
+
+    .ets2-map-viewport {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        overflow: hidden;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .ets2-map-viewport.is-dragging {
+        cursor: grabbing;
+    }
+
+    .ets2-map-transform {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+        will-change: transform;
+    }
+
+    .ets2-map-layer {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 0.85rem;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.38);
+    }
+
+    .ets2-map-image {
         position: absolute;
         inset: 0;
         width: 100%;
         height: 100%;
-        opacity: 0.95;
+        object-fit: fill;
+        display: block;
+        opacity: 0.94;
+        filter: saturate(1.08) contrast(1.04) brightness(0.82);
     }
 
-    .route-stop {
+    .ets2-route-svg {
         position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 4;
+        overflow: visible;
+        pointer-events: none;
+    }
+
+    .ets2-route-shadow,
+    .ets2-route-line {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .ets2-route-shadow {
+        stroke: rgba(0,0,0,0.62);
+        stroke-width: 1.65;
+    }
+
+    .ets2-route-line {
+        stroke: url(#ets2RouteGradient);
+        stroke-width: 0.62;
+        filter: drop-shadow(0 0 0.36px rgba(220,226,38,0.85));
+    }
+
+    .ets2-route-marker {
+        position: absolute;
+        z-index: 8;
         transform: translate(-50%, -50%);
-        z-index: 5;
-        min-width: 9rem;
-        max-width: 12rem;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.68);
-        padding: 0.8rem;
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-        backdrop-filter: blur(12px);
+        display: grid;
+        place-items: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 999px;
+        border: 2px solid rgba(255,255,255,0.86);
+        background: rgba(0,0,0,0.86);
+        box-shadow: 0 0 0 4px rgba(0,0,0,0.28), 0 0 22px rgba(137,190,50,0.45);
     }
 
-    .route-stop.start {
-        left: 18%;
-        top: 72%;
-        border-color: rgba(137, 190, 50, 0.38);
+    .ets2-route-marker::after {
+        content: "";
+        width: 0.42rem;
+        height: 0.42rem;
+        border-radius: 999px;
+        background: var(--brand-green);
     }
 
-    .route-stop.end {
-        left: 80%;
-        top: 27%;
-        border-color: rgba(220, 226, 38, 0.38);
+    .ets2-route-marker.end {
+        box-shadow: 0 0 0 4px rgba(0,0,0,0.28), 0 0 22px rgba(220,226,38,0.45);
+    }
+
+    .ets2-route-marker.end::after {
+        background: var(--brand-yellow);
+    }
+
+    .ets2-route-label {
+        position: absolute;
+        z-index: 9;
+        transform: translate(-50%, calc(-100% - 1rem));
+        min-width: 8rem;
+        max-width: 14rem;
+        padding: 0.62rem 0.72rem;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 0.85rem;
+        background: rgba(0,0,0,0.76);
+        color: rgba(255,255,255,0.92);
+        box-shadow: 0 14px 34px rgba(0,0,0,0.36);
+        backdrop-filter: blur(14px);
+        pointer-events: auto;
+    }
+
+    .ets2-route-label.is-low {
+        transform: translate(-50%, 1rem);
+    }
+
+    .ets2-route-label span {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.54rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    .ets2-route-label strong {
+        display: block;
+        margin-top: 0.26rem;
+        font-size: 0.78rem;
+        line-height: 1.25;
+        color: #fff;
+        word-break: break-word;
+    }
+
+    .ets2-route-label small {
+        display: block;
+        margin-top: 0.24rem;
+        font-size: 0.68rem;
+        line-height: 1.2;
+        color: var(--muted);
+    }
+
+    .ets2-map-empty,
+    .ets2-map-error {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 30;
+        transform: translate(-50%, -50%);
+        width: min(520px, calc(100% - 2rem));
+        border: 1px solid rgba(220,226,38,0.22);
+        border-radius: 1.25rem;
+        background: rgba(0,0,0,0.76);
+        padding: 1.1rem;
+        text-align: center;
+        box-shadow: 0 22px 60px rgba(0,0,0,0.38);
+        backdrop-filter: blur(18px);
+    }
+
+    .ets2-map-empty[hidden],
+    .ets2-map-error[hidden] {
+        display: none;
     }
 
     .detail-stat {
@@ -12392,25 +13101,42 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
         background: rgba(137, 190, 50, 0.10);
     }
 
+    @media (max-width: 1024px) {
+        .ets2-map {
+            min-height: 500px;
+        }
+    }
+
     @media (max-width: 768px) {
-        .detail-map {
-            min-height: 300px;
+        .ets2-map {
+            min-height: 380px;
         }
 
-        .route-stop {
-            min-width: 7.5rem;
-            max-width: 9.5rem;
-            padding: 0.7rem;
+        .ets2-map-header {
+            top: 0.75rem;
+            left: 0.75rem;
+            right: 0.75rem;
         }
 
-        .route-stop.start {
-            left: 25%;
-            top: 74%;
+        .ets2-map-badge {
+            max-width: calc(100% - 5.8rem);
+            padding: 0.64rem 0.72rem;
         }
 
-        .route-stop.end {
-            left: 72%;
-            top: 24%;
+        .ets2-map-controls {
+            flex-direction: column;
+            border-radius: 1rem;
+        }
+
+        .ets2-map-control-btn {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        .ets2-route-label {
+            min-width: 7rem;
+            max-width: 10rem;
+            padding: 0.54rem 0.62rem;
         }
     }
 </style>
@@ -12420,7 +13146,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
         <div>
             <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Fahrtenbuch Detail</span>
             <h1 class="font-orbitron font-bold text-2xl md:text-3xl text-white mt-2">Gefahrene Route & LKW-Daten</h1>
-            <p class="text-sm text-[var(--muted)] font-inter mt-2">Route, Fahrzeug, Fracht, Zeiten und Abrechnung der ausgewählten Fahrt.</p>
+            <p class="text-sm text-[var(--muted)] font-inter mt-2">Route auf ETS2-Karte, Fahrzeug, Fracht, Zeiten und Abrechnung der ausgewählten Fahrt.</p>
         </div>
 
         <a href="/dashboard"
@@ -12454,34 +13180,69 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
                     </span>
                 </div>
 
-                <div class="detail-map">
-                    {% if trip_map_embed_url %}
-                        <iframe src="{{ trip_map_embed_url }}" class="absolute inset-0 w-full h-full border-0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Gefahrene Route"></iframe>
-                    {% else %}
-                        <div class="detail-map-grid"></div>
-                        <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="5" stroke-linecap="round"></path>
-                            <path d="M18 72 C 33 56, 38 82, 50 55 S 65 33, 80 27" fill="none" stroke="url(#routeGradient)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 2"></path>
-                            <defs>
-                                <linearGradient id="routeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="rgb(137,190,50)"></stop>
-                                    <stop offset="100%" stop-color="rgb(220,226,38)"></stop>
-                                </linearGradient>
-                            </defs>
-                        </svg>
-
-                        <div class="route-stop start">
-                            <span class="block text-[9px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest">Start</span>
-                            <strong class="block text-white text-sm mt-1">{{ trip_from }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_departure }}</span>
+                <div class="ets2-map"
+                     id="ets2RouteMap"
+                     data-map-src="{{ trip_ets2_map_image_url }}"
+                     data-route-name="{{ trip_route }}"
+                     data-start-name="{{ trip_from }}"
+                     data-end-name="{{ trip_to }}"
+                     data-start-time="{{ trip_departure }}"
+                     data-end-time="{{ trip_arrival }}"
+                     data-start-x="{{ trip_start_x }}"
+                     data-start-y="{{ trip_start_y }}"
+                     data-end-x="{{ trip_end_x }}"
+                     data-end-y="{{ trip_end_y }}"
+                     data-route-points='{{ trip_route_points|tojson|safe }}'>
+                    <div class="ets2-map-header">
+                        <div class="ets2-map-badge">
+                            <span class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.22em] text-[var(--brand-green)]">ETS2-Karte</span>
+                            <strong class="block text-white text-sm md:text-base mt-1">{{ trip_from }} → {{ trip_to }}</strong>
+                            <span class="block text-[11px] text-[var(--muted)] mt-1">Aktuelles lokales Kartenbild: {{ trip_ets2_map_image_url }}</span>
                         </div>
 
-                        <div class="route-stop end">
-                            <span class="block text-[9px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest">Ziel</span>
-                            <strong class="block text-white text-sm mt-1">{{ trip_to }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">{{ trip_arrival }}</span>
+                        <div class="ets2-map-controls" aria-label="Kartensteuerung">
+                            <button type="button" class="ets2-map-control-btn" data-map-zoom="in" aria-label="Hineinzoomen">+</button>
+                            <button type="button" class="ets2-map-control-btn" data-map-zoom="out" aria-label="Herauszoomen">−</button>
+                            <button type="button" class="ets2-map-control-btn" data-map-reset aria-label="Karte zurücksetzen">↺</button>
                         </div>
-                    {% endif %}
+                    </div>
+
+                    <div class="ets2-map-viewport" data-map-viewport>
+                        <div class="ets2-map-transform" data-map-transform>
+                            <div class="ets2-map-layer" data-map-layer>
+                                <img class="ets2-map-image"
+                                     data-map-image
+                                     src="{{ trip_ets2_map_image_url }}"
+                                     alt="Aktuelle ETS2-Karte für {{ trip_route }}"
+                                     draggable="false">
+
+                                <svg class="ets2-route-svg" data-route-svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="ets2RouteGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="rgb(137,190,50)"></stop>
+                                            <stop offset="100%" stop-color="rgb(220,226,38)"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <polyline class="ets2-route-shadow" data-route-shadow points=""></polyline>
+                                    <polyline class="ets2-route-line" data-route-line points=""></polyline>
+                                </svg>
+
+                                <div data-marker-layer></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ets2-map-empty" data-map-empty hidden>
+                        <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--brand-yellow)]">Keine Kartenpunkte</span>
+                        <strong class="block text-white mt-2">Für diese Fahrt fehlen echte ETS2-Koordinaten.</strong>
+                        <p class="text-sm text-[var(--muted)] mt-2">Damit die Route korrekt angezeigt wird, muss die Fahrt <code class="text-white/80">ets2_route_points</code> oder Start/Ziel-Koordinaten mit <code class="text-white/80">start_map_x/start_map_y/end_map_x/end_map_y</code> enthalten.</p>
+                    </div>
+
+                    <div class="ets2-map-error" data-map-error hidden>
+                        <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--danger)]">Karte nicht gefunden</span>
+                        <strong class="block text-white mt-2">Das ETS2-Kartenbild konnte nicht geladen werden.</strong>
+                        <p class="text-sm text-[var(--muted)] mt-2">Lege die aktuelle offizielle ETS2-Karte unter <code class="text-white/80">/static/img/ets2/ets2-official-map-current.jpg</code> ab oder übergib <code class="text-white/80">ets2_map_image_url</code>.</p>
+                    </div>
                 </div>
             </div>
 
@@ -12497,25 +13258,28 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
                         </div>
                     </div>
 
-                    {% if trip_waypoints and trip_waypoints is not string %}
-                        {% for waypoint in trip_waypoints %}
-                        <div class="route-timeline-item">
-                            <span class="route-timeline-dot"></span>
-                            <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
-                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkt</span>
-                                <strong class="block text-white mt-1">{{ waypoint.name|default(waypoint.city|default(waypoint, true), true) }}</strong>
-                                {% if waypoint.time|default('', true) %}
-                                    <span class="block text-xs text-[var(--muted)] mt-1">{{ waypoint.time }}</span>
-                                {% endif %}
+                    {% if trip_route_points and trip_route_points is not string %}
+                        {% for waypoint in trip_route_points %}
+                            {% set waypoint_name = waypoint.name|default(waypoint.city|default(waypoint.label|default('', true), true), true) %}
+                            {% if waypoint_name and waypoint_name|string not in [trip_from|string, trip_to|string] %}
+                            <div class="route-timeline-item">
+                                <span class="route-timeline-dot"></span>
+                                <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                                    <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkt</span>
+                                    <strong class="block text-white mt-1">{{ waypoint_name }}</strong>
+                                    {% if waypoint.time|default('', true) %}
+                                        <span class="block text-xs text-[var(--muted)] mt-1">{{ waypoint.time }}</span>
+                                    {% endif %}
+                                </div>
                             </div>
-                        </div>
+                            {% endif %}
                         {% endfor %}
-                    {% elif trip_waypoints %}
+                    {% elif trip_route_points %}
                         <div class="route-timeline-item">
                             <span class="route-timeline-dot"></span>
                             <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
                                 <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Zwischenpunkte</span>
-                                <strong class="block text-white mt-1">{{ trip_waypoints }}</strong>
+                                <strong class="block text-white mt-1">{{ trip_route_points }}</strong>
                             </div>
                         </div>
                     {% endif %}
@@ -12638,6 +13402,278 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
     </div>
     {% endif %}
 </div>
+
+<script>
+(function () {
+    const map = document.getElementById('ets2RouteMap');
+    if (!map) return;
+
+    const viewport = map.querySelector('[data-map-viewport]');
+    const transformEl = map.querySelector('[data-map-transform]');
+    const layer = map.querySelector('[data-map-layer]');
+    const image = map.querySelector('[data-map-image]');
+    const routeLine = map.querySelector('[data-route-line]');
+    const routeShadow = map.querySelector('[data-route-shadow]');
+    const markerLayer = map.querySelector('[data-marker-layer]');
+    const emptyBox = map.querySelector('[data-map-empty]');
+    const errorBox = map.querySelector('[data-map-error]');
+
+    let baseScale = 1;
+    let userScale = 1;
+    let pos = { x: 0, y: 0 };
+    let fitted = { width: 0, height: 0 };
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let posStart = { x: 0, y: 0 };
+
+    function numberValue(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = Number(String(value).replace(',', '.'));
+        if (!Number.isFinite(parsed)) return null;
+        return parsed;
+    }
+
+    function percentValue(value) {
+        const parsed = numberValue(value);
+        if (parsed === null) return null;
+        const normalized = Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+        return Math.max(0, Math.min(100, normalized));
+    }
+
+    function readField(obj, names) {
+        for (const name of names) {
+            if (obj && Object.prototype.hasOwnProperty.call(obj, name) && obj[name] !== null && obj[name] !== undefined && obj[name] !== '') {
+                return obj[name];
+            }
+        }
+        return null;
+    }
+
+    function parseRoutePoints() {
+        let raw = [];
+        try {
+            raw = JSON.parse(map.dataset.routePoints || '[]');
+        } catch (error) {
+            raw = [];
+        }
+
+        if (typeof raw === 'string') raw = [];
+        if (!Array.isArray(raw)) raw = [];
+
+        const points = raw.map((point, index) => normalizePoint(point, index, raw.length)).filter(Boolean);
+
+        if (points.length >= 2) return points;
+
+        const startX = percentValue(map.dataset.startX);
+        const startY = percentValue(map.dataset.startY);
+        const endX = percentValue(map.dataset.endX);
+        const endY = percentValue(map.dataset.endY);
+
+        if (startX !== null && startY !== null && endX !== null && endY !== null) {
+            return [
+                {
+                    x: startX,
+                    y: startY,
+                    name: map.dataset.startName || 'Start',
+                    time: map.dataset.startTime || '',
+                    type: 'start'
+                },
+                {
+                    x: endX,
+                    y: endY,
+                    name: map.dataset.endName || 'Ziel',
+                    time: map.dataset.endTime || '',
+                    type: 'end'
+                }
+            ];
+        }
+
+        return [];
+    }
+
+    function normalizePoint(point, index, total) {
+        if (Array.isArray(point)) {
+            const x = percentValue(point[0]);
+            const y = percentValue(point[1]);
+            if (x === null || y === null) return null;
+            return {
+                x,
+                y,
+                name: point[2] || (index === 0 ? map.dataset.startName : index === total - 1 ? map.dataset.endName : 'Zwischenpunkt'),
+                time: point[3] || '',
+                type: index === 0 ? 'start' : index === total - 1 ? 'end' : 'via'
+            };
+        }
+
+        if (!point || typeof point !== 'object') return null;
+
+        const x = percentValue(readField(point, ['x', 'map_x', 'mapX', 'px', 'percent_x', 'percentX', 'left']));
+        const y = percentValue(readField(point, ['y', 'map_y', 'mapY', 'py', 'percent_y', 'percentY', 'top']));
+        if (x === null || y === null) return null;
+
+        const type = String(readField(point, ['type', 'kind']) || '').toLowerCase();
+
+        return {
+            x,
+            y,
+            name: readField(point, ['name', 'city', 'label', 'title']) || (index === 0 ? map.dataset.startName : index === total - 1 ? map.dataset.endName : 'Zwischenpunkt'),
+            time: readField(point, ['time', 'eta', 'arrival', 'departure']) || '',
+            type: type || (index === 0 ? 'start' : index === total - 1 ? 'end' : 'via')
+        };
+    }
+
+    function renderRoute() {
+        const points = parseRoutePoints();
+        markerLayer.innerHTML = '';
+
+        if (!points.length || points.length < 2) {
+            routeLine.setAttribute('points', '');
+            routeShadow.setAttribute('points', '');
+            emptyBox.hidden = false;
+            return;
+        }
+
+        emptyBox.hidden = true;
+        const polyline = points.map((point) => `${point.x},${point.y}`).join(' ');
+        routeLine.setAttribute('points', polyline);
+        routeShadow.setAttribute('points', polyline);
+
+        points.forEach((point, index) => {
+            const marker = document.createElement('div');
+            marker.className = `ets2-route-marker ${point.type === 'end' || index === points.length - 1 ? 'end' : point.type === 'start' || index === 0 ? 'start' : 'via'}`;
+            marker.style.left = `${point.x}%`;
+            marker.style.top = `${point.y}%`;
+            marker.title = point.name || '';
+            markerLayer.appendChild(marker);
+
+            const isMainPoint = index === 0 || index === points.length - 1 || point.name;
+            if (isMainPoint) {
+                const label = document.createElement('div');
+                label.className = `ets2-route-label ${point.y < 18 ? 'is-low' : ''}`;
+                label.style.left = `${point.x}%`;
+                label.style.top = `${point.y}%`;
+
+                const labelType = index === 0 ? 'Start' : index === points.length - 1 ? 'Ziel' : 'Zwischenpunkt';
+                const safeName = escapeHtml(point.name || labelType);
+                const safeTime = point.time ? `<small>${escapeHtml(point.time)}</small>` : '';
+
+                label.innerHTML = `<span>${labelType}</span><strong>${safeName}</strong>${safeTime}`;
+                markerLayer.appendChild(label);
+            }
+        });
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function fitMap() {
+        if (!image.naturalWidth || !image.naturalHeight) return;
+
+        const viewportRect = viewport.getBoundingClientRect();
+        const imageRatio = image.naturalWidth / image.naturalHeight;
+        const viewportRatio = viewportRect.width / viewportRect.height;
+
+        if (imageRatio > viewportRatio) {
+            fitted.width = viewportRect.width * 0.96;
+            fitted.height = fitted.width / imageRatio;
+        } else {
+            fitted.height = viewportRect.height * 0.86;
+            fitted.width = fitted.height * imageRatio;
+        }
+
+        layer.style.width = `${fitted.width}px`;
+        layer.style.height = `${fitted.height}px`;
+
+        baseScale = 1;
+        userScale = 1;
+        pos.x = (viewportRect.width - fitted.width) / 2;
+        pos.y = (viewportRect.height - fitted.height) / 2;
+        applyTransform();
+    }
+
+    function applyTransform() {
+        transformEl.style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${baseScale * userScale})`;
+    }
+
+    function zoomAt(factor, clientX, clientY) {
+        const viewportRect = viewport.getBoundingClientRect();
+        const oldScale = baseScale * userScale;
+        const nextUserScale = Math.max(0.75, Math.min(5, userScale * factor));
+        const nextScale = baseScale * nextUserScale;
+
+        const originX = clientX === undefined ? viewportRect.left + viewportRect.width / 2 : clientX;
+        const originY = clientY === undefined ? viewportRect.top + viewportRect.height / 2 : clientY;
+        const mapX = (originX - viewportRect.left - pos.x) / oldScale;
+        const mapY = (originY - viewportRect.top - pos.y) / oldScale;
+
+        userScale = nextUserScale;
+        pos.x = originX - viewportRect.left - mapX * nextScale;
+        pos.y = originY - viewportRect.top - mapY * nextScale;
+        applyTransform();
+    }
+
+    image.addEventListener('load', () => {
+        errorBox.hidden = true;
+        fitMap();
+        renderRoute();
+    });
+
+    image.addEventListener('error', () => {
+        errorBox.hidden = false;
+    });
+
+    if (image.complete && image.naturalWidth) {
+        fitMap();
+        renderRoute();
+    }
+
+    window.addEventListener('resize', () => {
+        fitMap();
+        renderRoute();
+    });
+
+    map.querySelector('[data-map-zoom="in"]')?.addEventListener('click', () => zoomAt(1.2));
+    map.querySelector('[data-map-zoom="out"]')?.addEventListener('click', () => zoomAt(1 / 1.2));
+    map.querySelector('[data-map-reset]')?.addEventListener('click', fitMap);
+
+    viewport.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomAt(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+    }, { passive: false });
+
+    viewport.addEventListener('pointerdown', (event) => {
+        isDragging = true;
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture(event.pointerId);
+        dragStart = { x: event.clientX, y: event.clientY };
+        posStart = { x: pos.x, y: pos.y };
+    });
+
+    viewport.addEventListener('pointermove', (event) => {
+        if (!isDragging) return;
+        pos.x = posStart.x + (event.clientX - dragStart.x);
+        pos.y = posStart.y + (event.clientY - dragStart.y);
+        applyTransform();
+    });
+
+    viewport.addEventListener('pointerup', (event) => {
+        isDragging = false;
+        viewport.classList.remove('is-dragging');
+        try { viewport.releasePointerCapture(event.pointerId); } catch (error) {}
+    });
+
+    viewport.addEventListener('pointercancel', () => {
+        isDragging = false;
+        viewport.classList.remove('is-dragging');
+    });
+})();
+</script>
 {% endblock %}
 '''
 
@@ -12856,7 +13892,8 @@ def dashboard_detail():
         fahrtenbuch_entries=fahrtenbuch_entries,
         driver_trips=fahrtenbuch_entries,
         selected_trip=selected_trip,
-        detail_trip=selected_trip
+        detail_trip=selected_trip,
+        ets2_map_image_url=ETS2_MAP_IMAGE_URL
     )
 
 
