@@ -46,14 +46,47 @@
 
 {% block content %}
 <style>
+    :root {
+        --servicecenter-auto-zoom: 0.5;
+        --servicecenter-bg-blur: 14px;
+        --servicecenter-bg-darken: rgba(0, 0, 0, 0.52);
+    }
+
+    .servicecenter-bg-blur {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        backdrop-filter: blur(var(--servicecenter-bg-blur)) saturate(0.9);
+        -webkit-backdrop-filter: blur(var(--servicecenter-bg-blur)) saturate(0.9);
+        background:
+            radial-gradient(circle at 50% 12%, rgba(137, 190, 50, 0.10), transparent 34%),
+            var(--servicecenter-bg-darken);
+    }
+
     .servicecenter-shell {
         --service-radius: clamp(1rem, 1vw, 1.35rem);
         --service-card-padding: clamp(0.95rem, 1vw, 1.25rem);
         --service-gap: clamp(0.85rem, 1vw, 1.25rem);
-        width: 100%;
-        max-width: 100%;
+        position: relative;
+        z-index: 1;
+        width: calc(100% / var(--servicecenter-auto-zoom));
+        max-width: calc(100% / var(--servicecenter-auto-zoom));
+        min-height: calc(100vh / var(--servicecenter-auto-zoom));
         margin-inline: auto;
         min-width: 0;
+        transform: scale(var(--servicecenter-auto-zoom));
+        transform-origin: top center;
+    }
+
+    @supports (zoom: 1) {
+        .servicecenter-shell {
+            width: 100%;
+            max-width: 100%;
+            min-height: 100vh;
+            transform: none;
+            zoom: var(--servicecenter-auto-zoom);
+        }
     }
 
     .servicecenter-shell,
@@ -1226,6 +1259,8 @@
         }
     }
 </style>
+
+<div class="servicecenter-bg-blur" aria-hidden="true"></div>
 
 <div id="servicecenter-shell" class="servicecenter-shell">
     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 mt-6">
