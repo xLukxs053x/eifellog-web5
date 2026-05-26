@@ -1140,35 +1140,34 @@
     }
 
     /* FIX: Bestätigungs-Modal
-       Das Modal ist jetzt komplett viewport-basiert:
-       - es wird per JavaScript direkt in <body> verschoben,
-       - es wird immer mittig im sichtbaren Browserfenster angezeigt,
-       - keine Positionierung mehr relativ zum Formular/Button,
-       - kein fehlerhaftes margin-top auf Mobile/Zoom. */
+       Modal erscheint jetzt immer im aktuell sichtbaren Browserbereich.
+       Die Lösung nutzt <dialog>.showModal() als echte Browser-Top-Layer-Ebene.
+       Dadurch wird es nicht mehr oben am Dokument/Formular-Wrapper platziert,
+       sondern direkt über der Stelle, an der der User gerade geklickt hat. */
     :root {
         --service-modal-vh: 1vh;
     }
 
     #fahrerkarte-confirm-modal {
         position: fixed !important;
-        top: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        left: 0 !important;
+        inset: 0 !important;
         z-index: 2147483647 !important;
         width: 100vw !important;
+        max-width: none !important;
         height: calc(var(--service-modal-vh, 1vh) * 100) !important;
+        max-height: none !important;
         min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         margin: 0 !important;
         padding: clamp(0.75rem, 3vw, 2rem) !important;
+        border: 0 !important;
         box-sizing: border-box !important;
-        display: none !important;
         align-items: center !important;
         justify-content: center !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         overscroll-behavior: contain !important;
         background: transparent !important;
+        color: inherit !important;
         opacity: 0 !important;
         pointer-events: none !important;
         transform: none !important;
@@ -1179,19 +1178,11 @@
         transition: opacity 180ms ease !important;
     }
 
-    #fahrerkarte-confirm-modal::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        background:
-            radial-gradient(circle at 50% 38%, rgba(137, 190, 50, 0.10), transparent 34%),
-            rgba(2, 6, 4, 0.72);
-        backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
-        -webkit-backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
-        pointer-events: none;
+    #fahrerkarte-confirm-modal:not([open]) {
+        display: none !important;
     }
 
+    #fahrerkarte-confirm-modal[open],
     #fahrerkarte-confirm-modal.service-modal-open {
         display: flex !important;
         opacity: 1 !important;
@@ -1200,6 +1191,30 @@
 
     #fahrerkarte-confirm-modal.hidden {
         display: none !important;
+    }
+
+    #fahrerkarte-confirm-modal[open].hidden {
+        display: flex !important;
+    }
+
+    #fahrerkarte-confirm-modal::backdrop {
+        background:
+            radial-gradient(circle at 50% 42%, rgba(137, 190, 50, 0.10), transparent 34%),
+            rgba(2, 6, 4, 0.74);
+        backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
+        -webkit-backdrop-filter: blur(16px) brightness(0.70) saturate(0.92);
+    }
+
+    /* Fallback-Overlay, falls ein Browser <dialog>::backdrop nicht sauber rendert. */
+    #fahrerkarte-confirm-modal.service-modal-open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background:
+            radial-gradient(circle at 50% 42%, rgba(137, 190, 50, 0.08), transparent 34%),
+            rgba(2, 6, 4, 0.34);
+        pointer-events: none;
     }
 
     #fahrerkarte-confirm-panel {
@@ -1220,7 +1235,8 @@
         transition: transform 180ms ease !important;
     }
 
-    #fahrerkarte-confirm-modal.service-modal-open #fahrerkarte-confirm-panel {
+    #fahrerkarte-confirm-modal.service-modal-open #fahrerkarte-confirm-panel,
+    #fahrerkarte-confirm-modal[open] #fahrerkarte-confirm-panel {
         transform: translateY(0) scale(1) !important;
     }
 
@@ -1307,25 +1323,6 @@
         }
     }
 
-    @media (max-width: 640px) {
-        #fahrerkarte-confirm-modal {
-            padding: 0 0.5rem 0.5rem !important;
-            align-items: flex-start !important;
-        }
-
-        #fahrerkarte-confirm-panel {
-            width: 100% !important;
-            max-width: calc(100vw - 1rem) !important;
-            max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1rem) !important;
-            margin-top: var(--service-modal-panel-top) !important;
-            border-radius: 1.25rem !important;
-        }
-
-        #fahrerkarte-confirm-panel .p-6,
-        #fahrerkarte-confirm-panel .p-7 {
-            padding: 1rem !important;
-        }
-    }
 </style>
 
 <div id="servicecenter-shell" class="servicecenter-shell">
@@ -1988,7 +1985,7 @@
     </div>
 </div>
 
-<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="service-confirm-modal hidden">
+<dialog id="fahrerkarte-confirm-modal" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="service-confirm-modal hidden">
     <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
@@ -2015,7 +2012,7 @@
             </div>
         </div>
     </div>
-</div>
+</dialog>
 
 <script>
 (function () {
@@ -2037,6 +2034,7 @@
     const confirmSubmit = document.getElementById('fahrerkarte-confirm-submit');
     const cancelSubmit = document.getElementById('fahrerkarte-cancel-submit');
     const shell = document.getElementById('servicecenter-shell');
+    const supportsNativeDialog = !!(modal && typeof modal.showModal === 'function');
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
@@ -2127,19 +2125,35 @@
 
         moveModalToBody();
         previousActiveElement = document.activeElement;
-        lockScroll();
+        scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
+        setModalViewportHeight();
 
         modal.classList.remove('hidden', 'opacity-0');
         modal.classList.add('service-modal-open');
-        modal.style.display = 'flex';
-        modal.style.opacity = '1';
         modal.setAttribute('aria-hidden', 'false');
+
+        if (shell) {
+            shell.setAttribute('aria-hidden', 'true');
+        }
+
+        if (supportsNativeDialog) {
+            try {
+                if (!modal.open) modal.showModal();
+            } catch (error) {
+                modal.setAttribute('open', '');
+            }
+        } else {
+            lockScroll();
+            modal.style.display = 'flex';
+            modal.style.opacity = '1';
+        }
 
         requestAnimationFrame(() => {
             setModalViewportHeight();
             modal.scrollTop = 0;
             if (panel) panel.scrollTop = 0;
             if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
+            window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
         });
     }
 
@@ -2152,10 +2166,22 @@
         modal.setAttribute('aria-hidden', 'true');
 
         window.setTimeout(() => {
+            if (supportsNativeDialog && modal.open) {
+                modal.close();
+            } else if (supportsNativeDialog) {
+                modal.removeAttribute('open');
+            }
+
             modal.classList.add('hidden');
             modal.style.display = '';
             modal.style.opacity = '';
-            unlockScroll();
+
+            if (!supportsNativeDialog) {
+                unlockScroll();
+            } else {
+                if (shell) shell.removeAttribute('aria-hidden');
+                window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
+            }
 
             if (!options.skipFocusRestore && previousActiveElement && typeof previousActiveElement.focus === 'function') {
                 previousActiveElement.focus({ preventScroll: true });
@@ -2202,6 +2228,11 @@
     if (modal) {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) closeModal();
+        });
+
+        modal.addEventListener('cancel', (event) => {
+            event.preventDefault();
+            closeModal();
         });
     }
 
