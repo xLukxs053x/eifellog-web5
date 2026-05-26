@@ -4,6 +4,121 @@
 
 {% block content %}
 
+<style>
+    .team-slideshow-shell {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .team-slideshow-track {
+        display: flex;
+        width: 100%;
+        transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: transform;
+    }
+
+    .team-slide {
+        min-width: 100%;
+        width: 100%;
+        opacity: 0.45;
+        transform: scale(0.94);
+        transition:
+            opacity 280ms ease,
+            transform 280ms ease,
+            filter 280ms ease;
+        filter: blur(0.25px);
+    }
+
+    .team-slide.is-active {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+    }
+
+    .team-slide-inner {
+        --team-slide-scale: 0.88;
+        width: calc(100% / var(--team-slide-scale));
+        transform: scale(var(--team-slide-scale));
+        transform-origin: top center;
+        margin-left: calc((100% - (100% / var(--team-slide-scale))) / 2);
+    }
+
+    .team-slide-card {
+        min-height: 560px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .team-slideshow-control {
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(14px);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+            border-color 180ms ease,
+            color 180ms ease,
+            background 180ms ease,
+            transform 180ms ease;
+    }
+
+    .team-slideshow-control:hover {
+        color: var(--brand-green);
+        border-color: rgba(137, 190, 50, 0.45);
+        background: rgba(137, 190, 50, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .team-slideshow-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+        transition:
+            width 220ms ease,
+            background 220ms ease,
+            border-color 220ms ease,
+            box-shadow 220ms ease;
+    }
+
+    .team-slideshow-dot.is-active {
+        width: 28px;
+        background: var(--brand-green);
+        border-color: rgba(137, 190, 50, 0.75);
+        box-shadow: 0 0 14px rgba(137, 190, 50, 0.28);
+    }
+
+    .team-slideshow-counter {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    @media (max-width: 768px) {
+        .team-slide-inner {
+            --team-slide-scale: 0.96;
+        }
+
+        .team-slide-card {
+            min-height: auto;
+        }
+
+        .team-slideshow-control {
+            width: 38px;
+            height: 38px;
+        }
+    }
+</style>
+
 {% macro team_card(name, role, image_file, image_fallback) %}
 <article class="group relative overflow-hidden rounded-3xl border border-white/10 bg-black/35 p-5 md:p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:border-[var(--brand-green)]/40 hover:bg-black/45 hover:shadow-[0_0_35px_rgba(137,190,50,0.13)]">
     <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/60 to-transparent opacity-60"></div>
@@ -31,9 +146,130 @@
 </article>
 {% endmacro %}
 
+{% if team_sections is not defined %}
+    {% set team_sections = [
+        {
+            'title': 'Geschäftsleitung',
+            'subtitle': 'Leitung & Unternehmensführung',
+            'description': 'Die Geschäftsleitung verantwortet die Organisation, strategische Ausrichtung und finale Entscheidungen innerhalb von Eifel LOG.',
+            'members': [
+                {
+                    'name': 'Max',
+                    'role': 'Geschäftsleitung',
+                    'image_file': 'Max.png',
+                    'image_fallback': 'max.png'
+                },
+                {
+                    'name': 'Frecherdachs',
+                    'role': 'Geschäftsleitung',
+                    'image_file': 'Frecherdachs.png',
+                    'image_fallback': 'frecherdachs.png'
+                }
+            ]
+        },
+        {
+            'title': 'Projektleitung',
+            'subtitle': 'Projektsteuerung & Entwicklung',
+            'description': 'Die Projektleitung koordiniert technische Abläufe, Weiterentwicklung, interne Prozesse und die Umsetzung neuer Funktionen.',
+            'members': [
+                {
+                    'name': 'LuxksDE',
+                    'role': 'Projektleitung',
+                    'image_file': 'LuxksDE.png',
+                    'image_fallback': 'luxksde.png'
+                }
+            ]
+        },
+        {
+            'title': 'Stellvertretende Projektleitung',
+            'subtitle': 'Vertretung & Projektunterstützung',
+            'description': 'Die stellvertretende Projektleitung unterstützt die Projektleitung bei organisatorischen Aufgaben und interner Abstimmung.',
+            'members': [
+                {
+                    'name': 'durch_trucker_ibo',
+                    'role': 'Stellvertretende Projektleitung',
+                    'image_file': 'durch_trucker_ibo.png',
+                    'image_fallback': 'Durch_Trucker_Ibo.png'
+                }
+            ]
+        },
+        {
+            'title': 'Verwaltung & Personal',
+            'subtitle': 'HR, Personalmanagement & interne Verwaltung',
+            'description': 'Dieser Bereich betreut Personalthemen, interne Verwaltung, HR-Prozesse und organisatorische Personalaufgaben.',
+            'members': [
+                {
+                    'name': 'Prysm',
+                    'role': 'HR-Controlling',
+                    'image_file': 'Prysm.png',
+                    'image_fallback': 'prysm.png'
+                },
+                {
+                    'name': 'daivd_tmp',
+                    'role': 'Personalmanagement',
+                    'image_file': 'daivd_tmp.png',
+                    'image_fallback': 'Daivd_tmp.png'
+                }
+            ]
+        },
+        {
+            'title': 'Buchhaltung',
+            'subtitle': 'Abrechnung & Finanzverwaltung',
+            'description': 'Die Buchhaltung verwaltet Abrechnungen, finanzielle Abläufe und interne buchhalterische Vorgänge.',
+            'members': [
+                {
+                    'name': 'danielsurig',
+                    'role': 'Buchhaltung',
+                    'image_file': 'danielsurig.png',
+                    'image_fallback': 'Danielsurig.png'
+                }
+            ]
+        },
+        {
+            'title': 'Disposition',
+            'subtitle': 'Touren, Planung & operative Steuerung',
+            'description': 'Die Disposition plant und begleitet operative Abläufe, Touren und interne Fahrtenprozesse.',
+            'members': [
+                {
+                    'name': 'Kalle',
+                    'role': 'Disposition',
+                    'image_file': 'Kalle.png',
+                    'image_fallback': 'kalle.png'
+                }
+            ]
+        },
+        {
+            'title': 'Fahrer',
+            'subtitle': 'Aktive Fahrer & Probefahrer',
+            'description': 'Unsere Fahrer bilden den aktiven Fahrbetrieb von Eifel LOG und übernehmen Touren, Transporte und Probephasen.',
+            'members': [
+                {
+                    'name': 'ghost_robbert',
+                    'role': 'Fahrer',
+                    'image_file': 'ghost_robbert.png',
+                    'image_fallback': 'Ghost_Robbert.png'
+                },
+                {
+                    'name': 'jus_tin123',
+                    'role': 'Fahrer',
+                    'image_file': 'jus_tin123.png',
+                    'image_fallback': 'Jus_Tin123.png'
+                },
+                {
+                    'name': 'busspotter_duisburg',
+                    'role': 'Probefahrer',
+                    'image_file': 'busspotter.png',
+                    'image_fallback': 'eifellog.jpg'
+                }
+            ]
+        }
+    ] %}
+{% endif %}
+
 <section class="w-full py-6 md:py-10">
+
     <!-- Header -->
-    <div class="text-center mb-10 md:mb-14">
+    <div class="text-center mb-8 md:mb-10">
         <p class="font-orbitron text-[10px] md:text-xs uppercase tracking-[0.35em] text-[var(--brand-green)] mb-4">
             Eifel LOG Struktur
         </p>
@@ -43,107 +279,110 @@
         </h1>
 
         <p class="max-w-2xl mx-auto mt-5 text-sm md:text-base text-[var(--muted)] leading-relaxed">
-            Die Organisation von Eifel LOG: von der Geschäftsleitung über Projektleitung und Verwaltung bis zu unseren Fahrern.
+            Die Organisation von Eifel LOG jetzt als rausgezoomte Slideshow: von der Geschäftsleitung über Projektleitung und Verwaltung bis zu unseren Fahrern.
         </p>
     </div>
 
-    <!-- Team Layout -->
-    <div class="max-w-6xl mx-auto space-y-8 md:space-y-10">
+    <div class="max-w-6xl mx-auto space-y-6">
 
-        <!-- Geschäftsleitung -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Geschäftsleitung
-                </span>
+        <!-- Slideshow Navigation -->
+        <div class="glass-card p-4 md:p-5 relative z-10 overflow-hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+                <div>
+                    <h2 class="text-lg md:text-xl font-orbitron font-bold text-[var(--text)] uppercase tracking-wider">
+                        Team Slideshow
+                    </h2>
+
+                    <p class="mt-1 text-xs md:text-sm text-[var(--muted)] font-inter">
+                        Rausgezoomte Ansicht der einzelnen Team-Bereiche.
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="button" class="team-slideshow-control" data-team-prev aria-label="Vorheriger Team-Bereich">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+
+                    <span class="team-slideshow-counter font-orbitron" data-team-counter>
+                        01 / {{ team_sections | length }}
+                    </span>
+
+                    <button type="button" class="team-slideshow-control" data-team-next aria-label="Nächster Team-Bereich">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
-                {{ team_card("Max", "Geschäftsleitung", "Max.png", "max.png") }}
-                {{ team_card("Frecherdachs", "Geschäftsleitung", "Frecherdachs.png", "frecherdachs.png") }}
+            <div class="flex flex-wrap items-center gap-2 mt-5" data-team-dots>
+                {% for section in team_sections %}
+                    <button type="button"
+                            class="team-slideshow-dot {% if loop.first %}is-active{% endif %}"
+                            data-team-dot="{{ loop.index0 }}"
+                            aria-label="Team Slide {{ loop.index }}">
+                    </button>
+                {% endfor %}
             </div>
-        </section>
+        </div>
 
-        <!-- Projektleitung -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Projektleitung
-                </span>
-            </div>
+        <!-- Team Slideshow -->
+        <div class="team-slideshow-shell" data-team-slideshow>
+            <div class="team-slideshow-track" data-team-track>
 
-            <div class="grid grid-cols-1 max-w-md mx-auto">
-                {{ team_card("LuxksDE", "Projektleitung", "LuxksDE.png", "luxksde.png") }}
-            </div>
-        </section>
+                {% for section in team_sections %}
+                    <div class="team-slide {% if loop.first %}is-active{% endif %}" data-team-slide>
+                        <div class="team-slide-inner">
 
-        <!-- Stellvertretende Projektleitung -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Stellvertretende Projektleitung
-                </span>
-            </div>
+                            <section class="glass-card team-slide-card p-5 md:p-8">
 
-            <div class="grid grid-cols-1 max-w-md mx-auto">
-                {{ team_card("durch_trucker_ibo", "Stellvertretende Projektleitung", "durch_trucker_ibo.png", "Durch_Trucker_Ibo.png") }}
-            </div>
-        </section>
+                                <div class="text-center mb-7 md:mb-9">
+                                    <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
+                                        {{ section.title }}
+                                    </span>
 
-        <!-- HR / Personal -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Verwaltung & Personal
-                </span>
-            </div>
+                                    <h2 class="mt-5 font-orbitron text-2xl md:text-4xl font-extrabold uppercase tracking-[0.14em] text-[var(--text)]">
+                                        {{ section.subtitle }}
+                                    </h2>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
-                {{ team_card("Prysm", "HR-Controlling", "Prysm.png", "prysm.png") }}
-                {{ team_card("daivd_tmp", "Personalmanagement", "daivd_tmp.png", "Daivd_tmp.png") }}
-            </div>
-        </section>
+                                    <p class="max-w-2xl mx-auto mt-4 text-sm md:text-base text-[var(--muted)] leading-relaxed">
+                                        {{ section.description }}
+                                    </p>
+                                </div>
 
-        <!-- Buchhaltung -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Buchhaltung
-                </span>
-            </div>
+                                <div class="
+                                    grid grid-cols-1 gap-5 md:gap-6
+                                    {% if section.members | length == 1 %}
+                                        max-w-md mx-auto
+                                    {% elif section.members | length == 2 %}
+                                        sm:grid-cols-2
+                                    {% else %}
+                                        sm:grid-cols-2 lg:grid-cols-3
+                                    {% endif %}
+                                ">
+                                    {% for member in section.members %}
+                                        {{ team_card(member.name, member.role, member.image_file, member.image_fallback) }}
+                                    {% endfor %}
+                                </div>
 
-            <div class="grid grid-cols-1 max-w-md mx-auto">
-                {{ team_card("danielsurig", "Buchhaltung", "danielsurig.png", "Danielsurig.png") }}
-            </div>
-        </section>
+                            </section>
 
-        <!-- Disposition -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Disposition
-                </span>
-            </div>
+                        </div>
+                    </div>
+                {% endfor %}
 
-            <div class="grid grid-cols-1 max-w-md mx-auto">
-                {{ team_card("Kalle", "Disposition", "Kalle.png", "kalle.png") }}
             </div>
-        </section>
+        </div>
 
-        <!-- Fahrer -->
-        <section class="glass-card p-5 md:p-7">
-            <div class="flex flex-col items-center text-center mb-6">
-                <span class="inline-flex items-center justify-center px-4 py-2 rounded-full border border-[var(--brand-green)]/30 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[10px] uppercase tracking-[0.25em]">
-                    Fahrer
-                </span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-                {{ team_card("ghost_robbert", "Fahrer", "ghost_robbert.png", "Ghost_Robbert.png") }}
-                {{ team_card("jus_tin123", "Fahrer", "jus_tin123.png", "Jus_Tin123.png") }}
-                {{ team_card("busspotter_duisburg", "Probefahrer", "busspotter.png", "eifellog.jpg") }}
-            </div>
-        </section>
+        <div class="mt-2 flex justify-center">
+            <span class="px-6 py-3 rounded-full bg-black/40 border border-[var(--line)] backdrop-blur-md text-xs font-inter text-[var(--muted)] shadow-xl">
+                Team-Bereiche werden als rausgezoomte Slideshow angezeigt.
+            </span>
+        </div>
 
     </div>
 </section>
@@ -173,6 +412,78 @@
                 }
             });
         });
+
+        const root = document.querySelector('[data-team-slideshow]');
+        const track = document.querySelector('[data-team-track]');
+        const slides = Array.from(document.querySelectorAll('[data-team-slide]'));
+        const dots = Array.from(document.querySelectorAll('[data-team-dot]'));
+        const prevButton = document.querySelector('[data-team-prev]');
+        const nextButton = document.querySelector('[data-team-next]');
+        const counter = document.querySelector('[data-team-counter]');
+
+        if (!root || !track || slides.length === 0) {
+            return;
+        }
+
+        let activeIndex = 0;
+        const totalSlides = slides.length;
+
+        function formatNumber(number) {
+            return String(number).padStart(2, '0');
+        }
+
+        function updateSlideshow(nextIndex) {
+            activeIndex = (nextIndex + totalSlides) % totalSlides;
+
+            track.style.transform = 'translateX(-' + (activeIndex * 100) + '%)';
+
+            slides.forEach((slide, index) => {
+                slide.classList.toggle('is-active', index === activeIndex);
+            });
+
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('is-active', index === activeIndex);
+            });
+
+            if (counter) {
+                counter.textContent = formatNumber(activeIndex + 1) + ' / ' + formatNumber(totalSlides);
+            }
+        }
+
+        if (prevButton) {
+            prevButton.addEventListener('click', () => {
+                updateSlideshow(activeIndex - 1);
+            });
+        }
+
+        if (nextButton) {
+            nextButton.addEventListener('click', () => {
+                updateSlideshow(activeIndex + 1);
+            });
+        }
+
+        dots.forEach((dot) => {
+            dot.addEventListener('click', () => {
+                const targetIndex = Number(dot.getAttribute('data-team-dot'));
+
+                if (!Number.isNaN(targetIndex)) {
+                    updateSlideshow(targetIndex);
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowLeft') {
+                updateSlideshow(activeIndex - 1);
+            }
+
+            if (event.key === 'ArrowRight') {
+                updateSlideshow(activeIndex + 1);
+            }
+        });
+
+        updateSlideshow(0);
     });
 </script>
+
 {% endblock %}
