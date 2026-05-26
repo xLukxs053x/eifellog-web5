@@ -5806,6 +5806,12 @@ def tracker_work_session_from_request_payload(data):
         "currentActivity", "current_activity",
         fallback=None,
     )
+    if root_status is None:
+        status_candidate = safe_str(data.get("status") or data.get("state"))
+        # Auf dem Work-Session-Endpunkt darf status/state als Arbeitsstatus gelten;
+        # normale Job-Statuswerte werden bewusst ignoriert.
+        if status_candidate and status_candidate.lower() not in {"started", "completed", "complete", "finished", "submitted", "done", "error", "success"}:
+            root_status = status_candidate
 
     root_keys = (
         "workMs", "work_ms", "workTimeMs", "work_time_ms", "arbeitszeitMs",
@@ -5961,7 +5967,89 @@ def tracker_save_work_session(user_doc, raw_session, driver_card_id=""):
         }}
     )
 
-    return tracker_work_sessions_collection.find_one({"discord_id": discord_id})
+    session_doc = tracker_work_sessions_collection.find_one({"discord_id": discord_id})
+    try:
+        persist_tracker_work_session_daily_history(
+            user_doc,
+            work_session,
+            driver_card_id=driver_card_id,
+            source="tracker_work_session",
+        )
+    except Exception as error:
+        print(f"Tracker-Tageshistorie konnte nicht gespeichert werden: {error}")
+
+    return session_doc
+
+
+def persist_tracker_work_session_daily_history(user_doc, work_session, driver_card_id="", source="tracker_work_session"):
+    """Speichert jede Tracker-Session dauerhaft als Tagesnachweis fuer HR/Fahrerkarten-Belege."""
+    user_doc = user_doc or {}
+    work_session = tracker_normalize_work_session(work_session) if "tracker_normalize_work_session" in globals() else (work_session or {})
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if not discord_id:
+        return None
+
+    updated_at = coerce_driver_log_datetime(work_session.get("updatedAt"), fallback=now_utc())
+    date_str, date_display = driver_log_date_keys(updated_at)
+    existing = tracker_shift_logs_collection.find_one({
+        "discord_id": discord_id,
+        "date_str": date_str,
+        "archived": {"$ne": True},
+    })
+
+    session_data = build_shift_session_data_from_work_session(
+        work_session,
+        existing_session_data=(existing or {}).get("session_data") or {},
+    )
+
+    shift_doc = persist_tracker_shift_log_snapshot(user_doc, date_str, shift_id=(existing or {}).get("shift_id") or "") or {}
+    summary = merge_driver_activity_summary_with_session_data(shift_doc.get("summary") or {}, session_data)
+    now = now_utc()
+    snapshot_entry = {
+        "snapshot_id": uuid.uuid4().hex,
+        "status": session_data.get("status"),
+        "status_label": session_data.get("statusLabel"),
+        "driveMs": session_data.get("driveMs", 0),
+        "workMs": session_data.get("workMs", 0),
+        "breakMs": session_data.get("breakMs", 0),
+        "restMs": session_data.get("restMs", 0),
+        "continuousDriveMs": session_data.get("continuousDriveMs", 0),
+        "currentBreakMs": session_data.get("currentBreakMs", 0),
+        "driver_card_id": safe_str(driver_card_id or resolve_driver_card_id(user_doc, {})),
+        "captured_at": now,
+        "updated_at": session_data.get("updated_at") if isinstance(session_data.get("updated_at"), datetime) else updated_at,
+        "source": source,
+    }
+
+    set_fields = {
+        "shift_id": safe_str((shift_doc or {}).get("shift_id") or (existing or {}).get("shift_id") or uuid.uuid4().hex),
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "driver_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "Unbekannt",
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "date_str": date_str,
+        "shift_date": date_display,
+        "summary": summary,
+        "session_data": session_data,
+        "current_work_session": work_session,
+        "driver_card_id": safe_str(driver_card_id or resolve_driver_card_id(user_doc, {})),
+        "pdf_url": (shift_doc or {}).get("pdf_url") or f"/api/hr/download_shift_pdf/{(shift_doc or existing or {}).get('shift_id') or ''}",
+        "updated_at": now,
+        "source": source,
+        "archived": False,
+    }
+
+    tracker_shift_logs_collection.update_one(
+        {"discord_id": discord_id, "date_str": date_str},
+        {
+            "$set": set_fields,
+            "$setOnInsert": {"created_at": now},
+            "$push": {"session_snapshots": {"$each": [snapshot_entry], "$slice": -288}},
+        },
+        upsert=True,
+    )
+    return tracker_shift_logs_collection.find_one({"discord_id": discord_id, "date_str": date_str})
 
 
 def tracker_effective_break_ms(work_session):
@@ -7430,10 +7518,11 @@ DRIVER_ACTIVITY_STATE_MAP = {
     "ruhepause": ("pause", "Pause"),
     "feierabend": ("offDuty", "Feierabend / 11h Ruhezeit"),
     "shift_end": ("offDuty", "Feierabend / 11h Ruhezeit"),
-    "offduty": ("offDuty", "Ruhezeit / außer Dienst"),
-    "off_duty": ("offDuty", "Ruhezeit / außer Dienst"),
-    "ruhezeit": ("offDuty", "Ruhezeit / außer Dienst"),
-    "rest": ("offDuty", "Ruhezeit / außer Dienst"),
+    "offduty": ("offDuty", "Feierabend / Ruhezeit"),
+    "off_duty": ("offDuty", "Feierabend / Ruhezeit"),
+    "off": ("offDuty", "Feierabend / Ruhezeit"),
+    "ruhezeit": ("offDuty", "Feierabend / Ruhezeit"),
+    "rest": ("offDuty", "Feierabend / Ruhezeit"),
 }
 
 
@@ -7451,7 +7540,7 @@ def driver_activity_state_info(value):
     raw = safe_str(value, "Arbeitszeit")
     key = re.sub(r"[^a-z0-9_]+", "", raw.lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss"))
     state_key, label = DRIVER_ACTIVITY_STATE_MAP.get(key, ("work", raw[:80] or "Arbeitszeit"))
-    is_shift_end = key in {"feierabend", "shift_end"}
+    is_shift_end = state_key == "offDuty" and key in {"feierabend", "shift_end", "offduty", "off_duty", "off", "ruhezeit", "rest"}
     return state_key, label, is_shift_end
 
 
@@ -7527,6 +7616,151 @@ def driver_activity_datetime_text(value, fallback="-"):
 
 def driver_activity_duration_text(ms):
     return format_ms_to_hhmm(parse_int(ms, 0))
+
+
+def driver_session_data_ms(session_data, *keys):
+    """Liest Millisekunden-Werte robust aus gespeicherten Tracker-/Fahrerkarten-Snapshots."""
+    session_data = session_data or {}
+    for key in keys:
+        if key in session_data and session_data.get(key) not in [None, ""]:
+            return max(0, parse_int(session_data.get(key), 0))
+    return 0
+
+
+def build_shift_session_data_from_work_session(work_session=None, existing_session_data=None):
+    """Normalisiert Tracker-Sessionzeiten fuer die dauerhaft abrufbare Tageshistorie."""
+    work_session = work_session or {}
+    existing_session_data = existing_session_data or {}
+
+    def ms_value(*keys, existing_key=None):
+        for key in keys:
+            if key in work_session and work_session.get(key) not in [None, ""]:
+                return max(0, tracker_ms(work_session.get(key), 0) if "tracker_ms" in globals() else parse_int(work_session.get(key), 0))
+        if existing_key:
+            return max(0, parse_int(existing_session_data.get(existing_key), 0))
+        return 0
+
+    status = safe_str(
+        work_session.get("status")
+        or work_session.get("workStatus")
+        or existing_session_data.get("status"),
+        "offDuty"
+    )
+    status = tracker_work_status_from_value(status, fallback="offDuty") if "tracker_work_status_from_value" in globals() else status
+    status_label = {
+        "working": "Arbeitszeit aktiv",
+        "pause": "Pause aktiv",
+        "offDuty": "Feierabend erfasst",
+    }.get(status, "Status unbekannt")
+
+    updated_at_raw = work_session.get("updatedAt") or existing_session_data.get("updatedAt")
+    updated_at = coerce_driver_log_datetime(updated_at_raw, fallback=now_utc())
+    last_shift_end_raw = work_session.get("lastShiftEndedAt") or existing_session_data.get("lastShiftEndedAt")
+    last_shift_ended_at = coerce_driver_log_datetime(last_shift_end_raw, fallback=None) if last_shift_end_raw not in [None, ""] else None
+
+    data = {
+        "driveMs": ms_value("driveMs", "drive_ms", "driveTimeMs", "drive_time_ms", "fahrzeitMs", existing_key="driveMs"),
+        "workMs": ms_value("workMs", "work_ms", "workTimeMs", "work_time_ms", "arbeitszeitMs", existing_key="workMs"),
+        "breakMs": ms_value("breakMs", "break_ms", "pauseMs", "pause_ms", existing_key="breakMs"),
+        "restMs": ms_value("restMs", "rest_ms", "ruhezeitMs", "restTimeMs", existing_key="restMs"),
+        "continuousDriveMs": ms_value("continuousDriveMs", "continuous_drive_ms", "continuousDrivingMs", existing_key="continuousDriveMs"),
+        "currentBreakMs": ms_value("currentBreakMs", "current_break_ms", "currentPauseMs", existing_key="currentBreakMs"),
+        "weeklyRestMs": ms_value("weeklyRestMs", "weekly_rest_ms", "weeklyRestTimeMs", existing_key="weeklyRestMs"),
+        "splitBreakFirstMs": ms_value("splitBreakFirstMs", "split_break_first_ms", existing_key="splitBreakFirstMs"),
+        "reducedDailyRestUsed": ms_value("reducedDailyRestUsed", "reduced_daily_rest_used", existing_key="reducedDailyRestUsed"),
+        "status": status,
+        "statusLabel": status_label,
+        "updatedAt": int(updated_at.timestamp() * 1000) if isinstance(updated_at, datetime) else int(now_utc().timestamp() * 1000),
+        "updated_at": updated_at,
+        "lastShiftEndedAt": int(last_shift_ended_at.timestamp() * 1000) if isinstance(last_shift_ended_at, datetime) else existing_session_data.get("lastShiftEndedAt"),
+        "last_shift_ended_at": last_shift_ended_at,
+    }
+    data["hasData"] = any(data.get(key, 0) > 0 for key in ("driveMs", "workMs", "breakMs", "restMs", "continuousDriveMs", "currentBreakMs")) or status == "offDuty"
+    return data
+
+
+def merge_driver_activity_summary_with_session_data(summary, session_data=None):
+    """Ergaenzt Tageszusammenfassungen um gespeicherte Tracker-Sessionwerte."""
+    summary = dict(summary or {})
+    session_data = session_data or {}
+    totals = dict(summary.get("totals") or {})
+
+    mapping = {
+        "drive_ms": ("driveMs", "drive_ms", "drive"),
+        "work_ms": ("workMs", "work_ms", "work"),
+        "pause_ms": ("breakMs", "pauseMs", "pause_ms", "break_ms", "pause"),
+        "rest_ms": ("restMs", "rest_ms", "ruhezeitMs", "rest"),
+        "other_ms": ("otherMs", "other_ms"),
+    }
+    for total_key, keys in mapping.items():
+        stored_value = max(driver_session_data_ms(session_data, *keys), parse_int(totals.get(total_key), 0))
+        totals[total_key] = stored_value
+
+    summary["totals"] = totals
+    summary["drive"] = driver_activity_duration_text(totals.get("drive_ms", 0))
+    summary["work"] = driver_activity_duration_text(totals.get("work_ms", 0))
+    summary["pause"] = driver_activity_duration_text(totals.get("pause_ms", 0))
+    summary["rest"] = driver_activity_duration_text(totals.get("rest_ms", 0))
+
+    continuous_drive_ms = max(
+        driver_session_data_ms(session_data, "continuousDriveMs", "continuous_drive_ms"),
+        parse_int((summary.get("totals") or {}).get("continuous_drive_ms"), 0),
+        parse_int(summary.get("max_continuous_drive_ms"), 0),
+    )
+    if continuous_drive_ms:
+        summary["max_continuous_drive"] = driver_activity_duration_text(continuous_drive_ms)
+        summary["max_continuous_drive_ms"] = continuous_drive_ms
+    else:
+        summary.setdefault("max_continuous_drive", "00:00")
+
+    issues = list(summary.get("issues") or [])
+    if totals.get("drive_ms", 0) > DAILY_DRIVE_LIMIT_MS and not any("Tageslenkzeit" in issue for issue in issues):
+        issues.append("Tageslenkzeit von 8 Stunden wurde überschritten.")
+    if continuous_drive_ms > CONTINUOUS_DRIVE_LIMIT_MS and not any("Lenkzeit am Stück" in issue or "Lenkzeit am Stueck" in issue for issue in issues):
+        issues.append("Lenkzeit am Stück überschreitet 4,5 Stunden ohne ausreichende Pause.")
+    summary["issues"] = issues
+
+    status = safe_str(session_data.get("status"))
+    last_shift_ended_at = session_data.get("last_shift_ended_at")
+    if not isinstance(last_shift_ended_at, datetime):
+        last_shift_ended_at = coerce_driver_log_datetime(session_data.get("lastShiftEndedAt"), fallback=None) if session_data.get("lastShiftEndedAt") not in [None, ""] else None
+
+    if status == "offDuty" or last_shift_ended_at:
+        rest_completed_at = summary.get("rest_completed_at")
+        if not isinstance(rest_completed_at, datetime) and isinstance(last_shift_ended_at, datetime):
+            rest_completed_at = last_shift_ended_at + timedelta(milliseconds=DAILY_REST_REQUIRED_MS)
+        summary["rest_completed_at"] = rest_completed_at
+        summary["rest_completed_display"] = driver_activity_datetime_text(rest_completed_at, "")
+        summary["rest_status"] = "fulfilled" if totals.get("rest_ms", 0) >= DAILY_REST_REQUIRED_MS else safe_str(summary.get("rest_status"), "pending")
+        summary["rest_label"] = "Feierabend erfasst" if summary["rest_status"] != "violation" else "Ruhezeit verletzt"
+        if isinstance(rest_completed_at, datetime):
+            summary["rest_summary"] = f"Feierabend erfasst; die tägliche Ruhezeit ist bis {driver_activity_datetime_text(rest_completed_at)} nachweisbar gespeichert."
+        else:
+            summary["rest_summary"] = "Feierabend erfasst; die Ruhezeit wurde in der Fahrerkarte-Historie gespeichert."
+    elif not any(totals.get(key, 0) for key in ("drive_ms", "work_ms", "pause_ms", "rest_ms")):
+        summary.setdefault("rest_status", "missing")
+        summary.setdefault("rest_label", "Keine Zeiten gespeichert")
+        summary.setdefault("rest_summary", "Für diesen Tag sind noch keine Tracker-/Fahrerkartenzeiten gespeichert.")
+    else:
+        summary.setdefault("rest_status", "missing")
+        summary.setdefault("rest_label", "Kein Feierabend erfasst")
+        summary.setdefault("rest_summary", "Für diesen Tag wurde noch kein Feierabend gespeichert.")
+
+    if issues:
+        summary["compliance_status"] = "violation"
+        summary["compliance_label"] = "Verstoß / Prüfung erforderlich"
+    elif summary.get("rest_label") == "Feierabend erfasst":
+        summary["compliance_status"] = "ok" if totals.get("rest_ms", 0) >= DAILY_REST_REQUIRED_MS else "warning"
+        summary["compliance_label"] = "Feierabend erfasst"
+    elif any(totals.get(key, 0) for key in ("drive_ms", "work_ms", "pause_ms", "rest_ms")):
+        summary["compliance_status"] = safe_str(summary.get("compliance_status"), "warning")
+        summary["compliance_label"] = safe_str(summary.get("compliance_label"), "Unvollständig")
+    else:
+        summary["compliance_status"] = safe_str(summary.get("compliance_status"), "unknown")
+        summary["compliance_label"] = safe_str(summary.get("compliance_label"), "Keine Daten")
+
+    summary["session_data"] = session_data
+    return summary
 
 
 def driver_log_for_api(log_doc, now_ref=None):
@@ -7654,11 +7888,11 @@ def summarize_driver_activity_logs(logs, now_ref=None):
             issues.append(rest_summary)
         elif isinstance(rest_completed_at, datetime) and now_ref >= rest_completed_at:
             rest_status = "fulfilled"
-            rest_label = "11 Stunden Ruhezeit erreicht"
+            rest_label = "Feierabend erfasst"
             rest_summary = f"Feierabend erfasst; Ruhezeit seit {driver_activity_datetime_text(rest_completed_at)} erfüllt."
         else:
             rest_status = "pending"
-            rest_label = "11 Stunden Ruhezeit läuft"
+            rest_label = "Feierabend erfasst"
             if isinstance(rest_completed_at, datetime):
                 rest_remaining_ms = max(0, int((rest_completed_at - now_ref).total_seconds() * 1000))
                 rest_summary = f"Feierabend erfasst; Ruhezeit muss bis {driver_activity_datetime_text(rest_completed_at)} laufen."
@@ -7698,17 +7932,39 @@ def summarize_driver_activity_logs(logs, now_ref=None):
     }
 
 
-def build_driver_activity_day_snapshot(user_doc, date_value, logs=None):
+def build_driver_activity_day_snapshot(user_doc, date_value, logs=None, include_persisted=True):
     date_str, date_display = driver_log_date_keys(date_value)
     logs = logs if logs is not None else get_driver_activity_logs_for_day(user_doc, date_str)
+    entries = [driver_log_for_api(item) for item in logs]
     summary = summarize_driver_activity_logs(logs)
+
+    persisted_shift = None
+    session_data = {}
+    if include_persisted:
+        discord_id = safe_str((user_doc or {}).get("discord_id") or (user_doc or {}).get("user_id") or (user_doc or {}).get("id"))
+        if discord_id:
+            persisted_shift = tracker_shift_logs_collection.find_one({
+                "discord_id": discord_id,
+                "date_str": date_str,
+                "archived": {"$ne": True},
+            })
+        if persisted_shift:
+            session_data = persisted_shift.get("session_data") or {}
+            if not entries and persisted_shift.get("activity_entries"):
+                entries = persisted_shift.get("activity_entries") or []
+            summary = merge_driver_activity_summary_with_session_data(summary, session_data)
+
     return {
         "date_str": date_str,
         "shift_date": date_display,
         "date_display": date_display,
-        "entries": [driver_log_for_api(item) for item in logs],
+        "entries": entries,
         "summary": summary,
-        "entry_count": len(logs),
+        "entry_count": len(entries),
+        "session_data": session_data,
+        "has_data": bool(entries) or bool((session_data or {}).get("hasData")),
+        "shift_id": safe_str((persisted_shift or {}).get("shift_id")),
+        "pdf_url": safe_str((persisted_shift or {}).get("pdf_url")),
     }
 
 
@@ -7740,6 +7996,22 @@ def build_driver_activity_period_report(user_doc, date_from="", date_to=""):
         entries.append(driver_log_for_api(item))
 
     combined_summary = summarize_driver_activity_logs(all_logs)
+
+    shift_logs = []
+    discord_id = safe_str((user_doc or {}).get("discord_id") or (user_doc or {}).get("user_id") or (user_doc or {}).get("id"))
+    if discord_id:
+        try:
+            shift_logs = list(tracker_shift_logs_collection.find({
+                "discord_id": discord_id,
+                "date_str": {"$gte": start_date.strftime("%Y-%m-%d"), "$lte": end_date.strftime("%Y-%m-%d")},
+                "archived": {"$ne": True},
+            }).sort([("date_str", ASCENDING)]))
+        except Exception:
+            shift_logs = []
+
+    for day in day_summaries:
+        combined_summary = merge_driver_activity_summary_with_session_data(combined_summary, day.get("session_data") or {})
+
     return {
         "date_from": start_date.strftime("%Y-%m-%d"),
         "date_to": end_date.strftime("%Y-%m-%d"),
@@ -7747,6 +8019,7 @@ def build_driver_activity_period_report(user_doc, date_from="", date_to=""):
         "date_to_display": end_date.strftime("%d.%m.%Y"),
         "entries": entries,
         "days": day_summaries,
+        "shift_logs": [driver_shift_log_for_api(item) for item in shift_logs] if "driver_shift_log_for_api" in globals() else [],
         "summary": combined_summary,
     }
 
@@ -7757,7 +8030,7 @@ def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_fi
     if not discord_id:
         return None
 
-    snapshot = build_driver_activity_day_snapshot(user_doc, date_value)
+    snapshot = build_driver_activity_day_snapshot(user_doc, date_value, include_persisted=False)
     existing = tracker_shift_logs_collection.find_one({
         "discord_id": discord_id,
         "date_str": snapshot["date_str"],
@@ -7765,6 +8038,21 @@ def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_fi
     })
 
     now = now_utc()
+    existing_session_data = (existing or {}).get("session_data") or {}
+    summary = merge_driver_activity_summary_with_session_data(snapshot["summary"], existing_session_data)
+    session_data = build_shift_session_data_from_work_session(
+        {
+            "driveMs": summary["totals"].get("drive_ms", 0),
+            "workMs": summary["totals"].get("work_ms", 0),
+            "breakMs": summary["totals"].get("pause_ms", 0),
+            "restMs": summary["totals"].get("rest_ms", 0),
+            "status": existing_session_data.get("status") or ("offDuty" if summary.get("rest_label") == "Feierabend erfasst" else existing_session_data.get("status", "working")),
+            "updatedAt": int(now.timestamp() * 1000),
+            "lastShiftEndedAt": existing_session_data.get("lastShiftEndedAt"),
+        },
+        existing_session_data=existing_session_data,
+    )
+    summary = merge_driver_activity_summary_with_session_data(summary, session_data)
     document = {
         "shift_id": safe_str(shift_id or (existing or {}).get("shift_id") or uuid.uuid4().hex),
         "discord_id": discord_id,
@@ -7775,13 +8063,8 @@ def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_fi
         "date_str": snapshot["date_str"],
         "shift_date": snapshot["shift_date"],
         "activity_entries": snapshot["entries"],
-        "summary": snapshot["summary"],
-        "session_data": {
-            "driveMs": snapshot["summary"]["totals"]["drive_ms"],
-            "workMs": snapshot["summary"]["totals"]["work_ms"],
-            "breakMs": snapshot["summary"]["totals"]["pause_ms"],
-            "restMs": snapshot["summary"]["totals"]["rest_ms"],
-        },
+        "summary": summary,
+        "session_data": session_data,
         "updated_at": now,
         "source": "driver_activity_logs",
     }
@@ -10459,11 +10742,14 @@ def tracker_feierabend():
     new_session = tracker_default_work_session()
     new_session["status"] = "offDuty"
     new_session["lastShiftEndedAt"] = int(now_utc().timestamp() * 1000)
+    new_session["updatedAt"] = int(now_utc().timestamp() * 1000)
     tracker_save_work_session(fresh_user, new_session)
 
     return jsonify({
         "success": True,
-        "message": "Feierabend erfolgreich protokolliert. Die 11-Stunden-Ruhezeit wurde gespeichert und bleibt fuer den Tagesauszug abrufbar.",
+        "message": "Feierabend erfasst. Die 11-Stunden-Ruhezeit wurde gespeichert und bleibt fuer jeden Tagesauszug abrufbar.",
+        "statusText": "Feierabend erfasst",
+        "status_text": "Feierabend erfasst",
         "shift_id": shift_doc.get("shift_id"),
         "date": shift_doc.get("shift_date"),
         "pdf_url": shift_doc.get("pdf_url"),
@@ -11175,10 +11461,18 @@ def tracker_work_session():
     if error_response:
         return error_response
 
+    daily_history = None
     if request.method == "POST":
         incoming_session = tracker_work_session_from_request_payload(data)
         driver_card_id = safe_str(data.get("driverCardId") or data.get("driver_card_id"))
         session_doc = tracker_save_work_session(user_doc, incoming_session, driver_card_id=driver_card_id)
+        work_session_for_history = tracker_prepare_work_session_payload(session_doc)
+        history_date, _history_display = driver_log_date_keys(coerce_driver_log_datetime(work_session_for_history.get("updatedAt"), fallback=now_utc()))
+        daily_history = tracker_shift_logs_collection.find_one({
+            "discord_id": safe_str(user_doc.get("discord_id")),
+            "date_str": history_date,
+            "archived": {"$ne": True},
+        })
     else:
         session_doc = tracker_get_latest_work_session_doc(user_doc)
 
@@ -11186,8 +11480,15 @@ def tracker_work_session():
     driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     eligibility = tracker_validate_job_requirements(user_doc, driver_card_doc, work_session)
 
+    status_text = "Feierabend erfasst" if work_session.get("status") == "offDuty" else {"working": "Arbeitszeit aktiv", "pause": "Pause aktiv"}.get(work_session.get("status"), "Status gespeichert")
+
     return jsonify({
         "success": True,
+        "message": status_text,
+        "statusText": status_text,
+        "status_text": status_text,
+        "dailyHistory": driver_shift_log_for_api(daily_history) if daily_history else None,
+        "daily_history": driver_shift_log_for_api(daily_history) if daily_history else None,
         "workSession": work_session,
         "work_session": work_session,
         "eligibility": eligibility,
@@ -15712,9 +16013,13 @@ def update_driver_state():
             "summary": shift_doc.get("summary"),
         }
 
+    response_message = "Feierabend erfasst. Die Zeiten wurden dauerhaft in der Fahrerkarte-Historie gespeichert." if is_shift_end else f"{state_label} wurde dauerhaft in der Fahrerkarte-Historie gespeichert."
+
     return jsonify({
         "success": True,
-        "message": f"{state_label} wurde dauerhaft in der Fahrerkarte-Historie gespeichert.",
+        "message": response_message,
+        "statusText": "Feierabend erfasst" if is_shift_end else state_label,
+        "status_text": "Feierabend erfasst" if is_shift_end else state_label,
         "state": state_label,
         "stateKey": state_key,
         "result": result,
@@ -16662,7 +16967,7 @@ def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filena
         story.append(p(safe_str(note) or "Kein interner Hinweis angegeben.", "Small"))
         story.append(Spacer(1, 7))
         story.append(p("Technischer Nachweis", "SectionTitle"))
-        story.append(p("Dieser PDF-Beleg wurde serverseitig aus den gespeicherten EifelLog-Daten erzeugt. Datenbasis: users, tracker_driver_cards, tracker_work_sessions und ServiceCenter-Fahrerkarte.", "Small"))
+        story.append(p("Dieser PDF-Beleg wurde serverseitig aus den gespeicherten EifelLog-Daten erzeugt. Datenbasis: users, tracker_driver_cards, tracker_work_sessions, tracker_shift_logs, driver_logs und ServiceCenter-Fahrerkarte.", "Small"))
 
         doc.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
         pdf_bytes = buffer.getvalue()
@@ -16820,6 +17125,19 @@ def api_personalabteilung_fahrerkarte_data_query():
             return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
 
         card_doc = get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True)
+        selected_date = safe_str(
+            data.get("date")
+            or data.get("selectedDate")
+            or data.get("selected_date")
+            or data.get("shiftDate")
+            or data.get("shift_date")
+        )
+        date_from = safe_str(data.get("dateFrom") or data.get("date_from") or selected_date)
+        date_to = safe_str(data.get("dateTo") or data.get("date_to") or selected_date or date_from)
+        if not date_from and not date_to:
+            date_from = now_utc().strftime("%Y-%m-%d")
+            date_to = date_from
+
         if card_doc:
             card_doc = refresh_driver_card_snapshot_for_personalabteilung(user_doc, card_doc, set_last_query=True, persist=True)
             if card_doc.get("_id"):
@@ -16827,14 +17145,89 @@ def api_personalabteilung_fahrerkarte_data_query():
             message = "Fahrerkarten-Daten wurden erfolgreich aus der Datenbank abgefragt."
         else:
             message = "Keine Fahrerkarte in der Datenbank gefunden. Es wurde keine zufällige Karten-ID erzeugt."
-        return jsonify(driver_card_json_payload(
+
+        activity_report = build_driver_activity_period_report(user_doc, date_from, date_to)
+        selected_day = (activity_report.get("days") or [{}])[0] if activity_report.get("date_from") == activity_report.get("date_to") else None
+        payload = driver_card_json_payload(
             user_doc,
             card_doc,
             message=message,
-        ))
+            activityHistory=activity_report,
+            activity_history=activity_report,
+            dailyTimes=selected_day,
+            daily_times=selected_day,
+            selectedDate=activity_report.get("date_from") if selected_day else selected_date,
+            selected_date=activity_report.get("date_from") if selected_day else selected_date,
+        )
+        return jsonify(payload)
     except Exception as error:
         app.logger.exception("Fahrerkarten-Datenabfrage fehlgeschlagen")
         return personalabteilung_json_error(f"Fahrerkarten-Daten konnten nicht abgefragt werden: {error}", 500)
+
+
+@app.route("/api/personalabteilung/fahrerkarte/daily-times", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/personalabteilung/fahrerkarte/times", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/personalabteilung/fahrerkarte/day", methods=["GET", "POST", "OPTIONS"])
+def api_personalabteilung_fahrerkarte_daily_times():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    try:
+        data = request.get_json(silent=True) if request.method == "POST" else {}
+        data = data or {}
+        driver_id = safe_str(
+            data.get("driverId")
+            or data.get("driver_id")
+            or data.get("discordId")
+            or data.get("discord_id")
+            or request.args.get("driverId")
+            or request.args.get("driver_id")
+            or request.args.get("discordId")
+            or request.args.get("discord_id")
+        )
+        if not driver_id:
+            return personalabteilung_json_error("Fahrer-ID fehlt.", 400)
+        user_doc = find_driver_for_personalabteilung(driver_id)
+        if not user_doc:
+            return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
+
+        selected_date = safe_str(
+            data.get("date")
+            or data.get("selectedDate")
+            or data.get("selected_date")
+            or data.get("shiftDate")
+            or data.get("shift_date")
+            or request.args.get("date")
+            or request.args.get("selectedDate")
+            or request.args.get("shiftDate")
+        )
+        date_from = safe_str(data.get("dateFrom") or data.get("date_from") or request.args.get("dateFrom") or request.args.get("date_from") or selected_date)
+        date_to = safe_str(data.get("dateTo") or data.get("date_to") or request.args.get("dateTo") or request.args.get("date_to") or selected_date or date_from)
+        if not date_from and not date_to:
+            date_from = now_utc().strftime("%Y-%m-%d")
+            date_to = date_from
+
+        activity_report = build_driver_activity_period_report(user_doc, date_from, date_to)
+        selected_day = (activity_report.get("days") or [{}])[0] if activity_report.get("date_from") == activity_report.get("date_to") else None
+        return jsonify({
+            "success": True,
+            "message": "Fahrerkarten-Zeiten wurden aus der dauerhaften Tageshistorie geladen.",
+            "driverId": safe_str(user_doc.get("discord_id") or user_doc.get("_id")),
+            "driverName": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer",
+            "dateFrom": activity_report.get("date_from"),
+            "dateTo": activity_report.get("date_to"),
+            "selectedDate": activity_report.get("date_from") if selected_day else selected_date,
+            "dailyTimes": selected_day,
+            "daily_times": selected_day,
+            "activityHistory": activity_report,
+            "activity_history": activity_report,
+        })
+    except Exception as error:
+        app.logger.exception("Fahrerkarten-Tageszeiten konnten nicht geladen werden")
+        return personalabteilung_json_error(f"Fahrerkarten-Zeiten konnten nicht geladen werden: {error}", 500)
 
 
 @app.route("/api/personalabteilung/fahrerkarte/pdf/create", methods=["POST", "OPTIONS"])
