@@ -1264,27 +1264,68 @@
         overflow-wrap: anywhere;
     }
 
+    /* Robuste Modal-Technik für alle Personalabteilungs-Modals.
+       Die Modals werden per JavaScript als Portal direkt in <body> verschoben.
+       Dadurch bleiben sie immer im sichtbaren Browserfenster, auch wenn man im
+       Tab "Fahrerkarten Daten" weit unten scrollt oder beliebige User-Zeilen öffnet. */
+    :root {
+        --hr-modal-vh: 1vh;
+        --hr-modal-scroll-y: 0px;
+    }
+
     .modal-backdrop {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483000 !important;
+        width: 100vw !important;
+        min-width: 100vw !important;
+        height: calc(var(--hr-modal-vh, 1vh) * 100) !important;
+        min-height: calc(var(--hr-modal-vh, 1vh) * 100) !important;
+        display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: clamp(0.75rem, 2.5vw, 1.5rem) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        background: transparent !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        isolation: isolate !important;
+        transform: none !important;
+        filter: none !important;
+        box-sizing: border-box !important;
+        transition: opacity 180ms ease !important;
+    }
+
+    .modal-backdrop::before {
+        content: "";
         position: fixed;
         inset: 0;
-        z-index: 2147482000;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem;
-        background: rgba(0, 0, 0, 0.72);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
+        z-index: -1;
+        background:
+            radial-gradient(circle at 50% 38%, rgba(var(--el-green-rgb), 0.12), transparent 34%),
+            rgba(1, 5, 3, 0.76);
+        backdrop-filter: blur(18px) brightness(0.72) saturate(0.96);
+        -webkit-backdrop-filter: blur(18px) brightness(0.72) saturate(0.96);
+        pointer-events: none;
     }
 
     .modal-backdrop.active {
-        display: flex;
+        display: flex !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
     }
 
     .modal-card {
-        width: min(660px, 100%);
-        max-height: 88vh;
-        overflow: hidden;
+        position: relative !important;
+        z-index: 1 !important;
+        width: min(660px, calc(100vw - 1.5rem)) !important;
+        max-width: calc(100vw - 1.5rem) !important;
+        max-height: calc((var(--hr-modal-vh, 1vh) * 100) - 1.5rem) !important;
+        margin: auto !important;
+        overflow: hidden !important;
         border-radius: var(--hr-radius-xl);
         background:
             radial-gradient(circle at 14% 0%, rgba(var(--el-green-rgb), 0.12), transparent 35%),
@@ -1293,7 +1334,47 @@
         box-shadow: 0 34px 90px rgba(0, 0, 0, 0.78);
         display: flex;
         flex-direction: column;
+        flex: 0 1 auto !important;
+        transform: translateY(12px) scale(0.985);
+        transform-origin: center center !important;
         animation: modalIn 220ms ease-out forwards;
+    }
+
+    .modal-backdrop.active .modal-card {
+        transform: translateY(0) scale(1);
+    }
+
+    #documentModal .modal-card,
+    #driverCardModal .modal-card,
+    #serviceModal .modal-card,
+    #accountingModal .modal-card {
+        width: min(760px, calc(100vw - 1.5rem)) !important;
+    }
+
+    html.hr-modal-locked,
+    body.hr-modal-locked {
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+    }
+
+    body.hr-modal-locked {
+        position: fixed !important;
+        top: calc(var(--hr-modal-scroll-y, 0px) * -1) !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        touch-action: none !important;
+    }
+
+    @supports (height: 100dvh) {
+        .modal-backdrop {
+            height: 100dvh !important;
+            min-height: 100dvh !important;
+        }
+
+        .modal-card {
+            max-height: calc(100dvh - 1.5rem) !important;
+        }
     }
 
     .modal-head {
@@ -1341,6 +1422,26 @@
         overflow-y: auto;
         display: grid;
         gap: 0.9rem;
+        flex: 1 1 auto;
+        min-height: 0;
+        overscroll-behavior: contain;
+    }
+
+    .modal-card::-webkit-scrollbar,
+    .modal-body::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .modal-card::-webkit-scrollbar-track,
+    .modal-body::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.18);
+        border-radius: 999px;
+    }
+
+    .modal-card::-webkit-scrollbar-thumb,
+    .modal-body::-webkit-scrollbar-thumb {
+        background: rgba(var(--el-green-rgb), 0.44);
+        border-radius: 999px;
     }
 
     .modal-actions {
@@ -1463,7 +1564,15 @@
 
         .personal-page .table-head span { text-align: left; }
 
-        .modal-backdrop { padding: 1rem; }
+        .modal-backdrop { padding: 0.75rem !important; }
+        .modal-card {
+            width: calc(100vw - 1.5rem) !important;
+            max-width: calc(100vw - 1.5rem) !important;
+            max-height: calc((var(--hr-modal-vh, 1vh) * 100) - 1.5rem) !important;
+            border-radius: 1.15rem !important;
+        }
+        .modal-head { padding: 1rem !important; }
+        .modal-body { padding: 1rem !important; }
         .modal-actions { flex-direction: column; }
         .modal-actions .request-btn,
         .modal-actions .token-btn,
@@ -3248,6 +3357,118 @@ Lenk/Ruhe
         const driverCardSubmitButton = document.getElementById("driverCardSubmitButton");
         let currentDriverCardContext = {};
 
+        let modalLockScrollY = 0;
+        const modalFocusStore = new WeakMap();
+
+        function updateModalViewportUnit() {
+            const viewportHeight = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0;
+            if (viewportHeight > 0) {
+                document.documentElement.style.setProperty("--hr-modal-vh", `${viewportHeight * 0.01}px`);
+            }
+        }
+
+        function mountModalsToBody() {
+            document.querySelectorAll(".modal-backdrop").forEach((modal) => {
+                if (modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+
+                modal.setAttribute("role", "dialog");
+                modal.setAttribute("aria-modal", "true");
+                modal.setAttribute("aria-hidden", modal.classList.contains("active") ? "false" : "true");
+            });
+        }
+
+        function getOpenModals() {
+            return Array.from(document.querySelectorAll(".modal-backdrop.active"));
+        }
+
+        function lockModalScroll() {
+            if (document.documentElement.classList.contains("hr-modal-locked")) return;
+
+            modalLockScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+            document.documentElement.style.setProperty("--hr-modal-scroll-y", `${modalLockScrollY}px`);
+            document.documentElement.classList.add("hr-modal-locked");
+            document.body.classList.add("hr-modal-locked");
+        }
+
+        function unlockModalScrollIfNeeded() {
+            if (getOpenModals().length > 0) return;
+
+            const scrollY = modalLockScrollY;
+            document.documentElement.classList.remove("hr-modal-locked");
+            document.body.classList.remove("hr-modal-locked");
+            document.body.style.removeProperty("top");
+            document.body.style.removeProperty("left");
+            document.body.style.removeProperty("right");
+            document.body.style.removeProperty("width");
+            window.scrollTo(0, scrollY);
+        }
+
+        function getInitialModalFocus(modal, preferredFocus) {
+            if (preferredFocus && typeof preferredFocus.focus === "function") return preferredFocus;
+
+            return modal?.querySelector(
+                "[autofocus], input:not([type='hidden']):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+            );
+        }
+
+        function openHrModal(modal, preferredFocus = null) {
+            if (!modal) return;
+
+            updateModalViewportUnit();
+            mountModalsToBody();
+
+            modalFocusStore.set(modal, document.activeElement);
+            lockModalScroll();
+
+            modal.classList.add("active");
+            modal.setAttribute("aria-hidden", "false");
+
+            const card = modal.querySelector(".modal-card");
+            const body = modal.querySelector(".modal-body");
+
+            if (card) card.scrollTop = 0;
+            if (body) body.scrollTop = 0;
+
+            requestAnimationFrame(() => {
+                updateModalViewportUnit();
+
+                const focusTarget = getInitialModalFocus(modal, preferredFocus) || card || modal;
+                if (!focusTarget.hasAttribute?.("tabindex") && focusTarget === card) {
+                    focusTarget.setAttribute("tabindex", "-1");
+                }
+
+                if (typeof focusTarget.focus === "function") {
+                    focusTarget.focus({ preventScroll: true });
+                }
+            });
+        }
+
+        function closeHrModal(modal) {
+            if (!modal) return;
+
+            modal.classList.remove("active");
+            modal.setAttribute("aria-hidden", "true");
+
+            const previousFocus = modalFocusStore.get(modal);
+            unlockModalScrollIfNeeded();
+
+            if (previousFocus && typeof previousFocus.focus === "function") {
+                window.setTimeout(() => {
+                    if (getOpenModals().length === 0) {
+                        previousFocus.focus({ preventScroll: true });
+                    }
+                }, 0);
+            }
+        }
+
+        updateModalViewportUnit();
+        mountModalsToBody();
+        window.addEventListener("resize", updateModalViewportUnit, { passive: true });
+        window.visualViewport?.addEventListener("resize", updateModalViewportUnit, { passive: true });
+        window.visualViewport?.addEventListener("scroll", updateModalViewportUnit, { passive: true });
+
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
         }
@@ -3696,17 +3917,11 @@ Lenk/Ruhe
                 ? "Token-Anfrage ablehnen"
                 : "Fahrer-Registrierung ablehnen";
 
-            rejectModal.classList.add("active");
-            document.body.style.overflow = "hidden";
-
-            setTimeout(() => {
-                rejectReason.focus();
-            }, 60);
+            openHrModal(rejectModal, rejectReason);
         }
 
         function closeRejectModal() {
-            rejectModal.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(rejectModal);
         }
         
         function normalizeDocumentMode(mode) {
@@ -3753,18 +3968,11 @@ Lenk/Ruhe
             documentTitle.value = presetTitle || "";
             documentMessage.value = presetMessage || "";
             setDocumentMode(context.mode || "direct_document");
-            
-            documentModal.classList.add("active");
-            document.body.style.overflow = "hidden";
-            
-            setTimeout(() => {
-                documentTitle.focus();
-            }, 60);
+            openHrModal(documentModal, documentTitle);
         }
         
         function closeDocumentModal() {
-            documentModal.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(documentModal);
         }
 
         function downloadFromUrl(url, filename = "EifelLog_Beleg.pdf") {
@@ -3816,16 +4024,11 @@ Lenk/Ruhe
 
         function openTaskModal() {
             taskForm.reset();
-            taskModal.classList.add("active");
-            document.body.style.overflow = "hidden";
-            setTimeout(() => {
-                document.getElementById("taskTitle").focus();
-            }, 60);
+            openHrModal(taskModal, document.getElementById("taskTitle"));
         }
 
         function closeTaskModal() {
-            taskModal.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(taskModal);
         }
 
         function humanizeAccountingStatus(status) {
@@ -3894,13 +4097,11 @@ Lenk/Ruhe
             accountingDetailSubject.textContent = subject;
             accountingDetailMessage.textContent = message;
 
-            accountingModal.classList.add("active");
-            document.body.style.overflow = "hidden";
+            openHrModal(accountingModal);
         }
 
         function closeAccountingModal() {
-            accountingModal?.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(accountingModal);
         }
 
         function openServiceModal(button) {
@@ -3968,13 +4169,11 @@ Lenk/Ruhe
                 }
             }
 
-            serviceModal.classList.add("active");
-            document.body.style.overflow = "hidden";
+            openHrModal(serviceModal);
         }
 
         function closeServiceModal() {
-            serviceModal?.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(serviceModal);
         }
 
         function humanizeDriverCardCompliance(status) {
@@ -4029,13 +4228,11 @@ Lenk/Ruhe
                 driverCardNote.placeholder = "Hinweis zum Fahrerkarten-Beleg, z.B. Abfragegrund oder Aktennotiz...";
             }
 
-            driverCardModal.classList.add("active");
-            document.body.style.overflow = "hidden";
+            openHrModal(driverCardModal, driverCardDateFrom || driverCardSubmitButton);
         }
 
         function closeDriverCardModal() {
-            driverCardModal?.classList.remove("active");
-            document.body.style.overflow = "";
+            closeHrModal(driverCardModal);
         }
 
         function updateDriverCardRow(row, result = {}) {
