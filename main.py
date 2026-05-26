@@ -6742,7 +6742,7 @@ ETS2_MAP_IMAGE_URL = env_first(
     "ETS2_MAP_IMAGE_URL",
     "ETS2_OFFICIAL_MAP_IMAGE_URL",
     "OFFICIAL_ETS2_MAP_IMAGE_URL",
-    default="/static/img/ets2/ets2-official-map-current.jpg",
+    default="/static/ets2_map.png",
 )
 
 ETS2_CITY_COORDINATES_PATH = env_first(
