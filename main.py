@@ -6738,7 +6738,17 @@ def normalize_logbook_entry(entry, user_doc=None):
 # ETS2-KARTENROUTEN FÜR FAHRTENBUCH-DETAIL
 # ==========================================
 
-ETS2_MAP_IMAGE_URL = "/static/ets2_map.jpg"
+ETS2_MAP_IMAGE_URL = env_first(
+    "ETS2_MAP_IMAGE_URL",
+    "PROMODS_2_82_MAP_IMAGE_URL",
+    "PROMODS_MAP_IMAGE_URL",
+    default="/static/ets2_map.jpg"
+)
+ETS2_MAP_PROFILE = env_first(
+    "ETS2_MAP_PROFILE",
+    "PROMODS_MAP_PROFILE",
+    default="ProMods Europe 2.82 / ETS2"
+)
 
 ETS2_CITY_COORDINATES_PATH = env_first(
     "ETS2_CITY_COORDINATES_PATH",
@@ -6884,6 +6894,332 @@ DEFAULT_ETS2_CITY_MAP_COORDINATES = {
     "københavn": {"x": 53.8, "y": 29.6},
 }
 
+# ProMods Europe 2.82 / aktuelle ETS2-Karte – breite Fallback-Koordinaten.
+# Werte sind Prozentkoordinaten auf /static/ets2_map.jpg bzw. PROMODS_2_82_MAP_IMAGE_URL.
+# Exakte projektspezifische Werte können weiterhin über ETS2_CITY_COORDINATES_PATH überschrieben werden.
+PROMODS_2_82_CITY_MAP_COORDINATES = {
+    # Russland / Nordost-Erweiterungen / ProMods-Räume
+    "sankt peterburg": {"x": 79.8, "y": 16.8, "aliases": ["saint petersburg", "st petersburg", "st. petersburg", "st-petersburg", "sankt-peterburg", "sanct petersburg", "санкт-петербург", "санкт петербург", "петербург", "saint-petersbourg"]},
+    "saint petersburg": {"x": 79.8, "y": 16.8},
+    "st petersburg": {"x": 79.8, "y": 16.8},
+    "st. petersburg": {"x": 79.8, "y": 16.8},
+    "петербург": {"x": 79.8, "y": 16.8},
+    "выборг": {"x": 77.5, "y": 15.8, "aliases": ["vyborg"]},
+    "vyborg": {"x": 77.5, "y": 15.8},
+    "псков": {"x": 78.7, "y": 24.5, "aliases": ["pskov"]},
+    "pskov": {"x": 78.7, "y": 24.5},
+    "великие луки": {"x": 78.8, "y": 30.4, "aliases": ["velikiye luki", "velikie luki"]},
+    "velikiye luki": {"x": 78.8, "y": 30.4},
+    "луга": {"x": 79.2, "y": 20.2, "aliases": ["luga"]},
+    "luga": {"x": 79.2, "y": 20.2},
+
+    # Baltikum
+    "narva": {"x": 77.2, "y": 21.0},
+    "tartu": {"x": 75.5, "y": 23.5},
+    "parnu": {"x": 73.9, "y": 24.0, "aliases": ["pärnu"]},
+    "pärnu": {"x": 73.9, "y": 24.0},
+    "paldiski": {"x": 72.7, "y": 19.7},
+    "kunda": {"x": 75.4, "y": 20.2},
+    "liepaja": {"x": 72.0, "y": 31.0, "aliases": ["liepāja"]},
+    "liepāja": {"x": 72.0, "y": 31.0},
+    "ventspils": {"x": 72.5, "y": 28.8},
+    "rezekne": {"x": 78.0, "y": 31.3, "aliases": ["rēzekne"]},
+    "rēzekne": {"x": 78.0, "y": 31.3},
+    "daugavpils": {"x": 78.1, "y": 34.5},
+    "valmiera": {"x": 76.0, "y": 27.3},
+    "klaipeda": {"x": 71.3, "y": 34.1, "aliases": ["klaipėda"]},
+    "klaipėda": {"x": 71.3, "y": 34.1},
+    "siauliai": {"x": 73.5, "y": 34.2, "aliases": ["šiauliai"]},
+    "šiauliai": {"x": 73.5, "y": 34.2},
+    "panevezys": {"x": 74.6, "y": 35.0, "aliases": ["panevėžys"]},
+    "panevėžys": {"x": 74.6, "y": 35.0},
+    "utena": {"x": 76.0, "y": 35.8},
+    "mazeikiai": {"x": 72.3, "y": 33.1, "aliases": ["mažeikiai"]},
+    "mažeikiai": {"x": 72.3, "y": 33.1},
+
+    # Finnland / Skandinavien / ProMods Norden
+    "kotka": {"x": 74.2, "y": 15.8},
+    "loviisa": {"x": 73.2, "y": 15.2},
+    "kouvola": {"x": 74.0, "y": 13.8},
+    "lahti": {"x": 72.2, "y": 12.8},
+    "tampere": {"x": 70.0, "y": 11.6},
+    "pori": {"x": 67.8, "y": 11.0},
+    "naantali": {"x": 67.2, "y": 13.7},
+    "oulu": {"x": 67.8, "y": 4.8},
+    "rovaniemi": {"x": 67.8, "y": 1.6},
+    "ivalo": {"x": 66.2, "y": 0.7},
+    "kajaani": {"x": 70.0, "y": 6.8},
+    "kuopio": {"x": 71.6, "y": 8.8},
+    "joensuu": {"x": 74.0, "y": 10.3},
+    "vaasa": {"x": 65.5, "y": 8.8},
+    "jyvaskyla": {"x": 70.5, "y": 10.0, "aliases": ["jyväskylä"]},
+    "jyväskylä": {"x": 70.5, "y": 10.0},
+    "kirkenes": {"x": 68.3, "y": 0.7},
+    "alta": {"x": 58.8, "y": 1.3},
+    "tromso": {"x": 54.2, "y": 1.8, "aliases": ["tromsø"]},
+    "tromsø": {"x": 54.2, "y": 1.8},
+    "narvik": {"x": 54.6, "y": 5.3},
+    "bodo": {"x": 50.6, "y": 8.2, "aliases": ["bodø"]},
+    "bodø": {"x": 50.6, "y": 8.2},
+    "mo i rana": {"x": 51.5, "y": 10.3},
+    "trondheim": {"x": 48.7, "y": 14.6},
+    "kristiansund": {"x": 46.2, "y": 15.3},
+    "alesund": {"x": 45.0, "y": 15.8, "aliases": ["ålesund"]},
+    "ålesund": {"x": 45.0, "y": 15.8},
+    "vasteras": {"x": 60.7, "y": 20.7, "aliases": ["västerås"]},
+    "västerås": {"x": 60.7, "y": 20.7},
+    "orebro": {"x": 58.8, "y": 21.5, "aliases": ["örebro"]},
+    "örebro": {"x": 58.8, "y": 21.5},
+    "uppsala": {"x": 61.8, "y": 19.5},
+    "sodertalje": {"x": 60.8, "y": 19.7, "aliases": ["södertälje"]},
+    "södertälje": {"x": 60.8, "y": 19.7},
+    "nynashamn": {"x": 61.0, "y": 20.6, "aliases": ["nynäshamn"]},
+    "nynäshamn": {"x": 61.0, "y": 20.6},
+    "jonkoping": {"x": 56.2, "y": 23.0, "aliases": ["jönköping"]},
+    "jönköping": {"x": 56.2, "y": 23.0},
+    "linkoping": {"x": 58.3, "y": 22.0, "aliases": ["linköping"]},
+    "linköping": {"x": 58.3, "y": 22.0},
+    "kalmar": {"x": 57.6, "y": 26.4},
+    "karlskrona": {"x": 56.8, "y": 28.1},
+    "helsingborg": {"x": 54.2, "y": 28.1},
+    "trelleborg": {"x": 55.5, "y": 29.9},
+    "vaxjo": {"x": 56.6, "y": 25.5, "aliases": ["växjö"]},
+    "växjö": {"x": 56.6, "y": 25.5},
+    "hirtshals": {"x": 49.0, "y": 24.0},
+    "frederikshavn": {"x": 50.1, "y": 24.3},
+    "gedser": {"x": 52.7, "y": 30.6},
+
+    # Island / Färöer / Atlantik-ProMods
+    "reykjavik": {"x": 11.0, "y": 7.5, "aliases": ["reykjavík"]},
+    "reykjavík": {"x": 11.0, "y": 7.5},
+    "keflavik": {"x": 10.0, "y": 8.3, "aliases": ["keflavík"]},
+    "keflavík": {"x": 10.0, "y": 8.3},
+    "akureyri": {"x": 13.5, "y": 4.6},
+    "egilsstadir": {"x": 16.8, "y": 6.3, "aliases": ["egilsstaðir"]},
+    "egilsstaðir": {"x": 16.8, "y": 6.3},
+    "hofn": {"x": 16.1, "y": 8.7, "aliases": ["höfn"]},
+    "höfn": {"x": 16.1, "y": 8.7},
+    "torshavn": {"x": 24.0, "y": 18.4, "aliases": ["tórshavn"]},
+    "tórshavn": {"x": 24.0, "y": 18.4},
+
+    # UK / Irland / Inseln
+    "aberdeen": {"x": 15.9, "y": 24.2},
+    "inverness": {"x": 13.8, "y": 22.6},
+    "newcastle": {"x": 18.0, "y": 32.1},
+    "newcastle upon tyne": {"x": 18.0, "y": 32.1},
+    "sheffield": {"x": 18.8, "y": 35.8},
+    "grimsby": {"x": 21.0, "y": 36.2},
+    "southampton": {"x": 18.3, "y": 45.9},
+    "cardiff": {"x": 15.0, "y": 42.6},
+    "swansea": {"x": 13.7, "y": 42.7},
+    "carlisle": {"x": 17.1, "y": 31.1},
+    "dublin": {"x": 9.5, "y": 36.5},
+    "cork": {"x": 7.7, "y": 43.0},
+    "galway": {"x": 6.7, "y": 37.7},
+    "belfast": {"x": 10.4, "y": 32.1},
+
+    # Frankreich / Benelux / DACH Ergänzungen
+    "le havre": {"x": 27.2, "y": 47.0},
+    "rennes": {"x": 24.5, "y": 53.5},
+    "brest": {"x": 19.5, "y": 54.0},
+    "nantes": {"x": 25.0, "y": 57.5},
+    "la rochelle": {"x": 25.0, "y": 61.5},
+    "limoges": {"x": 29.6, "y": 62.8},
+    "clermont ferrand": {"x": 32.7, "y": 62.3, "aliases": ["clermont-ferrand"]},
+    "clermont-ferrand": {"x": 32.7, "y": 62.3},
+    "bourges": {"x": 31.8, "y": 57.1},
+    "montpellier": {"x": 33.2, "y": 71.7},
+    "bayonne": {"x": 23.6, "y": 72.1},
+    "roscoff": {"x": 20.8, "y": 51.4},
+    "golfech": {"x": 27.3, "y": 69.1},
+    "lacq": {"x": 24.8, "y": 71.0},
+    "civaux": {"x": 27.8, "y": 60.1},
+    "saint alban du rhone": {"x": 35.0, "y": 66.6, "aliases": ["saint-alban-du-rhone", "saint-alban-du-rhône"]},
+    "ajaccio": {"x": 40.7, "y": 82.0},
+    "bastia": {"x": 42.3, "y": 79.0},
+    "bonifacio": {"x": 41.2, "y": 84.2},
+    "calvi": {"x": 40.4, "y": 78.4},
+    "porto vecchio": {"x": 42.2, "y": 83.0},
+    "ile rousse": {"x": 40.7, "y": 78.0, "aliases": ["l'ile-rousse", "l ile rousse", "l'Île-Rousse"]},
+    "groningen": {"x": 41.2, "y": 30.0},
+    "antwerpen": {"x": 36.7, "y": 39.6, "aliases": ["antwerp", "anvers"]},
+    "antwerp": {"x": 36.7, "y": 39.6},
+    "charleroi": {"x": 36.3, "y": 43.3},
+    "namur": {"x": 37.2, "y": 43.3},
+    "koblenz": {"x": 41.0, "y": 45.0},
+    "saarbrucken": {"x": 39.8, "y": 49.8, "aliases": ["saarbrücken"]},
+    "saarbrücken": {"x": 39.8, "y": 49.8},
+    "freiburg": {"x": 40.9, "y": 57.2},
+    "karlsruhe": {"x": 42.0, "y": 53.4},
+    "wurzburg": {"x": 47.5, "y": 52.1, "aliases": ["würzburg"]},
+    "würzburg": {"x": 47.5, "y": 52.1},
+    "regensburg": {"x": 51.2, "y": 57.5},
+    "passau": {"x": 53.4, "y": 60.0},
+    "augsburg": {"x": 47.5, "y": 61.0},
+    "ulm": {"x": 45.5, "y": 59.4},
+    "klagenfurt": {"x": 56.0, "y": 70.4},
+    "sankt polten": {"x": 60.0, "y": 65.0, "aliases": ["st polten", "st. polten", "st. pölten", "sankt pölten"]},
+
+    # Polen / Tschechien / Slowakei / Ungarn Ergänzungen
+    "lodz": {"x": 67.0, "y": 43.7, "aliases": ["łódź", "lódz"]},
+    "łódź": {"x": 67.0, "y": 43.7},
+    "bialystok": {"x": 73.5, "y": 39.1, "aliases": ["białystok"]},
+    "białystok": {"x": 73.5, "y": 39.1},
+    "lublin": {"x": 72.3, "y": 48.6},
+    "olsztyn": {"x": 68.2, "y": 35.4},
+    "zakrzewo": {"x": 62.5, "y": 38.2},
+    "banska bystrica": {"x": 64.3, "y": 59.7, "aliases": ["banská bystrica"]},
+    "banská bystrica": {"x": 64.3, "y": 59.7},
+    "kosice": {"x": 69.5, "y": 59.7, "aliases": ["košice"]},
+    "košice": {"x": 69.5, "y": 59.7},
+    "pecs": {"x": 65.1, "y": 75.7, "aliases": ["pécs"]},
+    "pécs": {"x": 65.1, "y": 75.7},
+    "szeged": {"x": 69.6, "y": 75.3},
+
+    # Rumänien / Bulgarien / Türkei / Ukraine-nahe Räume
+    "arad": {"x": 70.7, "y": 76.5},
+    "timisoara": {"x": 69.0, "y": 78.5, "aliases": ["timișoara", "timisoara"]},
+    "timișoara": {"x": 69.0, "y": 78.5},
+    "resita": {"x": 69.5, "y": 81.0, "aliases": ["reșița"]},
+    "sibiu": {"x": 73.5, "y": 80.2},
+    "brasov": {"x": 76.0, "y": 80.0, "aliases": ["brașov"]},
+    "cluj napoca": {"x": 73.0, "y": 76.4, "aliases": ["cluj-napoca"]},
+    "bacau": {"x": 79.5, "y": 77.6, "aliases": ["bacău"]},
+    "iasi": {"x": 80.3, "y": 74.8, "aliases": ["iași"]},
+    "constanta": {"x": 81.0, "y": 85.0, "aliases": ["constanța"]},
+    "bucharest": {"x": 77.4, "y": 84.0, "aliases": ["bucuresti", "bucurești"]},
+    "bucuresti": {"x": 77.4, "y": 84.0},
+    "craiova": {"x": 73.9, "y": 84.5},
+    "varna": {"x": 81.3, "y": 89.2},
+    "burgas": {"x": 82.6, "y": 91.4},
+    "ruse": {"x": 78.2, "y": 86.3},
+    "pleven": {"x": 76.2, "y": 87.5},
+    "sofia": {"x": 73.3, "y": 91.3},
+    "plovdiv": {"x": 76.5, "y": 92.1},
+    "veliko tarnovo": {"x": 78.2, "y": 88.6},
+    "pernik": {"x": 72.7, "y": 92.0},
+    "karlovo": {"x": 76.2, "y": 90.4},
+    "pirdop": {"x": 75.5, "y": 90.3},
+    "edirne": {"x": 81.4, "y": 94.4},
+    "istanbul": {"x": 84.8, "y": 95.2},
+    "tekirdag": {"x": 83.2, "y": 96.0, "aliases": ["tekirdağ"]},
+    "hopa": {"x": 94.0, "y": 90.0},
+
+    # Balkan / Adria / Griechenland
+    "ljubljana": {"x": 54.1, "y": 73.5},
+    "maribor": {"x": 57.0, "y": 72.5},
+    "koper": {"x": 53.0, "y": 75.5},
+    "novo mesto": {"x": 55.3, "y": 74.7},
+    "zagreb": {"x": 58.2, "y": 75.0},
+    "rijeka": {"x": 55.5, "y": 78.0},
+    "split": {"x": 58.3, "y": 84.0},
+    "zadar": {"x": 57.2, "y": 81.3},
+    "osijek": {"x": 63.5, "y": 77.5},
+    "sarajevo": {"x": 62.0, "y": 85.0},
+    "mostar": {"x": 60.5, "y": 86.8},
+    "tuzla": {"x": 63.0, "y": 83.0},
+    "zenica": {"x": 61.8, "y": 84.0},
+    "banja luka": {"x": 60.0, "y": 81.3},
+    "bihac": {"x": 58.0, "y": 80.5, "aliases": ["bihać"]},
+    "karakaj": {"x": 64.0, "y": 83.8},
+    "belgrade": {"x": 66.3, "y": 82.4, "aliases": ["beograd", "београд"]},
+    "beograd": {"x": 66.3, "y": 82.4},
+    "novi sad": {"x": 65.8, "y": 80.5},
+    "kragujevac": {"x": 67.0, "y": 85.0},
+    "nis": {"x": 68.6, "y": 88.0, "aliases": ["niš"]},
+    "niš": {"x": 68.6, "y": 88.0},
+    "podgorica": {"x": 62.7, "y": 90.1},
+    "niksic": {"x": 61.8, "y": 89.0, "aliases": ["nikšić"]},
+    "bijelo polje": {"x": 64.0, "y": 88.7},
+    "tirana": {"x": 63.8, "y": 94.8},
+    "durres": {"x": 63.2, "y": 94.4, "aliases": ["durrës"]},
+    "vlore": {"x": 63.0, "y": 96.8, "aliases": ["vlorë"]},
+    "fier": {"x": 63.1, "y": 95.9},
+    "skopje": {"x": 67.0, "y": 93.5},
+    "bitola": {"x": 66.4, "y": 96.3},
+    "pristina": {"x": 66.0, "y": 91.8},
+    "thessaloniki": {"x": 70.5, "y": 97.5, "aliases": ["saloniki", "θεσσαλονίκη", "solun"]},
+    "kavala": {"x": 73.5, "y": 96.7},
+    "ioannina": {"x": 67.0, "y": 98.4},
+    "larisa": {"x": 69.8, "y": 99.0, "aliases": ["larissa"]},
+    "trikala": {"x": 68.8, "y": 98.9},
+    "lamia": {"x": 69.5, "y": 99.5},
+    "patras": {"x": 68.0, "y": 99.8},
+    "athens": {"x": 71.1, "y": 99.9, "aliases": ["athina", "athen", "αθήνα"]},
+
+    # Italien Erweiterungen / Inseln
+    "ancona": {"x": 52.0, "y": 80.0},
+    "bari": {"x": 56.2, "y": 89.0},
+    "taranto": {"x": 56.0, "y": 91.6},
+    "catanzaro": {"x": 57.0, "y": 96.2},
+    "cassino": {"x": 51.4, "y": 88.8},
+    "pescara": {"x": 53.0, "y": 84.5},
+    "terni": {"x": 50.5, "y": 84.0},
+    "parma": {"x": 46.0, "y": 74.8},
+    "livorno": {"x": 46.0, "y": 81.8},
+    "suzzara": {"x": 48.0, "y": 74.4},
+    "cagliari": {"x": 44.0, "y": 90.5},
+    "olbia": {"x": 44.5, "y": 86.5},
+    "sassari": {"x": 43.0, "y": 85.5},
+    "palermo": {"x": 52.4, "y": 99.1},
+    "catania": {"x": 55.6, "y": 99.2},
+    "messina": {"x": 55.3, "y": 97.8},
+    "villa san giovanni": {"x": 55.0, "y": 97.3},
+
+    # Iberia
+    "madrid": {"x": 19.2, "y": 82.5},
+    "barcelona": {"x": 28.5, "y": 80.7},
+    "zaragoza": {"x": 24.2, "y": 78.8},
+    "valencia": {"x": 24.5, "y": 86.0},
+    "murcia": {"x": 23.8, "y": 90.0},
+    "albacete": {"x": 21.6, "y": 87.8},
+    "almeria": {"x": 22.4, "y": 94.2, "aliases": ["almería"]},
+    "malaga": {"x": 17.4, "y": 94.0, "aliases": ["málaga"]},
+    "granada": {"x": 20.0, "y": 93.0},
+    "sevilla": {"x": 14.5, "y": 91.6, "aliases": ["seville"]},
+    "huelva": {"x": 12.5, "y": 91.0},
+    "cordoba": {"x": 16.7, "y": 90.0, "aliases": ["córdoba"]},
+    "jerez de la frontera": {"x": 15.0, "y": 93.5},
+    "algeciras": {"x": 16.2, "y": 96.4},
+    "la linea de la concepcion": {"x": 16.4, "y": 96.2, "aliases": ["la línea de la concepción"]},
+    "san roque": {"x": 16.0, "y": 96.0},
+    "ciudad real": {"x": 18.4, "y": 87.5},
+    "bailen": {"x": 18.5, "y": 90.0, "aliases": ["bailén"]},
+    "mengibar": {"x": 18.7, "y": 90.1, "aliases": ["mengíbar"]},
+    "badajoz": {"x": 12.0, "y": 85.4},
+    "caceres": {"x": 13.3, "y": 82.5, "aliases": ["cáceres"]},
+    "salamanca": {"x": 14.6, "y": 77.8},
+    "valladolid": {"x": 16.4, "y": 76.2},
+    "burgos": {"x": 18.6, "y": 74.8},
+    "bilbao": {"x": 20.0, "y": 72.0},
+    "santander": {"x": 17.6, "y": 72.0},
+    "gijon": {"x": 14.3, "y": 71.5, "aliases": ["gijón"]},
+    "leon": {"x": 14.9, "y": 74.0, "aliases": ["león"]},
+    "vigo": {"x": 9.2, "y": 76.2},
+    "la coruna": {"x": 8.0, "y": 72.8, "aliases": ["a coruña", "la Coruña"]},
+    "pamplona": {"x": 22.5, "y": 73.7},
+    "lleida": {"x": 26.0, "y": 78.5, "aliases": ["lérida"]},
+    "tarragona": {"x": 27.0, "y": 81.8},
+    "teruel": {"x": 24.2, "y": 83.7},
+    "villarreal": {"x": 25.7, "y": 84.1, "aliases": ["vila-real"]},
+    "puerto de sagunto": {"x": 25.1, "y": 84.9},
+    "lisboa": {"x": 8.8, "y": 85.7, "aliases": ["lisbon"]},
+    "lisbon": {"x": 8.8, "y": 85.7},
+    "porto": {"x": 9.6, "y": 78.7},
+    "coimbra": {"x": 10.0, "y": 82.0},
+    "faro": {"x": 11.8, "y": 95.2},
+    "guarda": {"x": 11.4, "y": 78.6},
+    "evora": {"x": 10.1, "y": 88.5, "aliases": ["évora"]},
+    "setubal": {"x": 8.9, "y": 86.9, "aliases": ["setúbal"]},
+    "sines": {"x": 8.4, "y": 89.2},
+    "olhao": {"x": 12.2, "y": 95.4, "aliases": ["olhão"]},
+    "ponte de sor": {"x": 10.3, "y": 85.8},
+    "corticadas de lavre": {"x": 9.8, "y": 87.2, "aliases": ["cortiçadas de lavre"]},
+    "beja": {"x": 10.0, "y": 91.2},
+}
+
+DEFAULT_ETS2_CITY_MAP_COORDINATES.update(PROMODS_2_82_CITY_MAP_COORDINATES)
+
 _ETS2_CITY_COORDINATES_CACHE = None
 
 
@@ -6891,30 +7227,36 @@ def normalize_ets2_city_key(value):
     value = safe_str(value).lower()
     if not value:
         return ""
+
+    # Klammer-/Länderzusätze und Firmenzusätze entfernen, damit z. B.
+    # "Санкт-Петербург (RU)" oder "St. Petersburg / Tradeaux" sauber matchen.
+    value = re.sub(r"\([^)]*\)", " ", value)
+    value = value.replace("→", " ").replace("->", " ").replace("/", " ").replace("_", " ").replace("-", " ")
+
     replacements = {
-        "ä": "a",
-        "ö": "o",
-        "ü": "u",
-        "ß": "ss",
-        "á": "a",
-        "à": "a",
-        "â": "a",
-        "é": "e",
-        "è": "e",
-        "ê": "e",
-        "í": "i",
-        "ì": "i",
-        "ó": "o",
-        "ò": "o",
-        "ú": "u",
-        "ù": "u",
-        "ń": "n",
-        "ł": "l",
-        "ø": "o",
-        "å": "a",
+        "ä": "a", "ö": "o", "ü": "u", "ß": "ss",
+        "á": "a", "à": "a", "â": "a", "ã": "a", "å": "a", "æ": "ae",
+        "č": "c", "ć": "c", "ç": "c", "ď": "d",
+        "é": "e", "è": "e", "ê": "e", "ë": "e", "ě": "e", "ė": "e", "ę": "e",
+        "í": "i", "ì": "i", "î": "i", "ï": "i",
+        "ł": "l", "ľ": "l", "ĺ": "l",
+        "ń": "n", "ň": "n", "ñ": "n",
+        "ó": "o", "ò": "o", "ô": "o", "õ": "o", "ø": "o",
+        "ř": "r", "ś": "s", "š": "s", "ș": "s", "ş": "s",
+        "ť": "t", "ț": "t", "ţ": "t",
+        "ú": "u", "ù": "u", "û": "u", "ů": "u",
+        "ý": "y", "ž": "z", "ź": "z", "ż": "z",
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+        "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+        "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+        "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
+        "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
     }
     for old, new in replacements.items():
         value = value.replace(old, new)
+
+    value = value.replace("saint ", "sankt ").replace("st. ", "sankt ").replace("st ", "sankt ")
+    value = re.sub(r"[^a-z0-9 ]+", " ", value)
     value = re.sub(r"\s+", " ", value)
     return value.strip()
 
@@ -7086,35 +7428,138 @@ def normalize_ets2_route_point(point, index=0, default_name="", default_kind="st
     }
 
 
+def clamp_ets2_percent(value, fallback=0.0):
+    return round(max(0.0, min(100.0, parse_number(value, fallback))), 3)
+
+
+def points_share_ets2_position(a, b, tolerance=0.22):
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    return (
+        abs(parse_number(a.get("x"), -999) - parse_number(b.get("x"), 999)) <= tolerance
+        and abs(parse_number(a.get("y"), -999) - parse_number(b.get("y"), 999)) <= tolerance
+    )
+
+
+def finalize_ets2_route_points(route_points, source_city="", destination_city="", departure="", arrival=""):
+    points = [dict(point) for point in (route_points or []) if isinstance(point, dict)]
+    points = [point for point in points if parse_number(point.get("x"), -1) >= 0 and parse_number(point.get("y"), -1) >= 0]
+    if len(points) < 2:
+        return []
+
+    points[0]["kind"] = "start"
+    points[0]["type"] = points[0].get("type") or "start"
+    points[0]["time"] = safe_str(points[0].get("time") or departure)
+    points[-1]["kind"] = "end"
+    points[-1]["type"] = points[-1].get("type") or "end"
+    points[-1]["time"] = safe_str(points[-1].get("time") or arrival)
+
+    for index, point in enumerate(points):
+        point["x"] = clamp_ets2_percent(point.get("x"), 0)
+        point["y"] = clamp_ets2_percent(point.get("y"), 0)
+        point["name"] = safe_str(point.get("name") or point.get("city") or point.get("label"), f"Punkt {index + 1}")
+        point["kind"] = safe_str(point.get("kind") or point.get("type"), "stop")
+        point["type"] = safe_str(point.get("type") or point.get("kind"), point["kind"])
+        point["time"] = safe_str(point.get("time"))
+
+    same_city = normalize_ets2_city_key(source_city) and normalize_ets2_city_key(source_city) == normalize_ets2_city_key(destination_city)
+    same_position = points_share_ets2_position(points[0], points[-1])
+
+    # Bei Rundfahrten/Same-City-Jobs (z. B. Санкт-Петербург → Санкт-Петербург)
+    # wäre Start=Ziel sonst eine unsichtbare Linie. Wir erzeugen eine kleine lokale Schleife.
+    if len(points) == 2 and (same_city or same_position):
+        cx = clamp_ets2_percent(points[0].get("x"), 50)
+        cy = clamp_ets2_percent(points[0].get("y"), 50)
+        label = safe_str(source_city or destination_city or points[0].get("name") or "Route")
+        dx = 0.85
+        dy = 0.55
+        points = [
+            {"name": label, "x": clamp_ets2_percent(cx - dx, cx), "y": clamp_ets2_percent(cy + dy, cy), "kind": "start", "type": "start", "time": safe_str(departure)},
+            {"name": f"{label} Nord", "x": clamp_ets2_percent(cx - dx * 0.15, cx), "y": clamp_ets2_percent(cy - dy, cy), "kind": "via", "type": "via", "time": ""},
+            {"name": f"{label} Ost", "x": clamp_ets2_percent(cx + dx, cx), "y": clamp_ets2_percent(cy - dy * 0.15, cy), "kind": "via", "type": "via", "time": ""},
+            {"name": label, "x": clamp_ets2_percent(cx + dx * 0.25, cx), "y": clamp_ets2_percent(cy + dy * 0.75, cy), "kind": "end", "type": "end", "time": safe_str(arrival)},
+        ]
+
+    return points
+
+
+def parse_route_text_cities(route_text):
+    route_text = safe_str(route_text)
+    if not route_text:
+        return "", ""
+    separators = ["→", "->", "=>", " bis ", " nach ", " to "]
+    for separator in separators:
+        if separator in route_text:
+            left, right = route_text.split(separator, 1)
+            return clean_route_city_value(left, ""), clean_route_city_value(right, "")
+    return "", ""
+
+
+def coerce_ets2_route_point_list(candidate):
+    if not candidate:
+        return []
+    if isinstance(candidate, list):
+        return candidate
+    if isinstance(candidate, tuple):
+        return list(candidate)
+    if isinstance(candidate, dict):
+        for key in ("points", "route", "items", "waypoints", "coordinates", "nodes"):
+            nested = candidate.get(key)
+            if isinstance(nested, list) and nested:
+                return nested
+        return []
+    if isinstance(candidate, str):
+        value = candidate.strip()
+        if not value:
+            return []
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, dict):
+                return coerce_ets2_route_point_list(parsed)
+        except Exception:
+            pass
+        # Einfache Textliste: "Duisburg; Köln; Frankfurt" oder "A -> B".
+        if ";" in value:
+            return [part.strip() for part in value.split(";") if part.strip()]
+        start, end = parse_route_text_cities(value)
+        if start and end:
+            return [start, end]
+    return []
+
+
 def collect_raw_route_points(raw_entry):
     raw_entry = raw_entry or {}
     candidates = [
-        raw_entry.get("ets2_route_points"),
-        raw_entry.get("map_points"),
-        raw_entry.get("route_points"),
-        raw_entry.get("waypoints"),
-        raw_entry.get("zwischenstopps"),
-        raw_entry.get("routeCoordinates"),
-        raw_entry.get("route_coordinates"),
-        raw_entry.get("routeNodes"),
-        raw_entry.get("route_nodes"),
+        raw_entry.get("ets2_route_points"), raw_entry.get("ets2RoutePoints"),
+        raw_entry.get("map_points"), raw_entry.get("mapPoints"),
+        raw_entry.get("route_points"), raw_entry.get("routePoints"),
+        raw_entry.get("waypoints"), raw_entry.get("zwischenstopps"), raw_entry.get("stops"), raw_entry.get("via"),
+        raw_entry.get("routeCoordinates"), raw_entry.get("route_coordinates"), raw_entry.get("coordinates"),
+        raw_entry.get("routeNodes"), raw_entry.get("route_nodes"), raw_entry.get("nodes"),
+        raw_entry.get("route"),
     ]
 
     telemetry = raw_entry.get("telemetry") if isinstance(raw_entry.get("telemetry"), dict) else {}
     active_job = raw_entry.get("current_job") if isinstance(raw_entry.get("current_job"), dict) else {}
-    for nested in (telemetry, active_job):
+    job = raw_entry.get("job") if isinstance(raw_entry.get("job"), dict) else {}
+    navigation = raw_entry.get("navigation") if isinstance(raw_entry.get("navigation"), dict) else {}
+    for nested in (telemetry, active_job, job, navigation):
         candidates.extend([
-            nested.get("ets2_route_points"),
-            nested.get("map_points"),
-            nested.get("route_points"),
-            nested.get("waypoints"),
-            nested.get("routeCoordinates"),
-            nested.get("route_coordinates"),
+            nested.get("ets2_route_points"), nested.get("ets2RoutePoints"),
+            nested.get("map_points"), nested.get("mapPoints"),
+            nested.get("route_points"), nested.get("routePoints"),
+            nested.get("waypoints"), nested.get("stops"), nested.get("via"),
+            nested.get("routeCoordinates"), nested.get("route_coordinates"), nested.get("coordinates"),
+            nested.get("routeNodes"), nested.get("route_nodes"), nested.get("nodes"),
+            nested.get("route"),
         ])
 
     for candidate in candidates:
-        if isinstance(candidate, list) and candidate:
-            return candidate
+        points = coerce_ets2_route_point_list(candidate)
+        if points:
+            return points
     return []
 
 
@@ -7139,6 +7584,16 @@ def build_ets2_route_points_for_logbook_entry(raw_entry, normalized=None, depart
         ""
     )
 
+    source_city = clean_route_city_value(source_city, "")
+    destination_city = clean_route_city_value(destination_city, "")
+
+    if not source_city or not destination_city:
+        route_source, route_destination = parse_route_text_cities(
+            normalized.get("route") or raw_entry.get("route") or raw_entry.get("route_name") or raw_entry.get("routeName")
+        )
+        source_city = source_city or route_source
+        destination_city = destination_city or route_destination
+
     route_points = []
     raw_points = collect_raw_route_points(raw_entry)
     for index, raw_point in enumerate(raw_points):
@@ -7148,11 +7603,7 @@ def build_ets2_route_points_for_logbook_entry(raw_entry, normalized=None, depart
             route_points.append(point)
 
     if len(route_points) >= 2:
-        if route_points[0].get("kind") in {"", "stop"}:
-            route_points[0]["kind"] = "start"
-        if route_points[-1].get("kind") in {"", "stop"}:
-            route_points[-1]["kind"] = "end"
-        return route_points
+        return finalize_ets2_route_points(route_points, source_city, destination_city, departure, arrival)
 
     start_x = first_present_value(
         raw_entry,
@@ -7197,9 +7648,7 @@ def build_ets2_route_points_for_logbook_entry(raw_entry, normalized=None, depart
 
     route_points = [point for point in [start_point, end_point] if point]
     if len(route_points) >= 2:
-        route_points[0]["kind"] = "start"
-        route_points[-1]["kind"] = "end"
-        return route_points
+        return finalize_ets2_route_points(route_points, source_city, destination_city, departure, arrival)
     return []
 
 
@@ -7733,6 +8182,10 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
             "-"
         )
 
+        entry_route_points = build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival)
+        start_route_point = entry_route_points[0] if entry_route_points else {}
+        end_route_point = entry_route_points[-1] if entry_route_points else {}
+
         entry = {
             "id": raw_id,
             "trip_id": raw_id,
@@ -7767,10 +8220,15 @@ def get_user_logbook_entries_for_dashboard(user_doc, limit=10):
             "note": safe_str(raw_entry.get("note") or raw_entry.get("notes") or raw_entry.get("bemerkung"), ""),
             "map_embed_url": safe_str(raw_entry.get("map_embed_url") or raw_entry.get("map_url") or raw_entry.get("route_map_url"), ""),
             "ets2_map_image_url": ETS2_MAP_IMAGE_URL,
+            "map_profile": ETS2_MAP_PROFILE,
             "waypoints": raw_entry.get("waypoints") or raw_entry.get("route_points") or raw_entry.get("zwischenstopps") or [],
-            "route_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
-            "map_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
-            "ets2_route_points": build_ets2_route_points_for_logbook_entry(raw_entry, normalized, departure=departure, arrival=arrival),
+            "route_points": entry_route_points,
+            "map_points": entry_route_points,
+            "ets2_route_points": entry_route_points,
+            "start_map_x": start_route_point.get("x", ""),
+            "start_map_y": start_route_point.get("y", ""),
+            "end_map_x": end_route_point.get("x", ""),
+            "end_map_y": end_route_point.get("y", ""),
             "_sortDate": sort_date
         }
         entries.append(entry)
@@ -12727,7 +13185,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 {% set trip_note = trip.note|default(trip.notes|default(trip.bemerkung|default('', true), true), true) %}
 
 {# Kartenbild: bevorzugt pro Fahrt, sonst globale Einstellung, sonst lokaler Standardpfad #}
-{% set trip_ets2_map_image_url = '/static/ets2_map.jpg' %}
+{% set trip_ets2_map_image_url = trip.ets2_map_image_url|default(trip.map_image_url|default(ets2_map_image_url|default('/static/ets2_map.jpg', true), true), true) %}
 
 {# Routepunkte: korrekt nur aus Daten, keine Fake-Route #}
 {% set trip_route_points = trip.ets2_route_points|default(trip.map_points|default(trip.route_points|default(trip.waypoints|default(trip.zwischenstopps|default([], true), true), true), true), true) %}
@@ -13186,7 +13644,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
                         <div class="ets2-map-badge">
                             <span class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.22em] text-[var(--brand-green)]">ETS2-Karte</span>
                             <strong class="block text-white text-sm md:text-base mt-1">{{ trip_from }} → {{ trip_to }}</strong>
-                            <span class="block text-[11px] text-[var(--muted)] mt-1">Aktuelles lokales Kartenbild: {{ trip_ets2_map_image_url }}</span>
+                            <span class="block text-[11px] text-[var(--muted)] mt-1">Kartenprofil: {{ trip.map_profile|default('ProMods Europe 2.82 / ETS2', true) }} · Bild: {{ trip_ets2_map_image_url }}</span>
                         </div>
 
                         <div class="ets2-map-controls" aria-label="Kartensteuerung">
@@ -13224,7 +13682,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
                     <div class="ets2-map-empty" data-map-empty hidden>
                         <span class="block font-orbitron text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--brand-yellow)]">Keine Kartenpunkte</span>
                         <strong class="block text-white mt-2">Für diese Fahrt fehlen echte ETS2-Koordinaten.</strong>
-                        <p class="text-sm text-[var(--muted)] mt-2">Damit die Route korrekt angezeigt wird, muss die Fahrt <code class="text-white/80">ets2_route_points</code> oder Start/Ziel-Koordinaten mit <code class="text-white/80">start_map_x/start_map_y/end_map_x/end_map_y</code> enthalten.</p>
+                        <p class="text-sm text-[var(--muted)] mt-2">Damit die Route korrekt angezeigt wird, nutzt das Backend echte <code class="text-white/80">ets2_route_points</code>, Start/Ziel-Koordinaten oder den ProMods-2.82-Stadt-Fallback.</p>
                     </div>
 
                     <div class="ets2-map-error" data-map-error hidden>
@@ -13394,7 +13852,7 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
 <script>
 (function () {
-    const FIXED_ETS2_MAP_SRC = '/static/ets2_map.jpg';
+    const FIXED_ETS2_MAP_SRC = {{ trip_ets2_map_image_url|tojson|safe }} || '/static/ets2_map.jpg';
     const map = document.getElementById('ets2RouteMap');
     if (!map) return;
 
@@ -13502,8 +13960,8 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 
         if (!point || typeof point !== 'object') return null;
 
-        const x = percentValue(readField(point, ['x', 'map_x', 'mapX', 'px', 'percent_x', 'percentX', 'left']));
-        const y = percentValue(readField(point, ['y', 'map_y', 'mapY', 'py', 'percent_y', 'percentY', 'top']));
+        const x = percentValue(readField(point, ['x', 'map_x', 'mapX', 'px', 'percent_x', 'percentX', 'left', 'ets2_x', 'route_x', 'routeX']));
+        const y = percentValue(readField(point, ['y', 'map_y', 'mapY', 'py', 'percent_y', 'percentY', 'top', 'ets2_y', 'route_y', 'routeY']));
         if (x === null || y === null) return null;
 
         const type = String(readField(point, ['type', 'kind']) || '').toLowerCase();
@@ -13511,8 +13969,8 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
         return {
             x,
             y,
-            name: readField(point, ['name', 'city', 'label', 'title']) || (index === 0 ? map.dataset.startName : index === total - 1 ? map.dataset.endName : 'Zwischenpunkt'),
-            time: readField(point, ['time', 'eta', 'arrival', 'departure']) || '',
+            name: readField(point, ['name', 'city', 'label', 'title', 'ort', 'stadt', 'location']) || (index === 0 ? map.dataset.startName : index === total - 1 ? map.dataset.endName : 'Zwischenpunkt'),
+            time: readField(point, ['time', 'eta', 'arrival', 'departure', 'uhrzeit']) || '',
             type: type || (index === 0 ? 'start' : index === total - 1 ? 'end' : 'via')
         };
     }
@@ -13888,7 +14346,7 @@ def dashboard_detail():
         driver_trips=fahrtenbuch_entries,
         selected_trip=selected_trip,
         detail_trip=selected_trip,
-        ets2_map_image_url='/static/ets2_map.jpg'
+        ets2_map_image_url=ETS2_MAP_IMAGE_URL
     )
 
 
