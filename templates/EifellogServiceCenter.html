@@ -1140,31 +1140,34 @@
     }
 
     /* FIX: Bestätigungs-Modal
-       Design bleibt unverändert. Nur die Modal-Technik wurde stabil gemacht:
-       - Modal wird als Portal direkt in <body> gesetzt.
-       - Der Blur liegt auf einer eigenen ::before-Ebene und verwischt nicht das Modal.
-       - Das Panel bleibt bei 100% Browser-Zoom mittig sichtbar und intern scrollbar.
-       - Kein automatisches Scrollen zum Button, kein manuelles Rauszoomen nötig. */
+       Das Modal ist jetzt komplett viewport-basiert:
+       - es wird per JavaScript direkt in <body> verschoben,
+       - es wird immer mittig im sichtbaren Browserfenster angezeigt,
+       - keine Positionierung mehr relativ zum Formular/Button,
+       - kein fehlerhaftes margin-top auf Mobile/Zoom. */
     :root {
         --service-modal-vh: 1vh;
     }
 
     #fahrerkarte-confirm-modal {
         position: fixed !important;
-        inset: 0 !important;
-        z-index: 999999 !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        z-index: 2147483647 !important;
         width: 100vw !important;
-        min-width: 100vw !important;
         height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         margin: 0 !important;
         padding: clamp(0.75rem, 3vw, 2rem) !important;
         box-sizing: border-box !important;
+        display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         overscroll-behavior: contain !important;
-        align-items: center !important;
-        justify-content: center !important;
         background: transparent !important;
         opacity: 0 !important;
         pointer-events: none !important;
@@ -1189,18 +1192,14 @@
         pointer-events: none;
     }
 
-    #fahrerkarte-confirm-modal.hidden {
-        display: none !important;
-    }
-
-    #fahrerkarte-confirm-modal.flex,
     #fahrerkarte-confirm-modal.service-modal-open {
         display: flex !important;
-    }
-
-    #fahrerkarte-confirm-modal.service-modal-open {
         opacity: 1 !important;
         pointer-events: auto !important;
+    }
+
+    #fahrerkarte-confirm-modal.hidden {
+        display: none !important;
     }
 
     #fahrerkarte-confirm-panel {
@@ -1218,6 +1217,7 @@
         -webkit-backdrop-filter: none !important;
         transform: translateY(10px) scale(0.985) !important;
         transform-origin: center center !important;
+        transition: transform 180ms ease !important;
     }
 
     #fahrerkarte-confirm-modal.service-modal-open #fahrerkarte-confirm-panel {
@@ -1270,6 +1270,7 @@
             width: 100% !important;
             max-width: calc(100vw - 1.5rem) !important;
             max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.5rem) !important;
+            margin: auto !important;
             border-radius: 1.25rem !important;
         }
 
@@ -1987,7 +1988,7 @@
     </div>
 </div>
 
-<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+<div id="fahrerkarte-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="fahrerkarte-confirm-title" aria-hidden="true" class="service-confirm-modal hidden">
     <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
@@ -2050,6 +2051,10 @@
         if (!modal || modal.parentElement === document.body) return;
         document.body.appendChild(modal);
     }
+
+    // Sofort aus dem Content-Wrapper lösen, damit kein Parent-Element mit
+    // transform/filter/overflow die fixed-Position des Modals verfälscht.
+    moveModalToBody();
 
     function isModalOpen() {
         return !!modal && modal.classList.contains('service-modal-open') && !modal.classList.contains('hidden');
@@ -2125,11 +2130,14 @@
         lockScroll();
 
         modal.classList.remove('hidden', 'opacity-0');
-        modal.classList.add('flex', 'service-modal-open');
+        modal.classList.add('service-modal-open');
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
         modal.setAttribute('aria-hidden', 'false');
 
         requestAnimationFrame(() => {
             setModalViewportHeight();
+            modal.scrollTop = 0;
             if (panel) panel.scrollTop = 0;
             if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
         });
@@ -2139,12 +2147,14 @@
         if (!modal || !isModalOpen()) return;
 
         modal.classList.add('opacity-0');
+        modal.style.opacity = '0';
         modal.classList.remove('service-modal-open');
         modal.setAttribute('aria-hidden', 'true');
 
         window.setTimeout(() => {
             modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            modal.style.display = '';
+            modal.style.opacity = '';
             unlockScroll();
 
             if (!options.skipFocusRestore && previousActiveElement && typeof previousActiveElement.focus === 'function') {
