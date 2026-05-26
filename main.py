@@ -10702,6 +10702,7 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
             },
             "$setOnInsert": {
                 "created_at": now,
+                "start_request_count": 0,
             },
             "$inc": {"start_request_count": 1},
         },
@@ -11257,6 +11258,7 @@ def store_tracker_webhook_start_job(payload, raw_data=None):
             },
             "$setOnInsert": {
                 "created_at": now,
+                "start_request_count": 0,
             },
             "$inc": {"start_request_count": 1},
         },
