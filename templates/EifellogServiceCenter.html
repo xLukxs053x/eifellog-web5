@@ -1140,7 +1140,32 @@
     }
 
     #fahrerkarte-confirm-modal {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
         overscroll-behavior: contain;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding-top: max(1rem, env(safe-area-inset-top)) !important;
+        padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    }
+
+    #fahrerkarte-confirm-modal.flex {
+        display: flex !important;
+    }
+
+    #fahrerkarte-confirm-panel {
+        width: min(100%, 34rem) !important;
+        max-height: calc((var(--dashboard-vh, 1vh) * 100) - 2rem) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        margin: 0 auto !important;
+        overscroll-behavior: contain;
+    }
+
+    @supports (height: 100dvh) {
+        #fahrerkarte-confirm-panel {
+            max-height: calc(100dvh - 2rem) !important;
+        }
     }
 
     html.service-modal-locked,
@@ -1187,7 +1212,7 @@
     @media (max-width: 640px) {
         #fahrerkarte-confirm-modal {
             padding: 0.5rem !important;
-            align-items: center !important;
+            align-items: flex-start !important;
         }
 
         #fahrerkarte-confirm-panel {
@@ -1195,6 +1220,12 @@
             max-width: 100% !important;
             max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
             border-radius: 1.25rem !important;
+        }
+
+        @supports (height: 100dvh) {
+            #fahrerkarte-confirm-panel {
+                max-height: calc(100dvh - 1rem) !important;
+            }
         }
 
         #fahrerkarte-confirm-panel .p-6,
@@ -1864,8 +1895,8 @@
     </div>
 </div>
 
-<div id="fahrerkarte-confirm-modal" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
-    <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
+<div id="fahrerkarte-confirm-modal" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="fahrerkarte-confirm-panel" tabindex="-1" class="relative z-10 w-full max-w-lg mx-auto overflow-y-auto rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
                 <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.1)]">
@@ -1909,6 +1940,7 @@
     const errorBox = document.getElementById('fahrerkarte-error');
 
     const modal = document.getElementById('fahrerkarte-confirm-modal');
+    const modalPanel = document.getElementById('fahrerkarte-confirm-panel');
     const confirmSubmit = document.getElementById('fahrerkarte-confirm-submit');
     const cancelSubmit = document.getElementById('fahrerkarte-cancel-submit');
 
@@ -1948,10 +1980,13 @@
         if (!modal) return;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+        modal.scrollTop = 0;
+        if (modalPanel) modalPanel.scrollTop = 0;
         lockScroll();
         requestAnimationFrame(() => {
             modal.classList.remove('opacity-0');
             modal.setAttribute('aria-hidden', 'false');
+            if (modalPanel) modalPanel.focus({ preventScroll: true });
         });
     }
 
