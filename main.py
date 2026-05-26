@@ -6371,6 +6371,15 @@ def tracker_payload_destination_reached(payload, user_doc=None):
     if explicit_delivered and not has_any_distance_signal:
         return True, "Explizite Delivery-Meldung ohne Distanzfeld"
 
+    explicit_submit_endpoint = payload_bool(
+        payload,
+        "trackerSubmitRequested", "submissionRequested", "submittedByTracker",
+        "completeEndpointSubmit", "tourSubmitRequested",
+        fallback=False
+    )
+    if explicit_submit_endpoint and not has_any_distance_signal:
+        return True, "Authentifizierte Tracker-Abgabe ohne Distanzfeld"
+
     return False, (
         "Ziel-Ankunft nicht bestaetigt. Es wird kein Tourbeleg erzeugt, solange "
         f"Restdistanz > {TOUR_DESTINATION_REACHED_MAX_DISTANCE_KM} km ist oder kein echtes Zielsignal vorliegt."
@@ -6693,13 +6702,43 @@ def tracker_completed_live_state(now=None, game="ETS2/ATS"):
     }
 
 def get_user_job_entries(user_doc):
+    """Liest alle Job-/Logbook-Quellen und entfernt Duplikate zuverlässig.
+
+    Wichtig: Einige Tracker-Versionen schreiben denselben Abschluss zusätzlich in
+    job_history und tracker_logbook. Das Dashboard soll daraus nur einen Eintrag
+    anzeigen.
+    """
     result = []
-    possible_fields = ["job_history", "jobs", "deliveries", "logbook", "tracker_logbook"]
+    seen = set()
+    possible_fields = ["job_history", "tracker_logbook", "jobs", "deliveries", "logbook"]
+
     for field in possible_fields:
-        items = user_doc.get(field)
-        if isinstance(items, list):
-            for item in items:
-                if isinstance(item, dict): result.append(item)
+        items = (user_doc or {}).get(field)
+        if not isinstance(items, list):
+            continue
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            identity = safe_str(
+                item.get("receiptId")
+                or item.get("receipt_id")
+                or item.get("receiptNumber")
+                or item.get("receipt_number")
+                or item.get("jobStartKey")
+                or item.get("job_start_key")
+                or item.get("jobId")
+                or item.get("job_id")
+            )
+            if not identity:
+                identity = hashlib.sha256(json.dumps(item, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+            if identity in seen:
+                continue
+            seen.add(identity)
+            result.append(item)
+
     return result
 
 def normalize_logbook_entry(entry, user_doc=None):
@@ -9643,12 +9682,50 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
         ]
     }
 
-    return post_discord_file_to_tour_channel(
+    pdf_url = safe_str((receipt_doc.get("pdf") or {}).get("public_url"))
+    if pdf_url:
+        payload["embeds"][0]["fields"].append(discord_field("🔗 Beleg-Link", pdf_url, False))
+
+    file_result = post_discord_file_to_tour_channel(
         payload,
         (filename, pdf_bytes, "application/pdf"),
         channel_id=TOUR_RECEIPT_CHANNEL_ID,
         webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
     )
+    if file_result.get("sent"):
+        file_result["file_sent"] = True
+        file_result["embed_sent"] = True
+        return file_result
+
+    # Fallback: Falls Discord den Dateiupload ablehnt, trotzdem den Abschluss-Embed senden.
+    fallback_payload = dict(payload)
+    fallback_payload.pop("attachments", None)
+    fallback_payload["embeds"] = list(payload.get("embeds") or [])
+    if fallback_payload["embeds"]:
+        fallback_embed = dict(fallback_payload["embeds"][0])
+        fallback_embed["description"] = (
+            "Der Auftrag wurde abgeschlossen. Der PDF-Dateiupload zu Discord ist fehlgeschlagen; "
+            "der Beleg wurde serverseitig gespeichert."
+        )
+        fallback_embed["fields"] = list(fallback_embed.get("fields") or []) + [
+            discord_field("⚠️ PDF-Upload", safe_str(file_result.get("reason") or file_result.get("error"), "fehlgeschlagen"), False)
+        ]
+        fallback_payload["embeds"][0] = fallback_embed
+
+    embed_result = post_discord_json_to_tour_channel(
+        fallback_payload,
+        channel_id=TOUR_RECEIPT_CHANNEL_ID,
+        webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
+    )
+    file_result["file_sent"] = False
+    file_result["embed_sent"] = bool(embed_result.get("sent"))
+    file_result["embed_fallback"] = embed_result
+    if embed_result.get("sent"):
+        file_result["sent"] = True
+        file_result["method"] = f"{safe_str(embed_result.get('method'), 'discord')}_embed_fallback"
+        file_result["message_id"] = embed_result.get("message_id")
+        file_result["channel_id"] = embed_result.get("channel_id") or TOUR_RECEIPT_CHANNEL_ID
+    return file_result
 
 
 def build_tour_receipt_doc(user_doc, payload, telemetry=None):
@@ -9877,6 +9954,179 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "raw_telemetry": telemetry
     }
 
+
+def receipt_submitted_datetime(receipt_doc):
+    receipt_doc = receipt_doc or {}
+    submitted_at = receipt_doc.get("submitted_at") or receipt_doc.get("created_at") or now_utc()
+    if isinstance(submitted_at, datetime):
+        return submitted_at
+    return coerce_receipt_datetime(submitted_at, fallback=now_utc())
+
+
+def build_receipt_logbook_entry(user_doc, receipt_doc):
+    """Erzeugt einen einheitlichen Logbook-Eintrag fuer Dashboard, Tracker und Fahrerakte."""
+    user_doc = user_doc or {}
+    receipt_doc = receipt_doc or {}
+    tour = receipt_doc.get("tour") or {}
+    billing = receipt_doc.get("billing") or {}
+    driver = receipt_doc.get("driver") or {}
+    submitted_at = receipt_submitted_datetime(receipt_doc)
+    distance = get_receipt_distance_km(receipt_doc)
+    income = get_receipt_income(receipt_doc)
+    route = f"{safe_str(tour.get('source_city'), '-')} → {safe_str(tour.get('destination_city'), '-')}"
+
+    return {
+        "status": "Fertig",
+        "state": "Tour abgegeben",
+        "source": "tracker_tour_receipt",
+        "receiptId": receipt_doc.get("receipt_id"),
+        "receipt_id": receipt_doc.get("receipt_id"),
+        "receiptNumber": receipt_doc.get("receipt_number"),
+        "receipt_number": receipt_doc.get("receipt_number"),
+        "jobId": receipt_doc.get("job_id"),
+        "job_id": receipt_doc.get("job_id"),
+        "jobStartKey": receipt_doc.get("job_start_key") or receipt_doc.get("jobStartKey"),
+        "job_start_key": receipt_doc.get("job_start_key") or receipt_doc.get("jobStartKey"),
+        "route": route,
+        "sourceCity": tour.get("source_city", "-"),
+        "destinationCity": tour.get("destination_city", "-"),
+        "sourceCompany": tour.get("source_company") or tour.get("auftraggeber") or "-",
+        "destinationCompany": tour.get("destination_company") or tour.get("kunde") or "-",
+        "cargo": tour.get("cargo", "-"),
+        "truck": tour.get("truck", "-"),
+        "game": tour.get("game") or "ETS2/ATS",
+        "distanceKm": distance,
+        "completedDistanceKm": distance,
+        "income": income,
+        "incomeText": format_money(income, billing.get("currency")),
+        "currency": safe_str(billing.get("currency"), TOUR_RECEIPT_CURRENCY).upper(),
+        "driverName": driver.get("name") or user_doc.get("display_name") or user_doc.get("username"),
+        "driverUsername": driver.get("username") or user_doc.get("username") or user_doc.get("discord_username"),
+        "driverDiscordId": driver.get("discord_id") or user_doc.get("discord_id"),
+        "driverCardId": driver.get("fahrerkarte_id") or resolve_driver_card_id(user_doc, receipt_doc),
+        "createdAt": submitted_at.isoformat() + "Z",
+        "created_at": submitted_at,
+        "submittedAt": submitted_at.isoformat() + "Z",
+        "submitted_at": submitted_at,
+        "billingRelevant": True,
+        "completed": True,
+        "submitted": True,
+        "pdfFilePath": (receipt_doc.get("pdf") or {}).get("file_path"),
+        "pdfFileName": (receipt_doc.get("pdf") or {}).get("file_name"),
+        "pdfPublicUrl": (receipt_doc.get("pdf") or {}).get("public_url"),
+        "discordMessageId": (receipt_doc.get("discord") or {}).get("message_id"),
+        "discordChannelId": (receipt_doc.get("discord") or {}).get("channel_id"),
+    }
+
+
+def persist_receipt_to_driver_logbook(user_doc, receipt_doc):
+    """Speichert eine abgegebene Tour zusätzlich dauerhaft im Fahrer-Logbook.\n\n    Neben dem User-job_history-Eintrag entsteht ein eigener Eintrag in\n    driver_logs_collection und eine Referenz im tracker_shift_logs Tagesauszug.\n    Dadurch kommt die Abgabe im Tracker, Dashboard, Logbook und HR/Fahrerkarte an.\n    """
+    user_doc = user_doc or {}
+    receipt_doc = receipt_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id") or (receipt_doc.get("driver") or {}).get("discord_id"))
+    if not discord_id:
+        return {"stored": False, "reason": "Keine Discord-ID fuer Logbook-Persistenz."}
+
+    submitted_at = receipt_submitted_datetime(receipt_doc)
+    date_str, date_display = driver_log_date_keys(submitted_at)
+    logbook_entry = build_receipt_logbook_entry(user_doc, receipt_doc)
+    now = now_utc()
+    receipt_id = safe_str(receipt_doc.get("receipt_id") or logbook_entry.get("receiptId") or uuid.uuid4().hex)
+
+    activity_doc = {
+        "activity_id": f"tour-{receipt_id}",
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "driver_name": logbook_entry.get("driverName") or "EifelLog Fahrer",
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "state": "Tour abgegeben",
+        "state_key": "tour_completed",
+        "state_label": "Tour abgegeben / Beleg erstellt",
+        "is_shift_end": False,
+        "is_tour_completion": True,
+        "start_time": submitted_at,
+        "end_time": submitted_at,
+        "duration_ms": 0,
+        "duration_display": "00:00",
+        "date_str": date_str,
+        "date_display": date_display,
+        "shift_date": date_display,
+        "receipt_id": receipt_id,
+        "receipt_number": receipt_doc.get("receipt_number"),
+        "job_id": receipt_doc.get("job_id"),
+        "job_start_key": receipt_doc.get("job_start_key") or receipt_doc.get("jobStartKey"),
+        "route": logbook_entry.get("route"),
+        "source_city": logbook_entry.get("sourceCity"),
+        "destination_city": logbook_entry.get("destinationCity"),
+        "cargo": logbook_entry.get("cargo"),
+        "truck": logbook_entry.get("truck"),
+        "distance_km": logbook_entry.get("distanceKm"),
+        "income": logbook_entry.get("income"),
+        "driver_card_id": logbook_entry.get("driverCardId"),
+        "pdf": receipt_doc.get("pdf") or {},
+        "discord": receipt_doc.get("discord") or {},
+        "logbook_entry": logbook_entry,
+        "raw_payload": {
+            "receipt_id": receipt_id,
+            "receipt_number": receipt_doc.get("receipt_number"),
+            "job_id": receipt_doc.get("job_id"),
+        },
+        "source": "tracker_tour_receipt",
+        "archived": False,
+        "updated_at": now,
+    }
+
+    driver_logs_collection.update_one(
+        {"discord_id": discord_id, "receipt_id": receipt_id, "archived": {"$ne": True}},
+        {"$set": activity_doc, "$setOnInsert": {"created_at": now}},
+        upsert=True,
+    )
+
+    shift_doc = None
+    try:
+        shift_doc = persist_tracker_shift_log_snapshot(user_doc, date_str)
+    except Exception as error:
+        app.logger.exception("Tracker-Shift-Log konnte nach Tourabschluss nicht aktualisiert werden: %s", error)
+
+    if shift_doc:
+        tour_receipt_entry = {
+            "receipt_id": receipt_id,
+            "receipt_number": receipt_doc.get("receipt_number"),
+            "job_id": receipt_doc.get("job_id"),
+            "job_start_key": receipt_doc.get("job_start_key") or receipt_doc.get("jobStartKey"),
+            "route": logbook_entry.get("route"),
+            "distance_km": logbook_entry.get("distanceKm"),
+            "income": logbook_entry.get("income"),
+            "pdf": receipt_doc.get("pdf") or {},
+            "discord": receipt_doc.get("discord") or {},
+            "submitted_at": submitted_at,
+        }
+        tracker_shift_logs_collection.update_one(
+            {"_id": shift_doc["_id"], "tour_receipt_ids": {"$ne": receipt_id}},
+            {
+                "$set": {
+                    "latest_tour_receipt": tour_receipt_entry,
+                    "latest_tour_receipt_at": submitted_at,
+                    "updated_at": now,
+                    "source": "driver_activity_logs+tour_receipts",
+                },
+                "$addToSet": {"tour_receipt_ids": receipt_id},
+                "$push": {"tour_receipts": {"$each": [tour_receipt_entry], "$slice": -50}},
+                "$inc": {"completed_tour_count": 1},
+            },
+            upsert=False,
+        )
+
+    return {
+        "stored": True,
+        "receiptId": receipt_id,
+        "date": date_str,
+        "shiftLogId": safe_str((shift_doc or {}).get("shift_id")),
+        "logbookEntry": logbook_entry,
+    }
+
 def write_receipt_into_user_stats(user_doc, receipt_doc):
     billing = receipt_doc.get("billing") or {}
     tour = receipt_doc.get("tour") or {}
@@ -9892,25 +10142,7 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
     new_jobs = parse_int(stats.get("jobs"), new_deliveries - 1) + 1
     now = now_utc()
 
-    logbook_entry = {
-        "status": "Fertig",
-        "receiptId": receipt_doc.get("receipt_id"),
-        "receiptNumber": receipt_doc.get("receipt_number"),
-        "jobId": receipt_doc.get("job_id"),
-        "route": f"{tour.get('source_city', '-')} → {tour.get('destination_city', '-')}",
-        "sourceCity": tour.get("source_city", "-"),
-        "destinationCity": tour.get("destination_city", "-"),
-        "cargo": tour.get("cargo", "-"),
-        "distanceKm": distance,
-        "completedDistanceKm": distance,
-        "income": income,
-        "incomeText": format_money(income, billing.get("currency")),
-        "driverName": receipt_doc.get("driver", {}).get("name"),
-        "createdAt": receipt_doc.get("submitted_at").isoformat() + "Z",
-        "billingRelevant": True,
-        "pdfFilePath": receipt_doc.get("pdf", {}).get("file_path"),
-        "discordMessageId": receipt_doc.get("discord", {}).get("message_id")
-    }
+    logbook_entry = build_receipt_logbook_entry(user_doc, receipt_doc)
 
     users_collection.update_one(
         {"_id": user_doc["_id"]},
@@ -9960,10 +10192,17 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
                 "tracker_active_tour_start_embed_reset_reason": "tour_completed",
                 "tracker_last_receipt_id": receipt_doc.get("receipt_id"),
                 "tracker_last_receipt_number": receipt_doc.get("receipt_number"),
-                "tracker_last_job_completed_at": now
+                "tracker_last_job_completed_at": now,
+                "tracker_last_logbook_entry": logbook_entry,
+                "tracker_logbook_updated_at": now
             },
             "$push": {
                 "job_history": {
+                    "$each": [logbook_entry],
+                    "$position": 0,
+                    "$slice": 100
+                },
+                "tracker_logbook": {
                     "$each": [logbook_entry],
                     "$position": 0,
                     "$slice": 100
@@ -9971,6 +10210,11 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
             }
         }
     )
+
+    try:
+        persist_receipt_to_driver_logbook(user_doc, receipt_doc)
+    except Exception as error:
+        app.logger.exception("Tourabschluss konnte nicht vollständig ins Fahrer-Logbook gespiegelt werden: %s", error)
 
     # Eigener Company-All-Time-Datenbankeintrag: company_stats/company_all_time
     # wird nach jeder abgeschlossenen Tour aus allen gespeicherten Belegen neu aufgebaut.
@@ -9994,16 +10238,22 @@ def complete_tracker_tour_from_request():
     client_token = get_client_token_from_request(data)
 
     # Verbindung zur WPF/C#-App:
-    # Complete-Endpunkte duerfen nicht selbst blind "delivered=True" setzen.
-    # main.py nimmt den Abschluss nur an, wenn die Payload/Live-Telemetrie Ziel-Ankunft
-    # zeigt. Dadurch entsteht kein PDF, nur weil der Fahrer irgendwo steht oder die
-    # Telemetrie kurz verschwindet.
+    # Complete-Endpunkte markieren eine echte Abgabe-Anfrage. Liegen konkrete
+    # Restdistanz-/Fortschrittsdaten vor, werden diese weiterhin serverseitig geprüft;
+    # fehlt ein Distanzsignal vollständig, zählt die authentifizierte Abgabe als Zielsignal.
     if not client_token:
         payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
         payload.setdefault("event", "tour_completed")
         payload.setdefault("type", "tour_completed")
         payload.setdefault("messageType", "tour_completed")
         payload.setdefault("status", "completed")
+        payload.setdefault("submitted", True)
+        payload.setdefault("jobCompleted", True)
+        payload.setdefault("jobDelivered", True)
+        payload.setdefault("delivered", True)
+        payload.setdefault("trackerSubmitRequested", True)
+        payload.setdefault("submissionRequested", True)
+        payload.setdefault("completedAtUtc", now_utc().isoformat() + "Z")
 
         database_result = store_tracker_webhook_completed_job(payload)
         discord_result = database_result.get("discord") or {}
@@ -10047,6 +10297,13 @@ def complete_tracker_tour_from_request():
     completion_payload.setdefault("type", "tour_completed")
     completion_payload.setdefault("messageType", "tour_completed")
     completion_payload.setdefault("status", "completed")
+    completion_payload.setdefault("submitted", True)
+    completion_payload.setdefault("jobCompleted", True)
+    completion_payload.setdefault("jobDelivered", True)
+    completion_payload.setdefault("delivered", True)
+    completion_payload.setdefault("trackerSubmitRequested", True)
+    completion_payload.setdefault("submissionRequested", True)
+    completion_payload.setdefault("completedAtUtc", now_utc().isoformat() + "Z")
 
     telemetry = tracker_request_telemetry_payload(completion_payload, user_doc=user_doc)
     if telemetry:
@@ -10327,7 +10584,7 @@ def build_tour_start_discord_payload(user_doc, telemetry):
         "allowed_mentions": {"parse": []},
         "embeds": [
             {
-                "title": "🟢 Auftrag gestartet",
+                "title": "🟢 Tour gestartet",
                 "description": (
                     f"**{discord_text(display_name, 'EifelLog Fahrer', 120)}** ({discord_text(username_display, '@fahrer', 80)}) "
                     f"hat eine neue Tour gestartet. Alle Daten werden live für diese aktive Tour geführt."
@@ -11403,6 +11660,11 @@ def store_tracker_webhook_completed_job(payload):
 
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
+    try:
+        logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
+    except Exception as error:
+        app.logger.exception("Tourabschluss konnte nach Receipt-Speicherung nicht ins Logbook gespiegelt werden: %s", error)
+        logbook_result = {"stored": False, "error": str(error)}
     mark_tracker_job_start_completed(user_doc, payload_for_db, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
 
@@ -11423,7 +11685,8 @@ def store_tracker_webhook_completed_job(payload):
         "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "pdf": receipt_doc.get("pdf"),
-        "discord": receipt_doc.get("discord")
+        "discord": receipt_doc.get("discord"),
+        "logbook": logbook_result
     }
 
 
