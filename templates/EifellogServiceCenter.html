@@ -1139,13 +1139,11 @@
         }
     }
 
-    /* FIX: Bestätigungs-Modal wird nicht mehr oben/zentriert geöffnet,
-       sondern dynamisch auf Höhe des grünen Absende-Buttons ausgerichtet.
-       Das Modal bleibt trotzdem als Portal direkt in <body>, damit es nicht durch
-       transformierte/scalende Dashboard-Container abgeschnitten oder verschoben wird. */
+    /* FIX: Nur das Bestätigungs-Modal wurde angepasst.
+       Das restliche ServiceCenter-Design bleibt unverändert.
+       Ziel: Bei 100% Browser-Zoom auf Desktop, Notebook, Tablet und Mobile immer korrekt sichtbar. */
     :root {
         --service-modal-vh: 1vh;
-        --service-modal-panel-top: clamp(0.75rem, 8vh, 5rem);
     }
 
     #fahrerkarte-confirm-modal {
@@ -1157,15 +1155,18 @@
         height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         margin: 0 !important;
-        padding: 0 clamp(0.75rem, 2vw, 1.5rem) clamp(0.75rem, 2vw, 1.5rem) !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        overscroll-behavior: contain;
-        align-items: flex-start !important;
+        padding: clamp(0.75rem, 2vw, 1.5rem) !important;
+        display: none !important;
+        align-items: center !important;
         justify-content: center !important;
-        transform: none !important;
+        overflow: hidden !important;
+        overscroll-behavior: contain;
         isolation: isolate;
         box-sizing: border-box;
+        background: rgba(0, 0, 0, 0.72) !important;
+        backdrop-filter: blur(18px) saturate(1.12);
+        -webkit-backdrop-filter: blur(18px) saturate(1.12);
+        transform: none !important;
     }
 
     #fahrerkarte-confirm-modal.hidden {
@@ -1178,14 +1179,48 @@
     }
 
     #fahrerkarte-confirm-panel {
+        position: relative !important;
         width: min(100%, 34rem) !important;
         max-width: min(34rem, calc(100vw - 1.5rem)) !important;
-        max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.5rem) !important;
-        margin: var(--service-modal-panel-top) auto clamp(0.75rem, 2vw, 1.5rem) !important;
+        max-height: calc((var(--service-modal-vh, 1vh) * 100) - clamp(1.5rem, 4vw, 3rem)) !important;
+        margin: 0 auto !important;
         overflow-y: auto !important;
-        transform: none !important;
+        overscroll-behavior: contain;
+        transform: translateY(0) scale(1) !important;
+        transform-origin: center center !important;
         flex: 0 1 auto;
         box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(137, 190, 50, 0.45) rgba(255, 255, 255, 0.06);
+    }
+
+    #fahrerkarte-confirm-panel::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #fahrerkarte-confirm-panel::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+    }
+
+    #fahrerkarte-confirm-panel::-webkit-scrollbar-thumb {
+        background: rgba(137, 190, 50, 0.45);
+        border-radius: 999px;
+    }
+
+    #fahrerkarte-confirm-modal.service-modal-open #fahrerkarte-confirm-panel {
+        animation: serviceModalPanelIn 180ms ease-out both;
+    }
+
+    @keyframes serviceModalPanelIn {
+        from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.985) !important;
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1) !important;
+        }
     }
 
     @supports (height: 100dvh) {
@@ -1195,7 +1230,7 @@
         }
 
         #fahrerkarte-confirm-panel {
-            max-height: calc(100dvh - 1.5rem) !important;
+            max-height: calc(100dvh - clamp(1.5rem, 4vw, 3rem)) !important;
         }
     }
 
@@ -1205,8 +1240,50 @@
         overscroll-behavior: none !important;
     }
 
-    body.service-modal-locked {
-        touch-action: none;
+    body.service-modal-locked #servicecenter-shell {
+        filter: blur(5px) brightness(0.68);
+        transition: filter 180ms ease;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    @media (max-width: 640px), (max-height: 560px) {
+        #fahrerkarte-confirm-modal {
+            padding: 0.65rem !important;
+            align-items: center !important;
+            overflow-y: auto !important;
+        }
+
+        #fahrerkarte-confirm-panel {
+            width: 100% !important;
+            max-width: calc(100vw - 1.3rem) !important;
+            max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.3rem) !important;
+            border-radius: 1.25rem !important;
+        }
+
+        #fahrerkarte-confirm-panel .p-6,
+        #fahrerkarte-confirm-panel .p-7 {
+            padding: 1rem !important;
+        }
+    }
+
+    @media (max-height: 430px) {
+        #fahrerkarte-confirm-modal {
+            align-items: flex-start !important;
+        }
+
+        #fahrerkarte-confirm-panel {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        #fahrerkarte-confirm-modal,
+        #fahrerkarte-confirm-panel {
+            transition: none !important;
+            animation: none !important;
+        }
     }
 
     @media (min-width: 1280px) {
@@ -1962,12 +2039,15 @@
     const errorBox = document.getElementById('fahrerkarte-error');
 
     const modal = document.getElementById('fahrerkarte-confirm-modal');
+    const modalPanel = document.getElementById('fahrerkarte-confirm-panel');
     const confirmSubmit = document.getElementById('fahrerkarte-confirm-submit');
     const cancelSubmit = document.getElementById('fahrerkarte-cancel-submit');
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
+    let lastFocusedElement = null;
     let modalResizeHandler = null;
+    let previousBodyStyles = null;
 
     function setModalViewportHeight() {
         document.documentElement.style.setProperty('--service-modal-vh', `${window.innerHeight * 0.01}px`);
@@ -1978,32 +2058,42 @@
         document.body.appendChild(modal);
     }
 
-    function clampNumber(value, min, max) {
-        return Math.min(Math.max(value, min), max);
+    function getFocusableElements() {
+        if (!modal) return [];
+        return Array.from(modal.querySelectorAll([
+            'a[href]',
+            'button:not([disabled])',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])'
+        ].join(','))).filter((element) => {
+            return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+        });
     }
 
-    function setModalAnchorPosition() {
-        if (!modal || !submitButton) return;
+    function trapFocus(event) {
+        if (!modal || modal.classList.contains('hidden') || event.key !== 'Tab') return;
 
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-        const safeGap = window.matchMedia('(max-width: 640px)').matches ? 8 : 12;
-        const triggerRect = submitButton.getBoundingClientRect();
-        const panel = document.getElementById('fahrerkarte-confirm-panel');
-        const panelHeight = panel && panel.offsetHeight ? panel.offsetHeight : 320;
-        const triggerCenter = triggerRect.top + (triggerRect.height / 2);
+        const focusable = getFocusableElements();
+        if (!focusable.length) {
+            event.preventDefault();
+            return;
+        }
 
-        /* Panel vertikal auf die Höhe des grünen Buttons legen,
-           aber trotzdem innerhalb des sichtbaren Viewports halten. */
-        const preferredTop = triggerCenter - (panelHeight / 2);
-        const maxTop = Math.max(safeGap, viewportHeight - panelHeight - safeGap);
-        const top = clampNumber(preferredTop, safeGap, maxTop);
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
 
-        modal.style.setProperty('--service-modal-panel-top', `${Math.round(top)}px`);
-    }
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus({ preventScroll: true });
+            return;
+        }
 
-    function updateOpenModalMetrics() {
-        setModalViewportHeight();
-        setModalAnchorPosition();
+        if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus({ preventScroll: true });
+        }
     }
 
     function isFormValid() {
@@ -2025,25 +2115,59 @@
         scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
         setModalViewportHeight();
 
-        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-        if (scrollbarWidth > 0) {
-            document.body.style.paddingRight = `${scrollbarWidth}px`;
-        }
+        const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+        previousBodyStyles = {
+            position: document.body.style.position,
+            top: document.body.style.top,
+            left: document.body.style.left,
+            right: document.body.style.right,
+            width: document.body.style.width,
+            paddingRight: document.body.style.paddingRight
+        };
 
         document.documentElement.classList.add('service-modal-locked');
         document.body.classList.add('service-modal-locked');
 
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollYBeforeLock}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+
+        if (scrollbarWidth > 0) {
+            document.body.style.paddingRight = `${scrollbarWidth}px`;
+        }
+
         if (!modalResizeHandler) {
-            modalResizeHandler = updateOpenModalMetrics;
+            modalResizeHandler = setModalViewportHeight;
             window.addEventListener('resize', modalResizeHandler, { passive: true });
             window.addEventListener('orientationchange', modalResizeHandler, { passive: true });
         }
+
+        document.addEventListener('keydown', trapFocus);
     }
 
     function unlockScroll() {
         document.documentElement.classList.remove('service-modal-locked');
         document.body.classList.remove('service-modal-locked');
-        document.body.style.paddingRight = '';
+
+        if (previousBodyStyles) {
+            document.body.style.position = previousBodyStyles.position;
+            document.body.style.top = previousBodyStyles.top;
+            document.body.style.left = previousBodyStyles.left;
+            document.body.style.right = previousBodyStyles.right;
+            document.body.style.width = previousBodyStyles.width;
+            document.body.style.paddingRight = previousBodyStyles.paddingRight;
+            previousBodyStyles = null;
+        } else {
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            document.body.style.paddingRight = '';
+        }
 
         if (modalResizeHandler) {
             window.removeEventListener('resize', modalResizeHandler);
@@ -2051,33 +2175,52 @@
             modalResizeHandler = null;
         }
 
+        document.removeEventListener('keydown', trapFocus);
         window.scrollTo({ top: scrollYBeforeLock, left: 0, behavior: 'auto' });
     }
 
     function openModal() {
         if (!modal) return;
+
         moveModalToBody();
+        lastFocusedElement = document.activeElement;
         setModalViewportHeight();
+
         modal.classList.remove('hidden');
         modal.classList.add('flex', 'service-modal-open');
+        modal.setAttribute('aria-hidden', 'false');
+
         lockScroll();
-        requestAnimationFrame(() => {
-            setModalAnchorPosition();
+
+        window.requestAnimationFrame(() => {
             modal.classList.remove('opacity-0');
-            modal.setAttribute('aria-hidden', 'false');
-            if (confirmSubmit) confirmSubmit.focus({ preventScroll: true });
+
+            const focusTarget = confirmSubmit || cancelSubmit || modalPanel || modal;
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                focusTarget.focus({ preventScroll: true });
+            }
         });
     }
 
-    function closeModal() {
-        if (!modal) return;
+    function closeModal(options = {}) {
+        if (!modal || modal.classList.contains('hidden')) return;
+
+        const restoreFocus = options.restoreFocus !== false;
+
         modal.classList.add('opacity-0');
         modal.setAttribute('aria-hidden', 'true');
+
         window.setTimeout(() => {
             modal.classList.add('hidden');
             modal.classList.remove('flex', 'service-modal-open');
             unlockScroll();
-        }, 220);
+
+            if (restoreFocus && lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus({ preventScroll: true });
+            }
+
+            lastFocusedElement = null;
+        }, 180);
     }
 
     if (locked) {
@@ -2109,12 +2252,21 @@
     if (confirmSubmit) {
         confirmSubmit.addEventListener('click', () => {
             shouldSubmitDirectly = true;
-            closeModal();
-            window.setTimeout(() => form.submit(), 80);
+            closeModal({ restoreFocus: false });
+
+            window.setTimeout(() => {
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            }, 80);
         });
     }
 
-    if (cancelSubmit) cancelSubmit.addEventListener('click', closeModal);
+    if (cancelSubmit) {
+        cancelSubmit.addEventListener('click', () => closeModal());
+    }
 
     if (modal) {
         modal.addEventListener('click', (event) => {
@@ -2135,7 +2287,9 @@
     }
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+            closeModal();
+        }
     });
 
     updateSubmitState();
