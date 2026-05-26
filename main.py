@@ -13965,6 +13965,286 @@ def hub():
         wartung_deadline_text=format_wartung_deadline(wartung_config),
     )
 
+
+
+# ==========================================
+# LEADERBOARD / FAHRER-RANKING
+# ==========================================
+
+def leaderboard_first_value(source, *keys, fallback=""):
+    """Gibt den ersten nicht-leeren Wert aus einem Dict zurück."""
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) not in [None, ""]:
+            return source.get(key)
+    return fallback
+
+
+def leaderboard_number_value(source, *keys, fallback=0.0):
+    """Liest numerische Werte robust aus MongoDB-Feldern, auch wenn sie als Text gespeichert sind."""
+    value = leaderboard_first_value(source, *keys, fallback=None)
+    if value in [None, ""]:
+        return float(fallback)
+    return positive_number(value, fallback)
+
+
+def leaderboard_int_value(source, *keys, fallback=0):
+    try:
+        return int(round(leaderboard_number_value(source, *keys, fallback=fallback)))
+    except Exception:
+        return int(fallback)
+
+
+def driver_has_leaderboard_role(user_doc):
+    """Erkennt Fahrer/Probefahrer anhand der vorhandenen Rollenfelder."""
+    user_doc = user_doc or {}
+    role_values = set(clean_roles(user_doc.get("roles", [])))
+
+    for key in ("role", "primary_role", "primary_role_name", "rank"):
+        value = safe_str(user_doc.get(key))
+        if value:
+            role_values.add(value)
+
+    allowed_driver_roles = set(clean_roles([
+        ROLE_FAHRER,
+        ROLE_FAHRER_ID,
+        ROLE_PROBEFAHRER,
+        ROLE_PROBEFAHRER_ID,
+        "Fahrer",
+        "fahrer",
+        "Driver",
+        "driver",
+        "Probefahrer",
+        "probefahrer",
+        "Probe-Fahrer",
+        "probe-fahrer",
+    ]))
+
+    if role_values.intersection(allowed_driver_roles):
+        return True
+
+    primary_role_name = get_primary_role_name(list(role_values))
+    return primary_role_name in {"Fahrer", "Probefahrer"}
+
+
+def build_driver_leaderboard_entries(limit=250, include_zero_km=True):
+    """
+    Baut die komplette Fahrer-Rangliste.
+    Sortierung:
+    1. Gefahrene KM absteigend
+    2. Abgeschlossene Touren absteigend
+    3. Kontostand/Einnahmen absteigend
+    4. Fahrername aufsteigend
+
+    Fahrer mit identischer KM-Zahl erhalten denselben Rang.
+    """
+    try:
+        limit = int(limit)
+    except Exception:
+        limit = 250
+
+    if limit <= 0:
+        limit = 250
+    limit = min(limit, 500)
+
+    entries = []
+    cursor = users_collection.find({})
+
+    for user_doc in cursor:
+        total_km = leaderboard_number_value(
+            user_doc,
+            "tracker_all_time_km",
+            "profile_all_time_km",
+            "all_time_km",
+            "profile_km",
+            "total_km",
+            "driven_km",
+            "gefahrene_km",
+            fallback=0.0,
+        )
+
+        is_driver = driver_has_leaderboard_role(user_doc)
+
+        # Fahrer ohne KM sollen weiterhin sichtbar sein, damit neue Fahrer im Ranking auftauchen.
+        # Nicht-Fahrer werden nur aufgenommen, wenn sie bereits echte KM-Werte haben.
+        if not is_driver and total_km <= 0:
+            continue
+        if not include_zero_km and total_km <= 0:
+            continue
+
+        completed_trips = leaderboard_int_value(
+            user_doc,
+            "tracker_all_time_deliveries",
+            "profile_all_time_deliveries",
+            "tracker_all_time_jobs",
+            "profile_all_time_jobs",
+            "completed_trips",
+            "abgeschlossene_fahrten",
+            "touren_abgeschlossen",
+            "profile_deliveries",
+            "profile_jobs",
+            fallback=0,
+        )
+
+        balance = leaderboard_number_value(
+            user_doc,
+            "profile_all_time_income",
+            "tracker_all_time_income",
+            "all_time_income",
+            "profile_income",
+            "profile_revenue",
+            "balance",
+            "kontostand",
+            "account_balance",
+            "money",
+            fallback=0.0,
+        )
+
+        xp_value = leaderboard_int_value(
+            user_doc,
+            "fahrer_xp",
+            "driver_xp",
+            "profile_xp",
+            "tracker_xp",
+            "xp",
+            fallback=0,
+        )
+
+        username = safe_str(
+            user_doc.get("username")
+            or user_doc.get("display_name")
+            or user_doc.get("discord_username")
+            or user_doc.get("name"),
+            "Unbekannter Fahrer",
+        )
+        display_name = safe_str(
+            user_doc.get("display_name")
+            or user_doc.get("username")
+            or user_doc.get("discord_username")
+            or username,
+            username,
+        )
+
+        roles = user_doc.get("roles", [])
+        primary_role_name = safe_str(
+            user_doc.get("primary_role_name")
+            or user_doc.get("primary_role")
+            or user_doc.get("role")
+            or get_primary_role_name(roles),
+            "Fahrer",
+        )
+
+        level_name = safe_str(
+            user_doc.get("fahrer_level")
+            or user_doc.get("driver_level")
+            or user_doc.get("profile_level")
+            or user_doc.get("level")
+            or primary_role_name,
+            primary_role_name,
+        )
+
+        discord_id = safe_str(
+            user_doc.get("discord_id")
+            or user_doc.get("user_id")
+            or user_doc.get("id")
+        )
+
+        entry = {
+            "rank": 0,
+            "user_id": discord_id,
+            "discord_id": discord_id,
+            "id": discord_id,
+            "username": username,
+            "display_name": display_name,
+            "name": display_name,
+            "discord_name": safe_str(user_doc.get("discord_username") or username, username),
+            "avatar": safe_str(user_doc.get("avatar") or user_doc.get("avatar_hash") or user_doc.get("discord_avatar")),
+            "avatar_url": get_discord_avatar_url(user_doc),
+            "role": primary_role_name,
+            "primary_role": primary_role_name,
+            "primary_role_name": primary_role_name,
+            "level": level_name,
+            "fahrer_level": level_name,
+            "driver_level": level_name,
+            "xp": xp_value,
+            "fahrer_xp": xp_value,
+            "driver_xp": xp_value,
+            "total_km": round(total_km, 2),
+            "gefahrene_km": round(total_km, 2),
+            "driven_km": round(total_km, 2),
+            "km": round(total_km, 2),
+            "completed_trips": completed_trips,
+            "completedTrips": completed_trips,
+            "abgeschlossene_fahrten": completed_trips,
+            "touren_abgeschlossen": completed_trips,
+            "balance": round(balance, 2),
+            "kontostand": round(balance, 2),
+            "account_balance": round(balance, 2),
+            "money": round(balance, 2),
+        }
+        entries.append(entry)
+
+    entries.sort(
+        key=lambda item: (
+            -float(item.get("total_km") or 0),
+            -int(item.get("completed_trips") or 0),
+            -float(item.get("balance") or 0),
+            safe_str(item.get("display_name") or item.get("username")).lower(),
+        )
+    )
+
+    last_km_value = None
+    current_rank = 0
+
+    for index, entry in enumerate(entries, start=1):
+        km_value = round(float(entry.get("total_km") or 0), 3)
+        if last_km_value is None or km_value != last_km_value:
+            current_rank = index
+        entry["rank"] = current_rank
+        entry["rank_label"] = f"#{current_rank}"
+        last_km_value = km_value
+
+    return entries[:limit]
+
+
+@app.route("/leaderboard", methods=["GET"])
+@app.route("/leaderboard.html", methods=["GET"])
+def leaderboard():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    current_user = session.get("user") or {}
+    user_roles = current_user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um das Leaderboard zu öffnen.", "error")
+        return redirect(url_for("home"))
+
+    include_zero_km = safe_str(request.args.get("include_zero", "1")).lower() in {"1", "true", "yes", "ja", "on"}
+    limit = parse_int(request.args.get("limit"), 250)
+
+    leaderboard_entries = build_driver_leaderboard_entries(
+        limit=limit,
+        include_zero_km=include_zero_km,
+    )
+
+    leaderboard_updated_at = now_utc().strftime("%d.%m.%Y %H:%M UTC")
+
+    return render_template(
+        "leaderboard.html",
+        current_user=current_user,
+        user=current_user,
+        primary_role_name=get_primary_role_name(user_roles),
+        leaderboard_entries=leaderboard_entries,
+        leaderboard=leaderboard_entries,
+        drivers=leaderboard_entries,
+        driver_leaderboard=leaderboard_entries,
+        leaderboard_updated_at=leaderboard_updated_at,
+        leaderboard_scope_label="Gesamtwertung nach KM",
+    )
+
+
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
