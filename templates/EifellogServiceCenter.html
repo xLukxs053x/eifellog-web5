@@ -1139,13 +1139,13 @@
         }
     }
 
-    /* FIX: Bestätigungs-Modal wird nicht mehr oben/zentriert geöffnet,
-       sondern dynamisch auf Höhe des grünen Absende-Buttons ausgerichtet.
-       Das Modal bleibt trotzdem als Portal direkt in <body>, damit es nicht durch
-       transformierte/scalende Dashboard-Container abgeschnitten oder verschoben wird. */
+    /* FIX: Bestätigungs-Modal bleibt immer im sichtbaren Viewport.
+       Der Dialog wird per JS auf die Y-Höhe des grünen Buttons gesetzt,
+       aber nicht über Margin/Flex nach unten geschoben. Dadurch muss man
+       nicht auf 80% herauszoomen oder im Overlay suchen. */
     :root {
         --service-modal-vh: 1vh;
-        --service-modal-panel-top: clamp(0.75rem, 8vh, 5rem);
+        --service-modal-panel-top: 1rem;
     }
 
     #fahrerkarte-confirm-modal {
@@ -1157,12 +1157,11 @@
         height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         min-height: calc(var(--service-modal-vh, 1vh) * 100) !important;
         margin: 0 !important;
-        padding: 0 clamp(0.75rem, 2vw, 1.5rem) clamp(0.75rem, 2vw, 1.5rem) !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
+        padding: 0 !important;
+        overflow: hidden !important;
         overscroll-behavior: contain;
-        align-items: flex-start !important;
-        justify-content: center !important;
+        align-items: initial !important;
+        justify-content: initial !important;
         transform: none !important;
         isolation: isolate;
         box-sizing: border-box;
@@ -1174,17 +1173,19 @@
 
     #fahrerkarte-confirm-modal.flex,
     #fahrerkarte-confirm-modal.service-modal-open {
-        display: flex !important;
+        display: block !important;
     }
 
     #fahrerkarte-confirm-panel {
+        position: fixed !important;
+        top: var(--service-modal-panel-top) !important;
+        left: 50% !important;
         width: min(100%, 34rem) !important;
         max-width: min(34rem, calc(100vw - 1.5rem)) !important;
         max-height: calc((var(--service-modal-vh, 1vh) * 100) - 1.5rem) !important;
-        margin: var(--service-modal-panel-top) auto clamp(0.75rem, 2vw, 1.5rem) !important;
+        margin: 0 !important;
         overflow-y: auto !important;
-        transform: none !important;
-        flex: 0 1 auto;
+        transform: translateX(-50%) !important;
         box-sizing: border-box;
     }
 
@@ -1989,11 +1990,12 @@
         const safeGap = window.matchMedia('(max-width: 640px)').matches ? 8 : 12;
         const triggerRect = submitButton.getBoundingClientRect();
         const panel = document.getElementById('fahrerkarte-confirm-panel');
-        const panelHeight = panel && panel.offsetHeight ? panel.offsetHeight : 320;
-        const triggerCenter = triggerRect.top + (triggerRect.height / 2);
+        const panelHeight = panel && panel.offsetHeight ? panel.offsetHeight : Math.min(360, viewportHeight - (safeGap * 2));
 
-        /* Panel vertikal auf die Höhe des grünen Buttons legen,
-           aber trotzdem innerhalb des sichtbaren Viewports halten. */
+        /* Ziel: Dialog optisch auf Höhe des grünen Buttons öffnen.
+           Wenn dafür nicht genug Platz ist, wird er automatisch so geklemmt,
+           dass er bei 100% Zoom komplett sichtbar bleibt. */
+        const triggerCenter = triggerRect.top + (triggerRect.height / 2);
         const preferredTop = triggerCenter - (panelHeight / 2);
         const maxTop = Math.max(safeGap, viewportHeight - panelHeight - safeGap);
         const top = clampNumber(preferredTop, safeGap, maxTop);
