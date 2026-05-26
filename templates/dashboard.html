@@ -186,6 +186,15 @@
 
 {% block title %}EifelLog - Dashboard{% endblock %}
 
+{#
+    Detail-Aufrufe der Fahrer-Kennzahlen:
+    - /dashboard/gefahrene-km
+    - /dashboard/kontostand
+    - /dashboard/abgeschlossene-touren
+    - /dashboard/fahrer-level
+    Diese Pfade muessen in main.py als Routen vorhanden sein.
+#}
+
 {% block content %}
 <style>
     #alert-badge {
@@ -1371,7 +1380,7 @@
             <strong>{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }} km</strong>
         </div>
 
-        <a href="/dashboard/detail" class="driver-stat-footer" aria-label="Fahrten-Details öffnen">
+        <a href="/dashboard/gefahrene-km" class="driver-stat-footer" aria-label="Gefahrene-Kilometer-Details öffnen">
             <span>Details öffnen</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -1402,7 +1411,7 @@
             <strong>Live synchronisiert</strong>
         </div>
 
-        <a href="{{ url_for('profile', username=current_user.username) }}" class="driver-stat-footer" aria-label="Kontostand-Details öffnen">
+        <a href="/dashboard/kontostand" class="driver-stat-footer" aria-label="Kontostand-Details öffnen">
             <span>Details öffnen</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -1433,7 +1442,7 @@
             <strong>Erfolgreich beendet</strong>
         </div>
 
-        <a href="/dashboard/detail" class="driver-stat-footer" aria-label="Abgeschlossene Touren öffnen">
+        <a href="/dashboard/abgeschlossene-touren" class="driver-stat-footer" aria-label="Abgeschlossene-Touren-Details öffnen">
             <span>Fahrtenbuch öffnen</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -1468,7 +1477,7 @@
             <strong>{{ driver_level_progress|int }}% bis zum nächsten Rang</strong>
         </div>
 
-        <a href="/dashboard/detail#fahrer-level" class="driver-stat-footer" aria-label="Nächsten Rang anzeigen">
+        <a href="/dashboard/fahrer-level" class="driver-stat-footer" aria-label="Fahrer-Level-Details und nächsten Rang anzeigen">
             <span>Nächster Rang</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
