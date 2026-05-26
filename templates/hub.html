@@ -16,12 +16,35 @@
 {% set deadline_raw = w.get('deadline', '') %}
 {% set features = w.get('features', w.get('neue_features', w.get('updates', []))) %}
 {% set roadmap = w.get('roadmap', w.get('roadmap_items', [])) %}
+{% set green_status_values = ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben', 'erfolgreich getestet'] %}
+{% set completion = namespace(total=0, green=0) %}
+
+{% for feature in features %}
+    {% if feature is mapping %}
+        {% set completion.total = completion.total + 1 %}
+        {% if feature.get('status', '')|lower|trim in green_status_values %}
+            {% set completion.green = completion.green + 1 %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% for step in roadmap %}
+    {% if step is mapping %}
+        {% set completion.total = completion.total + 1 %}
+        {% if step.get('status', '')|lower|trim in green_status_values %}
+            {% set completion.green = completion.green + 1 %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% set all_green = completion.total > 0 and completion.total == completion.green %}
+{% set maintenance_finished = all_green %}
 
 {% macro status_badge(text, extra_classes='') -%}
     {% set value = text|default('', true) %}
     {% set normalized = value|lower|trim %}
 
-    {% if normalized in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+    {% if normalized in green_status_values %}
         <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/35 text-emerald-200 text-[10px] font-orbitron font-bold uppercase tracking-widest {{ extra_classes }}">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-2 shadow-[0_0_12px_rgba(110,231,183,0.8)]"></span>
             {{ value }}
@@ -52,7 +75,7 @@
     {% set value = status|default('', true) %}
     {% set normalized = value|lower|trim %}
 
-    {% if normalized in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+    {% if normalized in green_status_values %}
         <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-emerald-400 border-4 border-black/60 shadow-[0_0_20px_rgba(52,211,153,0.75)]"></div>
     {% elif normalized in ['in arbeit', 'bearbeitung', 'überarbeitung', 'optimierung', 'verbesserung'] %}
         <div class="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-[#5865F2] border-4 border-black/60 shadow-[0_0_20px_rgba(88,101,242,0.75)]"></div>
@@ -65,31 +88,51 @@
 
 <section class="flex-grow flex items-center justify-center min-h-[70vh] py-12 px-4">
 
-    {% if is_wartung %}
+    {% if is_wartung or maintenance_finished %}
 
-    <!-- Wartungsmodus Card -->
+    <!-- Wartungsmodus / Abschluss Card -->
     <div class="glass-card p-8 md:p-12 max-w-5xl w-full relative overflow-hidden text-center z-10">
 
         <!-- Background Ambient Glow -->
+        {% if maintenance_finished %}
+        <div class="absolute -top-24 -right-24 w-72 h-72 bg-emerald-400 rounded-full mix-blend-screen filter blur-[90px] opacity-20 pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-[var(--brand-green)] rounded-full mix-blend-screen filter blur-[90px] opacity-15 pointer-events-none"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-[var(--brand-green)]/5 pointer-events-none"></div>
+        {% else %}
         <div class="absolute -top-24 -right-24 w-72 h-72 bg-yellow-400 rounded-full mix-blend-screen filter blur-[90px] opacity-20 pointer-events-none"></div>
         <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-[var(--brand-green)] rounded-full mix-blend-screen filter blur-[90px] opacity-15 pointer-events-none"></div>
         <div class="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-red-500/5 pointer-events-none"></div>
+        {% endif %}
 
         <!-- Wartungs Icon -->
-        <div class="w-24 h-24 mx-auto rounded-full bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center mb-6 shadow-[0_0_35px_rgba(250,204,21,0.15)] relative z-10">
+        <div class="w-24 h-24 mx-auto rounded-full {% if maintenance_finished %}bg-emerald-400/10 border border-emerald-400/30 shadow-[0_0_35px_rgba(52,211,153,0.18)]{% else %}bg-yellow-400/10 border border-yellow-400/30 shadow-[0_0_35px_rgba(250,204,21,0.15)]{% endif %} flex items-center justify-center mb-6 relative z-10">
+            {% if maintenance_finished %}
+            <svg class="w-12 h-12 text-emerald-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            {% else %}
             <svg class="w-12 h-12 text-yellow-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.121 2.121 0 01-3-3l5.653-4.655M15.17 11.42l3.03-2.496c.384-.317.626-.74.766-1.208l.78-2.702a.75.75 0 00-.927-.927l-2.702.78a2.25 2.25 0 00-1.208.766l-2.496 3.03M15.17 11.42L12.58 8.83M12.58 8.83L9.172 5.42a2.121 2.121 0 00-3 3l3.408 3.408"></path>
             </svg>
+            {% endif %}
         </div>
 
         <!-- Wartungs Tag -->
         <div class="relative z-10 mb-6">
-            {{ status_badge(w.get('tag', 'Geplante Wartung'), 'px-4 py-2 text-[10px] tracking-[0.2em]') }}
+            {% if maintenance_finished %}
+                {{ status_badge('Wartungsmodus erfolgreich beendet', 'px-4 py-2 text-[10px] tracking-[0.2em]') }}
+            {% else %}
+                {{ status_badge(w.get('tag', 'Geplante Wartung'), 'px-4 py-2 text-[10px] tracking-[0.2em]') }}
+            {% endif %}
         </div>
 
         <!-- Titel -->
         <h1 class="text-3xl md:text-4xl font-orbitron font-bold text-white mb-3 tracking-wide relative z-10">
-            {{ w.get('title', 'Wartungsarbeiten') }}
+            {% if maintenance_finished %}
+                Wartungsmodus erfolgreich beendet
+            {% else %}
+                {{ w.get('title', 'Wartungsarbeiten') }}
+            {% endif %}
         </h1>
 
         <!-- Datum / Deadline -->
@@ -99,11 +142,15 @@
             </p>
 
             {% if deadline_text %}
-            <div class="inline-flex flex-col md:flex-row items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10">
+            <div class="inline-flex flex-col md:flex-row items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/5 border {% if maintenance_finished %}border-emerald-400/20{% else %}border-white/10{% endif %}">
                 <span class="text-white/50 text-xs font-orbitron uppercase tracking-widest">
-                    {{ w.get('deadline_label', 'Voraussichtlich wieder online') }}
+                    {% if maintenance_finished %}
+                        Abgeschlossen am
+                    {% else %}
+                        {{ w.get('deadline_label', 'Voraussichtlich wieder online') }}
+                    {% endif %}
                 </span>
-                <span class="text-yellow-200 text-sm font-orbitron font-bold">
+                <span class="{% if maintenance_finished %}text-emerald-200{% else %}text-yellow-200{% endif %} text-sm font-orbitron font-bold">
                     {{ deadline_text }}
                 </span>
             </div>
@@ -111,7 +158,7 @@
         </div>
 
         <!-- Countdown -->
-        {% if deadline_raw %}
+        {% if is_wartung and not maintenance_finished and deadline_raw %}
         <div class="relative z-10 mb-8">
             <div class="rounded-2xl bg-black/25 border border-yellow-400/20 p-5 md:p-6 shadow-[0_0_30px_rgba(250,204,21,0.06)]">
                 <div class="flex items-center justify-center gap-3 mb-5">
@@ -154,21 +201,35 @@
         </div>
         {% endif %}
 
-        <!-- Grund -->
-        <div class="relative z-10 text-left rounded-2xl bg-black/20 border border-white/10 p-6 mb-8">
+        <!-- Grund / Abschlussinfo -->
+        <div class="relative z-10 text-left rounded-2xl bg-black/20 border {% if maintenance_finished %}border-emerald-400/20{% else %}border-white/10{% endif %} p-6 mb-8">
             <div class="flex items-start gap-4">
-                <div class="shrink-0 w-10 h-10 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
+                <div class="shrink-0 w-10 h-10 rounded-xl {% if maintenance_finished %}bg-emerald-400/10 border border-emerald-400/20{% else %}bg-yellow-400/10 border border-yellow-400/20{% endif %} flex items-center justify-center">
+                    {% if maintenance_finished %}
+                    <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 12.75l6 6 9-13.5"></path>
+                    </svg>
+                    {% else %}
                     <svg class="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m0 3.75h.007v.008H12v-.008zM10.29 3.86L1.82 18a2.25 2.25 0 001.93 3.375h16.5A2.25 2.25 0 0022.18 18L13.71 3.86a2.25 2.25 0 00-3.42 0z"></path>
                     </svg>
+                    {% endif %}
                 </div>
 
                 <div>
                     <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest mb-2">
-                        Warum ist der Hub gerade nicht erreichbar?
+                        {% if maintenance_finished %}
+                            Abschlussstatus
+                        {% else %}
+                            Warum ist der Hub gerade nicht erreichbar?
+                        {% endif %}
                     </h2>
                     <p class="text-sm text-white/70 font-inter leading-relaxed">
-                        {{ w.get('reason', 'Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.') }}
+                        {% if maintenance_finished %}
+                            Der Wartungsmodus wurde erfolgreich beendet. Alle sichtbaren Wartungs-, Feature- und Roadmap-Punkte sind auf grün gesetzt und wurden abgeschlossen.
+                        {% else %}
+                            {{ w.get('reason', 'Wir führen aktuell Wartungsarbeiten am Eifel LOG Hub durch.') }}
+                        {% endif %}
                     </p>
                 </div>
             </div>
@@ -176,8 +237,88 @@
 
         <!-- Nachricht -->
         <p class="text-sm text-[var(--muted)] font-inter leading-relaxed mb-8 relative z-10">
-            {{ w.get('message', 'Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.') }}
+            {% if maintenance_finished %}
+                Der Hub ist wieder verfügbar. Die behobenen Punkte wurden zusammengeführt, geprüft und erfolgreich abgeschlossen.
+            {% else %}
+                {{ w.get('message', 'Der Hub ist vorübergehend nicht verfügbar. Eine Anmeldung ist während der Wartung nur für freigegebene Rollen möglich.') }}
+            {% endif %}
         </p>
+
+        <!-- Abschluss-Zusammenfassung -->
+        {% if maintenance_finished %}
+        <div class="relative z-10 mb-8 text-left">
+            <div class="rounded-2xl bg-emerald-400/[0.04] border border-emerald-400/20 p-5 md:p-6 shadow-[0_0_30px_rgba(52,211,153,0.06)]">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-400/10 border border-emerald-400/25 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+
+                    <div>
+                        <h2 class="text-white font-orbitron font-bold text-sm uppercase tracking-widest">
+                            Wartungsmodus erfolgreich beendet
+                        </h2>
+                        <p class="text-xs text-white/40 font-inter">
+                            Zusammenfassung aller behobenen und erfolgreich abgeschlossenen Punkte.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-3">
+                    {% for feature in features %}
+                        {% if feature is mapping and feature.get('status', '')|lower|trim in green_status_values %}
+                        <div class="rounded-xl bg-black/20 border border-emerald-400/15 p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="shrink-0 w-7 h-7 rounded-lg bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center mt-0.5">
+                                    <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 12.75l6 6 9-13.5"></path>
+                                    </svg>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <h3 class="text-white font-orbitron text-xs font-bold uppercase tracking-widest">
+                                        {{ feature.get('title', feature.get('name', 'Behobener Punkt')) }}
+                                    </h3>
+                                    {% if feature.get('description') or feature.get('text') %}
+                                    <p class="text-sm text-white/60 font-inter leading-relaxed mt-1">
+                                        {{ feature.get('description', feature.get('text')) }}
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% for step in roadmap %}
+                        {% if step is mapping and step.get('status', '')|lower|trim in green_status_values %}
+                        <div class="rounded-xl bg-black/20 border border-emerald-400/15 p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="shrink-0 w-7 h-7 rounded-lg bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center mt-0.5">
+                                    <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 12.75l6 6 9-13.5"></path>
+                                    </svg>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <h3 class="text-white font-orbitron text-xs font-bold uppercase tracking-widest">
+                                        {{ step.get('title', step.get('name', 'Abgeschlossener Schritt')) }}
+                                    </h3>
+                                    {% if step.get('description') or step.get('text') %}
+                                    <p class="text-sm text-white/60 font-inter leading-relaxed mt-1">
+                                        {{ step.get('description', step.get('text')) }}
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Features -->
         {% if features and features|length > 0 %}
@@ -194,7 +335,11 @@
                         Neue Features & Fehlerbehebungen
                     </h2>
                     <p class="text-xs text-white/40 font-inter">
-                        Diese Punkte werden während der Wartung verbessert, neu eingebaut oder wurden bereits behoben.
+                        {% if maintenance_finished %}
+                            Diese Punkte wurden behoben, zusammengeführt und erfolgreich abgeschlossen.
+                        {% else %}
+                            Diese Punkte werden während der Wartung verbessert, neu eingebaut oder wurden bereits behoben.
+                        {% endif %}
                     </p>
                 </div>
             </div>
@@ -205,10 +350,10 @@
                     {% set feature_status = feature.get('status', '') %}
                     {% set feature_status_norm = feature_status|lower|trim %}
 
-                    <div class="rounded-2xl bg-white/5 border {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}border-emerald-400/25 shadow-[0_0_24px_rgba(52,211,153,0.06)]{% else %}border-white/10{% endif %} p-5">
+                    <div class="rounded-2xl bg-white/5 border {% if feature_status_norm in green_status_values %}border-emerald-400/25 shadow-[0_0_24px_rgba(52,211,153,0.06)]{% else %}border-white/10{% endif %} p-5">
                         <div class="flex items-start gap-3">
-                            <div class="shrink-0 w-8 h-8 rounded-lg {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}bg-emerald-400/10 border border-emerald-400/25{% else %}bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20{% endif %} flex items-center justify-center mt-0.5">
-                                {% if feature_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}
+                            <div class="shrink-0 w-8 h-8 rounded-lg {% if feature_status_norm in green_status_values %}bg-emerald-400/10 border border-emerald-400/25{% else %}bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20{% endif %} flex items-center justify-center mt-0.5">
+                                {% if feature_status_norm in green_status_values %}
                                 <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 12.75l6 6 9-13.5"></path>
                                 </svg>
@@ -287,7 +432,11 @@
                         Wartungs-Roadmap
                     </h2>
                     <p class="text-xs text-white/40 font-inter">
-                        Fortschritt, behobene Punkte, laufende Arbeiten und nächste Schritte.
+                        {% if maintenance_finished %}
+                            Alle Roadmap-Punkte sind abgeschlossen und der Wartungsmodus wurde beendet.
+                        {% else %}
+                            Fortschritt, behobene Punkte, laufende Arbeiten und nächste Schritte.
+                        {% endif %}
                     </p>
                 </div>
             </div>
@@ -299,11 +448,11 @@
                         {% set step_status = step.get('status', '') %}
                         {% set step_status_norm = step_status|lower|trim %}
 
-                        <div class="relative pl-9 pb-5 border-l {% if step_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}border-emerald-400/25{% else %}border-white/10{% endif %} last:pb-0">
+                        <div class="relative pl-9 pb-5 border-l {% if step_status_norm in green_status_values %}border-emerald-400/25{% else %}border-white/10{% endif %} last:pb-0">
 
                             {{ roadmap_dot(step_status) }}
 
-                            <div class="rounded-2xl {% if step_status_norm in ['behoben', 'erledigt', 'fixed', 'done', 'abgeschlossen', 'erfolgreich behoben'] %}bg-emerald-400/[0.04] border border-emerald-400/20{% else %}bg-white/[0.03] border border-white/10{% endif %} p-4">
+                            <div class="rounded-2xl {% if step_status_norm in green_status_values %}bg-emerald-400/[0.04] border border-emerald-400/20{% else %}bg-white/[0.03] border border-white/10{% endif %} p-4">
                                 <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-2 mb-2">
@@ -378,17 +527,25 @@
 
         {% if login_allowed %}
 
-        <!-- Login Button während Wartung -->
+        <!-- Login Button während Wartung / nach Abschluss -->
         <div class="relative z-10">
             <a href="/login" class="flex items-center justify-center w-full px-8 py-4 rounded-xl font-orbitron font-bold text-sm uppercase tracking-widest transition-all duration-300 bg-[#5865F2]/10 border border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white hover:shadow-[0_0_25px_rgba(88,101,242,0.5)] hover:-translate-y-1">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" class="mr-3">
                     <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
                 </svg>
-                Login für freigegebene Rollen
+                {% if maintenance_finished %}
+                    Discord Login
+                {% else %}
+                    Login für freigegebene Rollen
+                {% endif %}
             </a>
 
             <p class="text-xs text-white/40 font-inter leading-relaxed mt-4">
-                Während der Wartung können sich nur Benutzer mit freigegebenen Discord-Rollen anmelden.
+                {% if maintenance_finished %}
+                    Der Wartungsmodus ist beendet. Berechtigte Nutzer können sich wieder regulär anmelden.
+                {% else %}
+                    Während der Wartung können sich nur Benutzer mit freigegebenen Discord-Rollen anmelden.
+                {% endif %}
             </p>
         </div>
 
@@ -464,7 +621,7 @@
 
 </section>
 
-{% if is_wartung and deadline_raw %}
+{% if is_wartung and not maintenance_finished and deadline_raw %}
 <script>
 (function () {
     const countdown = document.getElementById("maintenanceCountdown");
