@@ -130,6 +130,29 @@
 {% set driver_xp_value = db_xp_value if db_xp_value is not none else (attr_xp_value if attr_xp_value is not none else driver_stats.xp|default(driver_xp|default(0, true), true)) %}
 {% set driver_level_progress = db_level_progress if db_level_progress is not none else (attr_level_progress if attr_level_progress is not none else driver_stats.level_progress|default(driver_level_progress|default(0, true), true)) %}
 
+
+{# Globale Unternehmensstatistiken direkt aus MongoDB company_stats/company_all_time.
+   main.py sollte companyStats/company_stats/company in den Dashboard-Kontext geben.
+   Unterstützte Backend-Feldnamen:
+   - allTimeKilometers / all_time_km / all_time_kilometers / allTimeKm
+   - companyIncome / all_time_income / income / revenue
+   - jobsAllTime / jobs_all_time / jobs / totalJobs
+   - deliveriesAllTime / deliveries_all_time / deliveries / totalDeliveries
+   - activeDrivers / active_drivers
+#}
+{% set raw_company_stats = companyStats|default(company_stats|default(company|default({}, true), true), true) %}
+{% if raw_company_stats is mapping %}
+    {% set company_db = raw_company_stats %}
+{% else %}
+    {% set company_db = {} %}
+{% endif %}
+{% set company_all_time_km = company_db.get('allTimeKilometers', company_db.get('all_time_km', company_db.get('all_time_kilometers', company_db.get('allTimeKm', company_db.get('kilometers', 0))))) %}
+{% set company_income = company_db.get('companyIncome', company_db.get('all_time_income', company_db.get('income', company_db.get('revenue', 0)))) %}
+{% set company_jobs_all_time = company_db.get('jobsAllTime', company_db.get('jobs_all_time', company_db.get('jobs', company_db.get('totalJobs', 0)))) %}
+{% set company_deliveries_all_time = company_db.get('deliveriesAllTime', company_db.get('deliveries_all_time', company_db.get('deliveries', company_db.get('totalDeliveries', 0)))) %}
+{% set company_active_drivers = company_db.get('activeDrivers', company_db.get('active_drivers', 0)) %}
+{% set company_updated_at = company_db.get('updated_at', company_db.get('updatedAt', company_db.get('latest_receipt_at', company_db.get('latestReceiptAt', '-')))) %}
+
 {% set current_trip_from = driver_current_trip.from_city|default(driver_current_trip.start|default(driver_current_trip.origin|default('-', true), true), true) %}
 {% set current_trip_to = driver_current_trip.to_city|default(driver_current_trip.destination|default(driver_current_trip.target|default('-', true), true), true) %}
 {% set current_trip_departure = driver_current_trip.departure|default(driver_current_trip.start_time|default('-', true), true) %}
@@ -1312,6 +1335,115 @@
     }
 
 
+
+
+    /* ---------------------------------------------------------
+       Unternehmensstatistik / Company Stats
+       - Wird aus MongoDB company_stats/company_all_time befüllt.
+       - Nach Job-Abgabe aktualisiert JS die Werte sofort aus /api/dashboard/state.
+    --------------------------------------------------------- */
+    .company-stats-panel {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(137, 190, 50, 0.16) !important;
+        background:
+            radial-gradient(circle at 5% 0%, rgba(137, 190, 50, 0.12), transparent 30%),
+            radial-gradient(circle at 95% 15%, rgba(220, 226, 38, 0.09), transparent 34%),
+            rgba(4, 6, 5, 0.72) !important;
+    }
+
+    .company-stats-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(90deg, rgba(137,190,50,0.08), transparent 28%, rgba(220,226,38,0.06));
+        opacity: 0.9;
+    }
+
+    .company-stats-panel > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .company-stat-card {
+        min-height: 8.25rem;
+        border-radius: 1.15rem;
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        background: rgba(0, 0, 0, 0.22);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+    }
+
+    .company-stat-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.58rem;
+        font-weight: 900;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.52);
+    }
+
+    .company-stat-dot {
+        width: 0.52rem;
+        height: 0.52rem;
+        border-radius: 9999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 14px rgba(137, 190, 50, 0.5);
+        flex: 0 0 auto;
+    }
+
+    .company-stat-value {
+        margin-top: 1rem;
+        color: #fff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.2rem, 1.55vw, 1.7rem);
+        font-weight: 900;
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    .company-stat-subtext {
+        margin-top: 0.55rem;
+        color: rgba(255, 255, 255, 0.45);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+
+    .company-sync-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        background: rgba(137, 190, 50, 0.08);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 767px) {
+        .company-stat-card {
+            min-height: 7.5rem;
+            padding: 0.875rem;
+        }
+    }
+
 </style>
 
 <div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
@@ -1371,13 +1503,13 @@
         </div>
 
         <div class="driver-stat-value-wrap">
-            <span class="driver-stat-value">{{ ('%.1f'|format(driver_total_km|float))|replace('.', ',') }}</span>
+            <span id="driverTotalKm" data-driver-stat="total_km" class="driver-stat-value js-driver-total-km">{{ ('%.1f'|format(driver_total_km|float))|replace('.', ',') }}</span>
             <span class="driver-stat-unit">km</span>
         </div>
 
         <div class="driver-stat-meta">
             <span>Letzte Fahrt</span>
-            <strong>{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }} km</strong>
+            <strong><span id="driverLastTripDistance" data-driver-stat="last_trip_distance" class="js-driver-last-trip-distance">{{ ('%.1f'|format(driver_last_trip_distance|float))|replace('.', ',') }}</span> km</strong>
         </div>
 
         <a href="/dashboard/gefahrene-km" class="driver-stat-footer" aria-label="Gefahrene-Kilometer-Details öffnen">
@@ -1402,7 +1534,7 @@
         </div>
 
         <div class="driver-stat-value-wrap">
-            <span class="driver-stat-value">{{ ('%.2f'|format(driver_account_balance|float))|replace('.', ',') }}</span>
+            <span id="driverBalance" data-driver-stat="balance" class="driver-stat-value js-driver-balance">{{ ('%.2f'|format(driver_account_balance|float))|replace('.', ',') }}</span>
             <span class="driver-stat-unit">€</span>
         </div>
 
@@ -1433,7 +1565,7 @@
         </div>
 
         <div class="driver-stat-value-wrap">
-            <span class="driver-stat-value">{{ driver_completed_trips|int }}</span>
+            <span id="driverCompletedTrips" data-driver-stat="completed_trips" class="driver-stat-value js-driver-completed-trips">{{ driver_completed_trips|int }}</span>
             <span class="driver-stat-unit">Touren</span>
         </div>
 
@@ -1464,17 +1596,17 @@
         </div>
 
         <div class="driver-stat-value-wrap driver-stat-value-wrap--level">
-            <span class="driver-stat-value driver-stat-value--level">{{ driver_level_name }}</span>
-            <span class="driver-stat-unit">{{ driver_xp_value|int }} XP</span>
+            <span id="driverLevelName" data-driver-stat="level" class="driver-stat-value driver-stat-value--level js-driver-level-name">{{ driver_level_name }}</span>
+            <span id="driverXp" data-driver-stat="xp" class="driver-stat-unit js-driver-xp">{{ driver_xp_value|int }} XP</span>
         </div>
 
         <div class="driver-level-progress" aria-label="Level Fortschritt {{ driver_level_progress|int }} Prozent">
-            <div class="driver-level-progress-bar" style="width: {{ driver_level_progress|int }}%;"></div>
+            <div id="driverLevelProgressBar" class="driver-level-progress-bar js-driver-level-progress-bar" style="width: {{ driver_level_progress|int }}%;"></div>
         </div>
 
         <div class="driver-stat-meta">
             <span>Fortschritt</span>
-            <strong>{{ driver_level_progress|int }}% bis zum nächsten Rang</strong>
+            <strong><span id="driverLevelProgress" data-driver-stat="level_progress" class="js-driver-level-progress">{{ driver_level_progress|int }}</span>% bis zum nächsten Rang</strong>
         </div>
 
         <a href="/dashboard/fahrer-level" class="driver-stat-footer" aria-label="Fahrer-Level-Details und nächsten Rang anzeigen">
@@ -1483,6 +1615,91 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
         </a>
+    </div>
+</div>
+
+
+
+<div id="company-stats-panel" class="glass-card company-stats-panel p-6 mb-8 relative z-10" data-company-stats-panel>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Unternehmen</span>
+            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Eifel LOG Gesamtstatistik</h2>
+            <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                Diese Werte kommen direkt aus MongoDB <span class="text-white/70">company_stats/company_all_time</span> und werden nach jeder Job-Abgabe automatisch aktualisiert.
+            </p>
+        </div>
+        <div id="companySyncStatus" class="company-sync-status" data-company-sync-status>
+            <span class="company-stat-dot"></span>
+            Live Sync aktiv
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div class="company-stat-card">
+            <div class="company-stat-label">
+                <span>Gesamtkilometer</span>
+                <span class="company-stat-dot"></span>
+            </div>
+            <div id="companyAllTimeKilometers"
+                 class="company-stat-value js-company-all-time-km js-company-km"
+                 data-company-stat="allTimeKilometers"
+                 data-company="allTimeKilometers"
+                 data-eifellog-company="allTimeKilometers">{{ ('%.1f'|format(company_all_time_km|float))|replace('.', ',') }} KM</div>
+            <div class="company-stat-subtext">Alle korrekt abgegebenen Touren.</div>
+        </div>
+
+        <div class="company-stat-card">
+            <div class="company-stat-label">
+                <span>Firmenumsatz</span>
+                <span class="company-stat-dot"></span>
+            </div>
+            <div id="companyIncome"
+                 class="company-stat-value js-company-income js-company-revenue"
+                 data-company-stat="companyIncome"
+                 data-company="companyIncome"
+                 data-eifellog-company="companyIncome">{{ ('%.0f'|format(company_income|float))|replace('.', ',') }} €</div>
+            <div class="company-stat-subtext">Berechnet aus Beleg-/Tourdaten.</div>
+        </div>
+
+        <div class="company-stat-card">
+            <div class="company-stat-label">
+                <span>Jobs</span>
+                <span class="company-stat-dot"></span>
+            </div>
+            <div id="jobsAllTime"
+                 class="company-stat-value js-company-jobs"
+                 data-company-stat="jobsAllTime"
+                 data-company="jobsAllTime"
+                 data-eifellog-company="jobsAllTime">{{ company_jobs_all_time|int }}</div>
+            <div class="company-stat-subtext">Alle gezählten Job-Abgaben.</div>
+        </div>
+
+        <div class="company-stat-card">
+            <div class="company-stat-label">
+                <span>Lieferungen</span>
+                <span class="company-stat-dot"></span>
+            </div>
+            <div id="companyDeliveries"
+                 class="company-stat-value js-company-deliveries"
+                 data-company-stat="deliveries"
+                 data-company="deliveries"
+                 data-eifellog-company="deliveries">{{ company_deliveries_all_time|int }}</div>
+            <div class="company-stat-subtext">Synchronisiert mit der Datenbank.</div>
+        </div>
+
+        <div class="company-stat-card">
+            <div class="company-stat-label">
+                <span>Aktive Fahrer</span>
+                <span class="company-stat-dot"></span>
+            </div>
+            <div id="activeDrivers"
+                 class="company-stat-value js-active-drivers-count"
+                 data-company-stat="activeDrivers"
+                 data-company="activeDrivers"
+                 data-eifellog-company="activeDrivers">{{ company_active_drivers|int }}</div>
+            <div class="company-stat-subtext">Letztes Update: <span id="companyStatsUpdatedAt" class="js-company-updated-at">{{ company_updated_at }}</span></div>
+        </div>
     </div>
 </div>
 
@@ -3957,6 +4174,274 @@
             }
         });
     });
+</script>
+
+
+
+<!-- Dashboard MongoDB Live-Sync: Fahrer- und Unternehmenswerte nach Job-Abgabe aktualisieren -->
+<script>
+(function () {
+    if (window.__EIFELLOG_DASHBOARD_DB_SYNC__) return;
+    window.__EIFELLOG_DASHBOARD_DB_SYNC__ = true;
+
+    const COMPANY_SYNC_ENDPOINTS = ['/api/dashboard/state', '/api/dashboard/data'];
+
+    const normalizeNumber = (value, fallback = 0) => {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+        const cleaned = String(value)
+            .replace(/\s+/g, '')
+            .replace(/KM|km|€|EUR|eur/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.');
+        const parsed = Number(cleaned);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const getFirst = (source, keys, fallback = undefined) => {
+        if (!source || typeof source !== 'object') return fallback;
+        for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== null && source[key] !== undefined && source[key] !== '') {
+                return source[key];
+            }
+        }
+        return fallback;
+    };
+
+    const formatNumber = (value, decimals = 0) => normalizeNumber(value).toLocaleString('de-DE', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+
+    const setText = (selectors, value) => {
+        selectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(element => {
+                element.textContent = value;
+            });
+        });
+    };
+
+    const setWidth = (selectors, percent) => {
+        const safePercent = Math.max(0, Math.min(100, normalizeNumber(percent, 0)));
+        selectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(element => {
+                element.style.width = safePercent + '%';
+            });
+        });
+    };
+
+    const extractCompanyStats = (payload) => {
+        if (!payload || typeof payload !== 'object') return null;
+        return payload.companyStats
+            || payload.company_stats
+            || payload.company
+            || payload.stats?.company
+            || payload.state?.companyStats
+            || payload.state?.company_stats
+            || payload.state?.company
+            || payload.dashboardState?.companyStats
+            || payload.dashboardState?.company_stats
+            || payload.dashboardState?.company
+            || null;
+    };
+
+    const extractDriverStats = (payload) => {
+        if (!payload || typeof payload !== 'object') return null;
+        return payload.driverStats
+            || payload.driver_stats
+            || payload.profile
+            || payload.userStats
+            || payload.user_stats
+            || payload.state?.driverStats
+            || payload.state?.driver_stats
+            || payload.state?.profile
+            || payload.dashboardState?.driverStats
+            || payload.dashboardState?.driver_stats
+            || payload.dashboardState?.profile
+            || null;
+    };
+
+    function renderCompanyStats(stats) {
+        if (!stats || typeof stats !== 'object') return;
+
+        const kilometers = getFirst(stats, [
+            'allTimeKilometers', 'companyAllTimeKilometers', 'allTimeKm', 'all_time_km', 'all_time_kilometers', 'kilometers', 'totalKilometers', 'total_kilometers'
+        ], 0);
+        const income = getFirst(stats, [
+            'companyIncome', 'all_time_income', 'income', 'revenue', 'totalIncome', 'total_income'
+        ], 0);
+        const jobs = getFirst(stats, [
+            'jobsAllTime', 'jobs_all_time', 'jobs', 'totalJobs', 'total_jobs'
+        ], 0);
+        const deliveries = getFirst(stats, [
+            'deliveriesAllTime', 'deliveries_all_time', 'deliveries', 'totalDeliveries', 'total_deliveries'
+        ], 0);
+        const activeDrivers = getFirst(stats, [
+            'activeDrivers', 'active_drivers', 'onlineDrivers', 'online_drivers'
+        ], 0);
+        const updatedAt = getFirst(stats, [
+            'updated_at', 'updatedAt', 'latest_receipt_at', 'latestReceiptAt', 'reset_at', 'resetAt'
+        ], 'gerade aktualisiert');
+
+        setText([
+            '[data-company-stat="allTimeKilometers"]',
+            '[data-company="allTimeKilometers"]',
+            '[data-eifellog-company="allTimeKilometers"]',
+            '#companyAllTimeKilometers',
+            '#companyAllTimeKm',
+            '.js-company-all-time-km',
+            '.js-company-km'
+        ], formatNumber(kilometers, 1) + ' KM');
+
+        setText([
+            '[data-company-stat="companyIncome"]',
+            '[data-company="companyIncome"]',
+            '[data-eifellog-company="companyIncome"]',
+            '#companyIncome',
+            '.js-company-income',
+            '.js-company-revenue'
+        ], formatNumber(income, 0) + ' €');
+
+        setText([
+            '[data-company-stat="jobsAllTime"]',
+            '[data-company="jobsAllTime"]',
+            '[data-eifellog-company="jobsAllTime"]',
+            '#jobsAllTime',
+            '.js-company-jobs'
+        ], formatNumber(jobs, 0));
+
+        setText([
+            '[data-company-stat="deliveries"]',
+            '[data-company="deliveries"]',
+            '[data-eifellog-company="deliveries"]',
+            '#companyDeliveries',
+            '.js-company-deliveries'
+        ], formatNumber(deliveries, 0));
+
+        setText([
+            '[data-company-stat="activeDrivers"]',
+            '[data-company="activeDrivers"]',
+            '[data-eifellog-company="activeDrivers"]',
+            '#activeDrivers',
+            '.js-active-drivers-count'
+        ], formatNumber(activeDrivers, 0));
+
+        setText(['#companyStatsUpdatedAt', '.js-company-updated-at'], String(updatedAt || 'gerade aktualisiert'));
+        setText(['#companySyncStatus', '[data-company-sync-status]'], '● Live Sync aktiv');
+
+        window.dispatchEvent(new CustomEvent('eifellog:company-stats-rendered', { detail: stats }));
+    }
+
+    function renderDriverStats(stats) {
+        if (!stats || typeof stats !== 'object') return;
+
+        const totalKm = getFirst(stats, ['total_km', 'totalKm', 'total_driven_km', 'completed_km', 'driven_km', 'km'], null);
+        const balance = getFirst(stats, ['balance', 'account_balance', 'kontostand', 'money'], null);
+        const completedTrips = getFirst(stats, ['completed_trips', 'completedTrips', 'abgeschlossen', 'touren_abgeschlossen'], null);
+        const lastTrip = getFirst(stats, ['last_trip_distance', 'lastTripDistance', 'letzte_fahrt_km'], null);
+        const level = getFirst(stats, ['level', 'driver_level', 'fahrer_level', 'fahrerLevel'], null);
+        const xp = getFirst(stats, ['xp', 'driver_xp', 'fahrer_xp'], null);
+        const progress = getFirst(stats, ['level_progress', 'driver_level_progress', 'fahrer_level_progress'], null);
+
+        if (totalKm !== null) setText(['[data-driver-stat="total_km"]', '#driverTotalKm', '.js-driver-total-km'], formatNumber(totalKm, 1));
+        if (balance !== null) setText(['[data-driver-stat="balance"]', '#driverBalance', '.js-driver-balance'], formatNumber(balance, 2));
+        if (completedTrips !== null) setText(['[data-driver-stat="completed_trips"]', '#driverCompletedTrips', '.js-driver-completed-trips'], formatNumber(completedTrips, 0));
+        if (lastTrip !== null) setText(['[data-driver-stat="last_trip_distance"]', '#driverLastTripDistance', '.js-driver-last-trip-distance'], formatNumber(lastTrip, 1));
+        if (level !== null) setText(['[data-driver-stat="level"]', '#driverLevelName', '.js-driver-level-name'], String(level));
+        if (xp !== null) setText(['[data-driver-stat="xp"]', '#driverXp', '.js-driver-xp'], formatNumber(xp, 0) + ' XP');
+        if (progress !== null) {
+            setText(['[data-driver-stat="level_progress"]', '#driverLevelProgress', '.js-driver-level-progress'], formatNumber(progress, 0));
+            setWidth(['#driverLevelProgressBar', '.js-driver-level-progress-bar'], progress);
+        }
+    }
+
+    async function fetchDashboardState() {
+        for (const endpoint of COMPANY_SYNC_ENDPOINTS) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                if (!response.ok) continue;
+                const data = await response.json();
+                if (!data || data.success === false || data.ok === false) continue;
+                return data;
+            } catch (error) {
+                console.warn('Dashboard-Sync Endpoint nicht erreichbar:', endpoint, error);
+            }
+        }
+        return null;
+    }
+
+    async function refreshDashboardFromDatabase() {
+        const data = await fetchDashboardState();
+        if (!data) return;
+
+        const companyStats = extractCompanyStats(data);
+        const driverStats = extractDriverStats(data);
+
+        if (companyStats) renderCompanyStats(companyStats);
+        if (driverStats) renderDriverStats(driverStats);
+
+        window.dispatchEvent(new CustomEvent('eifellog:dashboard-synced', { detail: data }));
+    }
+
+    function handleTrackerMessage(rawMessage) {
+        let message = rawMessage;
+        if (typeof message === 'string') {
+            try { message = JSON.parse(message); } catch { return; }
+        }
+        if (!message || typeof message !== 'object') return;
+
+        const payload = message.payload || message.detail || message;
+        const type = message.type || payload.type || '';
+        const companyStats = extractCompanyStats(payload) || extractCompanyStats(message);
+        const driverStats = extractDriverStats(payload) || extractDriverStats(message);
+
+        if (companyStats) renderCompanyStats(companyStats);
+        if (driverStats) renderDriverStats(driverStats);
+
+        if (
+            type === 'job:complete:result' ||
+            type === 'tracker:state' ||
+            type === 'job:start:result' ||
+            type === 'native:api-response' ||
+            payload.completed === true ||
+            payload.dashboardRefresh === true
+        ) {
+            window.setTimeout(refreshDashboardFromDatabase, 250);
+            window.setTimeout(refreshDashboardFromDatabase, 1500);
+        }
+    }
+
+    window.EifelLogDashboardSync = {
+        refresh: refreshDashboardFromDatabase,
+        renderCompanyStats,
+        renderDriverStats,
+        handleTrackerMessage
+    };
+
+    window.addEventListener('message', event => handleTrackerMessage(event.data));
+    window.addEventListener('eifellog:native-message', event => handleTrackerMessage(event.detail));
+    window.addEventListener('eifellog:tracker-state', event => handleTrackerMessage({ type: 'tracker:state', payload: event.detail }));
+    window.addEventListener('eifellog:job-result', event => handleTrackerMessage({ type: 'job:complete:result', payload: event.detail }));
+    window.addEventListener('eifellog:company-stats', event => renderCompanyStats(event.detail));
+
+    if (window.chrome && window.chrome.webview && typeof window.chrome.webview.addEventListener === 'function') {
+        window.chrome.webview.addEventListener('message', event => handleTrackerMessage(event.data));
+    }
+
+    document.addEventListener('DOMContentLoaded', refreshDashboardFromDatabase, { once: true });
+    window.addEventListener('focus', refreshDashboardFromDatabase);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshDashboardFromDatabase();
+    });
+
+    refreshDashboardFromDatabase();
+    window.setInterval(refreshDashboardFromDatabase, 30000);
+})();
 </script>
 
 {% endblock %}
