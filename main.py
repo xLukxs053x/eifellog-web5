@@ -1491,73 +1491,144 @@ def company_receipt_key(receipt_doc):
 
 
 def add_receipt_to_company_all_time_stats(receipt_doc):
-    """Erhöht Company-All-Time nur fuer den frisch gespeicherten Beleg."""
+    """Erhöht die globale Company-Statistik genau einmal pro Beleg.
+
+    Wichtig fuer Dashboard/MongoDB:
+    - Der Beleg wird ueber processed_receipt_keys dedupliziert.
+    - Nach einem manuellen Reset kann ein bereits vorhandener Beleg die
+      Company-Kachel wieder korrekt fuellen, ohne einen zweiten Beleg anzulegen.
+    - Die Summen werden direkt in company_stats/company_all_time gespeichert und
+      koennen von dashboard.html sowie /api/tracker/state sofort gelesen werden.
+    """
     if not receipt_counts_as_completed(receipt_doc):
         return get_company_all_time_stats()
 
-    stats_doc = get_company_all_time_stats()
+    receipt_doc = receipt_doc or {}
     receipt_key = company_receipt_key(receipt_doc)
-    processed_receipt_keys = stats_doc.get("processed_receipt_keys") or []
-
-    if receipt_key and receipt_key in processed_receipt_keys:
-        return stats_doc
+    if not receipt_key:
+        receipt_key = hashlib.sha256(
+            json.dumps(receipt_doc, default=str, sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
     distance = round(get_receipt_distance_km(receipt_doc), 1)
     income = round(get_receipt_income(receipt_doc), 2)
     submitted_at = coerce_receipt_datetime(
         receipt_doc.get("submitted_at") or receipt_doc.get("created_at"),
-        fallback=now_utc()
+        fallback=now_utc(),
+    )
+    if not isinstance(submitted_at, datetime):
+        submitted_at = now_utc()
+
+    # Sichert das Basisschema und richtet die 6-Monats-Arrays auf den aktuellen Zeitraum aus.
+    stats_doc = get_company_all_time_stats()
+    month_keys, month_labels, empty_monthly_kilometers, empty_income_series = build_empty_company_month_series(6)
+
+    current_monthly_kilometers = list(
+        stats_doc.get("monthly_kilometers")
+        or stats_doc.get("monthlyKilometers")
+        or empty_monthly_kilometers
+    )
+    current_income_series = list(
+        stats_doc.get("income_series")
+        or stats_doc.get("incomeSeries")
+        or empty_income_series
+    )
+    current_monthly_labels = list(
+        stats_doc.get("monthly_labels")
+        or stats_doc.get("monthlyLabels")
+        or month_labels
     )
 
-    month_keys, month_labels, default_monthly_kilometers, default_income_series = build_empty_company_month_series(6)
-    monthly_kilometers = list(stats_doc.get("monthly_kilometers") or stats_doc.get("monthlyKilometers") or default_monthly_kilometers)
-    income_series = list(stats_doc.get("income_series") or stats_doc.get("incomeSeries") or default_income_series)
-    monthly_labels = list(stats_doc.get("monthly_labels") or stats_doc.get("monthlyLabels") or month_labels)
-
-    if len(monthly_kilometers) != 6 or len(income_series) != 6 or len(monthly_labels) != 6:
-        monthly_kilometers = default_monthly_kilometers
-        income_series = default_income_series
-        monthly_labels = month_labels
-
-    month_key = submitted_at.strftime("%Y-%m") if isinstance(submitted_at, datetime) else month_keys[-1]
-    if month_key in month_keys:
-        month_index = month_keys.index(month_key)
-        monthly_kilometers[month_index] = round(parse_number(monthly_kilometers[month_index], 0) + distance, 1)
-        income_series[month_index] = round(parse_number(income_series[month_index], 0) + income, 2)
-
-    latest_receipt_at = stats_doc.get("latest_receipt_at")
-    if isinstance(submitted_at, datetime):
-        latest_receipt_at = submitted_at if not isinstance(latest_receipt_at, datetime) or submitted_at > latest_receipt_at else latest_receipt_at
-
-    if receipt_key:
-        processed_receipt_keys = [safe_str(value) for value in processed_receipt_keys if safe_str(value)]
-        processed_receipt_keys.append(receipt_key)
-        processed_receipt_keys = processed_receipt_keys[-5000:]
-
-    updated_doc = normalize_company_stats_doc({
-        **stats_doc,
-        "all_time_km": round(company_stat_number(stats_doc, "all_time_km", "allTimeKilometers") + distance, 1),
-        "all_time_income": round(company_stat_number(stats_doc, "all_time_income", "companyIncome") + income, 2),
-        "jobs_all_time": company_stat_int(stats_doc, "jobs_all_time", "jobsAllTime", "jobs") + 1,
-        "deliveries_all_time": company_stat_int(stats_doc, "deliveries_all_time", "deliveries", "totalDeliveries") + 1,
-        "monthly_kilometers": monthly_kilometers,
-        "monthlyKilometers": monthly_kilometers,
-        "income_series": income_series,
-        "incomeSeries": income_series,
-        "monthly_labels": monthly_labels,
-        "monthlyLabels": monthly_labels,
-        "latest_receipt_at": latest_receipt_at,
-        "updated_at": now_utc(),
-        "source": "company_stats_incremental",
-        "all_time_initialized": True,
-        "processed_receipt_keys": processed_receipt_keys,
-    })
-
-    company_stats_collection.replace_one(
-        {"_id": COMPANY_STATS_DOCUMENT_ID},
-        updated_doc,
-        upsert=True
+    needs_month_schema_update = (
+        len(current_monthly_kilometers) != 6
+        or len(current_income_series) != 6
+        or len(current_monthly_labels) != 6
+        or current_monthly_labels != month_labels
     )
+
+    if needs_month_schema_update:
+        km_by_label = {
+            safe_str(label): parse_number(value, 0)
+            for label, value in zip(current_monthly_labels, current_monthly_kilometers)
+        }
+        income_by_label = {
+            safe_str(label): parse_number(value, 0)
+            for label, value in zip(current_monthly_labels, current_income_series)
+        }
+        current_monthly_kilometers = [round(km_by_label.get(label, 0), 1) for label in month_labels]
+        current_income_series = [round(income_by_label.get(label, 0), 2) for label in month_labels]
+        current_monthly_labels = list(month_labels)
+
+        company_stats_collection.update_one(
+            {"_id": COMPANY_STATS_DOCUMENT_ID},
+            {
+                "$set": {
+                    "monthly_kilometers": current_monthly_kilometers,
+                    "monthlyKilometers": current_monthly_kilometers,
+                    "income_series": current_income_series,
+                    "incomeSeries": current_income_series,
+                    "monthly_labels": current_monthly_labels,
+                    "monthlyLabels": current_monthly_labels,
+                    "kind": "global",
+                    "all_time_initialized": True,
+                    "updated_at": now_utc(),
+                },
+            },
+            upsert=False,
+        )
+
+    month_key = submitted_at.strftime("%Y-%m")
+    month_index = month_keys.index(month_key) if month_key in month_keys else -1
+
+    inc_fields = {
+        "all_time_km": distance,
+        "allTimeKilometers": distance,
+        "all_time_income": income,
+        "companyIncome": income,
+        "jobs_all_time": 1,
+        "deliveries_all_time": 1,
+    }
+    if month_index >= 0:
+        inc_fields[f"monthly_kilometers.{month_index}"] = distance
+        inc_fields[f"monthlyKilometers.{month_index}"] = distance
+        inc_fields[f"income_series.{month_index}"] = income
+        inc_fields[f"incomeSeries.{month_index}"] = income
+
+    now = now_utc()
+    update_result = company_stats_collection.update_one(
+        {
+            "_id": COMPANY_STATS_DOCUMENT_ID,
+            "processed_receipt_keys": {"$ne": receipt_key},
+        },
+        {
+            "$inc": inc_fields,
+            "$set": {
+                "kind": "global",
+                "source": "company_stats_incremental",
+                "all_time_initialized": True,
+                "monthly_labels": month_labels,
+                "monthlyLabels": month_labels,
+                "updated_at": now,
+            },
+            "$max": {"latest_receipt_at": submitted_at},
+            "$push": {"processed_receipt_keys": {"$each": [receipt_key], "$slice": -5000}},
+        },
+        upsert=False,
+    )
+
+    # Wenn matched_count == 0, war der Beleg bereits verarbeitet. Dann nur den aktuellen Stand liefern.
+    updated_doc = get_company_all_time_stats()
+
+    # Rundung sauber in MongoDB zurueckschreiben, damit dashboard.html keine Float-Artefakte sieht.
+    normalized = normalize_company_stats_doc(updated_doc)
+    if update_result.modified_count:
+        company_stats_collection.replace_one(
+            {"_id": COMPANY_STATS_DOCUMENT_ID},
+            normalized,
+            upsert=True,
+        )
+        return normalized
+
     return updated_doc
 
 
@@ -7849,7 +7920,12 @@ def build_company_stats_payload():
         "monthlyLabels": monthly_labels[:6],
 
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
-        "updatedAt": datetime_to_iso(persistent_stats.get("updated_at"))
+        "updatedAt": datetime_to_iso(persistent_stats.get("updated_at")),
+        "updated_at": datetime_to_iso(persistent_stats.get("updated_at")),
+        "latestReceiptAt": datetime_to_iso(persistent_stats.get("latest_receipt_at")),
+        "latest_receipt_at": datetime_to_iso(persistent_stats.get("latest_receipt_at")),
+        "source": persistent_stats.get("source"),
+        "processedReceiptCount": len(persistent_stats.get("processed_receipt_keys") or [])
     }
 
 
@@ -8105,10 +8181,16 @@ def prepare_driver_dashboard_context(user_doc):
         "last_update": format_datetime_for_template(live_updated_at)
     }
 
+    company_stats = build_company_stats_payload()
+
     return {
         "driver_stats": driver_stats,
         "fahrtenbuch_entries": fahrtenbuch_entries,
-        "driver_current_trip": get_driver_current_trip_for_dashboard(user_doc)
+        "driver_current_trip": get_driver_current_trip_for_dashboard(user_doc),
+        "company_stats": company_stats,
+        "companyStats": company_stats,
+        "company": company_stats,
+        "dashboard_company_stats": company_stats,
     }
 
 
@@ -10460,6 +10542,7 @@ def complete_tracker_tour_from_request():
         if database_result.get("notAtDestination") or database_result.get("notCurrentTour"):
             status_code = 409
 
+        company_stats_payload = build_company_stats_payload()
         return jsonify({
             "success": success,
             "message": "Tour wurde am Ziel abgeschlossen; PDF-Beleg wurde verarbeitet." if success else safe_str(database_result.get("reason"), "Tour-Abschluss wurde blockiert."),
@@ -10469,6 +10552,9 @@ def complete_tracker_tour_from_request():
             "billingRelevant": bool(success),
             "database": database_result,
             "discord": discord_result,
+            "companyStats": company_stats_payload,
+            "company": company_stats_payload,
+            "dashboardRefresh": True,
             "receipt": {
                 "receiptId": database_result.get("receiptId"),
                 "receiptNumber": database_result.get("receiptNumber"),
@@ -10535,6 +10621,8 @@ def complete_tracker_tour_from_request():
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
     company_all_time = get_company_all_time_stats()
+    company_stats_payload = build_company_stats_payload()
+    state_payload = tracker_state_payload(fresh_user)
 
     return jsonify({
         "success": True,
@@ -10546,6 +10634,9 @@ def complete_tracker_tour_from_request():
         "companyAllTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+        "companyStats": company_stats_payload,
+        "company": company_stats_payload,
+        "dashboardRefresh": True,
         "receipt": {
             "receiptId": database_result.get("receiptId"),
             "receiptNumber": database_result.get("receiptNumber"),
@@ -10562,7 +10653,8 @@ def complete_tracker_tour_from_request():
             "discordMessageId": discord_result.get("message_id"),
             "discordError": discord_result.get("error") or discord_result.get("reason"),
         },
-        "state": tracker_state_payload(fresh_user)
+        "state": state_payload,
+        "dashboardState": state_payload
     })
 
 
@@ -11919,19 +12011,27 @@ def store_tracker_webhook_completed_job(payload):
     if existing:
         mark_tracker_job_start_completed(user_doc, payload_for_db, existing)
         reset_active_tour_start_embed_state(user_doc, reason="tour_completed_existing", completed_job_key=current_job_key)
-        company_stats = get_company_all_time_stats()
+        # Kein zweiter Beleg/PDF/Discord-Embed, aber Company-Stats werden trotzdem
+        # gegen MongoDB synchronisiert. Das repariert z.B. einen Reset auf 0, wenn
+        # der Beleg bereits existiert und danach erneut abgegeben wird.
+        company_stats = add_receipt_to_company_all_time_stats(existing)
+        company_stats_payload = build_company_stats_payload()
         return {
             "stored": False,
             "alreadyStored": True,
             "skipped": True,
-            "reason": "Dieser Auftrag wurde fuer diesen Fahrer bereits verarbeitet. Kein zweiter Embed/PDF-Beleg wurde erstellt.",
+            "reason": "Dieser Auftrag wurde fuer diesen Fahrer bereits verarbeitet. Kein zweiter Embed/PDF-Beleg wurde erstellt; Dashboard/Company-Stats sind synchronisiert.",
             "jobId": existing.get("job_id"),
             "jobStartKey": existing.get("job_start_key"),
             "receiptId": existing.get("receipt_id"),
             "receiptNumber": existing.get("receipt_number"),
             "pdf": existing.get("pdf"),
             "discord": existing.get("discord") or {},
-            "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1)
+            "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+            "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+            "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+            "companyStats": company_stats_payload,
+            "company": company_stats_payload,
         }
 
     try:
@@ -11959,6 +12059,7 @@ def store_tracker_webhook_completed_job(payload):
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
     company_stats = get_company_all_time_stats()
+    company_stats_payload = build_company_stats_payload()
 
     return {
         "stored": True,
@@ -11972,7 +12073,10 @@ def store_tracker_webhook_completed_job(payload):
         "destinationConfirmationReason": allowed_reason,
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
         "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+        "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+        "companyStats": company_stats_payload,
+        "company": company_stats_payload,
         "pdf": receipt_doc.get("pdf"),
         "discord": receipt_doc.get("discord"),
         "logbook": logbook_result
@@ -12552,6 +12656,57 @@ def tracker_state():
     return jsonify(tracker_state_payload(fresh_user))
 
 
+@app.route("/api/dashboard/state", methods=["GET", "OPTIONS"])
+@app.route("/api/dashboard/data", methods=["GET", "OPTIONS"])
+def dashboard_state_api():
+    """Session-basierter JSON-Zustand fuer dashboard.html.
+
+    dashboard.html kann diesen Endpoint nach einer Job-Abgabe oder per Polling
+    abrufen. Die Werte kommen direkt aus MongoDB und enthalten sowohl Fahrer- als
+    auch globale Company-Stats.
+    """
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if "user" not in session:
+        return jsonify({"success": False, "error": "Nicht eingeloggt."}), 401
+
+    session_user = session.get("user") or {}
+    user_roles = session_user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        return jsonify({"success": False, "error": "Zugriff verweigert."}), 403
+
+    discord_id = safe_str(session_user.get("id") or session_user.get("discord_id"))
+    db_user = users_collection.find_one({"discord_id": discord_id}) if discord_id else None
+    if not db_user:
+        db_user = {
+            "discord_id": discord_id,
+            "username": session_user.get("username"),
+            "discord_username": session_user.get("discord_username"),
+            "display_name": session_user.get("username"),
+            "avatar": session_user.get("avatar"),
+            "roles": user_roles,
+        }
+
+    dashboard_context = prepare_driver_dashboard_context(db_user)
+    company_stats = dashboard_context.get("companyStats") or build_company_stats_payload()
+
+    return jsonify({
+        "success": True,
+        "updatedAt": datetime_to_iso(now_utc()),
+        "profile": tracker_profile_payload(db_user) if db_user and db_user.get("_id") else {},
+        "driverStats": dashboard_context.get("driver_stats") or {},
+        "driver_stats": dashboard_context.get("driver_stats") or {},
+        "currentTrip": dashboard_context.get("driver_current_trip") or {},
+        "driver_current_trip": dashboard_context.get("driver_current_trip") or {},
+        "fahrtenbuchEntries": dashboard_context.get("fahrtenbuch_entries") or [],
+        "fahrtenbuch_entries": dashboard_context.get("fahrtenbuch_entries") or [],
+        "companyStats": company_stats,
+        "company_stats": company_stats,
+        "company": company_stats,
+    })
+
+
 @app.route("/api/tracker/company/reset", methods=["POST", "OPTIONS"])
 @app.route("/api/company/reset", methods=["POST", "OPTIONS"])
 @tracker_api_key_required
@@ -12560,11 +12715,14 @@ def api_reset_company_stats():
         return jsonify({"success": True})
 
     reset_doc = reset_company_all_time_stats()
+    company_stats_payload = build_company_stats_payload()
     return jsonify({
         "success": True,
         "message": "Company-All-Time-Statistik wurde auf 0 gesetzt.",
-        "companyStats": build_company_stats_payload(),
+        "companyStats": company_stats_payload,
+        "company": company_stats_payload,
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+        "dashboardRefresh": True,
         "updatedAt": datetime_to_iso(reset_doc.get("updated_at"))
     })
 
