@@ -10253,6 +10253,14 @@ def complete_tracker_tour_from_request():
         payload.setdefault("delivered", True)
         payload.setdefault("trackerSubmitRequested", True)
         payload.setdefault("submissionRequested", True)
+        payload.setdefault("completeEndpointSubmit", True)
+        payload.setdefault("tourSubmitRequested", True)
+        payload.setdefault("submittedByTracker", True)
+        payload.setdefault("receiptRequired", True)
+        payload.setdefault("destinationReached", True)
+        payload.setdefault("arrivedAtDestination", True)
+        payload.setdefault("atDestination", True)
+        payload.setdefault("deliveryArrived", True)
         payload.setdefault("completedAtUtc", now_utc().isoformat() + "Z")
 
         database_result = store_tracker_webhook_completed_job(payload)
@@ -10303,6 +10311,14 @@ def complete_tracker_tour_from_request():
     completion_payload.setdefault("delivered", True)
     completion_payload.setdefault("trackerSubmitRequested", True)
     completion_payload.setdefault("submissionRequested", True)
+    completion_payload.setdefault("completeEndpointSubmit", True)
+    completion_payload.setdefault("tourSubmitRequested", True)
+    completion_payload.setdefault("submittedByTracker", True)
+    completion_payload.setdefault("receiptRequired", True)
+    completion_payload.setdefault("destinationReached", True)
+    completion_payload.setdefault("arrivedAtDestination", True)
+    completion_payload.setdefault("atDestination", True)
+    completion_payload.setdefault("deliveryArrived", True)
     completion_payload.setdefault("completedAtUtc", now_utc().isoformat() + "Z")
 
     telemetry = tracker_request_telemetry_payload(completion_payload, user_doc=user_doc)
@@ -10430,6 +10446,7 @@ def tracker_payload_explicit_job_key(payload):
     explicit_key = payload_lookup_value(
         payload,
         "activeJobKey", "jobKey", "tourKey", "currentJobKey", "jobStartKey",
+        "acceptedCurrentJobKey", "accepted_current_job_key",
         fallback=""
     )
     explicit_key = normalize_tracker_key_token(explicit_key)
@@ -11084,6 +11101,11 @@ def merge_tracker_webhook_payload(data, payload):
             "status", "jobStatus", "job_status", "event", "type", "messageType",
             "jobFinished", "jobDelivered", "jobCompleted", "jobCancelled",
             "completed", "delivered", "submitted", "finished",
+            "trackerSubmitRequested", "submissionRequested", "completeEndpointSubmit",
+            "tourSubmitRequested", "submittedByTracker", "receiptRequired",
+            "destinationReached", "destination_reached", "arrivedAtDestination",
+            "arrived_at_destination", "atDestination", "at_destination",
+            "deliveryArrived", "delivery_arrived", "discordReceiptRequested",
             "jobActive", "hasJob", "activeJob",
             "sourceCity", "source_city", "source", "jobSourceCity", "from", "routeOrigin",
             "destinationCity", "destination_city", "destination", "targetCity",
@@ -11099,7 +11121,10 @@ def merge_tracker_webhook_payload(data, payload):
             "routeProgressPercent", "damagePercent", "truckDamagePercent", "trailerDamagePercent",
             "fuelPercent", "fuelLiters", "fuel_liters", "rpm", "engineRpm",
             "speedKmh", "eta", "etaText", "game", "gameCode", "gameName",
-            "driverCardId", "fahrerkarteId"
+            "driverCardId", "fahrerkarteId",
+            "jobKey", "tourKey", "currentJobKey", "jobStartKey", "activeJobKey",
+            "acceptedCurrentJobKey", "completedJobKey", "completedAtUtc", "jobEndReason",
+            "manualSubmit", "currentTourOnly"
         ):
             if key in data and (key not in payload or payload.get(key) in (None, "", "-")):
                 payload[key] = data.get(key)
@@ -11314,7 +11339,9 @@ def tracker_webhook_payload_is_completed(payload):
         payload_bool(
             payload,
             "jobFinished", "jobDelivered", "jobCompleted", "completed",
-            "delivered", "submitted", "finished",
+            "delivered", "submitted", "finished", "completeEndpointSubmit",
+            "tourSubmitRequested", "submittedByTracker", "receiptRequired",
+            "discordReceiptRequested",
             fallback=False
         )
         or status in completed_statuses
