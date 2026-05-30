@@ -1254,6 +1254,14 @@ COMPANY_STATS_AUTO_REBUILD_FROM_RECEIPTS = env_bool(
     default=False,
 )
 
+# Beim ersten Einsatz der neuen Company-Statistik sollen bereits vorhandene
+# Tour-Belege einmalig uebernommen werden. Ein expliziter Reset bleibt trotzdem
+# stabil, weil Dokumente mit source=company_stats_reset nicht erneut aufgebaut werden.
+COMPANY_STATS_BOOTSTRAP_FROM_RECEIPTS_WHEN_EMPTY = env_bool(
+    "COMPANY_STATS_BOOTSTRAP_FROM_RECEIPTS_WHEN_EMPTY",
+    default=True,
+)
+
 
 def positive_number(value, fallback=0.0):
     number = parse_number(value, fallback)
@@ -1447,9 +1455,56 @@ def normalize_company_stats_doc(stats_doc):
         "updated_at": stats_doc.get("updated_at") if stats_doc.get("updated_at") else now_utc(),
         "source": safe_str(stats_doc.get("source"), "company_stats_manual") or "company_stats_manual",
         "all_time_initialized": True,
+        "bootstrap_checked_at": stats_doc.get("bootstrap_checked_at"),
+        "reset_at": stats_doc.get("reset_at"),
         "processed_receipt_keys": [safe_str(value) for value in processed_receipt_keys if safe_str(value)][-5000:]
     })
     return normalized
+
+
+def align_company_stats_month_series(stats_doc):
+    """Richtet die 6-Monats-Reihen beim Lesen auf den aktuellen Zeitraum aus.
+
+    Dadurch zeigt der Company-Tab auch nach einem Monatswechsel sofort die
+    richtigen Balken, selbst wenn noch keine neue Tour abgegeben wurde.
+    """
+    stats_doc = normalize_company_stats_doc(stats_doc)
+    _, month_labels, empty_monthly_kilometers, empty_income_series = build_empty_company_month_series(6)
+
+    current_monthly_kilometers = list(stats_doc.get("monthly_kilometers") or stats_doc.get("monthlyKilometers") or empty_monthly_kilometers)
+    current_income_series = list(stats_doc.get("income_series") or stats_doc.get("incomeSeries") or empty_income_series)
+    current_monthly_labels = list(stats_doc.get("monthly_labels") or stats_doc.get("monthlyLabels") or month_labels)
+
+    if (
+        len(current_monthly_kilometers) == 6
+        and len(current_income_series) == 6
+        and len(current_monthly_labels) == 6
+        and current_monthly_labels == month_labels
+    ):
+        return stats_doc, False
+
+    km_by_label = {
+        safe_str(label): round(parse_number(value, 0), 1)
+        for label, value in zip(current_monthly_labels, current_monthly_kilometers)
+    }
+    income_by_label = {
+        safe_str(label): round(parse_number(value, 0), 2)
+        for label, value in zip(current_monthly_labels, current_income_series)
+    }
+
+    monthly_kilometers = [round(km_by_label.get(label, 0), 1) for label in month_labels]
+    income_series = [round(income_by_label.get(label, 0), 2) for label in month_labels]
+
+    stats_doc.update({
+        "monthly_kilometers": monthly_kilometers,
+        "monthlyKilometers": monthly_kilometers,
+        "income_series": income_series,
+        "incomeSeries": income_series,
+        "monthly_labels": month_labels,
+        "monthlyLabels": month_labels,
+        "updated_at": now_utc(),
+    })
+    return stats_doc, True
 
 
 def build_company_stats_doc_from_receipts():
@@ -1460,11 +1515,21 @@ def build_company_stats_doc_from_receipts():
     latest_receipt_at = None
     month_keys, month_labels, monthly_kilometers, income_series = build_empty_company_month_series(6)
     processed_receipt_keys = []
+    processed_receipt_key_set = set()
 
     query = {"archived": {"$ne": True}}
     for receipt_doc in tour_receipts_collection.find(query):
         if not receipt_counts_as_completed(receipt_doc):
             continue
+
+        receipt_key = company_receipt_key(receipt_doc)
+        if not receipt_key:
+            receipt_key = hashlib.sha256(
+                json.dumps(receipt_doc, default=str, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+        if receipt_key in processed_receipt_key_set:
+            continue
+        processed_receipt_key_set.add(receipt_key)
 
         distance = get_receipt_distance_km(receipt_doc)
         income = get_receipt_income(receipt_doc)
@@ -1474,9 +1539,7 @@ def build_company_stats_doc_from_receipts():
         jobs_all_time += 1
         deliveries_all_time += 1
 
-        receipt_key = company_receipt_key(receipt_doc)
-        if receipt_key:
-            processed_receipt_keys.append(receipt_key)
+        processed_receipt_keys.append(receipt_key)
 
         submitted_at = coerce_receipt_datetime(receipt_doc.get("submitted_at") or receipt_doc.get("created_at"))
         if isinstance(submitted_at, datetime):
@@ -1538,11 +1601,52 @@ def refresh_company_all_time_stats_from_receipts(force=False):
     return stats_doc
 
 
+def company_stats_doc_needs_initial_bootstrap(stats_doc):
+    if not COMPANY_STATS_BOOTSTRAP_FROM_RECEIPTS_WHEN_EMPTY:
+        return False
+
+    if not stats_doc:
+        return True
+
+    source = safe_str(stats_doc.get("source"), "company_stats_manual")
+    if source not in {"", "company_stats_manual"}:
+        return False
+    if stats_doc.get("bootstrap_checked_at"):
+        return False
+
+    return (
+        company_stat_number(stats_doc, "all_time_km", "allTimeKilometers", fallback=0) <= 0
+        and company_stat_number(stats_doc, "all_time_income", "companyIncome", fallback=0) <= 0
+        and company_stat_int(stats_doc, "jobs_all_time", "jobsAllTime", fallback=0) <= 0
+        and not (stats_doc.get("processed_receipt_keys") or [])
+    )
+
+
+def bootstrap_company_all_time_stats_from_receipts(stats_doc=None):
+    stats_doc = stats_doc or empty_company_stats_doc()
+    if not company_stats_doc_needs_initial_bootstrap(stats_doc):
+        return stats_doc
+
+    rebuilt = build_company_stats_doc_from_receipts()
+    rebuilt["bootstrap_checked_at"] = now_utc()
+    rebuilt["source"] = "tour_receipts_initial_bootstrap" if rebuilt.get("processed_receipt_keys") else "company_stats_manual"
+    company_stats_collection.replace_one(
+        {"_id": COMPANY_STATS_DOCUMENT_ID},
+        rebuilt,
+        upsert=True,
+    )
+    return rebuilt
+
+
 def get_company_all_time_stats():
     stats_doc = company_stats_collection.find_one({"_id": COMPANY_STATS_DOCUMENT_ID})
 
+    if company_stats_doc_needs_initial_bootstrap(stats_doc):
+        return bootstrap_company_all_time_stats_from_receipts(stats_doc)
+
     if not stats_doc:
         stats_doc = empty_company_stats_doc()
+        stats_doc["bootstrap_checked_at"] = now_utc()
         company_stats_collection.replace_one(
             {"_id": COMPANY_STATS_DOCUMENT_ID},
             stats_doc,
@@ -1551,6 +1655,7 @@ def get_company_all_time_stats():
         return stats_doc
 
     normalized = normalize_company_stats_doc(stats_doc)
+    normalized, month_series_changed = align_company_stats_month_series(normalized)
 
     needs_schema_update = (
         not stats_doc.get("all_time_initialized")
@@ -1558,6 +1663,7 @@ def get_company_all_time_stats():
         or "companyIncome" not in stats_doc
         or "monthlyKilometers" not in stats_doc
         or "incomeSeries" not in stats_doc
+        or month_series_changed
     )
     if needs_schema_update:
         normalized["updated_at"] = now_utc()
@@ -1822,11 +1928,16 @@ def get_profile_stats(user_doc):
         "all_time_km": km_value,
         "allTimeKilometers": km_value,
         "deliveries": deliveries_value,
+        "tours": deliveries_value,
+        "totalDeliveries": deliveries_value,
         "jobs": jobs_value,
+        "totalJobs": jobs_value,
         "convoys": user_doc.get("profile_convoys", "0"),
         "rating": user_doc.get("profile_rating", "0.0"),
         "income": income_value,
-        "revenue": user_doc.get("profile_revenue", income_value)
+        "revenue": user_doc.get("profile_revenue", income_value),
+        "all_time_income": income_value,
+        "allTimeIncome": income_value
     }
 
 
@@ -8407,35 +8518,50 @@ def build_company_stats_payload():
 
     active_driver_count = len(get_active_drivers())
 
+    monthly_kilometers_payload = [
+        round(parse_number(value, 0), 1)
+        for value in monthly_kilometers[:6]
+    ]
+    income_series_payload = [
+        round(parse_number(value, 0), 2)
+        for value in income_series[:6]
+    ]
+
     return {
-        "companyIncome": round(company_income),
-        "income": round(company_income),
-        "revenue": round(company_income),
+        "companyIncome": round(company_income, 2),
+        "companyAllTimeIncome": round(company_income, 2),
+        "allTimeIncome": round(company_income, 2),
+        "all_time_income": round(company_income, 2),
+        "income": round(company_income, 2),
+        "revenue": round(company_income, 2),
 
         "allTimeKilometers": round(company_km, 1),
         "allTimeKm": round(company_km, 1),
         "companyAllTimeKilometers": round(company_km, 1),
         "companyAllTimeKm": round(company_km, 1),
+        "all_time_km": round(company_km, 1),
+        "company_all_time_km": round(company_km, 1),
         "kilometers": round(company_km, 1),
 
         "jobsAllTime": jobs_all_time,
+        "jobs_all_time": jobs_all_time,
         "jobs": jobs_all_time,
         "totalJobs": jobs_all_time,
 
+        "deliveriesAllTime": deliveries,
+        "deliveries_all_time": deliveries,
         "deliveries": deliveries,
         "totalDeliveries": deliveries,
 
         "activeDrivers": active_driver_count,
+        "active_drivers": active_driver_count,
 
-        "monthlyKilometers": [
-            round(parse_number(value, 0), 1)
-            for value in monthly_kilometers[:6]
-        ],
-        "incomeSeries": [
-            round(parse_number(value, 0), 2)
-            for value in income_series[:6]
-        ],
+        "monthlyKilometers": monthly_kilometers_payload,
+        "monthly_kilometers": monthly_kilometers_payload,
+        "incomeSeries": income_series_payload,
+        "income_series": income_series_payload,
         "monthlyLabels": monthly_labels[:6],
+        "monthly_labels": monthly_labels[:6],
 
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "updatedAt": datetime_to_iso(persistent_stats.get("updated_at")),
@@ -8447,9 +8573,50 @@ def build_company_stats_payload():
     }
 
 
+def build_tracker_driver_stats_payload(user_doc):
+    """Liefert Fahrer-All-Time-Werte mit stabilen Aliasen fuer Desktop und WebView."""
+    stats = get_profile_stats(user_doc or {})
+    km = round(positive_number(stats.get("km") or stats.get("all_time_km"), 0), 1)
+    income = round(positive_number(stats.get("income") or stats.get("revenue"), 0), 2)
+    deliveries = parse_int(stats.get("deliveries") or stats.get("tours"), 0)
+    jobs = parse_int(stats.get("jobs"), deliveries)
+
+    return {
+        "km": km,
+        "totalKm": km,
+        "total_km": km,
+        "allTimeKilometers": km,
+        "all_time_km": km,
+        "driverAllTimeKilometers": km,
+
+        "income": income,
+        "revenue": income,
+        "balance": income,
+        "allTimeIncome": income,
+        "all_time_income": income,
+        "driverAllTimeIncome": income,
+        "driverIncome": income,
+        "driverRevenue": income,
+
+        "deliveries": deliveries,
+        "tours": deliveries,
+        "totalDeliveries": deliveries,
+        "completedTrips": deliveries,
+        "completed_trips": deliveries,
+        "driverDeliveriesAllTime": deliveries,
+        "driverToursAllTime": deliveries,
+
+        "jobs": jobs,
+        "totalJobs": jobs,
+        "driverJobsAllTime": jobs,
+    }
+
+
 def tracker_state_payload(user_doc):
+    user_doc = user_doc or {}
     active_drivers = get_active_drivers()
     company_stats = build_company_stats_payload()
+    driver_stats = build_tracker_driver_stats_payload(user_doc)
     logbook = build_logbook_payload(limit=30)
 
     live = user_doc.get("tracker_live") or {}
@@ -8463,8 +8630,16 @@ def tracker_state_payload(user_doc):
     return {
         "success": True,
         "profile": tracker_profile_payload(user_doc),
+        "driverStats": driver_stats,
+        "driver_stats": driver_stats,
+        "driverAllTimeKilometers": driver_stats.get("driverAllTimeKilometers"),
+        "driverAllTimeIncome": driver_stats.get("driverAllTimeIncome"),
+        "driverToursAllTime": driver_stats.get("driverToursAllTime"),
+        "driverDeliveriesAllTime": driver_stats.get("driverDeliveriesAllTime"),
+        "driverJobsAllTime": driver_stats.get("driverJobsAllTime"),
         "company": company_stats,
         "companyStats": company_stats,
+        "company_stats": company_stats,
         "currentJob": current_job,
         "logbook": logbook,
         "lastDeliveries": logbook,
@@ -10954,7 +11129,10 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
                 "tracker_all_time_km": new_km,
                 "tracker_all_time_income": new_income,
                 "tracker_all_time_deliveries": new_deliveries,
+                "tracker_all_time_tours": new_deliveries,
                 "tracker_all_time_jobs": new_jobs,
+                "all_time_tours": new_deliveries,
+                "profile_all_time_tours": new_deliveries,
                 "tracker_all_time_updated_at": now,
 
                 # Wichtig für Dashboard/Buchhaltung/Listen:
@@ -12566,6 +12744,10 @@ def store_tracker_webhook_completed_job(payload):
         receipt_doc["discord"] = {"sent": False, "error": str(error)}
 
     tour_receipts_collection.insert_one(receipt_doc)
+    # Company-Summen sofort und unabhängig von der Profil-Synchronisierung erhöhen.
+    # write_receipt_into_user_stats ruft dieselbe Funktion aus Kompatibilitätsgründen
+    # ebenfalls auf; processed_receipt_keys verhindert dabei jede Doppelzählung.
+    add_receipt_to_company_all_time_stats(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
     try:
         logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
@@ -13222,6 +13404,42 @@ def dashboard_state_api():
         "companyStats": company_stats,
         "company_stats": company_stats,
         "company": company_stats,
+    })
+
+
+@app.route("/api/tracker/company/stats", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/company/state", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/company/stats", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/dashboard/company/stats", methods=["GET", "POST", "OPTIONS"])
+def api_company_stats():
+    """MongoDB-basierte Company-All-Time-Werte fuer Tracker- und Web-Dashboards."""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    client_token = get_client_token_from_request(data)
+
+    if client_token:
+        user_doc = find_tracker_user_by_client_token(client_token)
+        if not user_doc:
+            return jsonify({"success": False, "error": "Tracker-Sitzung ungueltig."}), 401
+        if not user_has_tracker_access(user_doc):
+            return jsonify({"success": False, "error": "Tracker-Zugriff deaktiviert."}), 403
+    else:
+        session_user = session.get("user") or {}
+        if not session_user:
+            return jsonify({"success": False, "error": "Nicht eingeloggt."}), 401
+        if not has_dashboard_permission(session_user.get("roles", [])):
+            return jsonify({"success": False, "error": "Zugriff verweigert."}), 403
+
+    company_stats = build_company_stats_payload()
+    return jsonify({
+        "success": True,
+        "companyStats": company_stats,
+        "company_stats": company_stats,
+        "company": company_stats,
+        "dashboardRefresh": True,
+        **company_stats,
     })
 
 
