@@ -32,6 +32,15 @@ except Exception:
     PIL_AVAILABLE = False
 
 
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+    FERNET_AVAILABLE = True
+except Exception:
+    Fernet = None
+    InvalidToken = Exception
+    FERNET_AVAILABLE = False
+
+
 # ==========================================
 # GRUNDKONFIGURATION
 # ==========================================
@@ -441,6 +450,8 @@ def ensure_indexes():
         fahrerkarte_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("card_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("pdf_relative_path", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("fahrerkarte_pin_issued_at", DESCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("fahrerkarte_pin_locked_until", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("archived", ASCENDING)], unique=False)
 
         fahrerkarte_beantragungen_collection.create_index([("request_id", ASCENDING)], unique=False)
@@ -636,6 +647,21 @@ SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW = env_first(
     "SERVICECENTER_REVIEW_ROLE_IDS",
     default=""
 )
+
+# Fahrerkarte-PIN: Der Klartext wird niemals in MongoDB gespeichert.
+# Setze in der .env bevorzugt einen separaten stabilen Schlüssel:
+# FAHRERKARTE_PIN_ENCRYPTION_KEY=<lange-zufaellige-zeichenfolge>
+# Als Kompatibilitätsfallback wird ein gesetzter FLASK_SECRET_KEY akzeptiert.
+FAHRERKARTE_PIN_ENCRYPTION_SECRET = env_first(
+    "FAHRERKARTE_PIN_ENCRYPTION_KEY",
+    "DRIVER_CARD_PIN_ENCRYPTION_KEY",
+    "FLASK_SECRET_KEY",
+    default=""
+)
+FAHRERKARTE_PIN_LENGTH = max(4, min(8, int(env_float("FAHRERKARTE_PIN_LENGTH", default=4))))
+FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS = max(3, min(20, int(env_float("FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS", default=5))))
+FAHRERKARTE_PIN_LOCK_SECONDS = max(60, int(env_float("FAHRERKARTE_PIN_LOCK_SECONDS", default=900)))
+FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS = max(10, min(120, int(env_float("FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS", default=30))))
 
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
@@ -2726,6 +2752,211 @@ def generate_fahrerkarte_card_id(discord_id, request_id=""):
     return f"EL-FK-{now_utc().strftime('%Y%m%d')}-{digest}"
 
 
+def normalize_fahrerkarte_pin(pin):
+    """Akzeptiert ausschließlich die konfigurierte Anzahl numerischer PIN-Ziffern."""
+    normalized = safe_str(pin)
+    if not re.fullmatch(rf"\d{{{FAHRERKARTE_PIN_LENGTH}}}", normalized):
+        return ""
+    return normalized
+
+
+def generate_fahrerkarte_pin():
+    """Erzeugt eine kryptografisch zufällige Fahrerkarte-PIN."""
+    return "".join(secrets.choice("0123456789") for _ in range(FAHRERKARTE_PIN_LENGTH))
+
+
+def get_fahrerkarte_pin_cipher():
+    """Leitet einen stabilen Fernet-Schlüssel aus der .env ab."""
+    if not FERNET_AVAILABLE or Fernet is None:
+        raise RuntimeError(
+            "Python-Paket 'cryptography' fehlt. Installiere es mit 'pip install cryptography', "
+            "bevor Fahrerkarte-PINs ausgestellt werden."
+        )
+
+    secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not secret:
+        raise RuntimeError(
+            "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
+        )
+
+    derived_key = hashlib.sha256(f"eifellog|fahrerkarte-pin|{secret}".encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(derived_key))
+
+
+def fahrerkarte_pin_hash_key():
+    secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not secret:
+        raise RuntimeError(
+            "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
+        )
+    return hashlib.sha256(f"eifellog|fahrerkarte-pin-hash|{secret}".encode("utf-8")).digest()
+
+
+def hash_fahrerkarte_pin(pin, salt=None):
+    normalized_pin = normalize_fahrerkarte_pin(pin)
+    if not normalized_pin:
+        raise ValueError(f"Fahrerkarte-PIN muss aus genau {FAHRERKARTE_PIN_LENGTH} Ziffern bestehen.")
+
+    salt = safe_str(salt) or secrets.token_hex(16)
+    digest = hmac.new(
+        fahrerkarte_pin_hash_key(),
+        f"{salt}|{normalized_pin}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return salt, digest
+
+
+def encrypt_fahrerkarte_pin(pin):
+    normalized_pin = normalize_fahrerkarte_pin(pin)
+    if not normalized_pin:
+        raise ValueError(f"Fahrerkarte-PIN muss aus genau {FAHRERKARTE_PIN_LENGTH} Ziffern bestehen.")
+    return get_fahrerkarte_pin_cipher().encrypt(normalized_pin.encode("utf-8")).decode("ascii")
+
+
+def decrypt_fahrerkarte_pin(request_doc):
+    request_doc = request_doc or {}
+    ciphertext = safe_str(request_doc.get("fahrerkarte_pin_ciphertext"))
+    if not ciphertext:
+        return ""
+
+    try:
+        decrypted = get_fahrerkarte_pin_cipher().decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    except InvalidToken as error:
+        raise RuntimeError(
+            "Fahrerkarte-PIN konnte nicht entschlüsselt werden. Prüfe den stabilen FAHRERKARTE_PIN_ENCRYPTION_KEY."
+        ) from error
+
+    normalized_pin = normalize_fahrerkarte_pin(decrypted)
+    if not normalized_pin:
+        raise RuntimeError("Gespeicherte Fahrerkarte-PIN ist ungültig.")
+    return normalized_pin
+
+
+def fahrerkarte_pin_actor_snapshot(actor=None):
+    actor = actor or {}
+    return {
+        "discord_id": safe_str(actor.get("discord_id") or actor.get("id")),
+        "username": safe_str(actor.get("username")),
+        "display_name": safe_str(actor.get("display_name") or actor.get("username"), "EifelLog ServiceCenter"),
+    }
+
+
+def fahrerkarte_pin_is_configured(request_doc):
+    request_doc = request_doc or {}
+    return bool(
+        safe_str(request_doc.get("fahrerkarte_pin_ciphertext"))
+        and safe_str(request_doc.get("fahrerkarte_pin_hash"))
+        and safe_str(request_doc.get("fahrerkarte_pin_salt"))
+    )
+
+
+def build_new_fahrerkarte_pin_fields(existing_doc=None, issued_at=None, actor=None, force_new=False):
+    """Erzeugt nur bei Bedarf eine neue PIN. Bestehende Karten behalten ihre PIN."""
+    existing_doc = existing_doc or {}
+    if not force_new and fahrerkarte_pin_is_configured(existing_doc):
+        return {
+            "fahrerkarte_pin_configured": True,
+            "fahrerkarte_pin_issued_at": existing_doc.get("fahrerkarte_pin_issued_at") or issued_at or now_utc(),
+        }
+
+    pin = generate_fahrerkarte_pin()
+    salt, digest = hash_fahrerkarte_pin(pin)
+    return {
+        "fahrerkarte_pin_ciphertext": encrypt_fahrerkarte_pin(pin),
+        "fahrerkarte_pin_hash": digest,
+        "fahrerkarte_pin_salt": salt,
+        "fahrerkarte_pin_version": 1,
+        "fahrerkarte_pin_configured": True,
+        "fahrerkarte_pin_issued_at": issued_at or now_utc(),
+        "fahrerkarte_pin_issued_by": fahrerkarte_pin_actor_snapshot(actor),
+        "fahrerkarte_pin_failed_attempts": 0,
+        "fahrerkarte_pin_locked_until": None,
+        "fahrerkarte_pin_last_verified_at": None,
+        "fahrerkarte_pin_last_revealed_at": None,
+        "fahrerkarte_pin_reveal_count": 0,
+    }
+
+
+def ensure_fahrerkarte_pin_for_request(request_doc, actor=None, force_new=False):
+    """Migriert bestehende ausgestellte Karten und unterstützt eine kontrollierte PIN-Neuausstellung."""
+    request_doc = request_doc or {}
+    if not request_doc.get("_id"):
+        raise ValueError("Fahrerkarte-Antrag besitzt keine MongoDB-ID.")
+
+    if not force_new and fahrerkarte_pin_is_configured(request_doc):
+        return request_doc
+
+    fields = build_new_fahrerkarte_pin_fields(
+        existing_doc=request_doc,
+        issued_at=now_utc(),
+        actor=actor,
+        force_new=force_new,
+    )
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": fields})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]}) or dict(request_doc, **fields)
+
+    user_doc = find_user_for_request_doc(fresh_request) if "find_user_for_request_doc" in globals() else None
+    if user_doc:
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {
+                "fahrerkarte_pin_configured": True,
+                "fahrerkarte_pin_issued_at": fresh_request.get("fahrerkarte_pin_issued_at"),
+                "fahrerkarte_pin_updated_at": now_utc(),
+            }},
+        )
+    return fresh_request
+
+
+def verify_fahrerkarte_pin_for_request(request_doc, submitted_pin):
+    """Prüft die PIN mit persistentem Fehlversuchszähler und temporärer Sperre."""
+    request_doc = request_doc or {}
+    if not fahrerkarte_pin_is_configured(request_doc):
+        return False, "Für diese Fahrerkarte wurde noch kein PIN ausgestellt.", 409
+
+    now = now_utc()
+    locked_until = coerce_fahrerkarte_datetime(request_doc.get("fahrerkarte_pin_locked_until"))
+    if locked_until and locked_until > now:
+        return False, f"PIN-Prüfung ist bis {format_datetime_for_template(locked_until)} gesperrt.", 429
+
+    normalized_pin = normalize_fahrerkarte_pin(submitted_pin)
+    salt = safe_str(request_doc.get("fahrerkarte_pin_salt"))
+    expected_hash = safe_str(request_doc.get("fahrerkarte_pin_hash"))
+    actual_hash = ""
+    if normalized_pin:
+        _salt, actual_hash = hash_fahrerkarte_pin(normalized_pin, salt=salt)
+
+    if normalized_pin and expected_hash and hmac.compare_digest(expected_hash, actual_hash):
+        fahrerkarte_requests_collection.update_one(
+            {"_id": request_doc["_id"]},
+            {"$set": {
+                "fahrerkarte_pin_failed_attempts": 0,
+                "fahrerkarte_pin_locked_until": None,
+                "fahrerkarte_pin_last_verified_at": now,
+                "updated_at": now,
+            }},
+        )
+        return True, "Fahrerkarte-PIN wurde bestätigt.", 200
+
+    failed_attempts = int(request_doc.get("fahrerkarte_pin_failed_attempts") or 0) + 1
+    update_fields = {
+        "fahrerkarte_pin_failed_attempts": failed_attempts,
+        "fahrerkarte_pin_last_failed_at": now,
+        "updated_at": now,
+    }
+    if failed_attempts >= FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS:
+        update_fields["fahrerkarte_pin_locked_until"] = now + timedelta(seconds=FAHRERKARTE_PIN_LOCK_SECONDS)
+        message = "Zu viele falsche PIN-Eingaben. Die PIN-Prüfung wurde vorübergehend gesperrt."
+        status_code = 429
+    else:
+        remaining = FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS - failed_attempts
+        message = f"Fahrerkarte-PIN ist nicht korrekt. Verbleibende Versuche: {remaining}."
+        status_code = 403
+
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": update_fields})
+    return False, message, status_code
+
+
 def normalize_fahrerkarte_status(status):
     status = safe_str(status, "none").lower()
     if status == "open":
@@ -2842,6 +3073,7 @@ def build_fahrerkarte_request_from_user_doc(user_doc):
         "card_id": safe_str(user_doc.get("fahrerkarte_card_id") or user_doc.get("card_id")),
         "handler_name": safe_str(user_doc.get("fahrerkarte_handler"), "Noch nicht zugewiesen"),
         "tracker_upload_ready": bool(user_doc.get("tracker_upload_ready") or status == "issued"),
+        "fahrerkarte_pin_configured": bool(user_doc.get("fahrerkarte_pin_configured")),
     }
 
     optional_map = {
@@ -2856,6 +3088,7 @@ def build_fahrerkarte_request_from_user_doc(user_doc):
         "pdf_relative_path": "fahrerkarte_pdf_relative_path",
         "pdf_filename": "fahrerkarte_pdf_filename",
         "download_url": "fahrerkarte_download_url",
+        "fahrerkarte_pin_issued_at": "fahrerkarte_pin_issued_at",
     }
     for target_key, user_key in optional_map.items():
         value = user_doc.get(user_key)
@@ -2998,6 +3231,10 @@ def sync_fahrerkarte_request_from_user_doc(user_doc, force=False):
             "pdf_path", "pdf_relative_path", "pdf_filename", "download_url",
             "card_id", "claimed_by", "approved_by", "issued_by", "rejected_by", "postponed_by",
             "claimed_at", "approved_at", "issued_at", "rejected_at", "postponed_at",
+            "fahrerkarte_pin_ciphertext", "fahrerkarte_pin_hash", "fahrerkarte_pin_salt",
+            "fahrerkarte_pin_version", "fahrerkarte_pin_configured", "fahrerkarte_pin_issued_at",
+            "fahrerkarte_pin_issued_by", "fahrerkarte_pin_failed_attempts", "fahrerkarte_pin_locked_until",
+            "fahrerkarte_pin_last_verified_at", "fahrerkarte_pin_last_revealed_at", "fahrerkarte_pin_reveal_count",
         ]:
             if existing.get(key) not in (None, "") and set_fields.get(key) in (None, ""):
                 set_fields[key] = existing.get(key)
@@ -3136,6 +3373,18 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
     authority = safe_str(user_doc.get("fahrerkarte_authority"), "EifelLog ServiceCenter")
     verify_url = f"/servicecenter/fahrerkarte/verifizieren/{card_id}" if card_id and "Wird" not in card_id else "/servicecenter/fahrerkarte"
     has_issued_cards = status == "issued"
+    pin_request_id = safe_str((latest_request or {}).get("request_id") or (latest_request or {}).get("_id"))
+    pin_available = bool(has_issued_cards and pin_request_id)
+    pin_reveal_url = (
+        url_for("servicecenter_fahrerkarte_pin_reveal", request_id=pin_request_id)
+        if pin_available
+        else ""
+    )
+    pin_issued_at = format_datetime_for_template(
+        (latest_request or {}).get("fahrerkarte_pin_issued_at")
+        or (latest_request or {}).get("issued_at")
+        or user_doc.get("fahrerkarte_pin_issued_at")
+    ) or "-"
 
     return {
         "personalisierte_fahrerkarte_status": status,
@@ -3159,6 +3408,11 @@ def prepare_fahrerkarte_context(user_doc, latest_request=None):
         "fahrerkarte_pdf_filename": pdf_filename,
         "fahrerkarte_avatar_url": avatar_url,
         "fahrerkarte_discord_avatar_url": avatar_url,
+        # Kein Klartext-PIN im initialen HTML. Abruf ausschließlich bewusst über die geschützte Route.
+        "fahrerkarte_pin": "",
+        "fahrerkarte_pin_available": pin_available,
+        "fahrerkarte_pin_reveal_url": pin_reveal_url,
+        "fahrerkarte_pin_issued_at": pin_issued_at,
     }
 
 
@@ -4075,6 +4329,7 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
         raise PermissionError("Abgelehnte oder archivierte Fahrerkarte-Anträge können nicht ausgestellt werden.")
 
     if current_status == "issued":
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor=actor)
         pdf_path = request_doc.get("pdf_path") or request_doc.get("pdf_relative_path")
         resolved_path = resolve_fahrerkarte_pdf_path(pdf_path)
         if not resolved_path or not os.path.exists(resolved_path):
@@ -4130,6 +4385,8 @@ def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request
         "tracker_upload_ready": True,
         "updated_at": now,
     }
+
+    pre_update.update(build_new_fahrerkarte_pin_fields(existing_doc=request_doc, issued_at=now, actor=actor))
 
     temp_doc = dict(request_doc)
     temp_doc.update(pre_update)
@@ -4295,6 +4552,12 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
         item["document_download_url"] = ""
         item["document_issue_url"] = "/api/personalabteilung/servicecenter/fahrerkarte/issue"
     item["auto_download_after_issue"] = True
+    item["pin_configured"] = fahrerkarte_pin_is_configured(item)
+    item["pinConfigured"] = item["pin_configured"]
+    item["pin_issued_at"] = format_datetime_for_template(item.get("fahrerkarte_pin_issued_at")) or "-"
+    # Verschlüsselter PIN, Hash und Salt werden niemals an das Frontend ausgegeben.
+    for sensitive_key in ["fahrerkarte_pin_ciphertext", "fahrerkarte_pin_hash", "fahrerkarte_pin_salt"]:
+        item.pop(sensitive_key, None)
     return item
 
 
@@ -4364,6 +4627,9 @@ def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, ext
     if request_doc.get("pdf_relative_path"):
         update_fields["fahrerkarte_pdf_relative_path"] = request_doc.get("pdf_relative_path")
         update_fields["fahrerkarte_pdf_filename"] = request_doc.get("pdf_filename") or request_doc.get("file_name")
+    if request_doc.get("fahrerkarte_pin_configured") or request_doc.get("fahrerkarte_pin_ciphertext"):
+        update_fields["fahrerkarte_pin_configured"] = True
+        update_fields["fahrerkarte_pin_issued_at"] = request_doc.get("fahrerkarte_pin_issued_at") or now
     if extra_set:
         update_fields.update(extra_set)
 
@@ -5763,6 +6029,23 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
     avatar_url = make_external_url(avatar_url)
 
     request_id = safe_str(source_request.get("request_id") or source_request.get("_id"))
+    digital_signature = source_request.get("digital_signature") or {}
+    pin_configured = bool(
+        extra.get("pinConfigured")
+        or source_request.get("fahrerkarte_pin_configured")
+        or source_request.get("fahrerkarte_pin_ciphertext")
+    )
+    signature_verified = bool(
+        extra.get("signatureVerified")
+        or source_request.get("signature_valid")
+        or digital_signature.get("valid")
+    )
+    signature_issuer = safe_str(
+        extra.get("signatureIssuer")
+        or source_request.get("signature_name")
+        or digital_signature.get("name"),
+        "EifelLog",
+    )
     doc = {
         "card_id": card_id,
         "discord_id": discord_id,
@@ -5787,6 +6070,10 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
         "card_number": card_id,
         "card_type": safe_str(extra.get("cardType") or extra.get("type"), "Digitale Ausgabe"),
         "signature": safe_str(extra.get("signature") or display_name),
+        "signature_verified": signature_verified,
+        "signature_issuer": signature_issuer,
+        "pin_configured": pin_configured,
+        "fahrerkarte_pin_configured": pin_configured,
         "tag": safe_str(extra.get("tag"), "INTERN"),
         "file_name": file_name,
         "original_filename": safe_str(extra.get("originalFilename") or file_name),
@@ -5828,6 +6115,8 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     avatar_url = make_external_url(avatar_url)
     created_at = card_doc.get("created_at") or card_doc.get("uploaded_at")
     updated_at = card_doc.get("updated_at") or created_at
+    pin_configured = bool(card_doc.get("pin_configured") or card_doc.get("fahrerkarte_pin_configured"))
+    pin_verify_api_url = make_external_url("/api/tracker/driver-card/pin/verify")
 
     return {
         "id": safe_str(card_doc.get("_id")) or card_id,
@@ -5859,6 +6148,14 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "cardType": safe_str(card_doc.get("card_type"), "Digitale Ausgabe"),
         "type": safe_str(card_doc.get("card_type"), "Digitale Ausgabe"),
         "signature": safe_str(card_doc.get("signature"), driver_name),
+        "signatureVerified": bool(card_doc.get("signature_verified")),
+        "digitalSignatureVerified": bool(card_doc.get("signature_verified")),
+        "signatureIssuer": safe_str(card_doc.get("signature_issuer"), "EifelLog"),
+        "pinRequired": pin_configured,
+        "pinConfigured": pin_configured,
+        "driverCardPinConfigured": pin_configured,
+        "pinVerifyApiUrl": pin_verify_api_url,
+        "driverCardPinVerifyUrl": pin_verify_api_url,
         "tag": safe_str(card_doc.get("tag"), "INTERN"),
         "fileName": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
         "filename": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
@@ -12840,6 +13137,49 @@ def tracker_driver_card():
     })
 
 
+@app.route("/api/tracker/driver-card/pin/verify", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/pin/verify", methods=["POST", "OPTIONS"])
+def tracker_driver_card_pin_verify():
+    """Prüft die Fahrerkarte-PIN serverseitig, ohne den Klartext an den Tracker auszuliefern."""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    payload = tracker_request_payload()
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(payload)
+    if error_response:
+        return error_response
+
+    submitted_pin = safe_str(payload.get("pin") or payload.get("driverCardPin") or payload.get("cardPin"))
+    if not submitted_pin:
+        return jsonify({"success": False, "verified": False, "error": "Fahrerkarte-PIN fehlt."}), 400
+
+    discord_id = safe_str(user_doc.get("discord_id"))
+    card_id = safe_str(payload.get("cardId") or payload.get("card_id") or payload.get("driverCardId"))
+    query = {"discord_id": discord_id, "archived": {"$ne": True}, "status": "issued"}
+    if card_id:
+        query["card_id"] = card_id
+    request_doc = fahrerkarte_requests_collection.find_one(query, sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)])
+    if not request_doc:
+        request_doc = tracker_latest_issued_fahrerkarte_request(user_doc)
+    if not request_doc:
+        return jsonify({"success": False, "verified": False, "error": "Keine ausgestellte Fahrerkarte gefunden."}), 404
+
+    try:
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "Tracker Legacy-Migration"})
+        verified, message, status_code = verify_fahrerkarte_pin_for_request(request_doc, submitted_pin)
+    except Exception as error:
+        app.logger.exception("Tracker-PIN-Prüfung fehlgeschlagen")
+        return jsonify({"success": False, "verified": False, "error": safe_str(error, "PIN-Prüfung fehlgeschlagen.")}), 500
+
+    return jsonify({
+        "success": bool(verified),
+        "verified": bool(verified),
+        "pinVerified": bool(verified),
+        "message": message,
+        "cardId": safe_str(request_doc.get("card_id")),
+    }), status_code
+
+
 @app.route("/api/tracker/driver-card/upload", methods=["POST", "OPTIONS"])
 @app.route("/api/tracker/fahrerkarte/upload", methods=["POST", "OPTIONS"])
 @app.route("/api/tracker/driver-card/pdf/upload", methods=["POST", "OPTIONS"])
@@ -15199,6 +15539,56 @@ def servicecenter():
 @app.route("/servicecenter/fahrerkarte", methods=["GET"])
 def servicecenter_fahrerkarte():
     return servicecenter()
+
+
+@app.route("/servicecenter/fahrerkarte/pin/<request_id>", methods=["GET"])
+def servicecenter_fahrerkarte_pin_reveal(request_id):
+    """Liefert den PIN erst nach bewusster Aktion ausschließlich an den eingeloggten Karteninhaber."""
+    if "user" not in session:
+        return jsonify({"success": False, "error": "Bitte logge dich zuerst ein."}), 401
+
+    session_user = session.get("user") or {}
+    session_discord_id = safe_str(session_user.get("id") or session_user.get("discord_id"))
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "error": "Fahrerkarte wurde nicht gefunden."}), 404
+
+    owner_discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    if not session_discord_id or session_discord_id != owner_discord_id:
+        return jsonify({"success": False, "error": "Der PIN darf ausschließlich vom Karteninhaber abgerufen werden."}), 403
+
+    if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
+        return jsonify({"success": False, "error": "PIN-Ausstellung ist erst nach Ausstellung der Fahrerkarte verfügbar."}), 409
+
+    try:
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "ServiceCenter Legacy-Migration"})
+        pin = decrypt_fahrerkarte_pin(request_doc)
+    except Exception as error:
+        app.logger.exception("Fahrerkarte-PIN konnte nicht abgerufen werden")
+        return jsonify({"success": False, "error": safe_str(error, "PIN konnte nicht geladen werden.")}), 500
+
+    now = now_utc()
+    fahrerkarte_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {"fahrerkarte_pin_last_revealed_at": now, "updated_at": now},
+            "$inc": {"fahrerkarte_pin_reveal_count": 1},
+        },
+    )
+
+    response = jsonify({
+        "success": True,
+        "payload": {
+            "pin": pin,
+            "cardId": safe_str(request_doc.get("card_id")),
+            "issuedAt": datetime_to_iso(request_doc.get("fahrerkarte_pin_issued_at")),
+            "autoHideSeconds": FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS,
+        },
+    })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/servicecenter/fahrerkarte/beantragen", methods=["POST"])
@@ -22015,6 +22405,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
         "updated_at": now,
     }
     pre_update.update(signature_data)
+    pre_update.update(build_new_fahrerkarte_pin_fields(existing_doc=request_doc, issued_at=now, actor=actor))
 
     temp_doc = dict(request_doc)
     temp_doc.update(pre_update)
@@ -22054,6 +22445,59 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
         "downloadUrl": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
         "pdfPath": relative_path,
         "pdfFilename": filename,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/pin/reissue", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_pin_reissue():
+    """Erstellt bei Verlust eine neue PIN. Der alte PIN wird unmittelbar ungültig."""
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("request_id") or data.get("id"))
+    reason = safe_str(data.get("reason") or data.get("note"), "PIN-Neuausstellung durch ServiceCenter")[:500]
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+    if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
+        return jsonify({"success": False, "message": "Eine PIN kann erst für eine ausgestellte Fahrerkarte neu ausgestellt werden."}), 409
+
+    actor = current_staff_identity()
+    try:
+        fresh_request = ensure_fahrerkarte_pin_for_request(request_doc, actor=actor, force_new=True)
+    except Exception as error:
+        app.logger.exception("Fahrerkarte-PIN-Neuausstellung fehlgeschlagen")
+        return jsonify({"success": False, "message": f"PIN konnte nicht neu ausgestellt werden: {error}"}), 500
+
+    now = now_utc()
+    fahrerkarte_requests_collection.update_one(
+        {"_id": fresh_request["_id"]},
+        {"$set": {
+            "fahrerkarte_pin_reissue_reason": reason,
+            "fahrerkarte_pin_reissued_at": now,
+            "fahrerkarte_pin_reissued_by": fahrerkarte_pin_actor_snapshot(actor),
+            "updated_at": now,
+        }},
+    )
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": fresh_request["_id"]}) or fresh_request
+    user_doc = find_user_for_request_doc(fresh_request)
+    if user_doc:
+        update_user_fahrerkarte_state(user_doc, fresh_request, "issued", actor)
+        sync_tracker_driver_card_from_fahrerkarte(user_doc, fresh_request, source="servicecenter_pin_reissue", archive_existing=False)
+
+    return jsonify({
+        "success": True,
+        "message": "Neue Fahrerkarte-PIN wurde ausgestellt. Der Karteninhaber kann sie im eigenen ServiceCenter abrufen.",
+        "status": "issued",
+        "cardId": safe_str(fresh_request.get("card_id")),
+        "pinConfigured": True,
+        "pinIssuedAt": datetime_to_iso(fresh_request.get("fahrerkarte_pin_issued_at")),
         "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
     })
 
