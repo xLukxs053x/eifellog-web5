@@ -124,21 +124,39 @@
             background-color: var(--bg-1);
         }
 
-        /* === PARALLAX WRAPPER FÜR DIE HINTERGRUND-SLIDESHOW === */
+        /* === DYNAMISCHER PARALLAX WRAPPER FÜR DIE HINTERGRUND-SLIDESHOW === */
         .hero-bg-parallax {
             position: absolute;
-            inset: -5vh -5vw;
+            inset: -12vh -10vw;
             pointer-events: none;
-            transform: translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0) scale(1.06);
+            transform:
+                translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0)
+                scale(var(--parallax-scale, 1.14));
             transform-origin: center center;
             will-change: transform;
-            transition: transform 180ms ease-out;
+        }
+
+        /*
+            Der Overlay-Layer bewegt sich bewusst leicht versetzt zum Bild.
+            Dadurch entsteht beim Scrollen eine sichtbarere Tiefenstaffelung.
+        */
+        .hero-overlay {
+            position: absolute;
+            inset: -4%;
+            transform:
+                translate3d(var(--overlay-x, 0px), var(--overlay-y, 0px), 0)
+                scale(1.04);
+            transform-origin: center center;
+            will-change: transform;
+            background:
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
         }
 
         @media (pointer: coarse), (max-width: 768px) {
             .hero-bg-parallax {
-                inset: -3vh -3vw;
-                transition-duration: 260ms;
+                inset: -10vh -9vw;
+                --parallax-scale: 1.13;
             }
         }
 
@@ -191,21 +209,13 @@
             }
         }
 
-        .hero-overlay {
-            position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
-                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
-        }
-
         /* Nutzer mit reduzierter Bewegung erhalten weiterhin den Bildwechsel,
            aber keine Verschiebung und keinen Zoom. */
         @media (prefers-reduced-motion: reduce) {
-            .hero-bg-parallax {
+            .hero-bg-parallax,
+            .hero-overlay {
                 inset: 0;
                 transform: none !important;
-                transition: none !important;
             }
 
             .hero-bg .bg-slide {
@@ -478,37 +488,98 @@
             initSecuritySystem();
         });
 
-        // === PARALLAX HINTERGRUND FUNKTIONEN ===
+        // === DYNAMISCHER PARALLAX HINTERGRUND ===
         function initHeroParallax() {
             const layer = document.getElementById('hero-parallax-layer');
 
             if (!layer) return;
 
+            const overlay = layer.querySelector('.hero-overlay');
             const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
             const coarsePointer = window.matchMedia('(pointer: coarse)');
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+            const lerp = (current, target, strength) => current + ((target - current) * strength);
 
+            let pointerTargetX = 0;
+            let pointerTargetY = 0;
             let pointerX = 0;
             let pointerY = 0;
-            let scrollOffsetY = 0;
+
+            let scrollY = window.scrollY;
+            let lastScrollY = scrollY;
+            let lastScrollTime = performance.now();
+            let scrollVelocity = 0;
+
+            let currentX = 0;
+            let currentY = 0;
+            let currentScale = coarsePointer.matches ? 1.13 : 1.14;
             let animationFrame = null;
 
-            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+            function applyStaticPosition() {
+                layer.style.setProperty('--parallax-x', '0px');
+                layer.style.setProperty('--parallax-y', '0px');
+                layer.style.setProperty('--parallax-scale', '1');
+
+                if (overlay) {
+                    overlay.style.setProperty('--overlay-x', '0px');
+                    overlay.style.setProperty('--overlay-y', '0px');
+                }
+            }
 
             function renderParallax() {
                 animationFrame = null;
 
                 if (reducedMotion.matches) {
-                    layer.style.setProperty('--parallax-x', '0px');
-                    layer.style.setProperty('--parallax-y', '0px');
+                    applyStaticPosition();
                     return;
                 }
 
-                const maxOffset = coarsePointer.matches ? 7 : 22;
-                const x = clamp(pointerX, -maxOffset, maxOffset);
-                const y = clamp(pointerY + scrollOffsetY, -maxOffset, maxOffset);
+                const mobile = coarsePointer.matches;
+                const maxY = mobile ? 58 : 92;
+                const maxX = mobile ? 0 : 30;
 
-                layer.style.setProperty('--parallax-x', `${x.toFixed(2)}px`);
-                layer.style.setProperty('--parallax-y', `${y.toFixed(2)}px`);
+                /*
+                    Positionsversatz + Geschwindigkeitsimpuls:
+                    - scrollPosition hält die Bewegung über längere Seiten sichtbar.
+                    - velocityImpulse erzeugt das dynamische Nachziehen bei schnellem Scrollen.
+                    - scrollWave verhindert einen abrupt statischen Eindruck nach dem Clamping.
+                */
+                const scrollPosition = clamp(scrollY * -0.075, -56, 56);
+                const velocityImpulse = clamp(scrollVelocity * -0.82, -46, 46);
+                const scrollWave = Math.sin(scrollY * 0.0035) * (mobile ? 5 : 9);
+
+                pointerX = lerp(pointerX, pointerTargetX, 0.075);
+                pointerY = lerp(pointerY, pointerTargetY, 0.075);
+
+                const targetX = clamp(pointerX, -maxX, maxX);
+                const targetY = clamp(scrollPosition + velocityImpulse + scrollWave + pointerY, -maxY, maxY);
+                const targetScale = (mobile ? 1.13 : 1.14) + Math.min(Math.abs(scrollVelocity) * 0.00075, 0.035);
+
+                currentX = lerp(currentX, targetX, 0.10);
+                currentY = lerp(currentY, targetY, 0.115);
+                currentScale = lerp(currentScale, targetScale, 0.085);
+
+                layer.style.setProperty('--parallax-x', `${currentX.toFixed(2)}px`);
+                layer.style.setProperty('--parallax-y', `${currentY.toFixed(2)}px`);
+                layer.style.setProperty('--parallax-scale', currentScale.toFixed(4));
+
+                if (overlay) {
+                    overlay.style.setProperty('--overlay-x', `${(-currentX * 0.16).toFixed(2)}px`);
+                    overlay.style.setProperty('--overlay-y', `${(-currentY * 0.22).toFixed(2)}px`);
+                }
+
+                // Geschwindigkeit klingt weich aus: Das erzeugt den Nachlauf.
+                scrollVelocity *= 0.885;
+
+                const stillMoving =
+                    Math.abs(currentX - targetX) > 0.05 ||
+                    Math.abs(currentY - targetY) > 0.05 ||
+                    Math.abs(currentScale - targetScale) > 0.0002 ||
+                    Math.abs(scrollVelocity) > 0.08 ||
+                    Math.abs(pointerX - pointerTargetX) > 0.05 ||
+                    Math.abs(pointerY - pointerTargetY) > 0.05;
+
+                if (stillMoving) requestParallaxRender();
             }
 
             function requestParallaxRender() {
@@ -523,23 +594,38 @@
                 const viewportX = (event.clientX / window.innerWidth) - 0.5;
                 const viewportY = (event.clientY / window.innerHeight) - 0.5;
 
-                // Hintergrund bewegt sich leicht entgegen der Mausposition.
-                pointerX = viewportX * -28;
-                pointerY = viewportY * -18;
-
+                pointerTargetX = viewportX * -38;
+                pointerTargetY = viewportY * -20;
                 requestParallaxRender();
             }
 
             function updateScrollParallax() {
-                // Der Wert bleibt bewusst gedeckelt, damit an den Rändern keine Lücken entstehen.
-                scrollOffsetY = clamp(window.scrollY * -0.035, -16, 16);
+                const now = performance.now();
+                const nextScrollY = window.scrollY;
+                const deltaY = nextScrollY - lastScrollY;
+                const deltaTime = Math.max(now - lastScrollTime, 16);
+
+                scrollVelocity = clamp((deltaY / deltaTime) * 16, -120, 120);
+                scrollY = nextScrollY;
+                lastScrollY = nextScrollY;
+                lastScrollTime = now;
+
                 requestParallaxRender();
             }
 
             function resetPointerParallax() {
-                pointerX = 0;
-                pointerY = 0;
+                pointerTargetX = 0;
+                pointerTargetY = 0;
                 requestParallaxRender();
+            }
+
+            function handleMotionPreferenceChange() {
+                if (reducedMotion.matches) {
+                    applyStaticPosition();
+                } else {
+                    currentScale = coarsePointer.matches ? 1.13 : 1.14;
+                    updateScrollParallax();
+                }
             }
 
             window.addEventListener('pointermove', updatePointerParallax, { passive: true });
@@ -548,8 +634,8 @@
             document.addEventListener('mouseleave', resetPointerParallax);
 
             if (typeof reducedMotion.addEventListener === 'function') {
-                reducedMotion.addEventListener('change', requestParallaxRender);
-                coarsePointer.addEventListener('change', requestParallaxRender);
+                reducedMotion.addEventListener('change', handleMotionPreferenceChange);
+                coarsePointer.addEventListener('change', handleMotionPreferenceChange);
             }
 
             updateScrollParallax();
