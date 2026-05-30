@@ -462,6 +462,7 @@ def ensure_indexes():
         fahrerkarte_requests_collection.create_index([("issued_at", DESCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("card_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("discord_id", ASCENDING), ("card_id", ASCENDING), ("status", ASCENDING), ("archived", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("pdf_relative_path", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("fahrerkarte_pin_issued_at", DESCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("fahrerkarte_pin_locked_until", ASCENDING)], unique=False)
@@ -705,6 +706,27 @@ FAHRERKARTE_PIN_LENGTH = max(4, min(8, int(env_float("FAHRERKARTE_PIN_LENGTH", d
 FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS = max(3, min(20, int(env_float("FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS", default=5))))
 FAHRERKARTE_PIN_LOCK_SECONDS = max(60, int(env_float("FAHRERKARTE_PIN_LOCK_SECONDS", default=900)))
 FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS = max(10, min(120, int(env_float("FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS", default=30))))
+
+# Keine globale Demo-PIN: Jede ausgestellte Fahrerkarte besitzt ausschließlich ihre
+# eigene kryptografisch zufällig erzeugte PIN. Frühere Testwerte werden explizit
+# gesperrt und bei einem kontrollierten Karteninhaber-Abruf automatisch ersetzt.
+FAHRERKARTE_PIN_FORBIDDEN_VALUES = {
+    str(value).strip()
+    for value in {
+        "1042",
+        *env_list("FAHRERKARTE_PIN_FORBIDDEN_VALUES", "DRIVER_CARD_PIN_FORBIDDEN_VALUES"),
+    }
+    if re.fullmatch(rf"\d{{{FAHRERKARTE_PIN_LENGTH}}}", str(value).strip())
+}
+
+# Standardmäßig muss die Karten-ID bei der PIN-Prüfung mitgesendet werden. Damit
+# kann ein Fahrer ausschließlich die zu seiner konkreten Fahrerkarte gehörende PIN
+# bestätigen; ein stiller Fallback auf irgendeine andere Karte ist ausgeschlossen.
+TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID = env_bool(
+    "TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID",
+    "FAHRERKARTE_PIN_REQUIRE_CARD_ID",
+    default=True,
+)
 
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
@@ -2803,9 +2825,19 @@ def normalize_fahrerkarte_pin(pin):
     return normalized
 
 
+def is_forbidden_fahrerkarte_pin(pin):
+    """Erkennt stillgelegte Testwerte. Solche Werte dürfen niemals eine Karte freischalten."""
+    normalized = normalize_fahrerkarte_pin(pin)
+    return bool(normalized and normalized in FAHRERKARTE_PIN_FORBIDDEN_VALUES)
+
+
 def generate_fahrerkarte_pin():
-    """Erzeugt eine kryptografisch zufällige Fahrerkarte-PIN."""
-    return "".join(secrets.choice("0123456789") for _ in range(FAHRERKARTE_PIN_LENGTH))
+    """Erzeugt eine individuelle kryptografisch zufällige PIN ohne Demo-/Testwerte."""
+    for _attempt in range(256):
+        pin = "".join(secrets.choice("0123456789") for _ in range(FAHRERKARTE_PIN_LENGTH))
+        if not is_forbidden_fahrerkarte_pin(pin):
+            return pin
+    raise RuntimeError("Es konnte keine zulässige individuelle Fahrerkarte-PIN erzeugt werden.")
 
 
 class FahrerkartePinDecryptError(RuntimeError):
@@ -2999,13 +3031,54 @@ def build_new_fahrerkarte_pin_fields(existing_doc=None, issued_at=None, actor=No
     }
 
 
+def rotate_forbidden_fahrerkarte_pin_if_needed(request_doc, actor=None):
+    """Ersetzt frühere Demo-/Test-PINs kontrolliert durch eine neue persönliche Karten-PIN."""
+    request_doc = request_doc or {}
+    if not request_doc.get("_id") or not fahrerkarte_pin_is_configured(request_doc):
+        return request_doc, False
+
+    stored_pin = decrypt_fahrerkarte_pin(request_doc)
+    if not is_forbidden_fahrerkarte_pin(stored_pin):
+        return request_doc, False
+
+    now = now_utc()
+    fields = build_new_fahrerkarte_pin_fields(
+        existing_doc=request_doc,
+        issued_at=now,
+        actor=actor or {"display_name": "Fahrerkarte PIN-Policy-Migration"},
+        force_new=True,
+    )
+    fields.update({
+        "fahrerkarte_pin_rotation_reason": "forbidden_demo_or_test_pin",
+        "fahrerkarte_pin_rotated_at": now,
+        "fahrerkarte_pin_rotation_pending_reveal": True,
+        "updated_at": now,
+    })
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": fields})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]}) or dict(request_doc, **fields)
+
+    user_doc = find_user_for_request_doc(fresh_request) if "find_user_for_request_doc" in globals() else None
+    if user_doc:
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {
+                "fahrerkarte_pin_configured": True,
+                "fahrerkarte_pin_issued_at": fresh_request.get("fahrerkarte_pin_issued_at"),
+                "fahrerkarte_pin_updated_at": now,
+                "fahrerkarte_pin_rotation_pending_reveal": True,
+            }},
+        )
+    return fresh_request, True
+
+
 def ensure_fahrerkarte_pin_for_request(request_doc, actor=None, force_new=False):
-    """Migriert bestehende ausgestellte Karten und unterstützt eine kontrollierte PIN-Neuausstellung."""
+    """Migriert bestehende Karten und stellt ausschließlich individuelle PINs bereit."""
     request_doc = request_doc or {}
     if not request_doc.get("_id"):
         raise ValueError("Fahrerkarte-Antrag besitzt keine MongoDB-ID.")
 
     if not force_new and fahrerkarte_pin_is_configured(request_doc):
+        request_doc, _rotated = rotate_forbidden_fahrerkarte_pin_if_needed(request_doc, actor=actor)
         return request_doc
 
     fields = build_new_fahrerkarte_pin_fields(
@@ -3031,10 +3104,13 @@ def ensure_fahrerkarte_pin_for_request(request_doc, actor=None, force_new=False)
 
 
 def verify_fahrerkarte_pin_for_request(request_doc, submitted_pin):
-    """Prüft die PIN mit persistentem Fehlversuchszähler und temporärer Sperre."""
+    """Prüft ausschließlich die persönliche PIN der konkret ausgewählten Fahrerkarte."""
     request_doc = request_doc or {}
     if not fahrerkarte_pin_is_configured(request_doc):
         return False, "Für diese Fahrerkarte wurde noch kein PIN ausgestellt.", 409
+
+    if request_doc.get("fahrerkarte_pin_rotation_pending_reveal") is True:
+        return False, "Für diese Fahrerkarte wurde aus Sicherheitsgründen eine neue persönliche PIN ausgestellt. Bitte rufe sie im ServiceCenter ab.", 409
 
     now = now_utc()
     locked_until = coerce_fahrerkarte_datetime(request_doc.get("fahrerkarte_pin_locked_until"))
@@ -3042,6 +3118,8 @@ def verify_fahrerkarte_pin_for_request(request_doc, submitted_pin):
         return False, f"PIN-Prüfung ist bis {format_datetime_for_template(locked_until)} gesperrt.", 429
 
     normalized_pin = normalize_fahrerkarte_pin(submitted_pin)
+    if is_forbidden_fahrerkarte_pin(normalized_pin):
+        return False, "Diese frühere Demo-/Test-PIN ist deaktiviert. Verwende ausschließlich die persönliche PIN deiner Fahrerkarte.", 403
     salt = safe_str(request_doc.get("fahrerkarte_pin_salt"))
     expected_hash = safe_str(request_doc.get("fahrerkarte_pin_hash"))
     matching_secret = ""
@@ -6294,6 +6372,9 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "pinRequired": pin_configured,
         "pinConfigured": pin_configured,
         "driverCardPinConfigured": pin_configured,
+        "pinVerificationMode": "server-card-bound",
+        "pinCardBindingRequired": bool(TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID),
+        "requiresCardIdForPinVerify": bool(TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID),
         "pinVerifyApiUrl": pin_verify_api_url,
         "driverCardPinVerifyUrl": pin_verify_api_url,
         "tag": safe_str(card_doc.get("tag"), "INTERN"),
@@ -13277,10 +13358,64 @@ def tracker_driver_card():
     })
 
 
+def tracker_resolve_issued_fahrerkarte_request_for_pin(user_doc, card_id=""):
+    """Bindet eine PIN-Prüfung eindeutig an den angemeldeten Fahrer und seine konkrete Karte."""
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    normalized_card_id = safe_str(card_id)
+    if not discord_id:
+        return None, "Der angemeldete Fahrer konnte nicht ermittelt werden.", 401
+
+    base_query = {
+        "discord_id": discord_id,
+        "archived": {"$ne": True},
+        "status": "issued",
+    }
+
+    if normalized_card_id:
+        exact_query = dict(base_query)
+        exact_query["card_id"] = normalized_card_id
+        request_doc = fahrerkarte_requests_collection.find_one(
+            exact_query,
+            sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)],
+        )
+        if not request_doc:
+            # Karten-IDs sind technisch nicht case-sensitiv. Der Fallback bleibt
+            # trotzdem streng auf genau diese ID und genau diesen Fahrer begrenzt.
+            case_insensitive_query = dict(base_query)
+            case_insensitive_query["card_id"] = {
+                "$regex": f"^{re.escape(normalized_card_id)}$",
+                "$options": "i",
+            }
+            request_doc = fahrerkarte_requests_collection.find_one(
+                case_insensitive_query,
+                sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)],
+            )
+        if not request_doc:
+            return None, "Die angegebene Fahrerkarte gehört nicht zum angemeldeten Fahrer oder ist nicht aktiv ausgestellt.", 404
+        return request_doc, "", 200
+
+    if TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID:
+        return None, "Karten-ID fehlt. Die PIN-Prüfung muss immer für die konkrete Fahrerkarte gesendet werden.", 400
+
+    # Optionaler Legacy-Modus über .env: ohne Karten-ID nur dann fortfahren,
+    # wenn exakt eine ausgestellte Karte für den Fahrer existiert.
+    candidates = list(
+        fahrerkarte_requests_collection.find(base_query)
+        .sort([("issued_at", DESCENDING), ("created_at", DESCENDING)])
+        .limit(2)
+    )
+    if len(candidates) == 1:
+        return candidates[0], "", 200
+    if not candidates:
+        return None, "Keine ausgestellte Fahrerkarte gefunden.", 404
+    return None, "Mehrere Fahrerkarte-Datensätze gefunden. Sende die Karten-ID für eine eindeutige PIN-Prüfung mit.", 409
+
+
 @app.route("/api/tracker/driver-card/pin/verify", methods=["POST", "OPTIONS"])
 @app.route("/api/tracker/fahrerkarte/pin/verify", methods=["POST", "OPTIONS"])
 def tracker_driver_card_pin_verify():
-    """Prüft die Fahrerkarte-PIN serverseitig, ohne den Klartext an den Tracker auszuliefern."""
+    """Prüft ausschließlich die persönliche PIN der übermittelten Fahrerkarte serverseitig."""
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
@@ -13291,32 +13426,39 @@ def tracker_driver_card_pin_verify():
 
     submitted_pin = safe_str(payload.get("pin") or payload.get("driverCardPin") or payload.get("cardPin"))
     if not submitted_pin:
-        return jsonify({"success": False, "verified": False, "error": "Fahrerkarte-PIN fehlt."}), 400
+        return jsonify({"success": False, "verified": False, "pinVerified": False, "error": "Fahrerkarte-PIN fehlt."}), 400
 
-    discord_id = safe_str(user_doc.get("discord_id"))
     card_id = safe_str(payload.get("cardId") or payload.get("card_id") or payload.get("driverCardId"))
-    query = {"discord_id": discord_id, "archived": {"$ne": True}, "status": "issued"}
-    if card_id:
-        query["card_id"] = card_id
-    request_doc = fahrerkarte_requests_collection.find_one(query, sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)])
+    request_doc, lookup_error, lookup_status = tracker_resolve_issued_fahrerkarte_request_for_pin(user_doc, card_id=card_id)
     if not request_doc:
-        request_doc = tracker_latest_issued_fahrerkarte_request(user_doc)
-    if not request_doc:
-        return jsonify({"success": False, "verified": False, "error": "Keine ausgestellte Fahrerkarte gefunden."}), 404
+        return jsonify({
+            "success": False,
+            "verified": False,
+            "pinVerified": False,
+            "cardBound": False,
+            "cardId": card_id,
+            "error": lookup_error,
+            "message": lookup_error,
+        }), lookup_status
 
     try:
-        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "Tracker Legacy-Migration"})
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "Tracker PIN-Policy-Migration"})
         verified, message, status_code = verify_fahrerkarte_pin_for_request(request_doc, submitted_pin)
     except Exception as error:
         app.logger.exception("Tracker-PIN-Prüfung fehlgeschlagen")
-        return jsonify({"success": False, "verified": False, "error": safe_str(error, "PIN-Prüfung fehlgeschlagen.")}), 500
+        return jsonify({"success": False, "verified": False, "pinVerified": False, "error": safe_str(error, "PIN-Prüfung fehlgeschlagen.")}), 500
 
+    bound_card_id = safe_str(request_doc.get("card_id"))
     return jsonify({
         "success": bool(verified),
         "verified": bool(verified),
         "pinVerified": bool(verified),
+        "cardBound": True,
         "message": message,
-        "cardId": safe_str(request_doc.get("card_id")),
+        "error": "" if verified else message,
+        "cardId": bound_card_id,
+        "driverCardId": bound_card_id,
+        "requiresPinReveal": bool(request_doc.get("fahrerkarte_pin_rotation_pending_reveal")),
     }), status_code
 
 
@@ -15701,8 +15843,10 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
         return jsonify({"success": False, "error": "PIN-Ausstellung ist erst nach Ausstellung der Fahrerkarte verfügbar."}), 409
 
     pin_reissued_after_key_loss = False
+    pin_reissued_after_policy_rotation = False
     try:
-        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "ServiceCenter Legacy-Migration"})
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "ServiceCenter PIN-Policy-Migration"})
+        pin_reissued_after_policy_rotation = bool(request_doc.get("fahrerkarte_pin_rotation_pending_reveal"))
         pin = decrypt_fahrerkarte_pin(request_doc)
     except FahrerkartePinDecryptError as error:
         if not FAHRERKARTE_PIN_AUTO_RECOVER_ON_REVEAL:
@@ -15752,10 +15896,28 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
     fahrerkarte_requests_collection.update_one(
         {"_id": request_doc["_id"]},
         {
-            "$set": {"fahrerkarte_pin_last_revealed_at": now, "updated_at": now},
+            "$set": {
+                "fahrerkarte_pin_last_revealed_at": now,
+                "fahrerkarte_pin_rotation_pending_reveal": False,
+                "updated_at": now,
+            },
             "$inc": {"fahrerkarte_pin_reveal_count": 1},
         },
     )
+
+    try:
+        owner_user_doc = find_user_for_request_doc(request_doc)
+        if owner_user_doc:
+            users_collection.update_one(
+                {"_id": owner_user_doc["_id"]},
+                {"$set": {
+                    "fahrerkarte_pin_rotation_pending_reveal": False,
+                    "fahrerkarte_pin_last_revealed_at": now,
+                    "fahrerkarte_pin_updated_at": now,
+                }},
+            )
+    except Exception:
+        app.logger.exception("Fahrerkarte-PIN-Abrufmetadaten konnten nicht vollständig synchronisiert werden")
 
     response = jsonify({
         "success": True,
@@ -15765,10 +15927,15 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
             "issuedAt": datetime_to_iso(request_doc.get("fahrerkarte_pin_issued_at")),
             "autoHideSeconds": FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS,
             "reissuedAfterKeyLoss": pin_reissued_after_key_loss,
+            "reissuedAfterPolicyRotation": pin_reissued_after_policy_rotation,
             "message": (
                 "Der frühere Verschlüsselungsschlüssel war nicht mehr verfügbar. Es wurde sicher eine neue PIN ausgestellt."
                 if pin_reissued_after_key_loss
-                else ""
+                else (
+                    "Eine frühere Demo-/Test-PIN wurde deaktiviert. Für deine Fahrerkarte wurde sicher eine neue persönliche PIN ausgestellt."
+                    if pin_reissued_after_policy_rotation
+                    else ""
+                )
             ),
         },
     })
