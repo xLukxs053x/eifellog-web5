@@ -1,129 +1,709 @@
 {% extends "base.html" %}
 
-{% block title %}EifelLog - Central Hub{% endblock %}
+{% block title %}Eifel LOG | Virtuelle ETS2 Spedition{% endblock %}
+
+{% block head_extra %}
+<style>
+    .home-page {
+        display: grid;
+        gap: clamp(4.5rem, 8vw, 7rem);
+        padding-top: 0.75rem;
+    }
+
+    .home-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+        gap: clamp(1.4rem, 3vw, 3rem);
+        align-items: stretch;
+        min-height: min(680px, calc(100vh - 11rem));
+    }
+
+    .home-hero__copy,
+    .home-hero__visual {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .home-hero__copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: clamp(1.5rem, 4vw, 3.75rem);
+    }
+
+    .home-hero__copy::after,
+    .home-hero__visual::after,
+    .home-panel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,0.055), transparent 44%);
+        opacity: 0.72;
+    }
+
+    .home-hero__copy > *,
+    .home-hero__visual > *,
+    .home-panel > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .home-kicker,
+    .home-section-kicker {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.58rem;
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.61rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .home-kicker::before,
+    .home-section-kicker::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 16px rgba(var(--brand-green-rgb), 0.7);
+    }
+
+    .home-hero__title {
+        max-width: 780px;
+        margin: 1.15rem 0 0;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.5rem, 6.1vw, 5.75rem);
+        font-weight: 700;
+        letter-spacing: -0.075em;
+        line-height: 0.98;
+        text-wrap: balance;
+    }
+
+    .home-hero__title span {
+        color: var(--brand-green);
+    }
+
+    .home-hero__lead {
+        max-width: 700px;
+        margin: 1.4rem 0 0;
+        color: var(--muted-strong);
+        font-size: clamp(0.98rem, 1.45vw, 1.12rem);
+        line-height: 1.75;
+    }
+
+    .home-hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        margin-top: 1.8rem;
+    }
+
+    .home-hero__actions .btn-primary,
+    .home-hero__actions .btn-secondary {
+        min-height: 46px;
+        padding-inline: 1.2rem;
+    }
+
+    .home-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 2.2rem;
+    }
+
+    .home-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 31px;
+        padding: 0.42rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.035);
+        color: var(--muted-strong);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.53rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .home-chip::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--brand-yellow);
+    }
+
+    .home-hero__visual {
+        min-height: 480px;
+    }
+
+    .home-hero__image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.9) contrast(1.04) brightness(0.68);
+    }
+
+    .home-hero__visual-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(180deg, rgba(4, 8, 5, 0.04), rgba(4, 8, 5, 0.82)),
+            linear-gradient(90deg, rgba(4, 8, 5, 0.28), transparent 58%);
+    }
+
+    .home-hero__visual-content {
+        position: absolute;
+        inset: auto 0 0;
+        padding: clamp(1.15rem, 3vw, 1.8rem);
+    }
+
+    .home-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 30px;
+        padding: 0.4rem 0.62rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.30);
+        border-radius: 999px;
+        background: rgba(8, 14, 10, 0.72);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.55rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        backdrop-filter: blur(12px);
+    }
+
+    .home-status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--brand-green);
+        box-shadow: 0 0 14px rgba(var(--brand-green-rgb), 0.7);
+        animation: homePulse 1.9s ease-in-out infinite;
+    }
+
+    @keyframes homePulse {
+        50% { opacity: 0.42; transform: scale(0.84); }
+    }
+
+    .home-visual-title {
+        margin: 0.95rem 0 0;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.2rem, 2vw, 1.65rem);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.16;
+    }
+
+    .home-visual-text {
+        max-width: 520px;
+        margin: 0.72rem 0 0;
+        color: rgba(255,255,255,0.74);
+        font-size: 0.9rem;
+        line-height: 1.62;
+    }
+
+    .home-section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.15rem;
+    }
+
+    .home-section-title {
+        margin: 0.65rem 0 0;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.55rem, 3vw, 2.45rem);
+        font-weight: 700;
+        letter-spacing: -0.045em;
+        line-height: 1.1;
+    }
+
+    .home-section-copy {
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.7;
+    }
+
+    .home-value-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .home-value-card {
+        position: relative;
+        overflow: hidden;
+        min-height: 238px;
+        padding: 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(9, 16, 11, 0.76);
+        box-shadow: var(--shadow-sm);
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+
+    .home-value-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(var(--brand-green-rgb), 0.28);
+        background: rgba(13, 23, 16, 0.88);
+    }
+
+    .home-value-index {
+        color: rgba(var(--brand-green-rgb), 0.82);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+    }
+
+    .home-value-icon {
+        display: inline-flex;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1.6rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.26);
+        border-radius: 13px;
+        background: rgba(var(--brand-green-rgb), 0.09);
+        color: var(--brand-green);
+    }
+
+    .home-value-card:nth-child(2) .home-value-icon {
+        border-color: rgba(220, 226, 38, 0.24);
+        background: rgba(220, 226, 38, 0.08);
+        color: var(--brand-yellow);
+    }
+
+    .home-value-title {
+        margin: 1rem 0 0;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .home-value-text {
+        margin: 0.7rem 0 0;
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.68;
+    }
+
+    .home-panel {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+        gap: 0;
+        overflow: hidden;
+    }
+
+    .home-panel__media {
+        min-height: 440px;
+        background: rgba(0,0,0,0.16);
+    }
+
+    .home-panel__media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.88) contrast(1.03) brightness(0.69);
+    }
+
+    .home-panel__body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: clamp(1.35rem, 3.6vw, 3rem);
+    }
+
+    .home-feature-list {
+        display: grid;
+        gap: 0.7rem;
+        margin: 1.45rem 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .home-feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.78rem 0;
+        border-top: 1px solid var(--line);
+        color: var(--muted-strong);
+        font-size: 0.89rem;
+        line-height: 1.58;
+    }
+
+    .home-feature-item:first-child {
+        border-top: 0;
+    }
+
+    .home-feature-dot {
+        width: 20px;
+        height: 20px;
+        flex: 0 0 auto;
+        margin-top: 0.1rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.3);
+        border-radius: 50%;
+        background: rgba(var(--brand-green-rgb), 0.08);
+        color: var(--brand-green);
+    }
+
+    .home-feature-dot svg {
+        width: 100%;
+        height: 100%;
+        padding: 4px;
+    }
+
+    .home-cta {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(1.5rem, 4vw, 3rem);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+        border-radius: var(--radius-lg);
+        background:
+            radial-gradient(circle at 0% 0%, rgba(var(--brand-green-rgb), 0.13), transparent 34%),
+            rgba(9, 16, 11, 0.84);
+        box-shadow: var(--shadow-md);
+    }
+
+    .home-cta__inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+    }
+
+    .home-cta__title {
+        max-width: 760px;
+        margin: 0.6rem 0 0;
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.55rem, 3vw, 2.55rem);
+        font-weight: 700;
+        letter-spacing: -0.045em;
+        line-height: 1.1;
+    }
+
+    .home-cta__copy {
+        max-width: 680px;
+        margin: 0.8rem 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.7;
+    }
+
+    .home-cta__actions {
+        display: flex;
+        flex: 0 0 auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.65rem;
+    }
+
+    @media (max-width: 1023px) {
+        .home-hero,
+        .home-panel {
+            grid-template-columns: 1fr;
+        }
+
+        .home-hero {
+            min-height: 0;
+        }
+
+        .home-hero__visual {
+            min-height: 360px;
+        }
+
+        .home-panel__media {
+            min-height: 330px;
+        }
+
+        .home-cta__inner {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .home-cta__actions {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .home-page {
+            gap: 4rem;
+        }
+
+        .home-value-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .home-value-card {
+            min-height: 0;
+        }
+
+        .home-section-head {
+            display: block;
+        }
+
+        .home-section-copy {
+            margin-top: 0.8rem;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .home-hero__copy {
+            padding: 1.15rem;
+        }
+
+        .home-hero__title {
+            font-size: clamp(2.2rem, 13vw, 3.35rem);
+        }
+
+        .home-hero__actions,
+        .home-cta__actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            width: 100%;
+        }
+
+        .home-hero__actions .btn-primary,
+        .home-hero__actions .btn-secondary,
+        .home-cta__actions .btn-primary,
+        .home-cta__actions .btn-secondary {
+            width: 100%;
+        }
+
+        .home-hero__visual {
+            min-height: 310px;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .home-status::before {
+            animation: none;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
-<section class="mb-12 flex-grow flex flex-col justify-center mt-10">
-    
-    <!-- Top Bar: Titel und Status -->
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between pb-4 mb-4">
-        <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase">Virtuelle ETS2 Spedition</span>
-            <h1 class="text-3xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
-                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
-                Eifel LOG Hub
+<div class="home-page">
+    <section class="home-hero" aria-labelledby="home-title">
+        <div class="glass-card home-hero__copy">
+            <span class="home-kicker">Virtuelle ETS2 Spedition</span>
+
+            <h1 id="home-title" class="home-hero__title">
+                Fahre mit <span>Leidenschaft.</span><br>
+                Werde Teil des Teams.
             </h1>
+
+            <p class="home-hero__lead">
+                Eifel LOG ist eine virtuelle Spedition für Fahrer, die Euro Truck Simulator 2 gemeinsam erleben möchten.
+                Ohne unrealistische Pflichtkilometer, ohne unnötigen Druck und mit einem Driver Hub, der dir den Überblick gibt.
+            </p>
+
+            <div class="home-hero__actions">
+                {% if session.get('user') %}
+                    <a href="/dashboard" class="btn-primary">
+                        Dashboard öffnen
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </a>
+                {% else %}
+                    <a href="/hub" class="btn-primary">
+                        Driver Hub starten
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </a>
+                {% endif %}
+
+                <a href="#werte" class="btn-secondary">Mehr erfahren</a>
+            </div>
+
+            <div class="home-chip-row" aria-label="Eifel LOG Vorteile">
+                <span class="home-chip">Real Life First</span>
+                <span class="home-chip">Familiäre Community</span>
+                <span class="home-chip">Eigener Driver Hub</span>
+            </div>
         </div>
-        
-        <div class="mt-4 sm:mt-0 flex items-center gap-4">
-            <span class="px-4 py-2 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2 shadow-[0_0_15px_rgba(137,190,50,0.2)]">
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] animate-pulse"></span>
-                Systems Online
-            </span>
+
+        <div class="glass-card home-hero__visual">
+            <img
+                class="home-hero__image"
+                src="{{ url_for('static', filename='eifelog1.jpg') }}"
+                alt="Eifel LOG Truck auf der Straße"
+            >
+            <div class="home-hero__visual-overlay"></div>
+
+            <div class="home-hero__visual-content">
+                <span class="home-status">Systeme online</span>
+                <h2 class="home-visual-title">Gemeinsam unterwegs. Strukturiert organisiert.</h2>
+                <p class="home-visual-text">
+                    Fahre deine Touren, dokumentiere deine Fortschritte und behalte deine wichtigsten Daten zentral im Blick.
+                </p>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Main Glass Panel -->
-    <div class="glass-card p-10 md:p-16 flex flex-col justify-center relative overflow-hidden">
-        
-        <p class="font-orbitron text-[11px] font-bold text-[var(--brand-yellow)] tracking-[0.25em] uppercase mb-4 drop-shadow-md">
-            Real Life geht vor.
-        </p>
-        
-        <h2 class="text-5xl md:text-6xl lg:text-7xl font-orbitron font-extrabold mb-6 glow-text leading-[1.05] text-[var(--text)] tracking-tight">
-            Fahre mit Leidenschaft.<br>
-            <span class="text-[var(--brand-green)]">Gemeinsam stark.</span>
-        </h2>
-        
-        <p class="text-base md:text-lg text-[var(--muted)] mb-10 max-w-2xl leading-relaxed font-inter">
-            Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander.
-        </p>
+    <section id="werte" aria-labelledby="werte-title">
+        <div class="home-section-head">
+            <div>
+                <span class="home-section-kicker">Unsere Grundsätze</span>
+                <h2 id="werte-title" class="home-section-title">Was Eifel LOG ausmacht</h2>
+            </div>
 
-        <div class="flex flex-wrap gap-3 mb-10">
-            <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Ohne Zwang</span>
-            <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Familiär</span>
-            <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Eigener Hub</span>
+            <p class="home-section-copy">
+                Eine gute virtuelle Spedition braucht keine komplizierten Regeln. Entscheidend sind Verlässlichkeit,
+                gegenseitige Unterstützung und ein System, das dir den Alltag erleichtert.
+            </p>
         </div>
 
-        <div class="flex flex-col sm:flex-row gap-4 mt-auto">
-            <!-- Verlinke hier deine Routen, z.B. /hub oder /apply -->
-            <a href="/hub" class="btn-primary">
-                Driver Hub Starten
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-1"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </a>
-            <a href="#info" class="btn-secondary">Mehr Erfahren</a>
+        <div class="home-value-grid">
+            <article class="home-value-card">
+                <span class="home-value-index">01 / REAL LIFE</span>
+                <span class="home-value-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 8v4l3 3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
+                    </svg>
+                </span>
+                <h3 class="home-value-title">Ohne Zwang</h3>
+                <p class="home-value-text">
+                    Das echte Leben steht immer an erster Stelle. Fahre dann, wenn du Zeit und Lust hast — ohne starre Online-Pflichten oder unrealistische Mindestkilometer.
+                </p>
+            </article>
+
+            <article class="home-value-card">
+                <span class="home-value-index">02 / COMMUNITY</span>
+                <span class="home-value-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M16 20a4 4 0 0 0-8 0M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 20a4 4 0 0 0-3-3.87M17 5.13a4 4 0 0 1 0 7.75M4 20a4 4 0 0 1 3-3.87M7 5.13a4 4 0 0 0 0 7.75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                <h3 class="home-value-title">Starkes Miteinander</h3>
+                <p class="home-value-text">
+                    Gemeinsame Konvois, ehrliche Kommunikation und gegenseitige Hilfe sorgen dafür, dass sich neue und erfahrene Fahrer gleichermaßen wohlfühlen.
+                </p>
+            </article>
+
+            <article class="home-value-card">
+                <span class="home-value-index">03 / SYSTEM</span>
+                <span class="home-value-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14M8 7h8M8 11h8M8 15h5M3 21h18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                <h3 class="home-value-title">Moderner Driver Hub</h3>
+                <p class="home-value-text">
+                    Touren, Statistiken, Finanzen und persönliche Fortschritte werden übersichtlich gebündelt. So bleibt alles nachvollziehbar und leicht zugänglich.
+                </p>
+            </article>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- Info Cards Section -->
-<section id="info" class="mb-16">
-    <div class="grid md:grid-cols-3 gap-6">
-        
-        <!-- Card 1 -->
-        <article class="info-card p-8 flex flex-col">
-            <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-                <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Philosophie</p>
-                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Real Life First</h3>
-                </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-            <div class="flex-grow">
-                <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Wir haben keine strengen Online-Pflichten oder Mindestkilometer. Das echte Leben geht immer vor. Fahr, wenn du Zeit und Lust hast.</p>
-            </div>
-        </article>
+    <section class="glass-card home-panel" aria-labelledby="hub-title">
+        <div class="home-panel__media">
+            <img src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck im Einsatz">
+        </div>
 
-        <!-- Card 2 -->
-        <article class="info-card p-8 flex flex-col">
-            <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-                <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Netzwerk</p>
-                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Starke Community</h3>
-                </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-yellow)" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-            </div>
-            <div class="flex-grow">
-                <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Regelmäßige Konvois, ein aktiver Discord-Server und gegenseitige Hilfe unter Kollegen stehen bei uns an der Tagesordnung.</p>
-            </div>
-        </article>
+        <div class="home-panel__body">
+            <span class="home-section-kicker">Driver Hub</span>
+            <h2 id="hub-title" class="home-section-title">Ein zentraler Ort für deine Touren.</h2>
+            <p class="home-section-copy" style="margin-top: 0.85rem;">
+                Der Hub verbindet Community und Organisation. Du erhältst eine klare Übersicht, ohne dass die Bedienung kompliziert wird.
+            </p>
 
-        <!-- Card 3 -->
-        <article class="info-card p-8 flex flex-col">
-            <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-                <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Technik</p>
-                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Moderne Systeme</h3>
-                </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-            </div>
-            <div class="flex-grow">
-                <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Mit unserem eigenen, komplett neu entwickelten Driver Hub protokollierst du deine Fahrten, behältst Statistiken im Blick und steuerst deine Finanzen.</p>
-            </div>
-        </article>
+            <ul class="home-feature-list">
+                <li class="home-feature-item">
+                    <span class="home-feature-dot" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 12 4 4 8-8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </span>
+                    Fahrten und Fortschritte übersichtlich dokumentieren.
+                </li>
+                <li class="home-feature-item">
+                    <span class="home-feature-dot" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 12 4 4 8-8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </span>
+                    Persönliche Kennzahlen und wichtige Informationen schnell abrufen.
+                </li>
+                <li class="home-feature-item">
+                    <span class="home-feature-dot" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 12 4 4 8-8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </span>
+                    Strukturiert fahren, ohne den Spaß am Simulator zu verlieren.
+                </li>
+            </ul>
 
-    </div>
-</section>
+            <div class="home-hero__actions" style="margin-top: 1.5rem;">
+                <a href="/hub" class="btn-primary">Zum Driver Hub</a>
+                <a href="/about" class="btn-secondary">Über uns</a>
+            </div>
+        </div>
+    </section>
 
-<!-- Smooth Scroll Script für den "Mehr Erfahren" Button -->
+    <section class="home-cta" aria-labelledby="cta-title">
+        <div class="home-cta__inner">
+            <div>
+                <span class="home-section-kicker">Bereit für die nächste Tour?</span>
+                <h2 id="cta-title" class="home-cta__title">Werde Teil einer Community, die Leidenschaft und Struktur verbindet.</h2>
+                <p class="home-cta__copy">
+                    Starte über den Driver Hub oder lerne zuerst mehr über Eifel LOG, unser Team und unseren Fuhrpark kennen.
+                </p>
+            </div>
+
+            <div class="home-cta__actions">
+                <a href="/hub" class="btn-primary">Driver Hub öffnen</a>
+                <a href="/fuhrpark" class="btn-secondary">Fuhrpark ansehen</a>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth'
-                    });
-                }
+        document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+            anchor.addEventListener('click', (event) => {
+                const selector = anchor.getAttribute('href');
+                const target = selector ? document.querySelector(selector) : null;
+
+                if (!target) return;
+
+                event.preventDefault();
+                target.scrollIntoView({
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                    block: 'start'
+                });
             });
         });
     });

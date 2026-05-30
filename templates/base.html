@@ -3,984 +3,695 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>{% block title %}{{ title|default('Eifel LOG - Virtuelle Spedition', true) }}{% endblock %}</title>
 
-    <title>{% block title %}{{ title|default('EifelLog - Virtuelle Spedition', true) }}{% endblock %}</title>
-
-    <!-- SEO / Social Preview -->
-    <meta name="description" content="{{ description|default('EifelLog ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
-    <meta name="theme-color" content="#0b130d">
+    <!-- SEO / Discord / Social Preview -->
+    <meta name="description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta name="theme-color" content="#89be32">
 
     <meta property="og:type" content="website">
     <meta property="og:locale" content="de_DE">
-    <meta property="og:site_name" content="EifelLog">
-    <meta property="og:title" content="{{ title|default('EifelLog', true)|e }}">
-    <meta property="og:description" content="{{ description|default('EifelLog ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta property="og:site_name" content="Eifel LOG">
+    <meta property="og:title" content="{{ title|default('Eifel LOG', true)|e }}">
+    <meta property="og:description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
     <meta property="og:image:secure_url" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
     <meta property="og:image:type" content="image/jpeg">
-    <meta property="og:image:alt" content="EifelLog Logo">
+    <meta property="og:image:alt" content="Eifel LOG Logo">
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ title|default('EifelLog', true)|e }}">
-    <meta name="twitter:description" content="{{ description|default('EifelLog ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
+    <meta name="twitter:title" content="{{ title|default('Eifel LOG', true)|e }}">
+    <meta name="twitter:description" content="{{ description|default('Eifel LOG ist eine virtuelle Spedition und Community für Fahrer, Simulation und digitales Trucking.', true)|e }}">
     <meta name="twitter:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
 
+    <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- Sci-Fi & Clean Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
+        /* === FARBPALETTE & VARIABLEN === */
         :root {
-            color-scheme: dark;
+            --bg-1: #040a06;
+            --bg-2: #08140c;
+            --panel: rgba(10, 20, 15, 0.45);
+            --line: rgba(255, 255, 255, 0.08);
+            --text: #edf3ff;
+            --muted: #93a4c8;
 
-            --bg: #070b08;
-            --bg-soft: #0b130d;
-            --surface: rgba(13, 22, 16, 0.82);
-            --surface-strong: rgba(15, 27, 19, 0.94);
-            --surface-muted: rgba(255, 255, 255, 0.035);
-            --surface-hover: rgba(255, 255, 255, 0.07);
-
-            --line: rgba(255, 255, 255, 0.09);
-            --line-strong: rgba(255, 255, 255, 0.15);
-
-            --text: #f4f7f4;
-            --muted: #a3aea6;
-            --muted-strong: #c4cdc6;
-
+            /* Eifel LOG Farben */
+            --brand-yellow: #dce226;
             --brand-green: #89be32;
             --brand-green-rgb: 137, 190, 50;
-            --brand-yellow: #dce226;
-            --danger: #ff9d9d;
-            --danger-rgb: 255, 157, 157;
 
-            --radius-sm: 10px;
-            --radius-md: 16px;
-            --radius-lg: 22px;
+            --danger: #ff9f9f;
+            --shadow: 0 36px 100px rgba(0, 0, 0, 0.6);
+
+            /* Allgemeiner Zoom / Layout-Balance */
             --site-max-width: 1280px;
             --nav-max-width: 1280px;
+        }
 
-            --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.18);
-            --shadow-md: 0 20px 60px rgba(0, 0, 0, 0.28);
+        /*
+            Global leicht rausgezoomt:
+            Tailwind nutzt viel rem. Dadurch werden Abstände, Texte, Karten und Buttons
+            etwas kleiner, ohne dass alles kaputt skaliert wird.
+        */
+        html {
+            font-size: 14.5px;
+            scroll-behavior: smooth;
+        }
+
+        @media (min-width: 1280px) {
+            html {
+                font-size: 14px;
+            }
+        }
+
+        @media (min-width: 1536px) {
+            html {
+                font-size: 13.6px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            html {
+                font-size: 14px;
+            }
+        }
+
+        /* === GLOBAL SCROLLBAR HIDE === */
+        ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
         }
 
         * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
             box-sizing: border-box;
         }
 
-        html {
-            scroll-behavior: smooth;
-            background: var(--bg);
-        }
-
         body {
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-            background: var(--bg);
+            background-color: var(--bg-1);
             color: var(--text);
             font-family: 'Inter', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            text-rendering: optimizeLegibility;
+            margin: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
-        body.menu-open {
+        body.overflow-hidden {
             overflow: hidden;
         }
 
-        ::selection {
-            background: rgba(var(--brand-green-rgb), 0.35);
-            color: #ffffff;
-        }
-
-        ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(var(--brand-green-rgb), 0.34);
-            border: 3px solid var(--bg);
-            border-radius: 999px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(var(--brand-green-rgb), 0.58);
-        }
-
-        a,
-        button {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .font-orbitron {
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .font-inter {
-            font-family: 'Inter', sans-serif;
-        }
-
-        /* Background */
-        .site-background {
+        /* === HINTERGRUND SLIDESHOW === */
+        .hero-bg {
             position: fixed;
             inset: 0;
-            z-index: -20;
+            z-index: -10;
             overflow: hidden;
-            background: var(--bg);
-            pointer-events: none;
+            background-color: var(--bg-1);
         }
 
-        .site-background__slide {
+        .hero-bg .bg-slide {
             position: absolute;
-            inset: -2%;
-            width: 104%;
-            height: 104%;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             object-position: center;
+            filter: saturate(1.05) brightness(0.50);
             opacity: 0;
-            filter: saturate(0.82) contrast(1.04) brightness(0.42);
-            animation: backgroundCrossfade 30s infinite;
-            will-change: opacity, transform;
+            animation: fadeZoom 24s infinite;
         }
 
-        .site-background__slide:nth-child(1) {
+        .hero-bg .slide-1 {
             animation-delay: 0s;
         }
 
-        .site-background__slide:nth-child(2) {
-            animation-delay: 10s;
+        .hero-bg .slide-2 {
+            animation-delay: 8s;
         }
 
-        .site-background__slide:nth-child(3) {
-            animation-delay: 20s;
+        .hero-bg .slide-3 {
+            animation-delay: 16s;
         }
 
-        .site-background__overlay {
-            position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(180deg, rgba(4, 8, 5, 0.62) 0%, rgba(5, 10, 7, 0.78) 46%, rgba(5, 9, 6, 0.96) 100%),
-                radial-gradient(circle at 50% 8%, rgba(var(--brand-green-rgb), 0.10), transparent 42%);
-        }
-
-        .site-background__grid {
-            position: absolute;
-            inset: 0;
-            opacity: 0.16;
-            background-image:
-                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-            background-size: 54px 54px;
-            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), transparent 82%);
-        }
-
-        @keyframes backgroundCrossfade {
+        @keyframes fadeZoom {
             0% {
                 opacity: 0;
                 transform: scale(1);
             }
 
-            8% {
+            10% {
                 opacity: 1;
             }
 
-            32% {
+            33% {
                 opacity: 1;
             }
 
-            42% {
+            45% {
                 opacity: 0;
-                transform: scale(1.035);
+                transform: scale(1.045);
             }
 
             100% {
                 opacity: 0;
-                transform: scale(1.035);
+                transform: scale(1.045);
             }
         }
 
-        /* Shared layout */
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
+        }
+
+        /* === UI ELEMENTE & GLASSMORPHISM === */
+        .glass-nav {
+            background: rgba(10, 20, 15, 0.58);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(20, 30, 20, 0.36) 0%, rgba(5, 10, 5, 0.76) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.2);
+            border-left: 1px solid rgba(137, 190, 50, 0.2);
+            border-radius: 28px;
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Spezialanpassung für das Security Modal */
+        .glass-card-danger {
+            border-top: 1px solid rgba(255, 159, 159, 0.3);
+            border-left: 1px solid rgba(255, 159, 159, 0.3);
+        }
+
+        /* === BUTTONS === */
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-radius: 12px;
+            padding: 11px 21px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            line-height: 1;
+            min-height: 40px;
+        }
+
+        .btn-primary {
+            background: rgba(var(--brand-green-rgb), 0.15);
+            color: var(--brand-green);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.5);
+            box-shadow: 0 0 15px rgba(var(--brand-green-rgb), 0.1);
+        }
+
+        .btn-primary:hover {
+            background: rgba(var(--brand-green-rgb), 0.3);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(var(--brand-green-rgb), 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: rgba(255, 159, 159, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(255, 159, 159, 0.4);
+            box-shadow: 0 0 15px rgba(255, 159, 159, 0.1);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 159, 159, 0.3);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(255, 159, 159, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Hover-Effekt für Navigations-Links */
+        .nav-link {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+            transition: all 0.3s ease;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            line-height: 1;
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
         .base-shell {
-            width: min(100%, var(--site-max-width));
-            margin-inline: auto;
-            padding-inline: 1.25rem;
+            width: 100%;
+            max-width: var(--site-max-width);
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
         }
 
         .base-main {
             position: relative;
             z-index: 10;
-            min-height: calc(100vh - 112px);
-            padding-top: 7.75rem;
-            padding-bottom: 4.5rem;
+            padding-top: 7.5rem;
+            padding-bottom: 4rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .base-content {
             width: 100%;
-        }
-
-        /* Compatibility classes for existing child templates */
-        .glass-nav,
-        .glass-card {
-            border: 1px solid var(--line);
-            background: linear-gradient(145deg, rgba(18, 31, 22, 0.84), rgba(8, 14, 10, 0.88));
-            box-shadow: var(--shadow-md);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-        }
-
-        .glass-nav {
-            background: rgba(9, 16, 11, 0.86);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .glass-card {
-            border-radius: var(--radius-lg);
-        }
-
-        .glass-card-danger {
-            border-color: rgba(var(--danger-rgb), 0.32);
-        }
-
-        /* Header */
-        .site-header {
-            position: fixed;
-            inset: 0 0 auto;
-            z-index: 50;
-            padding: 1rem;
-            pointer-events: none;
-        }
-
-        .site-header__inner {
-            width: min(100%, var(--nav-max-width));
-            margin-inline: auto;
-            pointer-events: auto;
-        }
-
-        .site-nav {
-            display: flex;
-            min-height: 64px;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 0.65rem 0.75rem 0.65rem 0.9rem;
-            border-radius: 18px;
-        }
-
-        .brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.8rem;
-            flex-shrink: 0;
-            color: var(--text);
-            text-decoration: none;
-        }
-
-        .brand__logo {
-            width: 40px;
-            height: 40px;
-            overflow: hidden;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.55);
-            border-radius: 12px;
-            background: rgba(var(--brand-green-rgb), 0.09);
-            box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.06);
-            transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
-        }
-
-        .brand:hover .brand__logo {
-            border-color: rgba(var(--brand-green-rgb), 0.9);
-            box-shadow: 0 0 0 5px rgba(var(--brand-green-rgb), 0.11);
-            transform: translateY(-1px);
-        }
-
-        .brand__logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .brand__copy {
+            flex: 1 1 auto;
             display: flex;
             flex-direction: column;
-            gap: 0.26rem;
-            line-height: 1;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .brand__name {
-            color: var(--text);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.74rem;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
+        /*
+            Modals aus Unterseiten wirken weniger „draufgedrückt“:
+            feste Overlays werden sauber mittig ausgerichtet.
+        */
+        .fixed.inset-0.items-center.justify-center {
+            align-items: center !important;
+            justify-content: center !important;
         }
 
-        .brand__subline {
-            color: var(--brand-green);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.48rem;
-            font-weight: 600;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-        }
-
-        .desktop-menu,
-        .desktop-actions {
-            display: none;
-        }
-
-        .nav-link {
-            display: inline-flex;
-            min-height: 38px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid transparent;
-            border-radius: var(--radius-sm);
-            padding: 0.65rem 0.78rem;
-            color: var(--muted);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.61rem;
-            font-weight: 700;
-            letter-spacing: 0.13em;
-            line-height: 1;
-            text-decoration: none;
-            text-transform: uppercase;
-            transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
-        }
-
-        .nav-link:hover,
-        .nav-link:focus-visible,
-        .nav-link.is-active {
-            border-color: rgba(var(--brand-green-rgb), 0.16);
-            background: rgba(var(--brand-green-rgb), 0.09);
-            color: var(--text);
-        }
-
-        .nav-link.is-active {
-            color: var(--brand-green);
-        }
-
-        /* Buttons */
-        .btn-primary,
-        .btn-secondary,
-        .btn-danger {
-            display: inline-flex;
-            min-height: 40px;
-            align-items: center;
-            justify-content: center;
-            gap: 0.52rem;
-            border: 1px solid transparent;
-            border-radius: var(--radius-sm);
-            padding: 0.72rem 1rem;
-            cursor: pointer;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.61rem;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            line-height: 1;
-            text-align: center;
-            text-decoration: none;
-            text-transform: uppercase;
-            transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
-        }
-
-        .btn-primary {
-            border-color: rgba(var(--brand-green-rgb), 0.38);
-            background: rgba(var(--brand-green-rgb), 0.14);
-            color: var(--brand-green);
-        }
-
-        .btn-primary:hover,
-        .btn-primary:focus-visible {
-            border-color: rgba(var(--brand-green-rgb), 0.72);
-            background: rgba(var(--brand-green-rgb), 0.23);
-            box-shadow: 0 10px 28px rgba(var(--brand-green-rgb), 0.12);
-            color: #ffffff;
-            transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-            border-color: var(--line);
-            background: rgba(255, 255, 255, 0.035);
-            color: var(--muted-strong);
-        }
-
-        .btn-secondary:hover,
-        .btn-secondary:focus-visible {
-            border-color: var(--line-strong);
-            background: rgba(255, 255, 255, 0.075);
-            color: #ffffff;
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            border-color: rgba(var(--danger-rgb), 0.35);
-            background: rgba(var(--danger-rgb), 0.10);
-            color: var(--danger);
-        }
-
-        .btn-danger:hover,
-        .btn-danger:focus-visible {
-            border-color: rgba(var(--danger-rgb), 0.62);
-            background: rgba(var(--danger-rgb), 0.18);
-            color: #ffffff;
-            transform: translateY(-1px);
-        }
-
-        .logout-button {
-            border-color: rgba(var(--danger-rgb), 0.25);
-            color: var(--danger);
-        }
-
-        .icon-button {
-            display: inline-flex;
-            width: 42px;
-            height: 42px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.04);
-            color: var(--text);
-            cursor: pointer;
-            transition: background 180ms ease, border-color 180ms ease;
-        }
-
-        .icon-button:hover,
-        .icon-button:focus-visible {
-            border-color: rgba(var(--brand-green-rgb), 0.42);
-            background: rgba(var(--brand-green-rgb), 0.10);
-        }
-
-        .icon-button:focus-visible,
-        .btn-primary:focus-visible,
-        .btn-secondary:focus-visible,
-        .btn-danger:focus-visible,
-        .nav-link:focus-visible,
-        a:focus-visible {
-            outline: 2px solid rgba(var(--brand-green-rgb), 0.88);
-            outline-offset: 3px;
-        }
-
-        /* Mobile menu */
-        .mobile-menu {
-            display: grid;
-            grid-template-rows: 0fr;
-            margin-top: 0;
-            opacity: 0;
-            transform: translateY(-8px);
-            transition: grid-template-rows 220ms ease, opacity 180ms ease, transform 220ms ease, margin-top 220ms ease;
-        }
-
-        .mobile-menu.is-open {
-            grid-template-rows: 1fr;
-            margin-top: 0.65rem;
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .mobile-menu__clip {
-            min-height: 0;
-            overflow: hidden;
-        }
-
-        .mobile-menu__panel {
-            display: flex;
-            flex-direction: column;
-            gap: 0.45rem;
-            border-radius: 16px;
-            padding: 0.75rem;
-        }
-
-        .mobile-menu .nav-link {
-            width: 100%;
-            justify-content: flex-start;
-            padding-inline: 0.85rem;
-        }
-
-        .mobile-menu__divider {
-            height: 1px;
-            margin: 0.35rem 0;
-            background: var(--line);
-        }
-
-        .mobile-menu .btn-primary,
-        .mobile-menu .btn-secondary {
-            width: 100%;
-        }
-
-        /* Flash messages */
-        .flash-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 0.65rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .flash-message {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.28);
-            border-radius: var(--radius-md);
-            background: rgba(9, 16, 11, 0.82);
-            padding: 0.9rem 1rem;
-            box-shadow: var(--shadow-sm);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-        }
-
-        .flash-message--error {
-            border-color: rgba(var(--danger-rgb), 0.34);
-        }
-
-        .flash-message__dot {
-            width: 8px;
-            height: 8px;
-            flex: 0 0 auto;
-            margin-top: 0.3rem;
-            border-radius: 999px;
-            background: var(--brand-green);
-            box-shadow: 0 0 14px rgba(var(--brand-green-rgb), 0.7);
-        }
-
-        .flash-message--error .flash-message__dot {
-            background: var(--danger);
-            box-shadow: 0 0 14px rgba(var(--danger-rgb), 0.6);
-        }
-
-        .flash-message__content {
-            min-width: 0;
-        }
-
-        .flash-message__label {
-            display: block;
-            margin-bottom: 0.2rem;
-            color: var(--brand-green);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.56rem;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-        }
-
-        .flash-message--error .flash-message__label {
-            color: var(--danger);
-        }
-
-        .flash-message__text {
-            color: var(--muted-strong);
-            font-size: 0.88rem;
-            line-height: 1.5;
-        }
-
-        /* Footer */
-        .site-footer {
-            position: relative;
-            z-index: 10;
-            border-top: 1px solid var(--line);
-            background: rgba(5, 10, 7, 0.86);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .site-footer__inner {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.9rem;
-            min-height: 92px;
-            padding-block: 1.35rem;
-            text-align: center;
-        }
-
-        .site-footer__brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.55rem;
-            color: var(--text);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.63rem;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-        }
-
-        .site-footer__dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: var(--brand-green);
-            box-shadow: 0 0 14px rgba(var(--brand-green-rgb), 0.62);
-        }
-
-        .site-footer__claim,
-        .site-footer__meta,
-        .site-footer__link {
-            color: var(--muted);
-            font-size: 0.72rem;
-            line-height: 1.55;
-        }
-
-        .site-footer__link {
-            text-decoration: none;
-            transition: color 180ms ease;
-        }
-
-        .site-footer__link:hover,
-        .site-footer__link:focus-visible {
-            color: var(--brand-green);
-        }
-
-        /* Page transition */
-        .page-enter {
-            animation: pageEnter 260ms ease-out both;
-        }
-
-        .page-leave {
-            animation: pageLeave 180ms ease-in both;
-        }
-
-        @keyframes pageEnter {
-            from {
-                opacity: 0;
-                transform: translateY(7px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes pageLeave {
-            from {
-                opacity: 1;
-                transform: translateY(0);
-            }
-
-            to {
-                opacity: 0;
-                transform: translateY(-5px);
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .site-header {
-                padding: 1.15rem 1.4rem;
-            }
-
-            .site-nav {
-                padding: 0.68rem 0.8rem 0.68rem 1rem;
-            }
-
-            .desktop-menu,
-            .desktop-actions {
-                display: flex;
-                align-items: center;
-            }
-
-            .desktop-menu {
-                gap: 0.1rem;
-            }
-
-            .desktop-actions {
-                gap: 0.55rem;
-            }
-
-            .mobile-menu-toggle,
-            .mobile-menu {
-                display: none;
-            }
-
+        /* Bei sehr breiten Monitoren etwas kompakter und mittiger */
+        @media (min-width: 1536px) {
             .base-main {
-                padding-top: 8.4rem;
-            }
-
-            .site-footer__inner {
-                flex-direction: row;
-                text-align: left;
-            }
-
-            .site-footer__meta-wrap {
-                text-align: right;
-            }
-        }
-
-        @media (max-width: 639px) {
-            .site-header {
-                padding: 0.7rem;
-            }
-
-            .site-nav {
-                min-height: 58px;
-                border-radius: 15px;
-                padding: 0.55rem 0.58rem 0.55rem 0.72rem;
-            }
-
-            .brand__logo {
-                width: 36px;
-                height: 36px;
-                border-radius: 10px;
-            }
-
-            .brand__subline {
-                display: none;
+                padding-top: 7rem;
             }
 
             .base-shell {
-                padding-inline: 0.9rem;
-            }
-
-            .base-main {
-                padding-top: 6.35rem;
-                padding-bottom: 3rem;
+                max-width: 1220px;
             }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                scroll-behavior: auto !important;
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
+        @media (max-width: 1024px) {
+            .base-main {
+                padding-top: 7rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .base-main {
+                padding-top: 6.5rem;
+                padding-bottom: 3rem;
             }
 
-            .site-background__slide:first-child {
+            .base-shell {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .btn-primary,
+            .btn-secondary,
+            .btn-danger {
+                width: 100%;
+            }
+        }
+
+        /* === FADE ANIMATIONEN FÜR SEITENWECHSEL === */
+        .fade-enter {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .fade-leave {
+            animation: fadeOut 0.3s ease-in forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
                 opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-12px);
             }
         }
     </style>
 
-    {% block head_extra %}{% endblock %}
+    <script>
+        // Fade-out Effekt für interne Links
+        document.addEventListener('DOMContentLoaded', () => {
+            const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not(.no-fade)');
+
+            links.forEach(link => {
+                link.addEventListener('click', e => {
+                    if (link.closest('#mobile-menu-btn')) return;
+
+                    if (link.hostname === window.location.hostname) {
+                        e.preventDefault();
+
+                        const href = link.href;
+
+                        document.body.classList.remove('fade-enter');
+                        document.body.classList.add('fade-leave');
+
+                        setTimeout(() => {
+                            window.location = href;
+                        }, 300);
+                    }
+                });
+            });
+
+            // === SICHERHEITSSYSTEM INIT ===
+            initSecuritySystem();
+        });
+
+        // Mobile Menü Toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+
+            if (!menu) return;
+
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
+
+        // === SICHERHEITSSYSTEM FUNKTIONEN ===
+        function initSecuritySystem() {
+            const modal = document.getElementById('security-modal');
+
+            if (!modal) return;
+
+            const modalCard = modal.querySelector('.glass-card');
+
+            if (!modalCard) return;
+
+            // Modal einblenden
+            window.showSecurityAlert = function(e) {
+                if (e) e.preventDefault();
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                // Kurze Verzögerung für saubere Transition
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.classList.add('opacity-100');
+                    modalCard.classList.remove('scale-95');
+                    modalCard.classList.add('scale-100');
+                }, 10);
+            };
+
+            // Modal schließen
+            window.closeSecurityAlert = function() {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0');
+                modalCard.classList.remove('scale-100');
+                modalCard.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 300);
+            };
+
+            // 1. Rechtsklick (Context Menu) blockieren
+            document.addEventListener('contextmenu', function(e) {
+                showSecurityAlert(e);
+            }, false);
+
+            // 2. Tasten-Kombinationen blockieren
+            document.addEventListener('keydown', function(e) {
+                // F12 Taste
+                if (e.key === 'F12' || e.keyCode === 123) {
+                    showSecurityAlert(e);
+                }
+                
+                // Strg + Shift + I (Chrome DevTools)
+                // Strg + Shift + J (Chrome Console)
+                // Strg + Shift + C (Chrome Element Inspector)
+                // Strg + U (Seitenquelltext anzeigen)
+                if (e.ctrlKey) {
+                    if (
+                        e.shiftKey &&
+                        (
+                            e.key === 'I' || e.key === 'i' ||
+                            e.key === 'J' || e.key === 'j' ||
+                            e.key === 'C' || e.key === 'c' ||
+                            e.keyCode === 73 ||
+                            e.keyCode === 74 ||
+                            e.keyCode === 67
+                        )
+                    ) {
+                        showSecurityAlert(e);
+                    }
+
+                    if (e.key === 'U' || e.key === 'u' || e.keyCode === 85) {
+                        showSecurityAlert(e);
+                    }
+                }
+            }, false);
+        }
+    </script>
 </head>
 
-<body class="page-enter {% block body_class %}{% endblock %}">
-    <!-- Subtle fixed background -->
-    <div class="site-background" aria-hidden="true">
-        <img class="site-background__slide" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="">
-        <img class="site-background__slide" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="">
-        <img class="site-background__slide" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="">
-        <div class="site-background__overlay"></div>
-        <div class="site-background__grid"></div>
+<body class="fade-enter antialiased flex flex-col overflow-x-hidden">
+
+    <!-- Hintergrund Slideshow -->
+    <div class="hero-bg" aria-hidden="true">
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
+        <div class="hero-overlay"></div>
     </div>
 
     <!-- Navigation -->
-    <header class="site-header">
-        <div class="site-header__inner">
-            <nav class="site-nav glass-nav" aria-label="Hauptnavigation">
-                <a href="/" class="brand" aria-label="Eifel LOG Startseite">
-                    <span class="brand__logo">
-                        <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo">
-                    </span>
+    <header class="fixed top-0 left-0 w-full z-50 px-4 py-4 md:py-5 pointer-events-none">
+        <div class="w-full max-w-[var(--nav-max-width)] mx-auto pointer-events-auto">
+            <nav class="glass-nav px-4 md:px-5 py-2.5 rounded-full flex justify-between items-center transition-all">
 
-                    <span class="brand__copy">
-                        <span class="brand__name">Eifel LOG</span>
-                        <span class="brand__subline">Virtual Logistics</span>
-                    </span>
+                <!-- Logo Brand -->
+                <a href="/" class="flex items-center gap-3 group shrink-0">
+                    <div class="w-9 h-9 rounded-full overflow-hidden border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.3)] group-hover:shadow-[0_0_25px_rgba(137,190,50,0.6)] transition-all duration-300">
+                        <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-full h-full object-cover">
+                    </div>
+
+                    <div class="hidden sm:flex flex-col leading-none">
+                        <span class="text-[13px] font-orbitron font-bold tracking-widest text-[var(--text)] uppercase">Eifel LOG</span>
+                        <span class="text-[7px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-[0.2em] mt-1">Network Node</span>
+                    </div>
                 </a>
 
-                <div class="desktop-menu" aria-label="Seiten">
-                    <a href="/" class="nav-link {% if request.path == '/' %}is-active{% endif %}">Home</a>
-                    <a href="/about" class="nav-link {% if request.path == '/about' %}is-active{% endif %}">Über uns</a>
-                    <a href="/team" class="nav-link {% if request.path == '/team' %}is-active{% endif %}">Team</a>
-                    <a href="/fuhrpark" class="nav-link {% if request.path == '/fuhrpark' %}is-active{% endif %}">Fuhrpark</a>
-                    <a href="/changelog" class="nav-link {% if request.path == '/changelog' %}is-active{% endif %}">News</a>
+                <!-- Desktop Menu -->
+                <div class="hidden lg:flex items-center gap-2">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/about" class="nav-link">Über uns</a>
+                    <a href="/team" class="nav-link">Team</a>
+                    <a href="/fuhrpark" class="nav-link">Fuhrpark</a>
+                    <a href="/changelog" class="nav-link">News</a>
                 </div>
 
-                <div class="desktop-actions">
+                <!-- Desktop Buttons -->
+                <div class="hidden lg:flex shrink-0 items-center gap-3">
                     {% if session.get('user') %}
+                        <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
                         <a href="/dashboard" class="btn-primary">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                                <path d="M3 10.5 12 3l9 7.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                <path d="M5.5 9.5V21h13V9.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                             </svg>
                             Dashboard
                         </a>
 
-                        <a href="/logout" class="btn-secondary logout-button">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                                <path d="M10 17l5-5-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                <path d="M15 12H3" stroke-width="2" stroke-linecap="round"></path>
-                                <path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5" stroke-width="2" stroke-linecap="round"></path>
+                        <a href="/logout" class="btn-secondary" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                             </svg>
                             Logout
                         </a>
                     {% else %}
+                        <!-- Zeige Driver Hub, wenn NICHT eingeloggt -->
                         <a href="/hub" class="btn-primary">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
-                                <path d="M8 14.5a4 4 0 0 1 8 0" stroke-width="2" stroke-linecap="round"></path>
-                                <circle cx="12" cy="9" r="2" stroke-width="2"></circle>
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path>
                             </svg>
                             Driver Hub
                         </a>
                     {% endif %}
                 </div>
 
-                <button
-                    type="button"
-                    id="mobile-menu-toggle"
-                    class="icon-button mobile-menu-toggle"
-                    aria-label="Menü öffnen"
-                    aria-controls="mobile-menu"
-                    aria-expanded="false"
-                >
-                    <svg id="menu-open-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                        <path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round"></path>
-                    </svg>
-                    <svg id="menu-close-icon" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6 6 18" stroke-width="2" stroke-linecap="round"></path>
-                    </svg>
-                </button>
+                <!-- Mobile Menu Toggle Button -->
+                <div class="lg:hidden flex items-center">
+                    <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="w-10 h-10 rounded-full bg-black/50 border border-white/10 text-[var(--text)] flex items-center justify-center focus:outline-none">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                        </svg>
+                    </button>
+                </div>
             </nav>
 
-            <div id="mobile-menu" class="mobile-menu" aria-hidden="true">
-                <div class="mobile-menu__clip">
-                    <div class="mobile-menu__panel glass-nav">
-                        <a href="/" class="nav-link {% if request.path == '/' %}is-active{% endif %}">Home</a>
-                        <a href="/about" class="nav-link {% if request.path == '/about' %}is-active{% endif %}">Über uns</a>
-                        <a href="/team" class="nav-link {% if request.path == '/team' %}is-active{% endif %}">Team</a>
-                        <a href="/fuhrpark" class="nav-link {% if request.path == '/fuhrpark' %}is-active{% endif %}">Fuhrpark</a>
-                        <a href="/changelog" class="nav-link {% if request.path == '/changelog' %}is-active{% endif %}">News</a>
+            <!-- Mobile Menu (Hidden by default) -->
+            <div id="mobile-menu" class="hidden flex-col gap-3 mt-4 p-6 glass-nav rounded-3xl lg:hidden pointer-events-auto">
+                <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
+                <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
+                <a href="/team" class="nav-link text-center w-full bg-white/5 border border-white/5">Team</a>
+                <a href="/fuhrpark" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+                <a href="/changelog" class="nav-link text-center w-full bg-white/5 border border-white/5">News</a>
 
-                        <div class="mobile-menu__divider"></div>
+                <div class="h-px w-full bg-white/10 my-2"></div>
 
-                        {% if session.get('user') %}
-                            <a href="/dashboard" class="btn-primary">Dashboard</a>
-                            <a href="/logout" class="btn-secondary logout-button">Logout</a>
-                        {% else %}
-                            <a href="/hub" class="btn-primary">Driver Hub</a>
-                        {% endif %}
-                    </div>
-                </div>
+                {% if session.get('user') %}
+                    <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
+                    <a href="/dashboard" class="btn-primary w-full justify-center">
+                        Dashboard
+                    </a>
+
+                    <a href="/logout" class="btn-secondary w-full justify-center mt-2" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">
+                        Logout
+                    </a>
+                {% else %}
+                    <!-- Zeige Driver Hub, wenn NICHT eingeloggt -->
+                    <a href="/hub" class="btn-primary w-full justify-center">
+                        Driver Hub
+                    </a>
+                {% endif %}
             </div>
         </div>
     </header>
 
-    <!-- Main content -->
+    <!-- Main Content -->
     <main class="base-main">
         <div class="base-shell base-content">
+
+            <!-- Optional: Flask Flash Messages können hier gerendert werden -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <div class="flash-stack" role="status" aria-live="polite">
+                    <div class="w-full mb-8 space-y-3 z-20">
                         {% for category, message in messages %}
-                            <div class="flash-message {% if category == 'error' %}flash-message--error{% endif %}">
-                                <span class="flash-message__dot" aria-hidden="true"></span>
-                                <div class="flash-message__content">
-                                    <span class="flash-message__label">
-                                        {% if category == 'error' %}Fehler{% else %}Systemmeldung{% endif %}
-                                    </span>
-                                    <div class="flash-message__text">{{ message }}</div>
-                                </div>
+                            <div class="px-5 py-4 rounded-xl flex items-center gap-3 border bg-black/40 backdrop-blur-md {% if category == 'error' %}border-[var(--danger)]/30 text-[var(--danger)]{% else %}border-[var(--brand-green)]/30 text-[var(--brand-green)]{% endif %}">
+                                <span class="font-orbitron text-[10px] font-bold uppercase tracking-widest">System Alert:</span>
+                                <span class="text-sm font-inter text-[var(--text)]">{{ message }}</span>
                             </div>
                         {% endfor %}
                     </div>
                 {% endif %}
             {% endwith %}
 
+            <!-- Injection Block für den Content der Unterseiten -->
             {% block content %}{% endblock %}
+
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="site-footer">
-        <div class="base-shell site-footer__inner">
-            <div class="site-footer__brand">
-                <span class="site-footer__dot" aria-hidden="true"></span>
-                <span>Eifel LOG</span>
+    <footer class="relative z-10 border-t border-[var(--line)] py-7 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="w-full max-w-[var(--site-max-width)] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
+                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
+                    Eifel LOG
+                </p>
             </div>
 
-            <p class="site-footer__claim">Wir bringen deine Fracht sicher ans Ziel.</p>
+            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
+                Wir bringen deine Fracht sicher ans Ziel.
+            </p>
 
-            <div class="site-footer__meta-wrap">
-                <p class="site-footer__meta">&copy; 2026 Eifel LOG. Fahre mit Leidenschaft.</p>
-                <a href="/impressum" class="site-footer__link">Impressum</a>
+            <div class="flex flex-col items-center md:items-end gap-1">
+                <p class="text-[10px] font-inter text-[var(--muted)]">
+                    &copy; 2026 Eifel LOG. Fahre mit Leidenschaft..
+                </p>
+
+                <a href="/impressum" class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest hover:text-[var(--brand-green)] transition-colors">
+                    Impressum
+                </a>
             </div>
         </div>
     </footer>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const body = document.body;
-            const menu = document.getElementById('mobile-menu');
-            const menuToggle = document.getElementById('mobile-menu-toggle');
-            const openIcon = document.getElementById('menu-open-icon');
-            const closeIcon = document.getElementById('menu-close-icon');
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    <!-- ========================================== -->
+    <!-- SECURITY MODAL (F12 / Rechtsklick Warnung) -->
+    <!-- ========================================== -->
+    <div id="security-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 backdrop-blur-md opacity-0 transition-opacity duration-300 pointer-events-auto">
+        <div class="glass-card glass-card-danger max-w-md w-full mx-4 p-8 text-center transform scale-95 transition-transform duration-300 relative">
+            <!-- Glow Effect -->
+            <div class="absolute -inset-2 bg-[var(--danger)]/10 blur-2xl rounded-full z-[-1]"></div>
+            
+            <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--danger)]/50 flex items-center justify-center bg-[var(--danger)]/10 text-[var(--danger)] shadow-[0_0_15px_rgba(255,159,159,0.3)]">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            
+            <h2 class="font-orbitron text-lg font-bold text-[var(--text)] tracking-widest mb-3 uppercase">Zugriff blockiert</h2>
+            
+            <p class="font-inter text-[var(--muted)] text-sm mb-8 leading-relaxed">
+                Quellcode-Inspektion und das Kontextmenü sind aus Sicherheitsgründen deaktiviert.<br>
+                <span class="text-[11px] uppercase tracking-wider text-[var(--danger)]/80 mt-2 block font-orbitron">Sicherheitsrichtlinie Eifel LOG</span>
+            </p>
+            
+            <button onclick="closeSecurityAlert()" class="btn-danger w-full justify-center">
+                System Alert schließen
+            </button>
+        </div>
+    </div>
 
-            function setMenuState(isOpen) {
-                if (!menu || !menuToggle) return;
-
-                menu.classList.toggle('is-open', isOpen);
-                menu.setAttribute('aria-hidden', String(!isOpen));
-                menuToggle.setAttribute('aria-expanded', String(isOpen));
-                menuToggle.setAttribute('aria-label', isOpen ? 'Menü schließen' : 'Menü öffnen');
-                body.classList.toggle('menu-open', isOpen);
-                openIcon?.classList.toggle('hidden', isOpen);
-                closeIcon?.classList.toggle('hidden', !isOpen);
-            }
-
-            menuToggle?.addEventListener('click', () => {
-                setMenuState(!menu.classList.contains('is-open'));
-            });
-
-            menu?.querySelectorAll('a').forEach((link) => {
-                link.addEventListener('click', () => setMenuState(false));
-            });
-
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') setMenuState(false);
-            });
-
-            window.addEventListener('resize', () => {
-                if (window.innerWidth >= 1024) setMenuState(false);
-            });
-
-            document.querySelectorAll('a[href]').forEach((link) => {
-                link.addEventListener('click', (event) => {
-                    const url = new URL(link.href, window.location.href);
-                    const isInternal = url.origin === window.location.origin;
-                    const isSamePageAnchor = url.pathname === window.location.pathname && url.hash;
-                    const shouldSkip =
-                        event.defaultPrevented ||
-                        event.button !== 0 ||
-                        event.metaKey ||
-                        event.ctrlKey ||
-                        event.shiftKey ||
-                        event.altKey ||
-                        link.target === '_blank' ||
-                        link.hasAttribute('download') ||
-                        link.classList.contains('no-fade') ||
-                        !isInternal ||
-                        isSamePageAnchor ||
-                        reduceMotion;
-
-                    if (shouldSkip) return;
-
-                    event.preventDefault();
-                    body.classList.remove('page-enter');
-                    body.classList.add('page-leave');
-
-                    window.setTimeout(() => {
-                        window.location.href = url.href;
-                    }, 170);
-                });
-            });
-        });
-    </script>
-
-    {% block scripts %}{% endblock %}
 </body>
 </html>
