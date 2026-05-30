@@ -14,6 +14,7 @@ import requests
 from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote
 
 from flask import Flask, render_template, render_template_string, redirect, request, session, url_for, flash, jsonify, abort, send_file, Response
 from dotenv import load_dotenv
@@ -201,6 +202,19 @@ TRACKER_JOB_START_PUBLIC_URL = env_first(
     default="https://www.eifellog.de/api/tracker/jobs/start"
 )
 
+# Kurzlebige, signierte Download-Links fuer PDF-Auszüge im lokalen Tracker/WebView2.
+# Der langlebige Tracker-Token muss dadurch nicht in einer Download-URL stehen.
+TRACKER_PDF_DOWNLOAD_TICKET_LIFETIME_SECONDS = max(60, min(3600, int(env_float(
+    "TRACKER_PDF_DOWNLOAD_TICKET_LIFETIME_SECONDS",
+    "FAHRERKARTE_AUSZUG_DOWNLOAD_TICKET_SECONDS",
+    default=600,
+))))
+TRACKER_PDF_DOWNLOAD_SIGNING_KEY = env_first(
+    "TRACKER_PDF_DOWNLOAD_SIGNING_KEY",
+    "FLASK_SECRET_KEY",
+    default="",
+)
+
 TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
     "TOUR_START_DUPLICATE_WINDOW_MINUTES",
     "JOB_START_WEBHOOK_DUPLICATE_WINDOW_MINUTES",
@@ -235,12 +249,12 @@ def add_tracker_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Accept, Origin, Authorization, X-Tracker-Token, X-Tracker-Code, "
-        "X-Tracker-Client-Token, X-Client-Token, X-Tracker-Api-Key, X-Requested-With"
+        "X-Tracker-Client-Token, X-Client-Token, X-Tracker-Api-Key, X-Tracker-Pdf-Ticket, X-Requested-With"
     )
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     response.headers["Access-Control-Max-Age"] = "86400"
     response.headers["Access-Control-Allow-Private-Network"] = "true"
-    response.headers["Access-Control-Expose-Headers"] = "Content-Type"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Type, Content-Disposition, Content-Length, ETag, Last-Modified, X-EifelLog-Pdf-Type, X-EifelLog-Shift-Id"
     return response
 
 
@@ -5883,6 +5897,153 @@ def tracker_auth_user_from_payload(data=None):
     return user_doc, client_token, None
 
 
+def tracker_pdf_download_ticket_key():
+    """Liefert einen stabilen HMAC-Key fuer kurzlebige PDF-Auszug-Downloadlinks."""
+    configured_secret = safe_str(TRACKER_PDF_DOWNLOAD_SIGNING_KEY)
+    if configured_secret:
+        secret_bytes = configured_secret.encode("utf-8")
+    else:
+        raw_secret = app.secret_key
+        secret_bytes = raw_secret if isinstance(raw_secret, bytes) else str(raw_secret or "").encode("utf-8")
+
+    if not secret_bytes:
+        raise RuntimeError("TRACKER_PDF_DOWNLOAD_SIGNING_KEY oder FLASK_SECRET_KEY fehlt.")
+
+    return hashlib.sha256(b"eifellog|tracker-pdf-download|" + secret_bytes).digest()
+
+
+def tracker_create_shift_pdf_download_ticket(discord_id, shift_id, lifetime_seconds=None):
+    """Erstellt einen kurzlebigen Download-Ticket-String ohne langlebigen Tracker-Token."""
+    discord_id = safe_str(discord_id)
+    shift_id = safe_str(shift_id)
+    if not discord_id or not shift_id:
+        return ""
+
+    lifetime = parse_int(lifetime_seconds, TRACKER_PDF_DOWNLOAD_TICKET_LIFETIME_SECONDS)
+    lifetime = max(60, min(3600, lifetime))
+    ticket_payload = {
+        "v": 1,
+        "sub": discord_id,
+        "shift": shift_id,
+        "exp": int(time.time()) + lifetime,
+    }
+    serialized = json.dumps(ticket_payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    encoded_payload = base64.urlsafe_b64encode(serialized).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        tracker_pdf_download_ticket_key(),
+        encoded_payload.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded_payload}.{signature}"
+
+
+def tracker_validate_shift_pdf_download_ticket(ticket, expected_shift_id=""):
+    """Prueft Signatur, Ablaufzeit und optionale Bindung an eine konkrete Schicht."""
+    ticket = safe_str(ticket)
+    expected_shift_id = safe_str(expected_shift_id)
+    if not ticket or "." not in ticket:
+        return None, "PDF-Download-Ticket fehlt oder ist ungueltig."
+
+    try:
+        encoded_payload, signature = ticket.rsplit(".", 1)
+        expected_signature = hmac.new(
+            tracker_pdf_download_ticket_key(),
+            encoded_payload.encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected_signature):
+            return None, "PDF-Download-Ticket ist ungueltig."
+
+        padded_payload = encoded_payload + ("=" * (-len(encoded_payload) % 4))
+        payload = json.loads(base64.urlsafe_b64decode(padded_payload.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return None, "PDF-Download-Ticket ist ungueltig."
+
+    discord_id = safe_str(payload.get("sub"))
+    shift_id = safe_str(payload.get("shift"))
+    expires_at = parse_int(payload.get("exp"), 0)
+    if not discord_id or not shift_id or expires_at <= int(time.time()):
+        return None, "PDF-Download-Ticket ist abgelaufen oder unvollstaendig."
+    if expected_shift_id and expected_shift_id != shift_id:
+        return None, "PDF-Download-Ticket gehoert nicht zu diesem Auszug."
+
+    return {
+        "discord_id": discord_id,
+        "shift_id": shift_id,
+        "expires_at": expires_at,
+    }, ""
+
+
+def tracker_shift_pdf_route_url(shift_id):
+    shift_id = safe_str(shift_id)
+    if not shift_id:
+        return ""
+    return f"/api/tracker/driver-card/extract/pdf/{quote(shift_id, safe='')}"
+
+
+def tracker_shift_pdf_links(shift_doc, absolute=False):
+    """Ergaenzt HR-Download, Token-API und direkt anklickbaren signierten WebView-Link."""
+    shift_doc = shift_doc or {}
+    shift_id = safe_str(shift_doc.get("shift_id"))
+    discord_id = safe_str(shift_doc.get("discord_id") or shift_doc.get("user_id"))
+    if not shift_id:
+        return {
+            "pdf_url": "",
+            "tracker_pdf_url": "",
+            "tracker_pdf_download_url": "",
+            "extract_pdf_download_url": "",
+        }
+
+    browser_url = safe_str(shift_doc.get("pdf_url")) or f"/api/hr/download_shift_pdf/{quote(shift_id, safe='')}"
+    tracker_url = tracker_shift_pdf_route_url(shift_id)
+    ticket = tracker_create_shift_pdf_download_ticket(discord_id, shift_id) if discord_id else ""
+    signed_url = f"{tracker_url}?ticket={quote(ticket, safe='')}" if tracker_url and ticket else tracker_url
+
+    if absolute:
+        try:
+            browser_url = make_external_url(browser_url)
+            tracker_url = make_external_url(tracker_url)
+            signed_url = make_external_url(signed_url)
+        except Exception:
+            pass
+
+    return {
+        "pdf_url": browser_url,
+        "tracker_pdf_url": tracker_url,
+        "tracker_pdf_download_url": signed_url,
+        "extract_pdf_download_url": signed_url,
+        "pdfDownloadUrl": signed_url,
+        "extractPdfDownloadUrl": signed_url,
+    }
+
+
+def tracker_latest_shift_log_doc(user_doc, prefer_today=True):
+    """Liefert bevorzugt den heutigen, sonst den zuletzt aktualisierten Fahrerkarten-Auszug."""
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    if not discord_id:
+        return None
+
+    if prefer_today:
+        today_doc = tracker_shift_logs_collection.find_one({
+            "discord_id": discord_id,
+            "date_str": now_utc().strftime("%Y-%m-%d"),
+            "archived": {"$ne": True},
+        })
+        if today_doc:
+            return today_doc
+
+    return tracker_shift_logs_collection.find_one(
+        {"discord_id": discord_id, "archived": {"$ne": True}},
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)],
+    )
+
+
+def tracker_latest_shift_pdf_payload(user_doc, prefer_today=True):
+    shift_doc = tracker_latest_shift_log_doc(user_doc, prefer_today=prefer_today)
+    return driver_shift_log_for_api(shift_doc) if shift_doc else None
+
+
 def tracker_allowed_driver_card_file(filename):
     filename = safe_str(filename).lower()
     return "." in filename and filename.rsplit(".", 1)[1] in ALLOWED_TRACKER_DRIVER_CARD_EXTENSIONS
@@ -6446,6 +6607,7 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     updated_at = card_doc.get("updated_at") or created_at
     pin_configured = bool(card_doc.get("pin_configured") or card_doc.get("fahrerkarte_pin_configured"))
     pin_verify_api_url = make_external_url("/api/tracker/driver-card/pin/verify")
+    extract_pdf_api_url = make_external_url("/api/tracker/driver-card/extract/pdf")
 
     return {
         "id": safe_str(card_doc.get("_id")) or card_id,
@@ -6499,6 +6661,9 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "downloadApiUrl": api_download_url,
         "pdfDownloadApiUrl": api_download_url,
         "authenticatedDownloadUrl": api_download_url,
+        "extractPdfApiUrl": extract_pdf_api_url,
+        "extract_pdf_api_url": extract_pdf_api_url,
+        "driverCardExtractPdfApiUrl": extract_pdf_api_url,
         "fileRelativePath": file_relative_path,
         "pdfRelativePath": file_relative_path,
         "hasPdf": bool(download_url or file_relative_path),
@@ -6966,6 +7131,7 @@ def persist_tracker_work_session_daily_history(user_doc, work_session, driver_ca
         "current_work_session": work_session,
         "driver_card_id": safe_str(driver_card_id or resolve_driver_card_id(user_doc, {})),
         "pdf_url": (shift_doc or {}).get("pdf_url") or f"/api/hr/download_shift_pdf/{(shift_doc or existing or {}).get('shift_id') or ''}",
+        "tracker_pdf_url": tracker_shift_pdf_route_url((shift_doc or existing or {}).get("shift_id") or ""),
         "updated_at": now,
         "source": source,
         "archived": False,
@@ -8620,6 +8786,7 @@ def tracker_state_payload(user_doc):
     logbook = build_logbook_payload(limit=30)
 
     live = user_doc.get("tracker_live") or {}
+    extract_payload = tracker_latest_shift_pdf_payload(user_doc, prefer_today=True)
 
     # CurrentJob nur anzeigen, wenn der eigene User wirklich aktiv ist.
     if driver_is_really_active(user_doc):
@@ -8641,6 +8808,11 @@ def tracker_state_payload(user_doc):
         "companyStats": company_stats,
         "company_stats": company_stats,
         "currentJob": current_job,
+        "driverCardExtract": extract_payload,
+        "driver_card_extract": extract_payload,
+        "extractPdfDownloadUrl": (extract_payload or {}).get("extractPdfDownloadUrl", ""),
+        "extract_pdf_download_url": (extract_payload or {}).get("extract_pdf_download_url", ""),
+        "pdfDownloadUrl": (extract_payload or {}).get("pdfDownloadUrl", ""),
         "logbook": logbook,
         "lastDeliveries": logbook,
         "activeDrivers": active_drivers
@@ -9627,6 +9799,7 @@ def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_fi
     elif existing and existing.get("pdf_filename"):
         document["pdf_filename"] = existing.get("pdf_filename")
     document["pdf_url"] = f"/api/hr/download_shift_pdf/{document['shift_id']}"
+    document["tracker_pdf_url"] = tracker_shift_pdf_route_url(document["shift_id"])
 
     tracker_shift_logs_collection.update_one(
         {"discord_id": discord_id, "date_str": snapshot["date_str"]},
@@ -9645,6 +9818,7 @@ def driver_shift_log_for_api(shift_doc):
     if isinstance(summary.get("rest_completed_at"), datetime):
         summary["rest_completed_at"] = datetime_to_iso(summary.get("rest_completed_at"))
     shift_doc["summary"] = summary
+    shift_doc.update(tracker_shift_pdf_links(shift_doc, absolute=True))
     return shift_doc
 
 
@@ -9820,12 +9994,21 @@ def generate_shift_log_pdf(shift_doc):
     filename = f"Fahrerkarte_Auszug_{safe_name}_{date_str}.pdf"
     file_path = os.path.join(target_folder, filename)
 
+    discord_id = safe_str(shift_doc.get("discord_id") or shift_doc.get("user_id"))
+    user_doc = users_collection.find_one({"discord_id": discord_id}) or {}
+    card_doc = None
+    if user_doc:
+        try:
+            card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+        except Exception:
+            app.logger.exception("Fahrerkarte konnte fuer den PDF-Auszug nicht geladen werden")
+            card_doc = None
+
     entries = shift_doc.get("activity_entries") or []
     if entries and isinstance(entries[0], dict) and "start_display" in entries[0]:
         api_entries = entries
         summary = shift_doc.get("summary") or summarize_driver_activity_logs([])
     else:
-        user_doc = users_collection.find_one({"discord_id": safe_str(shift_doc.get("discord_id"))}) or {}
         logs = get_driver_activity_logs_for_day(user_doc, date_str) if user_doc else []
         api_entries = [driver_log_for_api(item) for item in logs]
         summary = summarize_driver_activity_logs(logs)
@@ -9862,6 +10045,12 @@ def generate_shift_log_pdf(shift_doc):
             ("Zielzeit", summary.get("rest_completed_display", "")),
             ("Hinweis", summary.get("rest_summary", "")),
         ]),
+        ("Digitale Signatur / Pruefvermerk", [
+            ("Status", "Signatur geprueft" if bool((card_doc or {}).get("signature_verified")) else "Signatur ungeprueft"),
+            ("Aussteller", safe_str((card_doc or {}).get("signature_issuer"), "EifelLog")),
+            ("Fahrerkarte-ID", safe_str(shift_doc.get("driver_card_id") or (card_doc or {}).get("card_id"), "-")),
+            ("Hinweis", "Dieser PDF-Auszug enthaelt einen sichtbaren EifelLog-Pruefvermerk. Eine qualifizierte kryptografische Zertifikats-Signatur muss serverseitig mit einem echten Zertifikat erzeugt werden."),
+        ]),
     ]
 
     if summary.get("issues"):
@@ -9878,7 +10067,8 @@ def generate_shift_log_pdf(shift_doc):
 
     pdf_bytes = build_simple_pdf(
         "Auszug Fahrerkarte / Schichtprotokoll",
-        sections
+        sections,
+        footer_text="EifelLog Fahrerkarte / digitaler PDF-Auszug",
     )
 
     with open(file_path, "wb") as file:
@@ -9887,7 +10077,7 @@ def generate_shift_log_pdf(shift_doc):
     return file_path, filename
 
 
-def build_simple_pdf(title, sections):
+def build_simple_pdf(title, sections, footer_text="Eifel LOG Tour-Beleg / Abrechnung"):
     # Minimaler PDF-Generator ohne externe Bibliothek.
     # Nutzt Standard-Schrift Helvetica und erstellt bei Bedarf mehrere Seiten.
     page_width = 595
@@ -9963,7 +10153,7 @@ def build_simple_pdf(title, sections):
         stream.extend(f"{margin_left} 38 m {page_width - margin_left} 38 l S\n".encode("ascii"))
         stream.extend(b"BT\n/F1 8 Tf\n")
         stream.extend(f"1 0 0 1 {margin_left} 25 Tm\n".encode("ascii"))
-        stream.extend(b"(Eifel LOG Tour-Beleg / Abrechnung) Tj\nET\n")
+        stream.extend(b"(" + pdf_text_bytes(footer_text) + b") Tj\nET\n")
         stream.extend(b"Q\n")
 
         content_object_number = len(objects) + 1
@@ -12903,6 +13093,7 @@ def tracker_feierabend():
     new_session["updatedAt"] = int(now_utc().timestamp() * 1000)
     tracker_save_work_session(fresh_user, new_session)
 
+    shift_pdf_payload = driver_shift_log_for_api(shift_doc)
     return jsonify({
         "success": True,
         "message": "Feierabend erfasst. Die 11-Stunden-Ruhezeit wurde gespeichert und bleibt fuer jeden Tagesauszug abrufbar.",
@@ -12910,7 +13101,11 @@ def tracker_feierabend():
         "status_text": "Feierabend erfasst",
         "shift_id": shift_doc.get("shift_id"),
         "date": shift_doc.get("shift_date"),
-        "pdf_url": shift_doc.get("pdf_url"),
+        "pdf_url": shift_pdf_payload.get("pdf_url"),
+        "tracker_pdf_url": shift_pdf_payload.get("tracker_pdf_url"),
+        "tracker_pdf_download_url": shift_pdf_payload.get("tracker_pdf_download_url"),
+        "extractPdfDownloadUrl": shift_pdf_payload.get("extractPdfDownloadUrl"),
+        "extract_pdf_download_url": shift_pdf_payload.get("extract_pdf_download_url"),
         "activity": activity_result.get("activity"),
         "summary": shift_doc.get("summary"),
     })
@@ -13566,12 +13761,18 @@ def tracker_driver_card():
         }), 404
 
     driver_card_payload = tracker_prepare_driver_card_payload(card_doc, user_doc=user_doc)
+    extract_payload = tracker_latest_shift_pdf_payload(user_doc, prefer_today=True)
     return jsonify({
         "success": True,
         "driverCard": driver_card_payload,
         "driver_card": driver_card_payload,
         "digitalDriverCard": driver_card_payload,
         "fahrerkarte": driver_card_payload,
+        "driverCardExtract": extract_payload,
+        "driver_card_extract": extract_payload,
+        "extractPdfDownloadUrl": (extract_payload or {}).get("extractPdfDownloadUrl", ""),
+        "extract_pdf_download_url": (extract_payload or {}).get("extract_pdf_download_url", ""),
+        "pdfDownloadUrl": (extract_payload or {}).get("pdfDownloadUrl", ""),
         "profile": tracker_profile_payload(user_doc),
     })
 
@@ -13829,6 +14030,155 @@ def tracker_driver_card_pdf_download(card_id=""):
     return send_file(resolved_path, mimetype="application/pdf", as_attachment=True, download_name=download_name)
 
 
+def tracker_extract_pdf_shift_for_user(user_doc, payload=None, selector=""):
+    """Ermittelt oder erzeugt den Tagesauszug, der vom lokalen Tracker geladen werden darf."""
+    user_doc = user_doc or {}
+    payload = payload or {}
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    selector = safe_str(selector)
+    requested_shift_id = safe_str(
+        payload.get("shiftId")
+        or payload.get("shift_id")
+        or payload.get("extractId")
+        or payload.get("extract_id")
+    )
+    requested_date = safe_str(
+        payload.get("date")
+        or payload.get("dateStr")
+        or payload.get("date_str")
+        or payload.get("shiftDate")
+        or request.args.get("date")
+        or request.args.get("dateStr")
+        or request.args.get("date_str")
+    )
+
+    if selector:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", selector):
+            requested_date = selector
+        else:
+            requested_shift_id = selector
+
+    shift_doc = None
+    if requested_shift_id:
+        shift_doc = tracker_shift_logs_collection.find_one({
+            "discord_id": discord_id,
+            "shift_id": requested_shift_id,
+            "archived": {"$ne": True},
+        })
+        if not shift_doc:
+            return None, "Der angeforderte PDF-Auszug wurde fuer diesen Fahrer nicht gefunden."
+
+    if not shift_doc:
+        requested_date = requested_date or now_utc().strftime("%Y-%m-%d")
+        date_str, _date_display = driver_log_date_keys(requested_date)
+
+        latest_session_doc = tracker_get_latest_work_session_doc(user_doc)
+        if latest_session_doc:
+            try:
+                persist_tracker_work_session_daily_history(
+                    user_doc,
+                    tracker_prepare_work_session_payload(latest_session_doc),
+                    driver_card_id=safe_str(latest_session_doc.get("driver_card_id")),
+                    source="tracker_pdf_download",
+                )
+            except Exception:
+                app.logger.exception("Tracker-Tageshistorie konnte vor dem PDF-Download nicht aktualisiert werden")
+
+        shift_doc = persist_tracker_shift_log_snapshot(user_doc, date_str)
+
+    if not shift_doc:
+        return None, "Fuer diesen Fahrer konnte kein PDF-Auszug erzeugt werden."
+
+    has_activity = bool(shift_doc.get("activity_entries"))
+    session_data = shift_doc.get("session_data") or {}
+    has_session_data = bool(session_data.get("hasData")) or any(
+        parse_int(session_data.get(key), 0) > 0
+        for key in ("driveMs", "workMs", "breakMs", "restMs", "continuousDriveMs", "currentBreakMs")
+    )
+    has_existing_pdf = bool(safe_str(shift_doc.get("pdf_path"))) and os.path.exists(safe_str(shift_doc.get("pdf_path")))
+    if not has_activity and not has_session_data and not has_existing_pdf:
+        return None, "Fuer diesen Tag liegen noch keine Fahrerkarten-Zeiten fuer einen PDF-Auszug vor."
+
+    return shift_doc, ""
+
+
+@app.route("/api/tracker/driver-card/extract/pdf", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/driver-card/extract/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/auszug/pdf", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/fahrerkarte/auszug/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/shift/pdf", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/tracker/shift/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
+def tracker_driver_card_extract_pdf_download(selector=""):
+    """Liefert den echten Fahrerkarten-PDF-Auszug fuer WebView2 als Dateidownload."""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    payload = tracker_request_payload()
+    selector = safe_str(selector)
+    ticket = safe_str(
+        request.args.get("ticket")
+        or payload.get("ticket")
+        or request.headers.get("X-Tracker-Pdf-Ticket")
+    )
+
+    user_doc = None
+    if ticket:
+        ticket_payload, ticket_error = tracker_validate_shift_pdf_download_ticket(ticket, expected_shift_id=selector)
+        if ticket_error:
+            return jsonify({"success": False, "error": ticket_error}), 403
+        selector = ticket_payload["shift_id"]
+        user_doc = users_collection.find_one({"discord_id": ticket_payload["discord_id"]})
+        if not user_doc or not user_has_tracker_access(user_doc):
+            return jsonify({"success": False, "error": "Tracker-Zugriff fuer diesen PDF-Auszug ist nicht mehr freigegeben."}), 403
+    else:
+        user_doc, _client_token, error_response = tracker_auth_user_from_payload(payload)
+        if error_response:
+            return error_response
+
+    shift_doc, shift_error = tracker_extract_pdf_shift_for_user(user_doc, payload=payload, selector=selector)
+    if shift_error:
+        return jsonify({"success": False, "error": shift_error}), 404
+
+    file_path = safe_str(shift_doc.get("pdf_path"))
+    file_name = safe_str(shift_doc.get("pdf_filename"))
+    regenerate = safe_str(request.args.get("refresh") or payload.get("refresh")).lower() in {"1", "true", "yes", "ja", "on"}
+    if regenerate or not file_path or not os.path.exists(file_path):
+        file_path, file_name = generate_shift_log_pdf(shift_doc)
+        fresh_shift_doc = persist_tracker_shift_log_snapshot(
+            user_doc,
+            shift_doc.get("date_str") or shift_doc.get("shift_date") or now_utc(),
+            pdf_path=file_path,
+            pdf_filename=file_name,
+            shift_id=shift_doc.get("shift_id"),
+        )
+        if fresh_shift_doc:
+            shift_doc = fresh_shift_doc
+
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"success": False, "error": "PDF-Auszug konnte nicht auf dem Server bereitgestellt werden."}), 404
+
+    file_name = secure_filename(file_name or os.path.basename(file_path) or "EifelLog_Fahrerkarte_Auszug.pdf")
+    if not file_name.lower().endswith(".pdf"):
+        file_name += ".pdf"
+
+    inline = safe_str(request.args.get("inline") or payload.get("inline")).lower() in {"1", "true", "yes", "ja", "on"}
+    response = send_file(
+        file_path,
+        mimetype="application/pdf",
+        as_attachment=not inline,
+        download_name=file_name,
+        conditional=True,
+        etag=True,
+        last_modified=os.path.getmtime(file_path),
+    )
+    response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-EifelLog-Pdf-Type"] = "driver-card-extract"
+    response.headers["X-EifelLog-Shift-Id"] = safe_str(shift_doc.get("shift_id"))
+    return response
+
+
 @app.route("/api/tracker/work-session", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/worksession", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/arbeitszeit", methods=["GET", "POST", "OPTIONS"])
@@ -13855,6 +14205,13 @@ def tracker_work_session():
         })
     else:
         session_doc = tracker_get_latest_work_session_doc(user_doc)
+        work_session_for_history = tracker_prepare_work_session_payload(session_doc)
+        history_date, _history_display = driver_log_date_keys(coerce_driver_log_datetime(work_session_for_history.get("updatedAt"), fallback=now_utc()))
+        daily_history = tracker_shift_logs_collection.find_one({
+            "discord_id": safe_str(user_doc.get("discord_id")),
+            "date_str": history_date,
+            "archived": {"$ne": True},
+        })
 
     work_session = tracker_prepare_work_session_payload(session_doc)
     driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
@@ -13862,13 +14219,18 @@ def tracker_work_session():
 
     status_text = "Feierabend erfasst" if work_session.get("status") == "offDuty" else {"working": "Arbeitszeit aktiv", "pause": "Pause aktiv"}.get(work_session.get("status"), "Status gespeichert")
 
+    daily_history_payload = driver_shift_log_for_api(daily_history) if daily_history else None
+
     return jsonify({
         "success": True,
         "message": status_text,
         "statusText": status_text,
         "status_text": status_text,
-        "dailyHistory": driver_shift_log_for_api(daily_history) if daily_history else None,
-        "daily_history": driver_shift_log_for_api(daily_history) if daily_history else None,
+        "dailyHistory": daily_history_payload,
+        "daily_history": daily_history_payload,
+        "extractPdfDownloadUrl": (daily_history_payload or {}).get("extractPdfDownloadUrl", ""),
+        "extract_pdf_download_url": (daily_history_payload or {}).get("extract_pdf_download_url", ""),
+        "pdfDownloadUrl": (daily_history_payload or {}).get("pdfDownloadUrl", ""),
         "workSession": work_session,
         "work_session": work_session,
         "eligibility": eligibility,
@@ -19587,13 +19949,7 @@ def update_driver_state():
             pdf_filename=filename,
             shift_id=shift_doc.get("shift_id"),
         ) or shift_doc
-        result["shiftLog"] = {
-            "shift_id": shift_doc.get("shift_id"),
-            "date_str": shift_doc.get("date_str"),
-            "shift_date": shift_doc.get("shift_date"),
-            "pdf_url": shift_doc.get("pdf_url"),
-            "summary": shift_doc.get("summary"),
-        }
+        result["shiftLog"] = driver_shift_log_for_api(shift_doc)
 
     response_message = "Feierabend erfasst. Die Zeiten wurden dauerhaft in der Fahrerkarte-Historie gespeichert." if is_shift_end else f"{state_label} wurde dauerhaft in der Fahrerkarte-Historie gespeichert."
 
@@ -24682,6 +25038,8 @@ def health_check():
             "/api/tracker/activity-state", "/api/tracker/driver-activity",
             "/api/tracker/fahrerkarte/state", "/api/tracker/state/update",
             "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
+            "/api/tracker/driver-card/extract/pdf/<shift_id>",
+            "/api/tracker/fahrerkarte/auszug/pdf/<shift_id>",
             "/api/tracker/work-session", "/api/tracker/jobs/start",
             TRACKER_JOB_START_PUBLIC_URL,
             "/api/tracker/tour/start", "/api/tracker/tour/submit", "/api/tracker/tour/complete", "/api/tracker/job/complete", "/api/tracker/jobs/completed", "/api/tracker/logout",
