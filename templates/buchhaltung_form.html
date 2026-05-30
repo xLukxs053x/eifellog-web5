@@ -1,647 +1,581 @@
 {% extends "base.html" %}
 
-{% block title %}Anfrage an Personalabteilung | EifelLog{% endblock %}
+{% block title %}Personalabteilung | Eifel LOG{% endblock %}
 
-{% block content %}
-{% set session_user = session.get('user', {}) %}
-{% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Mitarbeiter' %}
-
+{% block head_extra %}
 <style>
-    /*
-        Diese Seite setzt bewusst KEINEN eigenen Hintergrund.
-        Die Slideshow, Navigation, Footer und der globale Look kommen aus base.html.
-    */
-
-    :root {
-        --pa-text: #edf3ff;
-        --pa-muted: #93a4c8;
-        --pa-muted-2: #65718a;
-        --pa-line: rgba(255, 255, 255, 0.08);
-        --pa-card: rgba(7, 14, 10, 0.62);
-        --pa-card-strong: rgba(7, 14, 10, 0.82);
-        --pa-green: #89be32;
-        --pa-green-soft: #9ed44a;
-        --pa-green-rgb: 137, 190, 50;
-        --pa-yellow: #dce226;
-        --pa-yellow-rgb: 220, 226, 38;
-        --pa-danger: #ff9f9f;
-        --pa-danger-rgb: 255, 159, 159;
-        --pa-blue: #7ba7ff;
-        --pa-blue-rgb: 123, 167, 255;
-        --pa-radius-xl: 30px;
-        --pa-radius-lg: 22px;
-        --pa-shadow: 0 32px 90px rgba(0, 0, 0, 0.56);
+    .hr-page {
+        padding: 1rem 0 2rem;
     }
 
-    .personal-page {
-        position: relative;
-        width: 100%;
-        min-height: calc(100vh - 160px);
-        padding: 32px 0 108px;
-        color: var(--pa-text);
-    }
-
-    .personal-shell {
-        width: min(1120px, 100%);
-        margin: 0 auto;
+    .hr-shell {
         display: grid;
-        gap: 22px;
+        gap: 1.25rem;
+        width: min(100%, 1160px);
+        margin-inline: auto;
     }
 
-    .pa-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: var(--pa-radius-xl);
-        border: 1px solid var(--pa-line);
-        border-top: 1px solid rgba(var(--pa-green-rgb), 0.24);
-        border-left: 1px solid rgba(var(--pa-green-rgb), 0.16);
-        background: linear-gradient(145deg, rgba(18, 30, 18, 0.48), rgba(2, 6, 3, 0.78));
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
-        box-shadow: var(--pa-shadow);
-    }
-
-    .pa-card > * {
-        position: relative;
-        z-index: 2;
-    }
-
-    .pa-card::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 14%;
-        right: 14%;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(var(--pa-green-rgb), 0.58), rgba(var(--pa-yellow-rgb), 0.28), transparent);
-        pointer-events: none;
-    }
-
-    .pa-card::after {
-        content: "";
-        position: absolute;
-        inset: -1px;
-        pointer-events: none;
-        opacity: 0.55;
-        background:
-            radial-gradient(circle at 14% 0%, rgba(var(--pa-yellow-rgb), 0.10), transparent 32%),
-            radial-gradient(circle at 86% 10%, rgba(var(--pa-green-rgb), 0.12), transparent 35%);
-    }
-
-    .pa-header {
-        padding: 30px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 24px;
-        align-items: center;
-    }
-
-    .pa-kicker {
-        display: inline-flex;
-        width: fit-content;
-        align-items: center;
-        gap: 9px;
-        margin-bottom: 14px;
-        color: var(--pa-yellow);
-        font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        font-weight: 900;
-    }
-
-    .pa-kicker i {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: var(--pa-green-soft);
-        box-shadow: 0 0 14px rgba(var(--pa-green-rgb), 0.6);
-    }
-
-    .pa-header h1 {
-        margin: 0;
-        max-width: 760px;
-        font-family: "Orbitron", sans-serif;
-        font-size: clamp(28px, 4vw, 52px);
-        line-height: 0.98;
-        letter-spacing: -0.045em;
-        color: #fff;
-    }
-
-    .pa-header h1 span {
-        color: var(--pa-green-soft);
-        text-shadow: 0 0 18px rgba(var(--pa-green-rgb), 0.22);
-    }
-
-    .pa-header p {
-        margin: 18px 0 0;
-        max-width: 760px;
-        color: var(--pa-muted);
-        font-size: 14px;
-        line-height: 1.72;
-        font-weight: 500;
-    }
-
-    .pa-head-actions {
-        display: grid;
-        gap: 10px;
-        min-width: 260px;
-    }
-
-    .pa-action-link,
-    .pa-action-button,
-    .pa-ghost-button {
-        min-height: 46px;
-        border-radius: 16px;
-        padding: 0 18px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 9px;
-        border: 1px solid rgba(var(--pa-green-rgb), 0.38);
-        background: rgba(var(--pa-green-rgb), 0.13);
-        color: var(--pa-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        text-decoration: none;
-        cursor: pointer;
-        transition: 220ms ease;
-    }
-
-    .pa-action-link:hover,
-    .pa-action-button:hover:not(:disabled),
-    .pa-ghost-button:hover:not(:disabled) {
-        color: #fff;
-        border-color: rgba(var(--pa-green-rgb), 0.62);
-        background: rgba(var(--pa-green-rgb), 0.22);
-        transform: translateY(-1px);
-    }
-
-    .pa-action-link.secondary,
-    .pa-ghost-button {
-        border-color: rgba(255, 255, 255, 0.11);
-        background: rgba(255, 255, 255, 0.045);
-        color: var(--pa-muted);
-    }
-
-    .pa-action-link.secondary:hover,
-    .pa-ghost-button:hover:not(:disabled) {
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.24);
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    .pa-action-button {
-        min-width: 220px;
-    }
-
-    .pa-action-button:disabled,
-    .pa-ghost-button:disabled {
-        opacity: 0.56;
-        cursor: not-allowed;
-        filter: grayscale(0.35);
-    }
-
-    .pa-status-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
-    }
-
-    .pa-status-card {
-        position: relative;
-        overflow: hidden;
-        padding: 20px;
-        border-radius: var(--pa-radius-lg);
-        border: 1px solid rgba(255, 255, 255, 0.075);
-        background: rgba(0, 0, 0, 0.30);
+    .hr-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(145deg, rgba(16, 28, 20, 0.88), rgba(8, 14, 10, 0.9));
+        box-shadow: var(--shadow-md);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
     }
 
-    .pa-status-card small {
-        display: block;
-        margin-bottom: 11px;
-        color: var(--pa-muted);
+    .hr-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin: 0 0 0.9rem;
+        color: var(--brand-yellow);
         font-family: "Orbitron", sans-serif;
-        font-size: 9px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.16em;
-    }
-
-    .pa-status-card strong {
-        display: block;
-        color: #fff;
-        font-family: "Orbitron", sans-serif;
-        font-size: 18px;
-        font-weight: 900;
-        line-height: 1.2;
-    }
-
-    .pa-status-card p {
-        margin: 9px 0 0;
-        color: var(--pa-muted);
-        font-size: 12px;
-        line-height: 1.55;
-    }
-
-    .pa-main-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.36fr) minmax(300px, 0.64fr);
-        gap: 22px;
-        align-items: start;
-    }
-
-    .pa-form-card,
-    .pa-info-card {
-        padding: 26px;
-    }
-
-    .pa-section-title {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 20px;
-    }
-
-    .pa-section-title h2 {
-        margin: 0;
-        color: var(--pa-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 15px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.16em;
-    }
-
-    .pa-section-title span {
-        color: var(--pa-muted-2);
-        font-size: 12px;
+        font-size: 0.68rem;
         font-weight: 700;
-        text-align: right;
-        line-height: 1.45;
-    }
-
-    .pa-form {
-        display: grid;
-        gap: 16px;
-    }
-
-    .pa-grid-2 {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-    }
-
-    .pa-grid-3 {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
-    }
-
-    .pa-field {
-        display: grid;
-        gap: 8px;
-    }
-
-    .pa-field label {
-        color: var(--pa-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
+        letter-spacing: 0.18em;
+        line-height: 1.3;
         text-transform: uppercase;
-        letter-spacing: 0.16em;
     }
 
-    .pa-input,
-    .pa-select,
-    .pa-textarea {
-        width: 100%;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        background: rgba(0, 0, 0, 0.42);
-        color: var(--pa-text);
-        outline: none;
-        padding: 0 16px;
-        font-size: 13px;
-        font-weight: 700;
-        transition: 180ms ease;
-    }
-
-    .pa-input,
-    .pa-select {
-        min-height: 48px;
-    }
-
-    .pa-select option {
-        color: #0f180f;
-        background: #edf3ff;
-    }
-
-    .pa-textarea {
-        min-height: 210px;
-        padding: 16px;
-        resize: vertical;
-        line-height: 1.58;
-    }
-
-    .pa-input::placeholder,
-    .pa-textarea::placeholder {
-        color: rgba(147, 164, 200, 0.48);
-    }
-
-    .pa-input:focus,
-    .pa-select:focus,
-    .pa-textarea:focus {
-        border-color: rgba(var(--pa-green-rgb), 0.52);
-        box-shadow: 0 0 0 3px rgba(var(--pa-green-rgb), 0.075);
-    }
-
-    .pa-template-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .pa-template-btn {
-        min-height: 34px;
+    .hr-eyebrow::before {
+        width: 0.48rem;
+        height: 0.48rem;
         border-radius: 999px;
-        padding: 0 12px;
-        border: 1px solid rgba(255, 255, 255, 0.095);
-        background: rgba(255, 255, 255, 0.045);
-        color: var(--pa-muted);
+        background: var(--brand-green);
+        box-shadow: 0 0 14px rgba(var(--brand-green-rgb), 0.72);
+        content: "";
+    }
+
+    .hr-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1.5rem;
+        align-items: end;
+        padding: clamp(1.5rem, 4vw, 2.6rem);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .hr-hero::after {
+        position: absolute;
+        right: -5rem;
+        bottom: -7rem;
+        width: 18rem;
+        height: 18rem;
+        border-radius: 999px;
+        background: rgba(var(--brand-green-rgb), 0.11);
+        filter: blur(50px);
+        pointer-events: none;
+        content: "";
+    }
+
+    .hr-hero__copy,
+    .hr-hero__actions {
+        position: relative;
+        z-index: 1;
+    }
+
+    .hr-hero h1 {
+        max-width: 780px;
+        margin: 0;
+        color: var(--text);
         font-family: "Orbitron", sans-serif;
-        font-size: 9px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.11em;
+        font-size: clamp(2rem, 5vw, 4.25rem);
+        font-weight: 700;
+        letter-spacing: -0.055em;
+        line-height: 1.02;
+    }
+
+    .hr-hero h1 span {
+        color: var(--brand-green);
+    }
+
+    .hr-hero p {
+        max-width: 760px;
+        margin: 1rem 0 0;
+        color: var(--muted);
+        font-size: 0.96rem;
+        line-height: 1.75;
+    }
+
+    .hr-hero__actions {
+        display: grid;
+        gap: 0.65rem;
+        min-width: 210px;
+    }
+
+    .hr-button {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.42);
+        border-radius: 12px;
+        padding: 0.72rem 1rem;
+        background: rgba(var(--brand-green-rgb), 0.13);
+        color: var(--brand-green);
         cursor: pointer;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        line-height: 1.25;
+        text-align: center;
+        text-decoration: none;
+        text-transform: uppercase;
         transition: 180ms ease;
     }
 
-    .pa-template-btn:hover {
-        color: #fff;
-        border-color: rgba(var(--pa-yellow-rgb), 0.44);
-        background: rgba(var(--pa-yellow-rgb), 0.08);
+    .hr-button:hover:not(:disabled) {
+        border-color: rgba(var(--brand-green-rgb), 0.7);
+        background: rgba(var(--brand-green-rgb), 0.22);
+        color: #ffffff;
         transform: translateY(-1px);
     }
 
-    .pa-submit-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 12px;
-        padding-top: 4px;
+    .hr-button--quiet {
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted-strong);
     }
 
-    .pa-submit-hint {
-        margin-right: auto;
-        color: var(--pa-muted-2);
-        font-size: 12px;
-        line-height: 1.45;
+    .hr-button--quiet:hover:not(:disabled) {
+        border-color: var(--line-strong);
+        background: rgba(255, 255, 255, 0.075);
     }
 
-    .pa-char-row {
-        margin-top: -4px;
-        color: var(--pa-muted-2);
-        font-size: 12px;
+    .hr-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.56;
+    }
+
+    .hr-overview {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    .hr-stat {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 1.1rem;
+        background: rgba(8, 14, 10, 0.76);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .hr-stat small {
+        display: block;
+        margin-bottom: 0.55rem;
+        color: var(--muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.6rem;
         font-weight: 700;
-        text-align: right;
-    }
-
-    .pa-result-box {
-        display: none;
-        margin-top: 16px;
-        padding: 15px;
-        border-radius: 18px;
-        border: 1px solid rgba(var(--pa-green-rgb), 0.34);
-        background: rgba(var(--pa-green-rgb), 0.085);
-        color: var(--pa-muted);
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .pa-result-box.active {
-        display: block;
-    }
-
-    .pa-result-box.error {
-        border-color: rgba(var(--pa-danger-rgb), 0.42);
-        background: rgba(var(--pa-danger-rgb), 0.08);
-    }
-
-    .pa-result-box strong {
-        display: block;
-        margin-bottom: 5px;
-        color: var(--pa-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
+        letter-spacing: 0.15em;
+        line-height: 1.4;
         text-transform: uppercase;
-        letter-spacing: 0.13em;
     }
 
-    .pa-result-box.error strong {
-        color: var(--pa-danger);
-    }
-
-    .pa-info-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .pa-info-item {
-        display: grid;
-        gap: 7px;
-        padding: 15px;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background: rgba(0, 0, 0, 0.28);
-    }
-
-    .pa-info-item strong {
-        color: #fff;
+    .hr-stat strong {
+        display: block;
+        color: var(--text);
         font-family: "Orbitron", sans-serif;
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.13em;
+        font-size: 1rem;
+        line-height: 1.3;
     }
 
-    .pa-info-item p {
-        margin: 0;
-        color: var(--pa-muted);
-        font-size: 12px;
+    .hr-stat p {
+        margin: 0.52rem 0 0;
+        color: var(--muted);
+        font-size: 0.78rem;
         line-height: 1.55;
     }
 
-    .pa-info-item.warning {
-        border-color: rgba(var(--pa-yellow-rgb), 0.22);
-        background: rgba(var(--pa-yellow-rgb), 0.055);
-    }
-
-    .pa-mini-list {
-        margin: 0;
-        padding: 0;
-        list-style: none;
+    .hr-layout {
         display: grid;
-        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
+        gap: 1.25rem;
+        align-items: start;
     }
 
-    .pa-mini-list li {
+    .hr-form-panel,
+    .hr-side-panel {
+        padding: clamp(1.2rem, 3vw, 1.7rem);
+    }
+
+    .hr-heading-row {
         display: flex;
-        gap: 9px;
-        color: var(--pa-muted);
-        font-size: 12px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .hr-heading-row h2 {
+        margin: 0;
+        color: var(--text);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.88rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        line-height: 1.5;
+        text-transform: uppercase;
+    }
+
+    .hr-heading-row span {
+        color: var(--muted);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        text-align: right;
+    }
+
+    .hr-form {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .hr-grid-2,
+    .hr-grid-3 {
+        display: grid;
+        gap: 0.9rem;
+    }
+
+    .hr-grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hr-grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hr-field {
+        display: grid;
+        gap: 0.48rem;
+    }
+
+    .hr-field label,
+    .hr-label {
+        color: var(--muted-strong);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.61rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        line-height: 1.45;
+        text-transform: uppercase;
+    }
+
+    .hr-input,
+    .hr-select,
+    .hr-textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.26);
+        color: var(--text);
+        font: inherit;
+        font-size: 0.86rem;
+        outline: none;
+        transition: 160ms ease;
+    }
+
+    .hr-input,
+    .hr-select {
+        min-height: 46px;
+        padding: 0 0.88rem;
+    }
+
+    .hr-textarea {
+        min-height: 210px;
+        padding: 0.88rem;
+        line-height: 1.6;
+        resize: vertical;
+    }
+
+    .hr-input::placeholder,
+    .hr-textarea::placeholder {
+        color: rgba(163, 174, 166, 0.54);
+    }
+
+    .hr-input:focus,
+    .hr-select:focus,
+    .hr-textarea:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.58);
+        box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.1);
+    }
+
+    .hr-select option {
+        background: #101912;
+        color: var(--text);
+    }
+
+    .hr-template-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .hr-template-button {
+        min-height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.38rem 0.75rem;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted-strong);
+        cursor: pointer;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.57rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        line-height: 1.35;
+        text-transform: uppercase;
+        transition: 160ms ease;
+    }
+
+    .hr-template-button:hover {
+        border-color: rgba(220, 226, 38, 0.5);
+        background: rgba(220, 226, 38, 0.08);
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .hr-counter {
+        margin-top: -0.2rem;
+        color: var(--muted);
+        font-size: 0.74rem;
+        line-height: 1.4;
+        text-align: right;
+    }
+
+    .hr-submit-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.7rem;
+        padding-top: 0.2rem;
+    }
+
+    .hr-submit-note {
+        margin-right: auto;
+        color: var(--muted);
+        font-size: 0.76rem;
         line-height: 1.5;
     }
 
-    .pa-mini-list li::before {
-        content: "";
-        width: 7px;
-        height: 7px;
-        margin-top: 6px;
-        border-radius: 999px;
+    .hr-result {
+        display: none;
+        margin-top: 1rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.4);
+        border-radius: 12px;
+        padding: 0.9rem;
+        background: rgba(var(--brand-green-rgb), 0.1);
+        color: var(--muted-strong);
+        font-size: 0.82rem;
+        line-height: 1.55;
+    }
+
+    .hr-result.is-visible {
+        display: block;
+    }
+
+    .hr-result.is-error {
+        border-color: rgba(var(--danger-rgb), 0.42);
+        background: rgba(var(--danger-rgb), 0.09);
+    }
+
+    .hr-result strong {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: var(--brand-green);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.63rem;
+        letter-spacing: 0.12em;
+        line-height: 1.4;
+        text-transform: uppercase;
+    }
+
+    .hr-result.is-error strong {
+        color: var(--danger);
+    }
+
+    .hr-side-stack {
+        display: grid;
+        gap: 0.72rem;
+    }
+
+    .hr-side-card {
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        padding: 0.9rem;
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .hr-side-card h3 {
+        margin: 0;
+        color: var(--text);
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.11em;
+        line-height: 1.45;
+        text-transform: uppercase;
+    }
+
+    .hr-side-card p {
+        margin: 0.45rem 0 0;
+        color: var(--muted);
+        font-size: 0.77rem;
+        line-height: 1.56;
+    }
+
+    .hr-side-card--warning {
+        border-color: rgba(220, 226, 38, 0.22);
+        background: rgba(220, 226, 38, 0.055);
+    }
+
+    .hr-checklist {
+        display: grid;
+        gap: 0.58rem;
+        margin: 0.55rem 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .hr-checklist li {
+        display: flex;
+        gap: 0.55rem;
+        color: var(--muted);
+        font-size: 0.77rem;
+        line-height: 1.5;
+    }
+
+    .hr-checklist li::before {
         flex: 0 0 auto;
-        background: var(--pa-green-soft);
-        box-shadow: 0 0 10px rgba(var(--pa-green-rgb), 0.45);
+        width: 0.42rem;
+        height: 0.42rem;
+        margin-top: 0.38rem;
+        border-radius: 999px;
+        background: var(--brand-green);
+        content: "";
     }
 
-    @media (max-width: 1080px) {
-        .pa-status-grid {
+    @media (max-width: 1000px) {
+        .hr-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 820px) {
+        .hr-hero {
+            grid-template-columns: 1fr;
+            align-items: start;
+        }
+
+        .hr-hero__actions {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .pa-main-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 980px) {
-        .pa-header {
-            grid-template-columns: 1fr;
-        }
-
-        .pa-head-actions {
             min-width: 0;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hr-overview {
+            grid-template-columns: 1fr;
         }
     }
 
-    @media (max-width: 720px) {
-        .personal-page {
-            padding: 18px 0 92px;
+    @media (max-width: 680px) {
+        .hr-page {
+            padding-top: 0;
         }
 
-        .pa-header,
-        .pa-form-card,
-        .pa-info-card {
-            padding: 22px;
-        }
-
-        .pa-status-grid,
-        .pa-grid-2,
-        .pa-grid-3 {
+        .hr-grid-2,
+        .hr-grid-3,
+        .hr-hero__actions {
             grid-template-columns: 1fr;
         }
 
-        .pa-head-actions {
-            grid-template-columns: 1fr;
-        }
-
-        .pa-section-title {
+        .hr-heading-row {
             display: grid;
         }
 
-        .pa-section-title span {
+        .hr-heading-row span {
             text-align: left;
         }
 
-        .pa-action-link,
-        .pa-action-button,
-        .pa-ghost-button {
-            width: 100%;
-        }
-
-        .pa-submit-row {
+        .hr-submit-row {
             display: grid;
             grid-template-columns: 1fr;
         }
 
-        .pa-submit-hint {
+        .hr-submit-note {
+            margin-right: 0;
+        }
+
+        .hr-button {
             width: 100%;
         }
     }
 </style>
+{% endblock %}
 
-<div class="personal-page">
-    <div class="personal-shell">
+{% block content %}
+{% set session_user = session.get('user', {}) %}
+{% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Mitarbeiter' %}
+{% set profile_username = session_user.get('username') or session_user.get('discord_username') %}
 
-        <section class="pa-card pa-header">
-            <div>
-                <div class="pa-kicker"><i></i> EifelLog Personalabteilung</div>
+<section class="hr-page">
+    <div class="hr-shell">
+        <header class="hr-panel hr-hero">
+            <div class="hr-hero__copy">
+                <p class="hr-eyebrow">Interner Service</p>
                 <h1>Anfrage an die <span>Personalabteilung</span></h1>
                 <p>
-                    Reiche hier deine Anfrage an die Personalabteilung ein. Die Nachricht wird mit deinem Account verknüpft
-                    und als interner Vorgang gespeichert. Bitte beschreibe dein Anliegen möglichst vollständig, damit es ohne
-                    Rückfragen bearbeitet werden kann.
+                    Reiche dein Anliegen direkt intern ein. Deine Anfrage wird deinem eingeloggten Account zugeordnet
+                    und als Vorgang gespeichert. Beschreibe den Sachverhalt möglichst vollständig, damit die Bearbeitung
+                    ohne unnötige Rückfragen erfolgen kann.
                 </p>
             </div>
 
-            <div class="pa-head-actions">
-                <a class="pa-action-link" href="{{ url_for('dashboard') }}">
-                    Zum Dashboard
-                </a>
-                <a class="pa-action-link secondary" href="{{ url_for('profile', username=display_name) }}">
-                    Mein Profil
-                </a>
+            <div class="hr-hero__actions">
+                <a class="hr-button" href="{{ url_for('dashboard') }}">Zum Dashboard</a>
+                {% if profile_username %}
+                    <a class="hr-button hr-button--quiet" href="{{ url_for('profile', username=profile_username) }}">Mein Profil</a>
+                {% else %}
+                    <a class="hr-button hr-button--quiet" href="{{ url_for('dashboard') }}">Profil im Dashboard</a>
+                {% endif %}
             </div>
-        </section>
+        </header>
 
-        <section class="pa-status-grid" aria-label="Statusinformationen">
-            <div class="pa-status-card">
+        <section class="hr-overview" aria-label="Informationen zur Anfrage">
+            <article class="hr-stat">
                 <small>Absender</small>
                 <strong>{{ display_name }}</strong>
-                <p>Die Anfrage wird automatisch deinem eingeloggten Account zugeordnet.</p>
-            </div>
+                <p>Der Vorgang wird automatisch deinem Account zugeordnet.</p>
+            </article>
 
-            <div class="pa-status-card">
+            <article class="hr-stat">
                 <small>Empfänger</small>
-                <strong>Personal</strong>
-                <p>Dein Anliegen geht direkt an die interne Personalabteilung.</p>
-            </div>
+                <strong>Personalabteilung</strong>
+                <p>Die Anfrage geht direkt an die zuständige interne Stelle.</p>
+            </article>
 
-            <div class="pa-status-card">
-                <small>Status</small>
-                <strong>Direktübermittlung</strong>
-                <p>Nach dem Absenden wird der Vorgang im System gespeichert.</p>
-            </div>
-
-            <div class="pa-status-card">
-                <small>Vorgang</small>
-                <strong>Automatisch</strong>
-                <p>Aus deiner Anfrage entsteht ein offener Bearbeitungseintrag.</p>
-            </div>
+            <article class="hr-stat">
+                <small>Bearbeitung</small>
+                <strong>Interner Vorgang</strong>
+                <p>Nach dem Absenden wird dein Anliegen im System gespeichert.</p>
+            </article>
         </section>
 
-        <section class="pa-main-grid">
-            <div class="pa-card pa-form-card">
-                <div class="pa-section-title">
+        <section class="hr-layout">
+            <div class="hr-panel hr-form-panel">
+                <div class="hr-heading-row">
                     <h2>Anfrage erstellen</h2>
-                    <span>Empfänger: Personalabteilung<br>Endpoint: /api/buchhaltung/request</span>
+                    <span>Bitte fülle die relevanten Felder aus.<br>Pflichtfelder sind eindeutig markiert.</span>
                 </div>
 
-                <form id="personal-request-form" class="pa-form">
-                    <div class="pa-grid-2">
-                        <div class="pa-field">
-                            <label for="pa-category">Kategorie</label>
-                            <select id="pa-category" class="pa-select" autocomplete="off" required>
+                <form id="personal-request-form" class="hr-form">
+                    <div class="hr-grid-2">
+                        <div class="hr-field">
+                            <label for="hr-category">Kategorie *</label>
+                            <select id="hr-category" class="hr-select" autocomplete="off" required>
                                 <option value="Allgemeine Personalfrage">Allgemeine Personalfrage</option>
                                 <option value="Lohn / Abrechnung">Lohn / Abrechnung</option>
                                 <option value="Auszahlung / Vergütung">Auszahlung / Vergütung</option>
@@ -654,9 +588,9 @@
                             </select>
                         </div>
 
-                        <div class="pa-field">
-                            <label for="pa-priority">Priorität</label>
-                            <select id="pa-priority" class="pa-select" autocomplete="off">
+                        <div class="hr-field">
+                            <label for="hr-priority">Priorität</label>
+                            <select id="hr-priority" class="hr-select" autocomplete="off">
                                 <option value="Normal">Normal</option>
                                 <option value="Wichtig">Wichtig</option>
                                 <option value="Dringend">Dringend</option>
@@ -664,27 +598,27 @@
                         </div>
                     </div>
 
-                    <div class="pa-grid-2">
-                        <div class="pa-field">
-                            <label for="pa-subject">Betreff</label>
-                            <input id="pa-subject" class="pa-input" type="text" maxlength="120" required placeholder="z. B. Rückfrage zur Abrechnung KW 20">
+                    <div class="hr-grid-2">
+                        <div class="hr-field">
+                            <label for="hr-subject">Betreff *</label>
+                            <input id="hr-subject" class="hr-input" type="text" maxlength="120" required placeholder="z. B. Rückfrage zur Abrechnung KW 20">
                         </div>
 
-                        <div class="pa-field">
-                            <label for="pa-reference">Bezug optional</label>
-                            <input id="pa-reference" class="pa-input" type="text" maxlength="120" placeholder="z. B. Zeitraum, Fahrt, Beleg, Vertrag, Schicht">
+                        <div class="hr-field">
+                            <label for="hr-reference">Bezug</label>
+                            <input id="hr-reference" class="hr-input" type="text" maxlength="120" placeholder="z. B. Zeitraum, Fahrt, Beleg oder Schicht">
                         </div>
                     </div>
 
-                    <div class="pa-grid-3">
-                        <div class="pa-field">
-                            <label for="pa-date">Datum optional</label>
-                            <input id="pa-date" class="pa-input" type="date">
+                    <div class="hr-grid-3">
+                        <div class="hr-field">
+                            <label for="hr-date">Datum</label>
+                            <input id="hr-date" class="hr-input" type="date">
                         </div>
 
-                        <div class="pa-field">
-                            <label for="pa-contact">Rückmeldung</label>
-                            <select id="pa-contact" class="pa-select" autocomplete="off">
+                        <div class="hr-field">
+                            <label for="hr-contact">Rückmeldung</label>
+                            <select id="hr-contact" class="hr-select" autocomplete="off">
                                 <option value="Antwort im Dashboard">Antwort im Dashboard</option>
                                 <option value="Antwort per Discord">Antwort per Discord</option>
                                 <option value="Antwort per E-Mail">Antwort per E-Mail</option>
@@ -692,249 +626,288 @@
                             </select>
                         </div>
 
-                        <div class="pa-field">
-                            <label for="pa-attachment">Belegstatus</label>
-                            <select id="pa-attachment" class="pa-select" autocomplete="off">
-                                <option value="Kein Beleg nötig">Kein Beleg nötig</option>
-                                <option value="Beleg vorhanden">Beleg vorhanden</option>
-                                <option value="Beleg fehlt noch">Beleg fehlt noch</option>
+                        <div class="hr-field">
+                            <label for="hr-evidence">Nachweis</label>
+                            <select id="hr-evidence" class="hr-select" autocomplete="off">
+                                <option value="Kein Nachweis erforderlich">Kein Nachweis erforderlich</option>
+                                <option value="Nachweis vorhanden">Nachweis vorhanden</option>
+                                <option value="Nachweis fehlt noch">Nachweis fehlt noch</option>
                                 <option value="Nachweis wird nachgereicht">Nachweis wird nachgereicht</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="pa-field">
-                        <label>Schnellvorlagen</label>
-                        <div class="pa-template-grid">
-                            <button type="button" class="pa-template-btn" data-category="Lohn / Abrechnung" data-subject="Rückfrage zur Abrechnung" data-template="Hallo Personalabteilung,\n\nich habe eine Rückfrage zu meiner Abrechnung. Es geht um folgenden Zeitraum / Vorgang:\n\n- Zeitraum:\n- Betrag / Position:\n- Was geprüft werden soll:\n\nBitte prüft das und gebt mir eine Rückmeldung.\n\nDanke.">Abrechnung</button>
-
-                            <button type="button" class="pa-template-btn" data-category="Auszahlung / Vergütung" data-subject="Auszahlung offen" data-template="Hallo Personalabteilung,\n\nich möchte eine offene Auszahlung prüfen lassen.\n\n- Zeitraum:\n- Betrag / Vergütung:\n- Bezug / Fahrt / Aufgabe:\n\nBitte prüft, ob die Auszahlung bereits eingeplant oder noch offen ist.\n\nDanke.">Auszahlung</button>
-
-                            <button type="button" class="pa-template-btn" data-category="Urlaub / Abwesenheit" data-subject="Rückfrage zu Urlaub / Abwesenheit" data-template="Hallo Personalabteilung,\n\nich habe eine Rückfrage zu Urlaub oder Abwesenheit.\n\n- Zeitraum:\n- Grund der Rückfrage:\n- Gewünschte Klärung:\n\nBitte gebt mir dazu eine Rückmeldung.\n\nDanke.">Urlaub</button>
-
-                            <button type="button" class="pa-template-btn" data-category="Krankmeldung / Nachweis" data-subject="Nachweis / Krankmeldung" data-template="Hallo Personalabteilung,\n\nich möchte einen Nachweis / eine Krankmeldung klären.\n\n- Datum / Zeitraum:\n- Nachweisstatus:\n- Bemerkung:\n\nBitte prüft den Vorgang und meldet euch bei mir.\n\nDanke.">Nachweis</button>
-
-                            <button type="button" class="pa-template-btn" data-category="Korrektur notwendig" data-subject="Korrektur notwendig" data-template="Hallo Personalabteilung,\n\nbei folgendem Vorgang ist meiner Meinung nach eine Korrektur notwendig:\n\n- Bereich:\n- Aktueller Eintrag:\n- Gewünschte Korrektur:\n- Begründung:\n\nBitte prüft das und korrigiert es, falls möglich.\n\nDanke.">Korrektur</button>
+                    <div class="hr-field">
+                        <span class="hr-label">Schnellvorlagen</span>
+                        <div class="hr-template-list" aria-label="Schnellvorlagen für die Nachricht">
+                            <button class="hr-template-button" type="button" data-template-key="billing">Abrechnung</button>
+                            <button class="hr-template-button" type="button" data-template-key="payment">Auszahlung</button>
+                            <button class="hr-template-button" type="button" data-template-key="absence">Urlaub</button>
+                            <button class="hr-template-button" type="button" data-template-key="certificate">Nachweis</button>
+                            <button class="hr-template-button" type="button" data-template-key="correction">Korrektur</button>
                         </div>
                     </div>
 
-                    <div class="pa-field">
-                        <label for="pa-message">Nachricht</label>
-                        <textarea id="pa-message" class="pa-textarea" maxlength="1200" required placeholder="Beschreibe hier dein Anliegen an die Personalabteilung. Bitte möglichst mit Zeitraum, Betrag, Beleg, Schicht, Fahrername oder Vorgangsnummer, falls relevant."></textarea>
-                        <div class="pa-char-row"><span id="pa-char-count">0</span>/1200 Zeichen</div>
+                    <div class="hr-field">
+                        <label for="hr-message">Nachricht *</label>
+                        <textarea id="hr-message" class="hr-textarea" maxlength="1200" required placeholder="Beschreibe dein Anliegen möglichst vollständig. Nenne bei Bedarf Zeitraum, Betrag, Beleg, Schicht, Fahrt oder Vorgangsnummer."></textarea>
+                        <div class="hr-counter"><span id="hr-character-count">0</span>/1200 Zeichen</div>
                     </div>
 
-                    <div class="pa-submit-row">
-                        <div class="pa-submit-hint">
-                            Leere Anfragen werden nicht gesendet. Bitte keine Passwörter, Tokens oder privaten Zugangsdaten eintragen.
-                        </div>
-
-                        <button id="pa-clear" class="pa-ghost-button" type="button">
-                            Zurücksetzen
-                        </button>
-
-                        <button id="pa-submit" class="pa-action-button" type="submit">
-                            Anfrage senden
-                        </button>
+                    <div class="hr-submit-row">
+                        <p class="hr-submit-note">Keine Passwörter, Tokens oder privaten Zugangsdaten eintragen.</p>
+                        <button id="hr-clear" class="hr-button hr-button--quiet" type="button">Zurücksetzen</button>
+                        <button id="hr-submit" class="hr-button" type="submit">Anfrage senden</button>
                     </div>
                 </form>
 
-                <div id="pa-result" class="pa-result-box" role="status" aria-live="polite"></div>
+                <div id="hr-result" class="hr-result" role="status" aria-live="polite"></div>
             </div>
 
-            <aside class="pa-card pa-info-card">
-                <div class="pa-section-title">
+            <aside class="hr-panel hr-side-panel">
+                <div class="hr-heading-row">
                     <h2>Ablauf</h2>
                 </div>
 
-                <div class="pa-info-list">
-                    <div class="pa-info-item">
-                        <strong>1. Formular ausfüllen</strong>
-                        <p>Wähle Kategorie und Priorität, trage einen klaren Betreff ein und beschreibe den Vorgang vollständig.</p>
-                    </div>
+                <div class="hr-side-stack">
+                    <article class="hr-side-card">
+                        <h3>1. Angaben prüfen</h3>
+                        <p>Wähle Kategorie und Priorität. Ergänze einen eindeutigen Betreff und alle relevanten Details.</p>
+                    </article>
 
-                    <div class="pa-info-item">
-                        <strong>2. Anfrage absenden</strong>
-                        <p>Die Daten werden zusammengefasst und an den bestehenden Backend-Endpunkt übermittelt.</p>
-                    </div>
+                    <article class="hr-side-card">
+                        <h3>2. Anfrage senden</h3>
+                        <p>Dein Anliegen wird zusammengefasst, deinem Account zugeordnet und intern gespeichert.</p>
+                    </article>
 
-                    <div class="pa-info-item">
-                        <strong>3. Personalabteilung prüft</strong>
-                        <p>Die zuständige Stelle sieht deine Anfrage als offenen Vorgang und kann sie intern bearbeiten.</p>
-                    </div>
+                    <article class="hr-side-card">
+                        <h3>3. Rückmeldung erhalten</h3>
+                        <p>Die zuständige Stelle prüft den Vorgang und meldet sich über den gewählten Kontaktweg.</p>
+                    </article>
 
-                    <div class="pa-info-item warning">
-                        <strong>Wichtig</strong>
-                        <p>Für sensible Daten nur notwendige Informationen eintragen. Zugangsdaten oder private Tokens niemals senden.</p>
-                    </div>
+                    <article class="hr-side-card hr-side-card--warning">
+                        <h3>Datenschutz</h3>
+                        <p>Übermittle nur Informationen, die für die Bearbeitung notwendig sind. Zugangsdaten gehören niemals in das Formular.</p>
+                    </article>
 
-                    <div class="pa-info-item">
-                        <strong>Gute Angaben</strong>
-                        <ul class="pa-mini-list">
-                            <li>Zeitraum oder konkretes Datum nennen.</li>
-                            <li>Betrag, Fahrt, Schicht oder Beleg angeben, falls relevant.</li>
-                            <li>Beschreiben, was genau geprüft oder geändert werden soll.</li>
-                            <li>Gewünschte Rückmeldeart auswählen.</li>
+                    <article class="hr-side-card">
+                        <h3>Hilfreiche Angaben</h3>
+                        <ul class="hr-checklist">
+                            <li>Zeitraum oder Datum nennen.</li>
+                            <li>Betrag, Fahrt, Schicht oder Beleg angeben.</li>
+                            <li>Gewünschte Änderung klar beschreiben.</li>
+                            <li>Geeigneten Kontaktweg auswählen.</li>
                         </ul>
-                    </div>
+                    </article>
                 </div>
             </aside>
         </section>
-
     </div>
-</div>
+</section>
+{% endblock %}
 
+{% block scripts %}
 <script>
     document.addEventListener("DOMContentLoaded", () => {
+        // Bestehende Backend-Route beibehalten, damit die aktuelle API-Anbindung kompatibel bleibt.
         const endpoint = {{ url_for('api_buchhaltung_request') | tojson }};
 
         const form = document.getElementById("personal-request-form");
-        const category = document.getElementById("pa-category");
-        const priority = document.getElementById("pa-priority");
-        const subject = document.getElementById("pa-subject");
-        const reference = document.getElementById("pa-reference");
-        const date = document.getElementById("pa-date");
-        const contact = document.getElementById("pa-contact");
-        const attachment = document.getElementById("pa-attachment");
-        const message = document.getElementById("pa-message");
-        const submit = document.getElementById("pa-submit");
-        const clear = document.getElementById("pa-clear");
-        const result = document.getElementById("pa-result");
-        const charCount = document.getElementById("pa-char-count");
-        const templateButtons = document.querySelectorAll(".pa-template-btn");
+        const category = document.getElementById("hr-category");
+        const priority = document.getElementById("hr-priority");
+        const subject = document.getElementById("hr-subject");
+        const reference = document.getElementById("hr-reference");
+        const requestDate = document.getElementById("hr-date");
+        const contact = document.getElementById("hr-contact");
+        const evidence = document.getElementById("hr-evidence");
+        const message = document.getElementById("hr-message");
+        const submitButton = document.getElementById("hr-submit");
+        const clearButton = document.getElementById("hr-clear");
+        const resultBox = document.getElementById("hr-result");
+        const characterCount = document.getElementById("hr-character-count");
+        const templateButtons = document.querySelectorAll("[data-template-key]");
 
-        const defaultSubmitText = submit ? submit.textContent.trim() : "Anfrage senden";
+        if (!form || !submitButton || !message) return;
+
+        const defaultSubmitText = submitButton.textContent.trim();
+        const templates = {
+            billing: {
+                category: "Lohn / Abrechnung",
+                subject: "Rückfrage zur Abrechnung",
+                message: "Hallo Personalabteilung,\n\nich habe eine Rückfrage zu meiner Abrechnung.\n\n- Zeitraum:\n- Betrag oder Position:\n- Was geprüft werden soll:\n\nBitte prüft den Vorgang und gebt mir eine Rückmeldung.\n\nDanke."
+            },
+            payment: {
+                category: "Auszahlung / Vergütung",
+                subject: "Auszahlung offen",
+                message: "Hallo Personalabteilung,\n\nich möchte eine offene Auszahlung prüfen lassen.\n\n- Zeitraum:\n- Betrag oder Vergütung:\n- Bezug, Fahrt oder Aufgabe:\n\nBitte prüft, ob die Auszahlung bereits eingeplant oder noch offen ist.\n\nDanke."
+            },
+            absence: {
+                category: "Urlaub / Abwesenheit",
+                subject: "Rückfrage zu Urlaub oder Abwesenheit",
+                message: "Hallo Personalabteilung,\n\nich habe eine Rückfrage zu Urlaub oder Abwesenheit.\n\n- Zeitraum:\n- Grund der Rückfrage:\n- Gewünschte Klärung:\n\nBitte gebt mir dazu eine Rückmeldung.\n\nDanke."
+            },
+            certificate: {
+                category: "Krankmeldung / Nachweis",
+                subject: "Nachweis oder Krankmeldung",
+                message: "Hallo Personalabteilung,\n\nich möchte einen Nachweis oder eine Krankmeldung klären.\n\n- Datum oder Zeitraum:\n- Nachweisstatus:\n- Bemerkung:\n\nBitte prüft den Vorgang und meldet euch bei mir.\n\nDanke."
+            },
+            correction: {
+                category: "Korrektur notwendig",
+                subject: "Korrektur notwendig",
+                message: "Hallo Personalabteilung,\n\nbei folgendem Vorgang ist meiner Ansicht nach eine Korrektur notwendig.\n\n- Bereich:\n- Aktueller Eintrag:\n- Gewünschte Korrektur:\n- Begründung:\n\nBitte prüft den Vorgang und korrigiert ihn, falls möglich.\n\nDanke."
+            }
+        };
 
         function escapeHtml(value) {
-            return String(value || "")
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#039;");
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
         function showResult(title, text, type = "success") {
-            if (!result) return;
+            if (!resultBox) return;
 
-            result.classList.add("active");
-            result.classList.toggle("error", type === "error");
-            result.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span>`;
+            resultBox.classList.add("is-visible");
+            resultBox.classList.toggle("is-error", type === "error");
+            resultBox.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span>`;
         }
 
-        function updateCounter() {
-            if (!message || !charCount) return;
-            charCount.textContent = String(message.value.length);
+        function hideResult() {
+            if (!resultBox) return;
+            resultBox.classList.remove("is-visible", "is-error");
+            resultBox.textContent = "";
+        }
+
+        function updateCharacterCount() {
+            if (!characterCount) return;
+            characterCount.textContent = String(message.value.length);
+        }
+
+        function getValue(element, fallback = "") {
+            return String(element?.value || fallback).trim();
         }
 
         function buildMessagePayload() {
-            const parts = [];
-            const selectedCategory = String(category?.value || "Allgemeine Personalfrage").trim();
-            const selectedPriority = String(priority?.value || "Normal").trim();
-            const subjectValue = String(subject?.value || "").trim();
-            const referenceValue = String(reference?.value || "").trim();
-            const dateValue = String(date?.value || "").trim();
-            const contactValue = String(contact?.value || "").trim();
-            const attachmentValue = String(attachment?.value || "").trim();
-            const messageValue = String(message?.value || "").trim();
+            const sections = [
+                "Empfänger: Personalabteilung",
+                `Kategorie: ${getValue(category, "Allgemeine Personalfrage")}`,
+                `Priorität: ${getValue(priority, "Normal")}`,
+                `Betreff: ${getValue(subject)}`
+            ];
 
-            parts.push("Empfänger: Personalabteilung");
-            parts.push("Bereich: Personal / Buchhaltung");
-            if (selectedCategory) parts.push(`Kategorie: ${selectedCategory}`);
-            if (selectedPriority) parts.push(`Priorität: ${selectedPriority}`);
-            if (subjectValue) parts.push(`Betreff: ${subjectValue}`);
-            if (referenceValue) parts.push(`Bezug: ${referenceValue}`);
-            if (dateValue) parts.push(`Datum: ${dateValue}`);
-            if (contactValue) parts.push(`Gewünschte Rückmeldung: ${contactValue}`);
-            if (attachmentValue) parts.push(`Belegstatus: ${attachmentValue}`);
-            if (messageValue) parts.push(`Nachricht:\n${messageValue}`);
+            const optionalFields = [
+                ["Bezug", getValue(reference)],
+                ["Datum", getValue(requestDate)],
+                ["Gewünschte Rückmeldung", getValue(contact)],
+                ["Nachweisstatus", getValue(evidence)]
+            ];
 
-            return parts.join("\n\n").slice(0, 1500);
+            optionalFields.forEach(([label, value]) => {
+                if (value) sections.push(`${label}: ${value}`);
+            });
+
+            sections.push(`Nachricht:\n${getValue(message)}`);
+            return sections.join("\n\n");
+        }
+
+        async function readResponse(response) {
+            const rawText = await response.text();
+            if (!rawText) return {};
+
+            try {
+                return JSON.parse(rawText);
+            } catch {
+                return { message: rawText };
+            }
         }
 
         templateButtons.forEach((button) => {
             button.addEventListener("click", () => {
-                const template = button.dataset.template || "";
-                const templateCategory = button.dataset.category || "";
-                const templateSubject = button.dataset.subject || "";
+                const template = templates[button.dataset.templateKey];
+                if (!template) return;
 
-                if (templateCategory && category) category.value = templateCategory;
-                if (templateSubject && subject && !subject.value.trim()) subject.value = templateSubject;
+                if (category) category.value = template.category;
+                if (subject && !subject.value.trim()) subject.value = template.subject;
 
-                const current = String(message?.value || "").trim();
-                if (message) {
-                    message.value = current ? `${current}\n\n${template}` : template;
-                    message.focus();
-                    updateCounter();
-                }
+                const currentMessage = message.value.trim();
+                const nextMessage = currentMessage ? `${currentMessage}\n\n${template.message}` : template.message;
+                message.value = nextMessage.slice(0, message.maxLength);
+                message.focus();
+                updateCharacterCount();
             });
         });
 
-        message?.addEventListener("input", updateCounter);
-        updateCounter();
+        message.addEventListener("input", updateCharacterCount);
+        updateCharacterCount();
 
-        clear?.addEventListener("click", () => {
-            form?.reset();
-            result?.classList.remove("active", "error");
-            updateCounter();
-
-            if (subject) subject.focus();
+        clearButton?.addEventListener("click", () => {
+            form.reset();
+            hideResult();
+            updateCharacterCount();
+            subject?.focus();
         });
 
-        form?.addEventListener("submit", async (event) => {
+        form.addEventListener("submit", async (event) => {
             event.preventDefault();
 
-            const subjectValue = String(subject?.value || "").trim();
-            const messageValue = String(message?.value || "").trim();
-            const payloadMessage = buildMessagePayload();
+            const subjectValue = getValue(subject);
+            const messageValue = getValue(message);
 
             if (!subjectValue) {
-                showResult("Fehler", "Bitte gib einen Betreff ein.", "error");
+                showResult("Betreff fehlt", "Bitte trage einen eindeutigen Betreff ein.", "error");
                 subject?.focus();
                 return;
             }
 
             if (!messageValue) {
-                showResult("Fehler", "Bitte gib eine Nachricht an die Personalabteilung ein.", "error");
-                message?.focus();
+                showResult("Nachricht fehlt", "Bitte beschreibe dein Anliegen an die Personalabteilung.", "error");
+                message.focus();
                 return;
             }
 
-            submit.disabled = true;
-            if (clear) clear.disabled = true;
-            submit.textContent = "Sende...";
+            submitButton.disabled = true;
+            if (clearButton) clearButton.disabled = true;
+            submitButton.textContent = "Wird gesendet ...";
+            hideResult();
 
             try {
                 const response = await fetch(endpoint, {
                     method: "POST",
+                    credentials: "same-origin",
                     headers: {
                         "Content-Type": "application/json",
                         "X-Requested-With": "XMLHttpRequest"
                     },
                     body: JSON.stringify({
-                        message: payloadMessage,
+                        message: buildMessagePayload(),
                         target_department: "Personalabteilung",
-                        category: String(category?.value || "Allgemeine Personalfrage"),
-                        priority: String(priority?.value || "Normal"),
+                        category: getValue(category, "Allgemeine Personalfrage"),
+                        priority: getValue(priority, "Normal"),
                         subject: subjectValue
                     })
                 });
 
-                const data = await response.json().catch(() => ({}));
+                const data = await readResponse(response);
 
                 if (!response.ok || data.success === false) {
-                    throw new Error(data.message || "Anfrage konnte nicht gesendet werden.");
+                    throw new Error(data.message || "Die Anfrage konnte nicht gesendet werden.");
                 }
 
-                showResult("Anfrage gesendet", data.message || "Deine Anfrage wurde erfolgreich an die Personalabteilung übermittelt.", "success");
+                showResult(
+                    "Anfrage gesendet",
+                    data.message || "Deine Anfrage wurde erfolgreich an die Personalabteilung übermittelt."
+                );
                 form.reset();
-                updateCounter();
+                updateCharacterCount();
             } catch (error) {
-                showResult("Fehler", error.message || "Anfrage konnte nicht gesendet werden.", "error");
+                showResult("Fehler beim Senden", error.message || "Die Anfrage konnte nicht gesendet werden.", "error");
             } finally {
-                submit.disabled = false;
-                if (clear) clear.disabled = false;
-                submit.textContent = defaultSubmitText;
+                submitButton.disabled = false;
+                if (clearButton) clearButton.disabled = false;
+                submitButton.textContent = defaultSubmitText;
             }
         });
     });

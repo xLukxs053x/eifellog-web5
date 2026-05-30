@@ -1,142 +1,828 @@
 {% extends "base.html" %}
 
-{% block title %}EifelLog - Über uns{% endblock %}
+{% block title %}Über uns | Eifel LOG{% endblock %}
+
+{% block head_extra %}
+<style>
+    .about-page {
+        display: flex;
+        flex-direction: column;
+        gap: 5.5rem;
+    }
+
+    .about-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.19em;
+        line-height: 1.4;
+        text-transform: uppercase;
+    }
+
+    .about-eyebrow::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 14px rgba(var(--brand-green-rgb), 0.72);
+        content: '';
+    }
+
+    .about-eyebrow--yellow {
+        color: var(--brand-yellow);
+    }
+
+    .about-eyebrow--yellow::before {
+        background: var(--brand-yellow);
+        box-shadow: 0 0 14px rgba(220, 226, 38, 0.56);
+    }
+
+    .about-section-heading {
+        max-width: 720px;
+    }
+
+    .about-section-heading h2 {
+        margin-top: 0.9rem;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.7rem, 4vw, 2.7rem);
+        font-weight: 700;
+        letter-spacing: -0.055em;
+        line-height: 1.14;
+        text-wrap: balance;
+    }
+
+    .about-section-heading p {
+        margin-top: 1rem;
+        color: var(--muted);
+        font-size: 0.98rem;
+        line-height: 1.82;
+    }
+
+    /* Hero */
+    .about-hero {
+        display: grid;
+        min-height: min(640px, calc(100vh - 180px));
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .about-hero__copy,
+    .about-hero__visual {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(10, 18, 13, 0.76);
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .about-hero__copy {
+        padding: clamp(1.4rem, 4vw, 2.45rem);
+    }
+
+    .about-hero__title {
+        max-width: 780px;
+        margin-top: 1.2rem;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.5rem, 7vw, 5.4rem);
+        font-weight: 700;
+        letter-spacing: -0.078em;
+        line-height: 1.01;
+        text-wrap: balance;
+    }
+
+    .about-hero__title span {
+        color: var(--brand-green);
+    }
+
+    .about-hero__lead {
+        max-width: 720px;
+        margin-top: 1.45rem;
+        color: var(--muted-strong);
+        font-size: clamp(1rem, 2vw, 1.1rem);
+        line-height: 1.82;
+    }
+
+    .about-hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.72rem;
+        margin-top: 1.9rem;
+    }
+
+    .about-hero__actions .btn-primary,
+    .about-hero__actions .btn-secondary {
+        min-height: 46px;
+        padding-inline: 1.15rem;
+    }
+
+    .about-hero__visual {
+        position: relative;
+        min-height: 380px;
+        overflow: hidden;
+    }
+
+    .about-hero__visual img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.78) contrast(1.02) brightness(0.56);
+    }
+
+    .about-hero__visual::after {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(180deg, rgba(5, 10, 7, 0.08), rgba(5, 10, 7, 0.92)),
+            linear-gradient(90deg, rgba(5, 10, 7, 0.56), transparent 72%);
+        content: '';
+    }
+
+    .about-hero__visual-content {
+        position: absolute;
+        inset: auto 0 0;
+        z-index: 1;
+        padding: 1.45rem;
+    }
+
+    .about-hero__visual-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.26);
+        border-radius: 999px;
+        background: rgba(var(--brand-green-rgb), 0.10);
+        padding: 0.5rem 0.72rem;
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.55rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .about-hero__visual-label::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 13px rgba(var(--brand-green-rgb), 0.78);
+        content: '';
+    }
+
+    .about-hero__visual-title {
+        max-width: 520px;
+        margin-top: 0.9rem;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.35rem, 4vw, 1.95rem);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1.18;
+    }
+
+    .about-hero__visual-text {
+        max-width: 560px;
+        margin-top: 0.72rem;
+        color: var(--muted-strong);
+        font-size: 0.88rem;
+        line-height: 1.7;
+    }
+
+    /* Principles strip */
+    .about-principles {
+        display: grid;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(9, 16, 11, 0.74);
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .about-principle {
+        padding: 1.25rem 1.3rem;
+    }
+
+    .about-principle + .about-principle {
+        border-top: 1px solid var(--line);
+    }
+
+    .about-principle strong {
+        display: block;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+
+    .about-principle span {
+        display: block;
+        margin-top: 0.42rem;
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.62;
+    }
+
+    /* Story */
+    .about-story {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .about-story__copy,
+    .about-story__vision {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(10, 18, 13, 0.74);
+        padding: clamp(1.35rem, 4vw, 2rem);
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .about-story__copy h3,
+    .about-story__vision h3 {
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.25rem, 3vw, 1.65rem);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1.24;
+    }
+
+    .about-story__copy p,
+    .about-story__vision p {
+        margin-top: 0.9rem;
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.82;
+    }
+
+    .about-story__vision {
+        position: relative;
+        overflow: hidden;
+        border-color: rgba(220, 226, 38, 0.22);
+    }
+
+    .about-story__vision::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        background: var(--brand-yellow);
+        content: '';
+    }
+
+    .about-story__vision-icon {
+        display: inline-flex;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(220, 226, 38, 0.24);
+        border-radius: 12px;
+        background: rgba(220, 226, 38, 0.08);
+        color: var(--brand-yellow);
+    }
+
+    .about-story__vision-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Values */
+    .about-values__grid {
+        display: grid;
+        gap: 0.85rem;
+        margin-top: 1.8rem;
+    }
+
+    .about-value-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: rgba(10, 18, 13, 0.72);
+        padding: 1.3rem;
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+    }
+
+    .about-value-card:hover {
+        border-color: rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(14, 25, 18, 0.84);
+        transform: translateY(-3px);
+    }
+
+    .about-value-card__icon {
+        display: inline-flex;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.20);
+        border-radius: 12px;
+        background: rgba(var(--brand-green-rgb), 0.09);
+        color: var(--brand-green);
+    }
+
+    .about-value-card:nth-child(2) .about-value-card__icon {
+        border-color: rgba(220, 226, 38, 0.22);
+        background: rgba(220, 226, 38, 0.08);
+        color: var(--brand-yellow);
+    }
+
+    .about-value-card__icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .about-value-card h3 {
+        margin-top: 1.12rem;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.94rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+
+    .about-value-card p {
+        margin-top: 0.64rem;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.72;
+    }
+
+    /* Commitment */
+    .about-commitment {
+        display: grid;
+        gap: 1rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(10, 18, 13, 0.74);
+        padding: clamp(1.35rem, 4vw, 2rem);
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .about-commitment__list {
+        display: grid;
+        gap: 0.72rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .about-commitment__item {
+        display: flex;
+        gap: 0.72rem;
+        align-items: flex-start;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.025);
+        padding: 0.92rem;
+    }
+
+    .about-commitment__check {
+        display: inline-flex;
+        width: 24px;
+        height: 24px;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(var(--brand-green-rgb), 0.11);
+        color: var(--brand-green);
+    }
+
+    .about-commitment__check svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .about-commitment__item strong {
+        display: block;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .about-commitment__item p {
+        margin-top: 0.32rem;
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.62;
+    }
+
+    /* CTA */
+    .about-cta {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.26);
+        border-radius: var(--radius-lg);
+        background:
+            linear-gradient(145deg, rgba(var(--brand-green-rgb), 0.12), rgba(9, 16, 11, 0.86) 54%),
+            rgba(9, 16, 11, 0.84);
+        padding: clamp(1.45rem, 4vw, 2.35rem);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .about-cta::after {
+        position: absolute;
+        right: -100px;
+        bottom: -135px;
+        width: 300px;
+        height: 300px;
+        border-radius: 999px;
+        background: rgba(var(--brand-green-rgb), 0.14);
+        filter: blur(64px);
+        content: '';
+        pointer-events: none;
+    }
+
+    .about-cta__inner {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 1.25rem;
+    }
+
+    .about-cta h2 {
+        max-width: 780px;
+        margin-top: 0.92rem;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.65rem, 5vw, 2.8rem);
+        font-weight: 700;
+        letter-spacing: -0.06em;
+        line-height: 1.12;
+        text-wrap: balance;
+    }
+
+    .about-cta p {
+        max-width: 740px;
+        margin-top: 0.9rem;
+        color: var(--muted-strong);
+        font-size: 0.95rem;
+        line-height: 1.78;
+    }
+
+    .about-cta__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.72rem;
+    }
+
+    .about-cta__actions .btn-primary,
+    .about-cta__actions .btn-secondary {
+        min-height: 46px;
+        padding-inline: 1.15rem;
+    }
+
+    .about-discord-button {
+        border-color: rgba(88, 101, 242, 0.48) !important;
+        background: rgba(88, 101, 242, 0.12) !important;
+        color: #aeb7ff !important;
+    }
+
+    .about-discord-button:hover {
+        border-color: rgba(88, 101, 242, 0.76) !important;
+        background: rgba(88, 101, 242, 0.22) !important;
+        color: #ffffff !important;
+    }
+
+    @media (min-width: 720px) {
+        .about-principles {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .about-principle + .about-principle {
+            border-top: 0;
+            border-left: 1px solid var(--line);
+        }
+
+        .about-values__grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .about-commitment__list {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 980px) {
+        .about-hero {
+            grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
+        }
+
+        .about-story {
+            grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
+        }
+
+        .about-commitment {
+            grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+            align-items: center;
+        }
+
+        .about-cta__inner {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+        }
+
+        .about-cta__actions {
+            justify-content: flex-end;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .about-page {
+            gap: 4.25rem;
+        }
+
+        .about-hero {
+            min-height: auto;
+        }
+
+        .about-hero__visual {
+            min-height: 320px;
+        }
+
+        .about-hero__actions,
+        .about-cta__actions {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        .about-hero__actions .btn-primary,
+        .about-hero__actions .btn-secondary,
+        .about-cta__actions .btn-primary,
+        .about-cta__actions .btn-secondary {
+            width: 100%;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .about-value-card {
+            transition: none;
+        }
+
+        .about-value-card:hover {
+            transform: none;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<!-- Header Section -->
-<section class="mb-10 flex-grow flex flex-col justify-center mt-10">
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between pb-4 mb-4">
-        <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase">Origin & Core Values</span>
-            <h1 class="text-3xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
-                Die Eifel LOG Story
+<div class="about-page">
+    <!-- Hero -->
+    <section class="about-hero" aria-labelledby="about-title">
+        <div class="about-hero__copy">
+            <span class="about-eyebrow">Über Eifel LOG</span>
+
+            <h1 id="about-title" class="about-hero__title">
+                Struktur trifft auf <span>Leidenschaft.</span>
             </h1>
-        </div>
-        
-        <div class="mt-4 sm:mt-0 flex items-center gap-4">
-            <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2">
-                <svg class="w-3 h-3 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Company Info
-            </span>
-        </div>
-    </div>
 
-    <!-- Main Intro Panel -->
-    <div class="glass-card p-10 md:p-14 flex flex-col md:flex-row gap-10 relative overflow-hidden">
-        
-        <!-- Text Content -->
-        <div class="flex-1 relative z-10">
-            <h2 class="text-3xl md:text-4xl font-orbitron font-extrabold mb-6 text-[var(--text)] tracking-tight">
-                Struktur & <span class="text-[var(--brand-green)]">Leidenschaft.</span>
-            </h2>
-            
-            <div class="space-y-6 text-base md:text-lg text-[var(--muted)] font-inter leading-relaxed">
+            <p class="about-hero__lead">
+                Eifel LOG ist eine virtuelle Spedition für Fahrer, die Euro Truck Simulator 2 mit einem verlässlichen Team,
+                klaren Abläufen und einem bodenständigen Miteinander erleben möchten. Bei uns zählt nicht der Zwang, sondern
+                die Freude am gemeinsamen Fahren.
+            </p>
+
+            <div class="about-hero__actions">
+                <a href="/hub" class="btn-primary">
+                    Driver Hub öffnen
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </a>
+
+                <a href="#werte" class="btn-secondary">Unsere Werte</a>
+            </div>
+        </div>
+
+        <div class="about-hero__visual">
+            <img src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck auf der Straße">
+
+            <div class="about-hero__visual-content">
+                <span class="about-hero__visual-label">Aus der Eifel</span>
+                <h2 class="about-hero__visual-title">Bodenständig im Umgang. Verlässlich auf der Straße.</h2>
+                <p class="about-hero__visual-text">
+                    Unsere Herkunft prägt den Anspruch: ehrliche Kommunikation, eine nachvollziehbare Organisation und ein Team,
+                    in dem jeder Fahrer willkommen ist.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Principles strip -->
+    <section class="about-principles" aria-label="Grundprinzipien von Eifel LOG">
+        <div class="about-principle">
+            <strong>Real Life First</strong>
+            <span>Keine unrealistischen Pflichtkilometer. Das echte Leben hat immer Vorrang.</span>
+        </div>
+
+        <div class="about-principle">
+            <strong>Klare Strukturen</strong>
+            <span>Ein eigener Driver Hub und nachvollziehbare Abläufe sorgen für Orientierung.</span>
+        </div>
+
+        <div class="about-principle">
+            <strong>Gemeinsam unterwegs</strong>
+            <span>Wir fahren als Community und unterstützen uns gegenseitig ohne unnötigen Druck.</span>
+        </div>
+    </section>
+
+    <!-- Story -->
+    <section aria-labelledby="story-title">
+        <div class="about-section-heading">
+            <span class="about-eyebrow about-eyebrow--yellow">Origin &amp; Vision</span>
+            <h2 id="story-title">Eine virtuelle Spedition mit einem klaren Anspruch.</h2>
+            <p>
+                Eifel LOG verbindet den Spaß am virtuellen Trucking mit einer Organisation, die langfristig funktioniert.
+                Wir möchten nicht einfach nur eine weitere VTC sein, sondern ein verlässliches Zuhause für Fahrer schaffen,
+                die Wert auf ein realistisches und zugleich entspanntes Erlebnis legen.
+            </p>
+        </div>
+
+        <div class="about-story">
+            <article class="about-story__copy">
+                <h3>Unsere Geschichte</h3>
                 <p>
-                    Die <strong class="text-white">EifelLog</strong> ist eine virtuelle Spedition mit Struktur und echter Leidenschaft für den Transportalltag. 
+                    Entstanden aus der Eifel, orientieren wir uns an Werten, die für uns im Alltag wichtig sind:
+                    Zusammenhalt, Ehrlichkeit und Bodenständigkeit. Diese Haltung bestimmt, wie wir miteinander umgehen,
+                    wie wir Entscheidungen treffen und wie wir unsere virtuellen Touren organisieren.
                 </p>
                 <p>
-                    Entstanden aus der Eifel, prägt uns eine Region, die für Zusammenhalt, Ehrlichkeit und Bodenständigkeit bekannt ist – Werte, die sich in unserer gesamten Firma bedingungslos widerspiegeln.
+                    Bei uns steht der Mensch hinter dem Lenkrad im Mittelpunkt. Jeder soll sich einbringen können, ohne dass
+                    aus einem Hobby eine Verpflichtung wird. Genau deshalb setzen wir auf klare Strukturen, aber verzichten
+                    bewusst auf unnötigen Leistungsdruck.
+                </p>
+            </article>
+
+            <article class="about-story__vision">
+                <span class="about-story__vision-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6S2.5 12 2.5 12Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <circle cx="12" cy="12" r="2.5" stroke-width="2"></circle>
+                    </svg>
+                </span>
+
+                <h3>Unsere Vision</h3>
+                <p>
+                    Wir bauen eine durchdachte, realitätsnahe und beständige Community auf. Ein modernes System, ein
+                    verlässliches Team und transparente Abläufe sollen dafür sorgen, dass jeder Fahrer genau weiß, woran er ist.
+                </p>
+            </article>
+        </div>
+    </section>
+
+    <!-- Values -->
+    <section id="werte" aria-labelledby="values-title">
+        <div class="about-section-heading">
+            <span class="about-eyebrow">Unsere DNA</span>
+            <h2 id="values-title">Werte, die nicht nur auf dem Papier stehen.</h2>
+            <p>
+                Ein gutes Team entsteht nicht durch Regeln allein. Entscheidend ist, wie wir miteinander umgehen und welche
+                Haltung wir bei jeder gemeinsamen Fahrt leben.
+            </p>
+        </div>
+
+        <div class="about-values__grid">
+            <article class="about-value-card">
+                <span class="about-value-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M16 19h5v-1a4 4 0 0 0-5.6-3.66M16 19H8m8 0v-1a4 4 0 0 0-8 0v1m0 0H3v-1a4 4 0 0 1 5.6-3.66M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                <h3>Zusammenhalt</h3>
+                <p>
+                    Wir lassen niemanden allein auf der Strecke. Bei technischen Fragen, gemeinsamen Konvois oder neuen
+                    Herausforderungen unterstützen wir uns gegenseitig.
+                </p>
+            </article>
+
+            <article class="about-value-card">
+                <span class="about-value-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="m9 12 2 2 4-4m5.6-4.1A12.1 12.1 0 0 1 12 3a12.1 12.1 0 0 1-8.6 2.9A12 12 0 0 0 3 9c0 5.6 3.8 10.3 9 11.6 5.2-1.3 9-6 9-11.6 0-1.1-.1-2.1-.4-3.1Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                <h3>Ehrlichkeit</h3>
+                <p>
+                    Transparente Kommunikation und ein respektvoller Umgang auf Augenhöhe sind für uns selbstverständlich.
+                    Wir versprechen nur, was wir auch halten können.
+                </p>
+            </article>
+
+            <article class="about-value-card">
+                <span class="about-value-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-4-16v1.5A2.5 2.5 0 0 0 10.5 9H11a2 2 0 0 1 2 2 2 2 0 1 0 4 0 2 2 0 0 1 2-2h1.1M15 20.5V18a2 2 0 0 1 2-2h3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                <h3>Bodenständigkeit</h3>
+                <p>
+                    Keine elitären Allüren und kein unnötiges Theater. Wir wissen, wo wir herkommen, und behalten den Blick
+                    für das Wesentliche: eine gute gemeinsame Zeit.
+                </p>
+            </article>
+        </div>
+    </section>
+
+    <!-- Commitment -->
+    <section class="about-commitment" aria-labelledby="commitment-title">
+        <div class="about-section-heading">
+            <span class="about-eyebrow about-eyebrow--yellow">Unser Versprechen</span>
+            <h2 id="commitment-title">Strukturiert, aber niemals unnötig kompliziert.</h2>
+            <p>
+                Organisation soll den Fahrspaß unterstützen und nicht ausbremsen. Deshalb konzentrieren wir uns auf wenige,
+                klare Grundsätze.
+            </p>
+        </div>
+
+        <ul class="about-commitment__list">
+            <li class="about-commitment__item">
+                <span class="about-commitment__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7 12 3 3 7-7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </span>
+                <div>
+                    <strong>Keine Pflichtkilometer</strong>
+                    <p>Du fährst, wenn du Zeit und Lust hast. Dein Alltag kommt immer zuerst.</p>
+                </div>
+            </li>
+
+            <li class="about-commitment__item">
+                <span class="about-commitment__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7 12 3 3 7-7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </span>
+                <div>
+                    <strong>Nachvollziehbare Abläufe</strong>
+                    <p>Unser Driver Hub schafft Übersicht, ohne das Hobby unnötig zu verkomplizieren.</p>
+                </div>
+            </li>
+
+            <li class="about-commitment__item">
+                <span class="about-commitment__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7 12 3 3 7-7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </span>
+                <div>
+                    <strong>Respektvolles Miteinander</strong>
+                    <p>Wir kommunizieren ehrlich und behandeln jedes Teammitglied auf Augenhöhe.</p>
+                </div>
+            </li>
+
+            <li class="about-commitment__item">
+                <span class="about-commitment__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7 12 3 3 7-7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </span>
+                <div>
+                    <strong>Langfristige Entwicklung</strong>
+                    <p>Wir bauen unsere Community und Systeme schrittweise und nachhaltig aus.</p>
+                </div>
+            </li>
+        </ul>
+    </section>
+
+    <!-- CTA -->
+    <section class="about-cta" aria-labelledby="about-cta-title">
+        <div class="about-cta__inner">
+            <div>
+                <span class="about-eyebrow">Teil des Teams werden</span>
+                <h2 id="about-cta-title">Du möchtest mit uns auf Tour gehen?</h2>
+                <p>
+                    Lerne die Community kennen, öffne den Driver Hub oder komm direkt auf unseren Discord-Server. Wir freuen
+                    uns auf Fahrer, die Motivation, Teamgeist und Freude am virtuellen Trucking mitbringen.
                 </p>
             </div>
-        </div>
 
-        <!-- Vision Highlight Box -->
-        <div class="flex-1">
-            <div class="info-card p-8 h-full border-l-4 border-l-[var(--brand-yellow)] relative overflow-hidden group">
-                <!-- Background Glow -->
-                <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-[var(--brand-yellow)] rounded-full mix-blend-screen filter blur-[50px] opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
-                
-                <h3 class="font-orbitron font-bold text-xl text-white mb-4 tracking-wide flex items-center gap-3">
-                    <svg class="w-6 h-6 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                    Unsere Vision
-                </h3>
-                <p class="text-sm text-[var(--muted)] font-inter leading-relaxed">
-                    Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.
-                </p>
+            <div class="about-cta__actions">
+                <a href="https://discord.gg/K47NwSbJuE" target="_blank" rel="noopener noreferrer" class="btn-primary about-discord-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M20.3 4.4A19.7 19.7 0 0 0 15.4 2.9a.1.1 0 0 0-.1 0c-.2.4-.4.9-.6 1.3a18.3 18.3 0 0 0-5.5 0c-.2-.4-.4-.9-.6-1.3a.1.1 0 0 0-.1 0 19.7 19.7 0 0 0-4.9 1.5C.5 9-.3 13.6.1 18.1a.1.1 0 0 0 0 .1 20 20 0 0 0 6 3 .1.1 0 0 0 .1 0c.5-.6.9-1.3 1.2-2a.1.1 0 0 0 0-.1c-.6-.2-1.3-.5-1.9-.9a.1.1 0 0 1 0-.1l.4-.3a.1.1 0 0 1 .1 0 14 14 0 0 0 12 0 .1.1 0 0 1 .1 0l.4.3a.1.1 0 0 1 0 .1c-.6.3-1.2.6-1.9.9a.1.1 0 0 0 0 .1c.4.7.8 1.4 1.2 2a.1.1 0 0 0 .1 0 20 20 0 0 0 6-3 .1.1 0 0 0 0-.1c.5-5.2-.8-9.7-3.5-13.7ZM8 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4S9.2 15.3 8 15.3Zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"></path>
+                    </svg>
+                    Discord beitreten
+                </a>
+
+                <a href="/hub" class="btn-secondary">Zum Driver Hub</a>
             </div>
         </div>
-    </div>
-</section>
-
-<!-- Core Values Section -->
-<section class="mb-16">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6">
-        <div>
-            <span class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase">Unsere DNA</span>
-            <h2 class="text-2xl font-orbitron font-bold text-[var(--text)] mt-1">Was uns ausmacht</h2>
-        </div>
-    </div>
-
-    <div class="grid md:grid-cols-3 gap-6">
-        
-        <!-- Value 1 -->
-        <article class="info-card p-8 flex flex-col text-center items-center">
-            <div class="w-14 h-14 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center mb-6 text-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.15)]">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-            </div>
-            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Zusammenhalt</h3>
-            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
-                Wir lassen niemanden allein auf der Strecke. Als Team unterstützen wir uns gegenseitig, egal ob bei technischen Fragen oder gemeinsamen Konvois.
-            </p>
-        </article>
-
-        <!-- Value 2 -->
-        <article class="info-card p-8 flex flex-col text-center items-center">
-            <div class="w-14 h-14 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center mb-6 text-[var(--brand-yellow)] shadow-[0_0_15px_rgba(220,226,38,0.15)]">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                </svg>
-            </div>
-            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Ehrlichkeit</h3>
-            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
-                Transparente Kommunikation und ein respektvoller Umgang auf Augenhöhe. Wir versprechen nichts, was wir nicht auch halten können.
-            </p>
-        </article>
-
-        <!-- Value 3 -->
-        <article class="info-card p-8 flex flex-col text-center items-center">
-            <div class="w-14 h-14 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center mb-6 text-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.15)]">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-            <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mb-3">Bodenständigkeit</h3>
-            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">
-                Keine elitären Allüren. Wir wissen, wo wir herkommen. Bei uns steht der Mensch hinter dem virtuellen Lenkrad im Mittelpunkt.
-            </p>
-        </article>
-
-    </div>
-</section>
-
-<!-- Call to Action Section -->
-<section class="mb-10">
-    <div class="glass-card p-10 text-center relative overflow-hidden border-t border-t-[var(--brand-yellow)]/30">
-        <!-- Background Ambient -->
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-full bg-gradient-to-r from-[var(--brand-yellow)]/5 via-[var(--brand-green)]/10 to-transparent blur-[40px] -z-10"></div>
-        
-        <h2 class="text-3xl md:text-4xl font-orbitron font-extrabold text-white mb-4 tracking-wide glow-text">
-            Wir suchen dich!
-        </h2>
-        
-        <p class="text-base text-[var(--muted)] font-inter max-w-xl mx-auto mb-8 leading-relaxed">
-            Du hast Lust auf eine strukturierte, aktive Community? Bei uns ist jeder willkommen, der Motivation und Teamgeist mitbringt. Interesse? Dann werde Teil der EifelLog!
-        </p>
-        
-        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <!-- Discord Button (Passe den href Link an deinen echten Discord Link an) -->
-            <a href="https://discord.gg/https://discord.gg/K47NwSbJuE" target="_blank" rel="noopener noreferrer" class="btn-primary w-full sm:w-auto px-8 py-4 text-sm bg-[#5865F2]/10 border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:shadow-[0_0_20px_rgba(88,101,242,0.4)]">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="mr-2"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-                Auf Discord beitreten
-            </a>
-            
-            <!-- Socials / Hub Button -->
-            <a href="/hub" class="btn-secondary w-full sm:w-auto px-8 py-4 text-sm">
-                Zum Driver Hub
-            </a>
-        </div>
-    </div>
-</section>
+    </section>
+</div>
 {% endblock %}
