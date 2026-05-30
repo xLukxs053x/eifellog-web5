@@ -124,6 +124,24 @@
             background-color: var(--bg-1);
         }
 
+        /* === PARALLAX WRAPPER FÜR DIE HINTERGRUND-SLIDESHOW === */
+        .hero-bg-parallax {
+            position: absolute;
+            inset: -5vh -5vw;
+            pointer-events: none;
+            transform: translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0) scale(1.06);
+            transform-origin: center center;
+            will-change: transform;
+            transition: transform 180ms ease-out;
+        }
+
+        @media (pointer: coarse), (max-width: 768px) {
+            .hero-bg-parallax {
+                inset: -3vh -3vw;
+                transition-duration: 260ms;
+            }
+        }
+
         .hero-bg .bg-slide {
             position: absolute;
             inset: 0;
@@ -179,6 +197,39 @@
             background:
                 radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
                 linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
+        }
+
+        /* Nutzer mit reduzierter Bewegung erhalten weiterhin den Bildwechsel,
+           aber keine Verschiebung und keinen Zoom. */
+        @media (prefers-reduced-motion: reduce) {
+            .hero-bg-parallax {
+                inset: 0;
+                transform: none !important;
+                transition: none !important;
+            }
+
+            .hero-bg .bg-slide {
+                animation-name: fadeOnly;
+            }
+
+            @keyframes fadeOnly {
+                0% {
+                    opacity: 0;
+                }
+
+                10% {
+                    opacity: 1;
+                }
+
+                33% {
+                    opacity: 1;
+                }
+
+                45%,
+                100% {
+                    opacity: 0;
+                }
+            }
         }
 
         /* === UI ELEMENTE & GLASSMORPHISM === */
@@ -420,9 +471,89 @@
                 });
             });
 
+            // === PARALLAX HINTERGRUND INIT ===
+            initHeroParallax();
+
             // === SICHERHEITSSYSTEM INIT ===
             initSecuritySystem();
         });
+
+        // === PARALLAX HINTERGRUND FUNKTIONEN ===
+        function initHeroParallax() {
+            const layer = document.getElementById('hero-parallax-layer');
+
+            if (!layer) return;
+
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+            const coarsePointer = window.matchMedia('(pointer: coarse)');
+
+            let pointerX = 0;
+            let pointerY = 0;
+            let scrollOffsetY = 0;
+            let animationFrame = null;
+
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+            function renderParallax() {
+                animationFrame = null;
+
+                if (reducedMotion.matches) {
+                    layer.style.setProperty('--parallax-x', '0px');
+                    layer.style.setProperty('--parallax-y', '0px');
+                    return;
+                }
+
+                const maxOffset = coarsePointer.matches ? 7 : 22;
+                const x = clamp(pointerX, -maxOffset, maxOffset);
+                const y = clamp(pointerY + scrollOffsetY, -maxOffset, maxOffset);
+
+                layer.style.setProperty('--parallax-x', `${x.toFixed(2)}px`);
+                layer.style.setProperty('--parallax-y', `${y.toFixed(2)}px`);
+            }
+
+            function requestParallaxRender() {
+                if (animationFrame !== null) return;
+
+                animationFrame = window.requestAnimationFrame(renderParallax);
+            }
+
+            function updatePointerParallax(event) {
+                if (reducedMotion.matches || coarsePointer.matches) return;
+
+                const viewportX = (event.clientX / window.innerWidth) - 0.5;
+                const viewportY = (event.clientY / window.innerHeight) - 0.5;
+
+                // Hintergrund bewegt sich leicht entgegen der Mausposition.
+                pointerX = viewportX * -28;
+                pointerY = viewportY * -18;
+
+                requestParallaxRender();
+            }
+
+            function updateScrollParallax() {
+                // Der Wert bleibt bewusst gedeckelt, damit an den Rändern keine Lücken entstehen.
+                scrollOffsetY = clamp(window.scrollY * -0.035, -16, 16);
+                requestParallaxRender();
+            }
+
+            function resetPointerParallax() {
+                pointerX = 0;
+                pointerY = 0;
+                requestParallaxRender();
+            }
+
+            window.addEventListener('pointermove', updatePointerParallax, { passive: true });
+            window.addEventListener('scroll', updateScrollParallax, { passive: true });
+            window.addEventListener('blur', resetPointerParallax);
+            document.addEventListener('mouseleave', resetPointerParallax);
+
+            if (typeof reducedMotion.addEventListener === 'function') {
+                reducedMotion.addEventListener('change', requestParallaxRender);
+                coarsePointer.addEventListener('change', requestParallaxRender);
+            }
+
+            updateScrollParallax();
+        }
 
         // Mobile Menü Toggle
         function toggleMobileMenu() {
@@ -515,12 +646,14 @@
 
 <body class="fade-enter antialiased flex flex-col overflow-x-hidden">
 
-    <!-- Hintergrund Slideshow -->
+    <!-- Hintergrund Slideshow mit Parallax Wrapper -->
     <div class="hero-bg" aria-hidden="true">
-        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
-        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
-        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
-        <div class="hero-overlay"></div>
+        <div id="hero-parallax-layer" class="hero-bg-parallax">
+            <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
+            <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
+            <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
+            <div class="hero-overlay"></div>
+        </div>
     </div>
 
     <!-- Navigation -->
