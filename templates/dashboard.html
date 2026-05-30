@@ -207,11 +207,20 @@
     {% set disposition_nav.allowed = true %}
 {% endif %}
 
-{% block title %}Dashboard | Eifel LOG{% endblock %}
+{% block title %}EifelLog - Dashboard{% endblock %}
 
-{% block head_extra %}
+{#
+    Detail-Aufrufe der Fahrer-Kennzahlen:
+    - /dashboard/gefahrene-km
+    - /dashboard/kontostand
+    - /dashboard/abgeschlossene-touren
+    - /dashboard/fahrer-level
+    Diese Pfade muessen in main.py als Routen vorhanden sein.
+#}
+
+{% block content %}
 <style>
-#alert-badge {
+    #alert-badge {
         line-height: 1.25rem;
     }
 
@@ -460,10 +469,12 @@
     }
 
     /* ---------------------------------------------------------
-       Dashboard-Fit passend zur cleanen base.html
-       - Hintergrund, Navigation und Footer bleiben vollständig in base.html.
-       - Das Dashboard verändert keine globalen html/body- oder Hintergrund-Regeln.
-       - Karten, Tabellen und Modals bleiben kompakt, ruhig und responsiv.
+       Dashboard-Fit passend zur base.html
+       - Der globale rem-Zoom, die fixe Hintergrund-Slideshow und
+         die fadeZoom-Animation bleiben vollständig in base.html.
+       - Das Dashboard skaliert nichts global per html/body/transform,
+         damit die Slideshow nicht doppelt oder falsch gezoomt wird.
+       - Karten, Tabellen und Modals bleiben kompakt und responsive.
     --------------------------------------------------------- */
 
     /* Slideshow aus base.html nicht durch Dashboard-Regeln begrenzen. */
@@ -1433,85 +1444,8 @@
         }
     }
 
-    /* ---------------------------------------------------------
-       Cleaner Base-Kompatibilität
-       - Verwendet die Design-Tokens der überarbeiteten base.html.
-       - Reduziert starke Glow-Effekte und vereinheitlicht Karten.
-       - Der globale Hintergrund bleibt vollständig Aufgabe der Base.
-    --------------------------------------------------------- */
-    .dashboard-responsive-shell {
-        display: grid;
-        gap: var(--dashboard-gap);
-        padding-bottom: 1.25rem;
-    }
-
-    .dashboard-responsive-shell .glass-card {
-        border-color: var(--line) !important;
-        background:
-            linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
-            var(--surface) !important;
-        box-shadow: var(--shadow-sm) !important;
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-    }
-
-    .dashboard-responsive-shell .driver-stat-card,
-    .dashboard-responsive-shell .company-stats-panel,
-    .dashboard-responsive-shell .trip-detail-card {
-        box-shadow: var(--shadow-sm) !important;
-    }
-
-    .dashboard-responsive-shell .driver-stat-card::before {
-        opacity: 0.58;
-    }
-
-    .dashboard-responsive-shell .company-stats-panel {
-        border-color: rgba(var(--brand-green-rgb), 0.18) !important;
-        background:
-            radial-gradient(circle at 5% 0%, rgba(var(--brand-green-rgb), 0.09), transparent 32%),
-            radial-gradient(circle at 95% 15%, rgba(220, 226, 38, 0.055), transparent 36%),
-            var(--surface) !important;
-    }
-
-    .dashboard-responsive-shell button,
-    .dashboard-responsive-shell a {
-        outline-offset: 3px;
-    }
-
-    .dashboard-responsive-shell button:focus-visible,
-    .dashboard-responsive-shell a:focus-visible {
-        outline: 2px solid rgba(var(--brand-green-rgb), 0.75);
-    }
-
-    .dashboard-responsive-shell .custom-scrollbar {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(var(--brand-green-rgb), 0.42) transparent;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .dashboard-responsive-shell *,
-        .dashboard-responsive-shell *::before,
-        .dashboard-responsive-shell *::after {
-            scroll-behavior: auto !important;
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-        }
-    }
 </style>
-{% endblock %}
 
-
-{#
-    Detail-Aufrufe der Fahrer-Kennzahlen:
-    - /dashboard/gefahrene-km
-    - /dashboard/kontostand
-    - /dashboard/abgeschlossene-touren
-    - /dashboard/fahrer-level
-    Diese Pfade muessen in main.py als Routen vorhanden sein.
-#}
-
-{% block content %}
 <div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
 <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 mt-6">
     <div class="flex items-center gap-4">
@@ -3025,10 +2959,7 @@
 </div>
 
 
-<!-- Dashboard MongoDB Live-Sync: Fahrer- und Unternehmenswerte nach Job-Abgabe aktualisieren -->
-{% endblock %}
 
-{% block scripts %}
 <script>
     (function () {
         function setDashboardViewportHeight() {
@@ -4245,6 +4176,9 @@
     });
 </script>
 
+
+
+<!-- Dashboard MongoDB Live-Sync: Fahrer- und Unternehmenswerte nach Job-Abgabe aktualisieren -->
 <script>
 (function () {
     if (window.__EIFELLOG_DASHBOARD_DB_SYNC__) return;
@@ -4509,4 +4443,5 @@
     window.setInterval(refreshDashboardFromDatabase, 30000);
 })();
 </script>
+
 {% endblock %}
