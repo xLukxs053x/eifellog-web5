@@ -124,42 +124,6 @@
             background-color: var(--bg-1);
         }
 
-        /* === DYNAMISCHER PARALLAX WRAPPER FÜR DIE HINTERGRUND-SLIDESHOW === */
-        .hero-bg-parallax {
-            position: absolute;
-            inset: -12vh -10vw;
-            pointer-events: none;
-            transform:
-                translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0)
-                scale(var(--parallax-scale, 1.14));
-            transform-origin: center center;
-            will-change: transform;
-        }
-
-        /*
-            Der Overlay-Layer bewegt sich bewusst leicht versetzt zum Bild.
-            Dadurch entsteht beim Scrollen eine sichtbarere Tiefenstaffelung.
-        */
-        .hero-overlay {
-            position: absolute;
-            inset: -4%;
-            transform:
-                translate3d(var(--overlay-x, 0px), var(--overlay-y, 0px), 0)
-                scale(1.04);
-            transform-origin: center center;
-            will-change: transform;
-            background:
-                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
-                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
-        }
-
-        @media (pointer: coarse), (max-width: 768px) {
-            .hero-bg-parallax {
-                inset: -10vh -9vw;
-                --parallax-scale: 1.13;
-            }
-        }
-
         .hero-bg .bg-slide {
             position: absolute;
             inset: 0;
@@ -209,37 +173,12 @@
             }
         }
 
-        /* Nutzer mit reduzierter Bewegung erhalten weiterhin den Bildwechsel,
-           aber keine Verschiebung und keinen Zoom. */
-        @media (prefers-reduced-motion: reduce) {
-            .hero-bg-parallax,
-            .hero-overlay {
-                inset: 0;
-                transform: none !important;
-            }
-
-            .hero-bg .bg-slide {
-                animation-name: fadeOnly;
-            }
-
-            @keyframes fadeOnly {
-                0% {
-                    opacity: 0;
-                }
-
-                10% {
-                    opacity: 1;
-                }
-
-                33% {
-                    opacity: 1;
-                }
-
-                45%,
-                100% {
-                    opacity: 0;
-                }
-            }
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
         }
 
         /* === UI ELEMENTE & GLASSMORPHISM === */
@@ -481,165 +420,9 @@
                 });
             });
 
-            // === PARALLAX HINTERGRUND INIT ===
-            initHeroParallax();
-
             // === SICHERHEITSSYSTEM INIT ===
             initSecuritySystem();
         });
-
-        // === DYNAMISCHER PARALLAX HINTERGRUND ===
-        function initHeroParallax() {
-            const layer = document.getElementById('hero-parallax-layer');
-
-            if (!layer) return;
-
-            const overlay = layer.querySelector('.hero-overlay');
-            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-            const coarsePointer = window.matchMedia('(pointer: coarse)');
-            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-            const lerp = (current, target, strength) => current + ((target - current) * strength);
-
-            let pointerTargetX = 0;
-            let pointerTargetY = 0;
-            let pointerX = 0;
-            let pointerY = 0;
-
-            let scrollY = window.scrollY;
-            let lastScrollY = scrollY;
-            let lastScrollTime = performance.now();
-            let scrollVelocity = 0;
-
-            let currentX = 0;
-            let currentY = 0;
-            let currentScale = coarsePointer.matches ? 1.13 : 1.14;
-            let animationFrame = null;
-
-            function applyStaticPosition() {
-                layer.style.setProperty('--parallax-x', '0px');
-                layer.style.setProperty('--parallax-y', '0px');
-                layer.style.setProperty('--parallax-scale', '1');
-
-                if (overlay) {
-                    overlay.style.setProperty('--overlay-x', '0px');
-                    overlay.style.setProperty('--overlay-y', '0px');
-                }
-            }
-
-            function renderParallax() {
-                animationFrame = null;
-
-                if (reducedMotion.matches) {
-                    applyStaticPosition();
-                    return;
-                }
-
-                const mobile = coarsePointer.matches;
-                const maxY = mobile ? 58 : 92;
-                const maxX = mobile ? 0 : 30;
-
-                /*
-                    Positionsversatz + Geschwindigkeitsimpuls:
-                    - scrollPosition hält die Bewegung über längere Seiten sichtbar.
-                    - velocityImpulse erzeugt das dynamische Nachziehen bei schnellem Scrollen.
-                    - scrollWave verhindert einen abrupt statischen Eindruck nach dem Clamping.
-                */
-                const scrollPosition = clamp(scrollY * -0.075, -56, 56);
-                const velocityImpulse = clamp(scrollVelocity * -0.82, -46, 46);
-                const scrollWave = Math.sin(scrollY * 0.0035) * (mobile ? 5 : 9);
-
-                pointerX = lerp(pointerX, pointerTargetX, 0.075);
-                pointerY = lerp(pointerY, pointerTargetY, 0.075);
-
-                const targetX = clamp(pointerX, -maxX, maxX);
-                const targetY = clamp(scrollPosition + velocityImpulse + scrollWave + pointerY, -maxY, maxY);
-                const targetScale = (mobile ? 1.13 : 1.14) + Math.min(Math.abs(scrollVelocity) * 0.00075, 0.035);
-
-                currentX = lerp(currentX, targetX, 0.10);
-                currentY = lerp(currentY, targetY, 0.115);
-                currentScale = lerp(currentScale, targetScale, 0.085);
-
-                layer.style.setProperty('--parallax-x', `${currentX.toFixed(2)}px`);
-                layer.style.setProperty('--parallax-y', `${currentY.toFixed(2)}px`);
-                layer.style.setProperty('--parallax-scale', currentScale.toFixed(4));
-
-                if (overlay) {
-                    overlay.style.setProperty('--overlay-x', `${(-currentX * 0.16).toFixed(2)}px`);
-                    overlay.style.setProperty('--overlay-y', `${(-currentY * 0.22).toFixed(2)}px`);
-                }
-
-                // Geschwindigkeit klingt weich aus: Das erzeugt den Nachlauf.
-                scrollVelocity *= 0.885;
-
-                const stillMoving =
-                    Math.abs(currentX - targetX) > 0.05 ||
-                    Math.abs(currentY - targetY) > 0.05 ||
-                    Math.abs(currentScale - targetScale) > 0.0002 ||
-                    Math.abs(scrollVelocity) > 0.08 ||
-                    Math.abs(pointerX - pointerTargetX) > 0.05 ||
-                    Math.abs(pointerY - pointerTargetY) > 0.05;
-
-                if (stillMoving) requestParallaxRender();
-            }
-
-            function requestParallaxRender() {
-                if (animationFrame !== null) return;
-
-                animationFrame = window.requestAnimationFrame(renderParallax);
-            }
-
-            function updatePointerParallax(event) {
-                if (reducedMotion.matches || coarsePointer.matches) return;
-
-                const viewportX = (event.clientX / window.innerWidth) - 0.5;
-                const viewportY = (event.clientY / window.innerHeight) - 0.5;
-
-                pointerTargetX = viewportX * -38;
-                pointerTargetY = viewportY * -20;
-                requestParallaxRender();
-            }
-
-            function updateScrollParallax() {
-                const now = performance.now();
-                const nextScrollY = window.scrollY;
-                const deltaY = nextScrollY - lastScrollY;
-                const deltaTime = Math.max(now - lastScrollTime, 16);
-
-                scrollVelocity = clamp((deltaY / deltaTime) * 16, -120, 120);
-                scrollY = nextScrollY;
-                lastScrollY = nextScrollY;
-                lastScrollTime = now;
-
-                requestParallaxRender();
-            }
-
-            function resetPointerParallax() {
-                pointerTargetX = 0;
-                pointerTargetY = 0;
-                requestParallaxRender();
-            }
-
-            function handleMotionPreferenceChange() {
-                if (reducedMotion.matches) {
-                    applyStaticPosition();
-                } else {
-                    currentScale = coarsePointer.matches ? 1.13 : 1.14;
-                    updateScrollParallax();
-                }
-            }
-
-            window.addEventListener('pointermove', updatePointerParallax, { passive: true });
-            window.addEventListener('scroll', updateScrollParallax, { passive: true });
-            window.addEventListener('blur', resetPointerParallax);
-            document.addEventListener('mouseleave', resetPointerParallax);
-
-            if (typeof reducedMotion.addEventListener === 'function') {
-                reducedMotion.addEventListener('change', handleMotionPreferenceChange);
-                coarsePointer.addEventListener('change', handleMotionPreferenceChange);
-            }
-
-            updateScrollParallax();
-        }
 
         // Mobile Menü Toggle
         function toggleMobileMenu() {
@@ -732,14 +515,12 @@
 
 <body class="fade-enter antialiased flex flex-col overflow-x-hidden">
 
-    <!-- Hintergrund Slideshow mit Parallax Wrapper -->
+    <!-- Hintergrund Slideshow -->
     <div class="hero-bg" aria-hidden="true">
-        <div id="hero-parallax-layer" class="hero-bg-parallax">
-            <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
-            <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
-            <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
-            <div class="hero-overlay"></div>
-        </div>
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="Eifel LOG Truck 1">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="Eifel LOG Truck 2">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="Eifel LOG Truck 3">
+        <div class="hero-overlay"></div>
     </div>
 
     <!-- Navigation -->
