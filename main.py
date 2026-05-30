@@ -116,6 +116,19 @@ def env_float(*names, default=0.0):
         return float(default)
 
 
+def env_list(*names):
+    """Liest kommagetrennte, semikolongetrennte oder mehrzeilige .env-Listen robust ein."""
+    values = []
+    for name in names:
+        raw_value = os.getenv(name)
+        if raw_value is None:
+            continue
+        for item in re.split(r"[,;\n\r]+", str(raw_value)):
+            item = item.strip()
+            if item and item not in values:
+                values.append(item)
+    return values
+
 
 DISCORD_BOT_TOKEN = env_first("DISCORD_BOT_TOKEN", "BOT_TOKEN", "DISCORD_TOKEN", default="")
 TOUR_CHANNEL_ID = env_first(
@@ -651,12 +664,42 @@ SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW = env_first(
 # Fahrerkarte-PIN: Der Klartext wird niemals in MongoDB gespeichert.
 # Setze in der .env bevorzugt einen separaten stabilen Schlüssel:
 # FAHRERKARTE_PIN_ENCRYPTION_KEY=<lange-zufaellige-zeichenfolge>
-# Als Kompatibilitätsfallback wird ein gesetzter FLASK_SECRET_KEY akzeptiert.
+#
+# Bei einer Schlüsselrotation bleiben frühere Schlüssel ausschließlich für die
+# kontrollierte Migration bereits ausgestellter Karten lesbar. Beispiel:
+# FAHRERKARTE_PIN_PREVIOUS_ENCRYPTION_KEYS=<alter-key-1>,<alter-key-2>
+#
+# Wurde früher nur FLASK_SECRET_KEY oder DRIVER_CARD_PIN_ENCRYPTION_KEY genutzt,
+# werden diese Werte automatisch als Legacy-Kandidaten berücksichtigt, sofern
+# sie vom aktuellen FAHRERKARTE_PIN_ENCRYPTION_KEY abweichen.
 FAHRERKARTE_PIN_ENCRYPTION_SECRET = env_first(
     "FAHRERKARTE_PIN_ENCRYPTION_KEY",
     "DRIVER_CARD_PIN_ENCRYPTION_KEY",
     "FLASK_SECRET_KEY",
     default=""
+)
+FAHRERKARTE_PIN_LEGACY_ENCRYPTION_SECRETS = env_list(
+    "FAHRERKARTE_PIN_PREVIOUS_ENCRYPTION_KEYS",
+    "FAHRERKARTE_PIN_LEGACY_ENCRYPTION_KEYS",
+    "DRIVER_CARD_PIN_PREVIOUS_ENCRYPTION_KEYS",
+)
+for _legacy_secret in (
+    os.getenv("DRIVER_CARD_PIN_ENCRYPTION_KEY"),
+    os.getenv("FLASK_SECRET_KEY"),
+):
+    _legacy_secret = str(_legacy_secret or "").strip()
+    if (
+        _legacy_secret
+        and _legacy_secret != FAHRERKARTE_PIN_ENCRYPTION_SECRET
+        and _legacy_secret not in FAHRERKARTE_PIN_LEGACY_ENCRYPTION_SECRETS
+    ):
+        FAHRERKARTE_PIN_LEGACY_ENCRYPTION_SECRETS.append(_legacy_secret)
+
+# Ist ein alter Schlüssel unwiederbringlich verloren, darf ausschließlich der
+# eingeloggte Karteninhaber beim bewussten PIN-Abruf eine neue PIN erhalten.
+FAHRERKARTE_PIN_AUTO_RECOVER_ON_REVEAL = env_bool(
+    "FAHRERKARTE_PIN_AUTO_RECOVER_ON_REVEAL",
+    default=True,
 )
 FAHRERKARTE_PIN_LENGTH = max(4, min(8, int(env_float("FAHRERKARTE_PIN_LENGTH", default=4))))
 FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS = max(3, min(20, int(env_float("FAHRERKARTE_PIN_MAX_VERIFY_ATTEMPTS", default=5))))
@@ -2765,71 +2808,149 @@ def generate_fahrerkarte_pin():
     return "".join(secrets.choice("0123456789") for _ in range(FAHRERKARTE_PIN_LENGTH))
 
 
-def get_fahrerkarte_pin_cipher():
-    """Leitet einen stabilen Fernet-Schlüssel aus der .env ab."""
+class FahrerkartePinDecryptError(RuntimeError):
+    """Die gespeicherte PIN konnte mit keinem verfügbaren Schlüssel gelesen werden."""
+
+
+def fahrerkarte_pin_key_id(secret=None):
+    """Erzeugt nur einen nicht reversiblen Fingerprint zur Diagnose und Migration."""
+    selected_secret = safe_str(secret if secret is not None else FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not selected_secret:
+        return ""
+    return hashlib.sha256(f"eifellog|fahrerkarte-pin-key-id|{selected_secret}".encode("utf-8")).hexdigest()[:16]
+
+
+def fahrerkarte_pin_secret_candidates():
+    """Aktueller Schlüssel zuerst, danach deduplizierte Legacy-Schlüssel."""
+    candidates = []
+    for candidate in [FAHRERKARTE_PIN_ENCRYPTION_SECRET, *FAHRERKARTE_PIN_LEGACY_ENCRYPTION_SECRETS]:
+        candidate = safe_str(candidate)
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    if not candidates:
+        raise RuntimeError(
+            "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
+        )
+    return candidates
+
+
+def get_fahrerkarte_pin_cipher(secret=None):
+    """Leitet einen stabilen Fernet-Schlüssel aus dem aktuellen oder einem Legacy-Secret ab."""
     if not FERNET_AVAILABLE or Fernet is None:
         raise RuntimeError(
             "Python-Paket 'cryptography' fehlt. Installiere es mit 'pip install cryptography', "
             "bevor Fahrerkarte-PINs ausgestellt werden."
         )
 
-    secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
-    if not secret:
+    selected_secret = safe_str(secret if secret is not None else FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not selected_secret:
         raise RuntimeError(
             "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
         )
 
-    derived_key = hashlib.sha256(f"eifellog|fahrerkarte-pin|{secret}".encode("utf-8")).digest()
+    derived_key = hashlib.sha256(f"eifellog|fahrerkarte-pin|{selected_secret}".encode("utf-8")).digest()
     return Fernet(base64.urlsafe_b64encode(derived_key))
 
 
-def fahrerkarte_pin_hash_key():
-    secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
-    if not secret:
+def fahrerkarte_pin_hash_key(secret=None):
+    selected_secret = safe_str(secret if secret is not None else FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not selected_secret:
         raise RuntimeError(
             "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
         )
-    return hashlib.sha256(f"eifellog|fahrerkarte-pin-hash|{secret}".encode("utf-8")).digest()
+    return hashlib.sha256(f"eifellog|fahrerkarte-pin-hash|{selected_secret}".encode("utf-8")).digest()
 
 
-def hash_fahrerkarte_pin(pin, salt=None):
+def hash_fahrerkarte_pin(pin, salt=None, secret=None):
     normalized_pin = normalize_fahrerkarte_pin(pin)
     if not normalized_pin:
         raise ValueError(f"Fahrerkarte-PIN muss aus genau {FAHRERKARTE_PIN_LENGTH} Ziffern bestehen.")
 
     salt = safe_str(salt) or secrets.token_hex(16)
     digest = hmac.new(
-        fahrerkarte_pin_hash_key(),
+        fahrerkarte_pin_hash_key(secret=secret),
         f"{salt}|{normalized_pin}".encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
     return salt, digest
 
 
-def encrypt_fahrerkarte_pin(pin):
+def encrypt_fahrerkarte_pin(pin, secret=None):
     normalized_pin = normalize_fahrerkarte_pin(pin)
     if not normalized_pin:
         raise ValueError(f"Fahrerkarte-PIN muss aus genau {FAHRERKARTE_PIN_LENGTH} Ziffern bestehen.")
-    return get_fahrerkarte_pin_cipher().encrypt(normalized_pin.encode("utf-8")).decode("ascii")
+    return get_fahrerkarte_pin_cipher(secret=secret).encrypt(normalized_pin.encode("utf-8")).decode("ascii")
 
 
-def decrypt_fahrerkarte_pin(request_doc):
+def migrate_fahrerkarte_pin_crypto(request_doc, pin, source_secret=None, migration_reason="legacy_key_rotation"):
+    """Verschlüsselt eine bekannte PIN mit dem aktuellen Schlüssel neu und aktualisiert ihren Hash."""
+    request_doc = request_doc or {}
+    normalized_pin = normalize_fahrerkarte_pin(pin)
+    if not normalized_pin:
+        raise RuntimeError("Gespeicherte Fahrerkarte-PIN ist ungültig.")
+
+    current_secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    if not current_secret:
+        raise RuntimeError(
+            "FAHRERKARTE_PIN_ENCRYPTION_KEY fehlt. Hinterlege einen stabilen geheimen Schlüssel in der .env."
+        )
+
+    salt, digest = hash_fahrerkarte_pin(normalized_pin, secret=current_secret)
+    now = now_utc()
+    fields = {
+        "fahrerkarte_pin_ciphertext": encrypt_fahrerkarte_pin(normalized_pin, secret=current_secret),
+        "fahrerkarte_pin_hash": digest,
+        "fahrerkarte_pin_salt": salt,
+        "fahrerkarte_pin_version": 2,
+        "fahrerkarte_pin_key_id": fahrerkarte_pin_key_id(current_secret),
+        "fahrerkarte_pin_configured": True,
+        "fahrerkarte_pin_crypto_migrated_at": now,
+        "fahrerkarte_pin_crypto_migration_reason": safe_str(migration_reason, "legacy_key_rotation"),
+        "fahrerkarte_pin_crypto_source_key_id": fahrerkarte_pin_key_id(source_secret),
+        "updated_at": now,
+    }
+
+    if request_doc.get("_id"):
+        fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": fields})
+    request_doc.update(fields)
+    return request_doc
+
+
+def decrypt_fahrerkarte_pin(request_doc, migrate_legacy=True):
+    """Entschlüsselt aktuelle und bekannte Legacy-PINs; Legacy-Daten werden automatisch migriert."""
     request_doc = request_doc or {}
     ciphertext = safe_str(request_doc.get("fahrerkarte_pin_ciphertext"))
     if not ciphertext:
         return ""
 
-    try:
-        decrypted = get_fahrerkarte_pin_cipher().decrypt(ciphertext.encode("ascii")).decode("utf-8")
-    except InvalidToken as error:
-        raise RuntimeError(
-            "Fahrerkarte-PIN konnte nicht entschlüsselt werden. Prüfe den stabilen FAHRERKARTE_PIN_ENCRYPTION_KEY."
-        ) from error
+    current_secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+    for candidate_secret in fahrerkarte_pin_secret_candidates():
+        try:
+            decrypted = get_fahrerkarte_pin_cipher(secret=candidate_secret).decrypt(
+                ciphertext.encode("ascii")
+            ).decode("utf-8")
+        except (InvalidToken, UnicodeDecodeError, ValueError):
+            continue
 
-    normalized_pin = normalize_fahrerkarte_pin(decrypted)
-    if not normalized_pin:
-        raise RuntimeError("Gespeicherte Fahrerkarte-PIN ist ungültig.")
-    return normalized_pin
+        normalized_pin = normalize_fahrerkarte_pin(decrypted)
+        if not normalized_pin:
+            continue
+
+        if migrate_legacy and candidate_secret != current_secret:
+            migrate_fahrerkarte_pin_crypto(
+                request_doc,
+                normalized_pin,
+                source_secret=candidate_secret,
+                migration_reason="decrypt_with_legacy_key",
+            )
+        return normalized_pin
+
+    raise FahrerkartePinDecryptError(
+        "Fahrerkarte-PIN konnte mit keinem verfügbaren Schlüssel entschlüsselt werden. "
+        "Hinterlege den früheren Schlüssel in FAHRERKARTE_PIN_PREVIOUS_ENCRYPTION_KEYS "
+        "oder rufe die PIN als Karteninhaber erneut ab, damit kontrolliert eine neue PIN ausgestellt wird."
+    )
 
 
 def fahrerkarte_pin_actor_snapshot(actor=None):
@@ -2865,7 +2986,8 @@ def build_new_fahrerkarte_pin_fields(existing_doc=None, issued_at=None, actor=No
         "fahrerkarte_pin_ciphertext": encrypt_fahrerkarte_pin(pin),
         "fahrerkarte_pin_hash": digest,
         "fahrerkarte_pin_salt": salt,
-        "fahrerkarte_pin_version": 1,
+        "fahrerkarte_pin_version": 2,
+        "fahrerkarte_pin_key_id": fahrerkarte_pin_key_id(),
         "fahrerkarte_pin_configured": True,
         "fahrerkarte_pin_issued_at": issued_at or now_utc(),
         "fahrerkarte_pin_issued_by": fahrerkarte_pin_actor_snapshot(actor),
@@ -2922,11 +3044,29 @@ def verify_fahrerkarte_pin_for_request(request_doc, submitted_pin):
     normalized_pin = normalize_fahrerkarte_pin(submitted_pin)
     salt = safe_str(request_doc.get("fahrerkarte_pin_salt"))
     expected_hash = safe_str(request_doc.get("fahrerkarte_pin_hash"))
-    actual_hash = ""
-    if normalized_pin:
-        _salt, actual_hash = hash_fahrerkarte_pin(normalized_pin, salt=salt)
+    matching_secret = ""
 
-    if normalized_pin and expected_hash and hmac.compare_digest(expected_hash, actual_hash):
+    if normalized_pin and expected_hash:
+        for candidate_secret in fahrerkarte_pin_secret_candidates():
+            _salt, candidate_hash = hash_fahrerkarte_pin(
+                normalized_pin,
+                salt=salt,
+                secret=candidate_secret,
+            )
+            if hmac.compare_digest(expected_hash, candidate_hash):
+                matching_secret = candidate_secret
+                break
+
+    if normalized_pin and expected_hash and matching_secret:
+        current_secret = safe_str(FAHRERKARTE_PIN_ENCRYPTION_SECRET)
+        if matching_secret != current_secret:
+            migrate_fahrerkarte_pin_crypto(
+                request_doc,
+                normalized_pin,
+                source_secret=matching_secret,
+                migration_reason="verify_with_legacy_hash_key",
+            )
+
         fahrerkarte_requests_collection.update_one(
             {"_id": request_doc["_id"]},
             {"$set": {
@@ -15560,9 +15700,50 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
     if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
         return jsonify({"success": False, "error": "PIN-Ausstellung ist erst nach Ausstellung der Fahrerkarte verfügbar."}), 409
 
+    pin_reissued_after_key_loss = False
     try:
         request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor={"display_name": "ServiceCenter Legacy-Migration"})
         pin = decrypt_fahrerkarte_pin(request_doc)
+    except FahrerkartePinDecryptError as error:
+        if not FAHRERKARTE_PIN_AUTO_RECOVER_ON_REVEAL:
+            app.logger.exception("Fahrerkarte-PIN konnte nicht mit verfügbarem Schlüssel entschlüsselt werden")
+            return jsonify({"success": False, "error": safe_str(error, "PIN konnte nicht geladen werden.")}), 500
+
+        # Ein verlorener Fernet-Schlüssel ist nicht rekonstruierbar. Da dieser Endpoint
+        # ausschließlich für den eingeloggten Karteninhaber erreichbar ist, wird beim
+        # bewussten Abruf eine neue PIN erzeugt und die alte PIN unmittelbar ungültig.
+        app.logger.warning(
+            "Fahrerkarte-PIN wird nach Schlüsselverlust kontrolliert neu ausgestellt: request_id=%s",
+            safe_str(request_doc.get("request_id") or request_doc.get("_id")),
+        )
+        recovery_actor = {"display_name": "ServiceCenter Schlüsselverlust-Recovery"}
+        request_doc = ensure_fahrerkarte_pin_for_request(request_doc, actor=recovery_actor, force_new=True)
+        recovery_now = now_utc()
+        recovery_fields = {
+            "fahrerkarte_pin_recovery_reason": "stored_ciphertext_not_decryptable",
+            "fahrerkarte_pin_recovered_at": recovery_now,
+            "fahrerkarte_pin_recovered_by": fahrerkarte_pin_actor_snapshot(recovery_actor),
+            "updated_at": recovery_now,
+        }
+        fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": recovery_fields})
+        request_doc.update(recovery_fields)
+        pin = decrypt_fahrerkarte_pin(request_doc)
+        pin_reissued_after_key_loss = True
+
+        try:
+            owner_user_doc = find_user_for_request_doc(request_doc)
+            if owner_user_doc:
+                update_user_fahrerkarte_state(owner_user_doc, request_doc, "issued", recovery_actor)
+                sync_tracker_driver_card_from_fahrerkarte(
+                    owner_user_doc,
+                    request_doc,
+                    source="servicecenter_pin_key_loss_recovery",
+                    archive_existing=False,
+                )
+        except Exception:
+            # Der PIN-Abruf selbst bleibt erfolgreich; die optionale Metadaten-Synchronisation
+            # darf den Karteninhaber nicht blockieren.
+            app.logger.exception("Fahrerkarte-PIN-Recovery-Metadaten konnten nicht vollständig synchronisiert werden")
     except Exception as error:
         app.logger.exception("Fahrerkarte-PIN konnte nicht abgerufen werden")
         return jsonify({"success": False, "error": safe_str(error, "PIN konnte nicht geladen werden.")}), 500
@@ -15583,6 +15764,12 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
             "cardId": safe_str(request_doc.get("card_id")),
             "issuedAt": datetime_to_iso(request_doc.get("fahrerkarte_pin_issued_at")),
             "autoHideSeconds": FAHRERKARTE_PIN_REVEAL_AUTO_HIDE_SECONDS,
+            "reissuedAfterKeyLoss": pin_reissued_after_key_loss,
+            "message": (
+                "Der frühere Verschlüsselungsschlüssel war nicht mehr verfügbar. Es wurde sicher eine neue PIN ausgestellt."
+                if pin_reissued_after_key_loss
+                else ""
+            ),
         },
     })
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
