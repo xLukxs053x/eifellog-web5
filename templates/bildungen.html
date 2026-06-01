@@ -2102,6 +2102,401 @@
         }
 
 
+        /* === SERVICECENTER MODAL V2: ARCHIV, CHAT & LAYOUT POLISH === */
+        .request-modal {
+            padding: clamp(0.65rem, 1.5vw, 1.2rem);
+        }
+
+        .request-modal-card {
+            width: min(1160px, 100%);
+            height: min(900px, calc(100svh - 2rem));
+            max-height: calc(100svh - 2rem);
+            gap: 0;
+            padding: 0;
+            overflow: hidden;
+            border-radius: 1.4rem;
+            background:
+                radial-gradient(circle at 7% 0%, rgba(var(--brand-green-rgb), 0.09), transparent 26%),
+                linear-gradient(145deg, rgba(8, 18, 12, 0.98), rgba(2, 7, 4, 0.985));
+            box-shadow: 0 34px 100px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(var(--brand-green-rgb), 0.05);
+        }
+
+        .request-modal-head {
+            min-height: 5.25rem;
+            padding: 0.95rem 1.05rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.008));
+        }
+
+        .request-modal-subtitle {
+            max-width: 48rem;
+            margin-top: 0.32rem;
+            color: rgba(147, 164, 200, 0.82);
+            font-size: 0.74rem;
+            line-height: 1.55;
+        }
+
+        .request-modal-body {
+            min-height: 0;
+            display: grid;
+            flex: 1 1 auto;
+            grid-template-columns: minmax(330px, 0.92fr) minmax(0, 1.42fr);
+            overflow: hidden;
+        }
+
+        .request-modal-sidebar {
+            min-height: 0;
+            padding: 0.9rem;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            border-right: 1px solid rgba(255, 255, 255, 0.07);
+            background: linear-gradient(155deg, rgba(255, 255, 255, 0.016), rgba(0, 0, 0, 0.08));
+        }
+
+        .request-topic-card {
+            padding: 0.82rem;
+            border-radius: 0.92rem;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+        }
+
+        .request-topic-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.46rem;
+        }
+
+        .request-topic-meta {
+            min-height: 4.05rem;
+            padding: 0.58rem;
+        }
+
+        .request-modal-actions {
+            margin-top: 0.72rem;
+            padding: 0;
+        }
+
+        .request-modal-actions .btn-primary,
+        .request-modal-actions .btn-danger,
+        .request-modal-actions .btn-secondary {
+            flex: 1 1 10rem;
+        }
+
+        .request-archive-card {
+            margin-top: 0.72rem;
+            padding: 0.82rem;
+            border: 1px solid rgba(147, 164, 200, 0.20);
+            border-radius: 0.92rem;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(147, 164, 200, 0.08), transparent 34%),
+                linear-gradient(145deg, rgba(12, 18, 16, 0.84), rgba(3, 8, 6, 0.94));
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+        }
+
+        .request-archive-head {
+            display: flex;
+            align-items: center;
+            gap: 0.66rem;
+        }
+
+        .request-archive-icon,
+        .request-chat-locked-icon {
+            width: 2.25rem;
+            height: 2.25rem;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(147, 164, 200, 0.24);
+            border-radius: 0.74rem;
+            color: var(--muted);
+            background: rgba(147, 164, 200, 0.06);
+        }
+
+        .request-archive-icon svg,
+        .request-chat-locked-icon svg {
+            width: 1.08rem;
+            height: 1.08rem;
+        }
+
+        .request-archive-kicker {
+            color: rgba(147, 164, 200, 0.82);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.5rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .request-archive-title {
+            margin: 0.18rem 0 0;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.84rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .request-archive-copy {
+            margin: 0.65rem 0 0;
+            color: var(--muted);
+            font-size: 0.73rem;
+            line-height: 1.58;
+        }
+
+        .request-archive-grid {
+            margin-top: 0.66rem;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.44rem;
+        }
+
+        .request-archive-meta {
+            padding: 0.54rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 0.68rem;
+            color: var(--muted);
+            background: rgba(0, 0, 0, 0.14);
+            font-size: 0.68rem;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .request-archive-meta strong {
+            display: block;
+            margin-bottom: 0.17rem;
+            color: rgba(237, 243, 255, 0.90);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.48rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .request-archive-note {
+            margin-top: 0.58rem;
+            padding: 0.58rem;
+            border-left: 2px solid rgba(147, 164, 200, 0.34);
+            color: var(--muted);
+            background: rgba(147, 164, 200, 0.035);
+            font-size: 0.7rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-status-chip.archived,
+        .request-status-chip.closed,
+        .request-status-chip.completed {
+            color: var(--muted);
+            border-color: rgba(147, 164, 200, 0.30);
+            background: rgba(147, 164, 200, 0.07);
+        }
+
+        .request-chat-panel {
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.11), rgba(0, 0, 0, 0.19));
+        }
+
+        .request-chat-toolbar {
+            padding: 0.82rem 0.92rem;
+            background: rgba(255, 255, 255, 0.012);
+        }
+
+        .request-chat-log {
+            min-height: 0;
+            max-height: none;
+            margin: 0;
+            padding: 0.92rem;
+            gap: 0.64rem;
+        }
+
+        .request-chat-message {
+            max-width: min(84%, 46rem);
+            gap: 0.52rem;
+        }
+
+        .request-chat-avatar {
+            width: 2.05rem;
+            height: 2.05rem;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+        }
+
+        .request-chat-bubble {
+            padding: 0.68rem 0.76rem;
+            border-radius: 0.86rem 0.86rem 0.86rem 0.22rem;
+            background: rgba(255, 255, 255, 0.044);
+            box-shadow: 0 9px 22px rgba(0, 0, 0, 0.16);
+        }
+
+        .request-chat-message.user .request-chat-bubble {
+            border-radius: 0.86rem 0.86rem 0.22rem 0.86rem;
+            background: rgba(var(--brand-green-rgb), 0.082);
+        }
+
+        .request-chat-message.system {
+            padding: 0.08rem 0;
+        }
+
+        .request-chat-message.system .request-chat-bubble {
+            max-width: 46rem;
+            padding: 0.46rem 0.62rem;
+            background: rgba(147, 164, 200, 0.026);
+        }
+
+        .request-chat-compose {
+            margin: 0;
+            padding: 0.78rem 0.92rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            background: rgba(0, 0, 0, 0.10);
+        }
+
+        .request-chat-compose.hidden,
+        .request-chat-closed.hidden {
+            display: none !important;
+        }
+
+        .request-chat-compose textarea {
+            min-height: 4.25rem;
+            max-height: 10rem;
+            border-radius: 0.78rem;
+            background: rgba(0, 0, 0, 0.22);
+        }
+
+        .request-chat-closed {
+            margin: 0;
+            padding: 0.82rem 0.92rem;
+            display: flex;
+            align-items: center;
+            gap: 0.66rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            color: var(--muted);
+            background: rgba(147, 164, 200, 0.035);
+            font-size: 0.71rem;
+            line-height: 1.55;
+        }
+
+        .request-chat-closed strong {
+            display: block;
+            margin-bottom: 0.14rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.57rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .request-modal-message {
+            min-height: 0;
+            margin: 0;
+            padding: 0 0.92rem 0.72rem;
+            background: rgba(0, 0, 0, 0.10);
+        }
+
+        .request-modal-message:empty {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .request-modal-card {
+                height: calc(100svh - 1.2rem);
+                max-height: calc(100svh - 1.2rem);
+            }
+
+            .request-modal-body {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .request-modal-sidebar {
+                max-height: 42svh;
+                flex: 0 0 auto;
+                border-right: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            }
+
+            .request-chat-panel {
+                min-height: 0;
+                flex: 1 1 auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .request-modal {
+                padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left));
+            }
+
+            .request-modal-card {
+                height: calc(100svh - 0.9rem);
+                max-height: calc(100svh - 0.9rem);
+                border-radius: 1rem;
+            }
+
+            .request-modal-head {
+                min-height: 4.65rem;
+                padding: 0.72rem;
+            }
+
+            .request-modal-subtitle {
+                display: none;
+            }
+
+            .request-modal-sidebar {
+                max-height: 41svh;
+                padding: 0.62rem;
+            }
+
+            .request-topic-card,
+            .request-archive-card {
+                padding: 0.66rem;
+                border-radius: 0.78rem;
+            }
+
+            .request-topic-grid,
+            .request-archive-grid {
+                gap: 0.36rem;
+            }
+
+            .request-topic-meta {
+                min-height: 3.65rem;
+                padding: 0.48rem;
+            }
+
+            .request-chat-toolbar {
+                padding: 0.66rem;
+            }
+
+            .request-chat-log {
+                padding: 0.68rem;
+                gap: 0.55rem;
+            }
+
+            .request-chat-message {
+                max-width: 96%;
+            }
+
+            .request-chat-avatar {
+                width: 1.8rem;
+                height: 1.8rem;
+                font-size: 0.5rem;
+            }
+
+            .request-chat-bubble {
+                padding: 0.58rem 0.64rem;
+            }
+
+            .request-chat-compose,
+            .request-chat-closed {
+                padding: 0.66rem;
+            }
+
+            .request-modal-message {
+                padding: 0 0.66rem 0.58rem;
+            }
+        }
+
+
     </style>
 
     <script>
@@ -2113,7 +2508,9 @@
             isSending: false,
             lastChatSignature: '',
             shouldStickToBottom: true,
-            isChatWritable: false
+            isChatWritable: false,
+            isArchived: false,
+            hasLoadedTicket: false
         };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -2283,6 +2680,8 @@
                 }
             });
 
+            input.addEventListener('input', () => autoResizeBildungenChatInput(input));
+
             chatLog.addEventListener('scroll', () => {
                 bildungenState.shouldStickToBottom = isBildungenNearChatBottom(chatLog);
             });
@@ -2343,33 +2742,42 @@
             message.style.color = isError ? 'var(--danger)' : 'var(--brand-green)';
         }
 
-        function setBildungenPresence(text, isError = false) {
+        function setBildungenPresence(text, tone = 'live') {
             const presenceText = document.getElementById('bildungen-chat-presence-text');
             const presenceDot = document.getElementById('bildungen-chat-presence-dot');
+            const normalizedTone = tone === true ? 'error' : tone;
             if (presenceText) presenceText.textContent = text || '';
-            if (presenceDot) {
-                presenceDot.style.background = isError ? 'var(--danger)' : 'var(--brand-green)';
-                presenceDot.style.boxShadow = isError
-                    ? '0 0 13px rgba(255, 159, 159, 0.75)'
-                    : '0 0 13px rgba(var(--brand-green-rgb), 0.8)';
-            }
+            if (!presenceDot) return;
+
+            const styles = {
+                live: ['var(--brand-green)', '0 0 13px rgba(var(--brand-green-rgb), 0.8)'],
+                archived: ['var(--muted)', '0 0 10px rgba(147, 164, 200, 0.48)'],
+                error: ['var(--danger)', '0 0 13px rgba(255, 159, 159, 0.75)']
+            };
+            const [background, shadow] = styles[normalizedTone] || styles.live;
+            presenceDot.style.background = background;
+            presenceDot.style.boxShadow = shadow;
         }
 
         function renderBildungenLoadingState() {
             const topic = document.getElementById('bildungen-topic-content');
+            const archive = document.getElementById('bildungen-archive-content');
             const chatLog = document.getElementById('bildungen-chat-log');
             const actions = document.getElementById('bildungen-topic-actions');
             if (topic) topic.innerHTML = '<div class="request-topic-loading">Topic und Ticket-Details werden geladen …</div>';
+            if (archive) archive.innerHTML = '';
             if (chatLog) chatLog.innerHTML = '<div class="request-chat-empty">Chat-Verlauf wird geladen …</div>';
             if (actions) actions.innerHTML = '';
             bildungenState.isChatWritable = false;
+            bildungenState.isArchived = false;
+            bildungenState.hasLoadedTicket = false;
             updateBildungenComposer();
             setBildungenPresence('Ticket wird synchronisiert …');
         }
 
         function startBildungenPolling() {
             stopBildungenPolling();
-            if (!bildungenState.activeRequestId || document.hidden) return;
+            if (!bildungenState.activeRequestId || document.hidden || bildungenState.isArchived) return;
             bildungenState.chatPollTimer = window.setInterval(() => {
                 refreshBildungenDetails({ silent: true });
             }, 3000);
@@ -2411,6 +2819,8 @@
             bildungenState.activeRequestId = '';
             bildungenState.focusChatAfterLoad = false;
             bildungenState.lastChatSignature = '';
+            bildungenState.isArchived = false;
+            bildungenState.hasLoadedTicket = false;
             modal.classList.remove('flex');
             modal.classList.add('hidden');
             modal.setAttribute('aria-hidden', 'true');
@@ -2426,7 +2836,12 @@
                 const data = await bildungenFetch(bildungenApiUrl(requestId));
                 if (bildungenState.activeRequestId !== requestId) return;
                 renderBildungenDetails(data.request || {});
-                setBildungenPresence('Live synchronisiert · Aktualisierung alle 3 Sekunden');
+                if (bildungenState.isArchived) {
+                    setBildungenPresence('Archiviert · Verlauf ist nur lesbar', 'archived');
+                    stopBildungenPolling();
+                } else {
+                    setBildungenPresence('Live synchronisiert · Aktualisierung alle 3 Sekunden', 'live');
+                }
                 if (!silent) setBildungenModalMessage('');
             } catch (error) {
                 setBildungenPresence('Synchronisierung fehlgeschlagen', true);
@@ -2439,7 +2854,7 @@
         function bildungenStatusClass(value) {
             const allowed = new Set([
                 'submitted', 'in_review', 'appointment_scheduled', 'approved',
-                'completed', 'rejected', 'withdrawn', 'cancelled'
+                'completed', 'rejected', 'withdrawn', 'cancelled', 'archived', 'closed'
             ]);
             const normalized = String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
             return allowed.has(normalized) ? normalized : '';
@@ -2457,6 +2872,61 @@
             const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
             if (!parts.length) return type === 'user' ? 'DU' : 'EL';
             return parts.slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase();
+        }
+
+        function isBildungenArchived(item) {
+            const status = String(item.status || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            return Boolean(
+                item.is_archived === true ||
+                item.is_closed === true ||
+                item.archived === true ||
+                ['completed', 'rejected', 'withdrawn', 'cancelled', 'archived', 'closed'].includes(status)
+            );
+        }
+
+        function bildungenArchiveMeta(label, value) {
+            return `<div class="request-archive-meta"><strong>${bildungenEscape(label)}</strong>${bildungenEscape(value)}</div>`;
+        }
+
+        function renderBildungenArchive(item, requestId) {
+            const container = document.getElementById('bildungen-archive-content');
+            if (!container) return;
+
+            if (!bildungenState.isArchived) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const archiveDate = item.archived_at_display || item.closed_at_display || item.updated_at_display || '-';
+            const archiveReason = item.archive_note || item.closure_note || item.resolution_note || '';
+            container.innerHTML = `
+                <section class="request-archive-card" aria-label="Archivierte Anfrage">
+                    <div class="request-archive-head">
+                        <div class="request-archive-icon" aria-hidden="true">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 8h14M6.5 8l.8 10.1a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 8M9 12h6M8 4h8a1 1 0 0 1 1 1v3H7V5a1 1 0 0 1 1-1Z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="request-archive-kicker">Ticket abgeschlossen</div>
+                            <h4 class="request-archive-title">Archiviert</h4>
+                        </div>
+                    </div>
+                    <p class="request-archive-copy">Diese Anfrage wurde abgeschlossen und revisionssicher in den lesbaren Verlauf verschoben. Neue Chat-Nachrichten sind für dieses Ticket nicht mehr möglich.</p>
+                    <div class="request-archive-grid">
+                        ${bildungenArchiveMeta('Finaler Status', item.status_label || 'Archiviert')}
+                        ${bildungenArchiveMeta('Archiviert am', archiveDate)}
+                        ${bildungenArchiveMeta('Ticket', requestId || '-')}
+                        ${bildungenArchiveMeta('Sachbearbeiter', item.claimed_by_name || 'ServiceCenter')}
+                    </div>
+                    ${archiveReason ? `<div class="request-archive-note">${bildungenEscape(archiveReason)}</div>` : ''}
+                </section>`;
+        }
+
+        function autoResizeBildungenChatInput(input) {
+            if (!input) return;
+            input.style.height = 'auto';
+            input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
         }
 
         function renderBildungenDetails(item) {
@@ -2500,8 +2970,11 @@
             }
             actions.innerHTML = actionButtons.join('');
 
+            bildungenState.isArchived = isBildungenArchived(item);
+            bildungenState.hasLoadedTicket = true;
+            renderBildungenArchive(item, requestId);
             renderBildungenChat(item.chat_messages || []);
-            bildungenState.isChatWritable = Boolean(item.is_chat_writable);
+            bildungenState.isChatWritable = Boolean(item.is_chat_writable) && !bildungenState.isArchived;
             updateBildungenComposer();
 
             if (bildungenState.focusChatAfterLoad) {
@@ -2562,14 +3035,26 @@
         function updateBildungenComposer() {
             const input = document.getElementById('bildungen-chat-input');
             const sendButton = document.getElementById('bildungen-chat-send');
-            if (!input || !sendButton) return;
+            const compose = document.getElementById('bildungen-chat-compose');
+            const closed = document.getElementById('bildungen-chat-closed');
+            const closedText = document.getElementById('bildungen-chat-closed-text');
+            if (!input || !sendButton || !compose || !closed) return;
+
+            const shouldShowComposer = bildungenState.hasLoadedTicket && bildungenState.isChatWritable;
+            const shouldShowClosed = bildungenState.hasLoadedTicket && !bildungenState.isChatWritable;
+            compose.classList.toggle('hidden', !shouldShowComposer);
+            closed.classList.toggle('hidden', !shouldShowClosed);
 
             input.disabled = !bildungenState.isChatWritable || bildungenState.isSending;
             sendButton.disabled = !bildungenState.isChatWritable || bildungenState.isSending;
-            input.placeholder = bildungenState.isChatWritable
-                ? 'Nachricht an den Sachbearbeiter schreiben'
-                : 'Für diese Anfrage ist der Chat geschlossen.';
+            input.placeholder = 'Nachricht an den Sachbearbeiter schreiben';
             sendButton.textContent = bildungenState.isSending ? 'Wird gesendet …' : 'Nachricht senden';
+
+            if (closedText) {
+                closedText.textContent = bildungenState.isArchived
+                    ? 'Dieses Ticket wurde archiviert. Der bisherige Verlauf bleibt vollständig lesbar, es können jedoch keine neuen Nachrichten gesendet werden.'
+                    : 'Dieser Chat ist aktuell geschlossen. Der bisherige Verlauf bleibt weiterhin lesbar.';
+            }
         }
 
         async function sendBildungenChatMessage() {
@@ -2598,6 +3083,7 @@
                 });
                 if (bildungenState.activeRequestId !== requestId) return;
                 input.value = '';
+                autoResizeBildungenChatInput(input);
                 bildungenState.shouldStickToBottom = true;
                 bildungenState.lastChatSignature = '';
                 renderBildungenDetails(data.request || {});
@@ -3002,41 +3488,58 @@
                 <div>
                     <div class="eyebrow">ServiceCenter Live-Ticket</div>
                     <h2 id="bildungen-detail-title" class="section-title" style="margin-top:0.35rem;">Anfrage</h2>
+                    <p class="request-modal-subtitle">Ticket-Details, Statusinformationen und der vollständige Verlauf sind in einer kompakten ServiceCenter-Ansicht gebündelt.</p>
                 </div>
                 <button class="btn-secondary btn-compact" type="button" onclick="closeBildungenDetails()">Schließen</button>
             </div>
 
-            <!-- Das Topic steht bewusst direkt über dem Chat. -->
-            <div id="bildungen-topic-content">
-                <div class="request-topic-loading">Topic und Ticket-Details werden geladen …</div>
-            </div>
-            <div id="bildungen-topic-actions" class="request-modal-actions" aria-label="Ticket-Aktionen"></div>
+            <div class="request-modal-body">
+                <aside class="request-modal-sidebar" aria-label="Ticket-Übersicht">
+                    <div id="bildungen-topic-content">
+                        <div class="request-topic-loading">Topic und Ticket-Details werden geladen …</div>
+                    </div>
+                    <div id="bildungen-topic-actions" class="request-modal-actions" aria-label="Ticket-Aktionen"></div>
+                    <div id="bildungen-archive-content"></div>
+                </aside>
 
-            <section id="bildungen-chat-panel" class="request-chat-panel" aria-label="Live-Chat mit dem Sachbearbeiter">
-                <div class="request-chat-toolbar">
-                    <div>
-                        <div class="request-chat-title">Live-Chat mit dem Sachbearbeiter</div>
-                        <div class="request-chat-presence">
-                            <span id="bildungen-chat-presence-dot" class="status-dot" aria-hidden="true"></span>
-                            <span id="bildungen-chat-presence-text">Ticket wird synchronisiert …</span>
+                <section id="bildungen-chat-panel" class="request-chat-panel" aria-label="Live-Chat mit dem Sachbearbeiter">
+                    <div class="request-chat-toolbar">
+                        <div>
+                            <div class="request-chat-title">Live-Chat mit dem Sachbearbeiter</div>
+                            <div class="request-chat-presence">
+                                <span id="bildungen-chat-presence-dot" class="status-dot" aria-hidden="true"></span>
+                                <span id="bildungen-chat-presence-text">Ticket wird synchronisiert …</span>
+                            </div>
+                        </div>
+                        <button class="btn-secondary btn-compact" type="button" onclick="refreshBildungenDetails()">Aktualisieren</button>
+                    </div>
+
+                    <div id="bildungen-chat-log" class="request-chat-log" aria-live="polite" aria-relevant="additions text">
+                        <div class="request-chat-empty">Chat-Verlauf wird geladen …</div>
+                    </div>
+
+                    <div id="bildungen-chat-closed" class="request-chat-closed hidden" role="status">
+                        <div class="request-chat-locked-icon" aria-hidden="true">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10m-8 0h9a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 16.5 19h-9A1.5 1.5 0 0 1 6 17.5v-6A1.5 1.5 0 0 1 7.5 10Z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <strong>Chat geschlossen</strong>
+                            <span id="bildungen-chat-closed-text">Der bisherige Verlauf bleibt weiterhin lesbar.</span>
                         </div>
                     </div>
-                    <button class="btn-secondary btn-compact" type="button" onclick="refreshBildungenDetails()">Aktualisieren</button>
-                </div>
 
-                <div id="bildungen-chat-log" class="request-chat-log" aria-live="polite" aria-relevant="additions text">
-                    <div class="request-chat-empty">Chat-Verlauf wird geladen …</div>
-                </div>
-
-                <div class="request-chat-compose">
-                    <textarea id="bildungen-chat-input" maxlength="2400" placeholder="Nachricht an den Sachbearbeiter schreiben" aria-label="Nachricht an den Sachbearbeiter"></textarea>
-                    <div class="request-chat-compose-side">
-                        <div class="request-chat-hint">Enter sendet · Shift + Enter fügt eine neue Zeile ein.</div>
-                        <button id="bildungen-chat-send" class="btn-primary btn-compact request-chat-send" type="button" onclick="sendBildungenChatMessage()">Nachricht senden</button>
+                    <div id="bildungen-chat-compose" class="request-chat-compose hidden">
+                        <textarea id="bildungen-chat-input" maxlength="2400" placeholder="Nachricht an den Sachbearbeiter schreiben" aria-label="Nachricht an den Sachbearbeiter"></textarea>
+                        <div class="request-chat-compose-side">
+                            <div class="request-chat-hint">Enter sendet · Shift + Enter fügt eine neue Zeile ein.</div>
+                            <button id="bildungen-chat-send" class="btn-primary btn-compact request-chat-send" type="button" onclick="sendBildungenChatMessage()">Nachricht senden</button>
+                        </div>
                     </div>
-                </div>
-                <div id="bildungen-modal-message" class="request-modal-message" role="status" aria-live="polite"></div>
-            </section>
+                    <div id="bildungen-modal-message" class="request-modal-message" role="status" aria-live="polite"></div>
+                </section>
+            </div>
         </div>
     </div>
 
