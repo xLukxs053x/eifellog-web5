@@ -1,194 +1,193 @@
 {% extends "base.html" %}
 
-{% block title %}Buchhaltung 2.0 | Eifel LOG{% endblock %}
+{% block title %}Buchhaltung | Eifel LOG{% endblock %}
 
-{% block head_extra %}
+{% block content %}
+{% set session_user = session.get('user', {}) %}
+{% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Buchhaltung' %}
+
 <style>
+    /*
+        buchhaltung2.html
+        Nutzt bewusst den Hintergrund, die Slideshow, Navigation, Buttons und das Grundlayout aus base.html.
+        Deshalb wird hier KEIN eigener Seitenhintergrund gesetzt.
+    */
+
     .buchhaltung2-page {
         width: 100%;
         display: grid;
-        gap: 1.5rem;
+        gap: 22px;
         color: var(--text);
     }
 
     .bh2-grid {
         display: grid;
-        gap: 1.25rem;
-    }
-
-    .bh2-hero,
-    .bh2-panel,
-    .bh2-stat {
-        position: relative;
-        overflow: hidden;
+        gap: 22px;
     }
 
     .bh2-hero {
-        padding: clamp(1.5rem, 3vw, 2.5rem);
+        padding: 30px;
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 1.5rem;
+        gap: 24px;
         align-items: center;
     }
 
     .bh2-kicker {
+        width: fit-content;
         display: inline-flex;
         align-items: center;
-        gap: .65rem;
-        width: fit-content;
-        margin-bottom: 1rem;
+        gap: 9px;
+        margin-bottom: 14px;
         color: var(--brand-yellow);
         font-family: "Orbitron", sans-serif;
-        font-size: .68rem;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .18em;
+        letter-spacing: 0.18em;
     }
 
     .bh2-kicker::before {
         content: "";
-        width: .5rem;
-        height: .5rem;
+        width: 8px;
+        height: 8px;
         border-radius: 999px;
         background: var(--brand-green);
-        box-shadow: 0 0 1rem rgba(var(--brand-green-rgb), .55);
+        box-shadow: 0 0 16px rgba(var(--brand-green-rgb), 0.65);
     }
 
     .bh2-title {
         margin: 0;
         color: #fff;
         font-family: "Orbitron", sans-serif;
-        font-size: clamp(2.25rem, 5vw, 4.5rem);
-        line-height: .95;
-        letter-spacing: -.055em;
+        font-size: clamp(30px, 4vw, 54px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
         text-transform: uppercase;
     }
 
     .bh2-title span {
         color: var(--brand-green);
+        text-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.28);
     }
 
     .bh2-lead {
-        max-width: 48rem;
-        margin: 1rem 0 0;
+        max-width: 780px;
+        margin: 18px 0 0;
         color: var(--muted);
-        font-size: .98rem;
+        font-size: 14px;
         line-height: 1.75;
+        font-weight: 500;
     }
 
     .bh2-hero-actions {
-        min-width: 15rem;
+        min-width: 260px;
         display: grid;
-        gap: .75rem;
+        gap: 10px;
     }
 
     .bh2-panel {
-        padding: clamp(1.25rem, 2.2vw, 1.8rem);
+        padding: 24px;
     }
 
     .bh2-section-head {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.15rem;
+        gap: 16px;
+        margin-bottom: 18px;
     }
 
     .bh2-section-head h2 {
         margin: 0;
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: .9rem;
+        font-size: 14px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .15em;
+        letter-spacing: 0.16em;
     }
 
     .bh2-section-head p {
-        margin: .45rem 0 0;
+        margin: 7px 0 0;
         color: var(--muted);
-        font-size: .82rem;
-        line-height: 1.6;
+        font-size: 12px;
+        line-height: 1.55;
     }
 
     .bh2-mini-label {
-        flex: 0 0 auto;
         color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: .62rem;
+        font-size: 9px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .13em;
+        letter-spacing: 0.14em;
         white-space: nowrap;
     }
 
     .bh2-stats {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: .9rem;
+        gap: 14px;
     }
 
     .bh2-stat {
-        min-height: 7.2rem;
-        padding: 1.15rem;
-        border-radius: 1.35rem;
-        border: 1px solid rgba(255, 255, 255, .075);
-        background: rgba(255, 255, 255, .035);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
+        padding: 17px;
+        min-height: 112px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        background: rgba(0, 0, 0, 0.30);
     }
 
     .bh2-stat small {
         display: block;
-        margin-bottom: .7rem;
+        margin-bottom: 10px;
         color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: .58rem;
+        font-size: 8.5px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .13em;
+        letter-spacing: 0.14em;
     }
 
     .bh2-stat strong {
         display: block;
         color: #fff;
         font-family: "Orbitron", sans-serif;
-        font-size: 1.15rem;
+        font-size: 18px;
         line-height: 1.2;
-        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     .bh2-stat span {
         display: block;
-        margin-top: .55rem;
+        margin-top: 8px;
         color: var(--muted);
-        font-size: .75rem;
-        line-height: 1.5;
+        font-size: 11px;
+        line-height: 1.45;
     }
 
     .bh2-main {
         display: grid;
-        grid-template-columns: minmax(0, 1.12fr) minmax(20rem, .88fr);
-        gap: 1.4rem;
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+        gap: 22px;
         align-items: start;
     }
 
-    .bh2-form,
-    .bh2-task-list,
-    .bh2-archive-list {
+    .bh2-form {
         display: grid;
-        gap: .9rem;
+        gap: 15px;
     }
 
     .bh2-field-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .9rem;
+        gap: 14px;
     }
 
     .bh2-field {
         display: grid;
-        gap: .5rem;
+        gap: 8px;
     }
 
     .bh2-field.full {
@@ -198,208 +197,234 @@
     .bh2-field label {
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: .64rem;
+        font-size: 9.5px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .14em;
+        letter-spacing: 0.15em;
     }
 
     .bh2-input,
     .bh2-select,
-    .bh2-textarea,
-    .bh2-file-input {
+    .bh2-textarea {
         width: 100%;
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, .1);
-        background: rgba(0, 0, 0, .32);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(0, 0, 0, 0.42);
         color: var(--text);
         outline: none;
-        font-size: .9rem;
-        font-weight: 600;
-        transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        font-size: 13px;
+        font-weight: 650;
+        transition: 180ms ease;
     }
 
     .bh2-input,
     .bh2-select {
-        min-height: 3rem;
-        padding: 0 .95rem;
-    }
-
-    .bh2-select option {
-        color: #10170f;
-        background: #edf3ff;
+        min-height: 46px;
+        padding: 0 14px;
     }
 
     .bh2-textarea {
-        min-height: 7.25rem;
+        min-height: 108px;
         resize: vertical;
-        padding: .95rem;
-        line-height: 1.6;
+        padding: 14px;
+        line-height: 1.55;
     }
 
     .bh2-input::placeholder,
     .bh2-textarea::placeholder {
-        color: rgba(147, 164, 200, .5);
+        color: rgba(147, 164, 200, 0.48);
     }
 
     .bh2-input:focus,
     .bh2-select:focus,
-    .bh2-textarea:focus,
-    .bh2-file-input:focus {
-        border-color: rgba(var(--brand-green-rgb), .55);
-        box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), .09);
-        background: rgba(0, 0, 0, .42);
+    .bh2-textarea:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.52);
+        box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.08);
     }
 
     .bh2-file-input {
-        min-height: 3.05rem;
-        padding: .7rem .9rem;
-        border-style: dashed;
+        width: 100%;
+        min-height: 48px;
+        padding: 11px 14px;
+        border-radius: 16px;
+        border: 1px dashed rgba(var(--brand-green-rgb), 0.32);
+        background: rgba(0, 0, 0, 0.42);
         color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
         cursor: pointer;
     }
 
     .bh2-file-input::file-selector-button {
-        min-height: 2rem;
-        margin-right: .75rem;
-        padding: 0 .9rem;
+        min-height: 30px;
+        margin-right: 12px;
+        padding: 0 12px;
         border: 0;
         border-radius: 999px;
-        background: var(--brand-green);
-        color: #071007;
+        background: linear-gradient(135deg, var(--brand-green), var(--brand-yellow));
+        color: #08100a;
         font-family: "Orbitron", sans-serif;
-        font-size: .55rem;
+        font-size: 8px;
         font-weight: 900;
         text-transform: uppercase;
-        letter-spacing: .1em;
+        letter-spacing: 0.10em;
         cursor: pointer;
     }
 
     .bh2-file-help,
     .bh2-file-meta {
         color: var(--muted);
-        font-size: .76rem;
+        font-size: 11px;
         line-height: 1.55;
     }
 
     .bh2-file-meta {
         display: none;
-        padding: .75rem .85rem;
-        border-radius: .95rem;
-        border: 1px solid rgba(var(--brand-green-rgb), .22);
-        background: rgba(var(--brand-green-rgb), .07);
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.20);
+        background: rgba(var(--brand-green-rgb), 0.06);
     }
 
-    .bh2-file-meta.active,
-    .bh2-archive-panel.active {
+    .bh2-file-meta.active {
         display: block;
-    }
-
-    .bh2-archive-panel {
-        display: none;
     }
 
     .bh2-pdf-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 1.75rem;
-        margin-top: .45rem;
-        padding: 0 .7rem;
+        min-height: 26px;
+        margin-top: 7px;
+        padding: 0 10px;
         border-radius: 999px;
-        border: 1px solid rgba(var(--brand-green-rgb), .34);
-        background: rgba(var(--brand-green-rgb), .08);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(var(--brand-green-rgb), 0.08);
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: .52rem;
+        font-size: 7.5px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .1em;
+        letter-spacing: 0.1em;
         text-decoration: none;
         white-space: nowrap;
     }
 
     .bh2-pdf-link:hover {
         color: #fff;
-        background: rgba(var(--brand-green-rgb), .16);
+        background: rgba(var(--brand-green-rgb), 0.15);
     }
 
-    .bh2-archive-item,
-    .bh2-task {
-        border-radius: 1.15rem;
-        border: 1px solid rgba(255, 255, 255, .075);
-        background: rgba(0, 0, 0, .24);
+    .bh2-archive-panel {
+        display: none;
+    }
+
+    .bh2-archive-panel.active {
+        display: block;
+    }
+
+    .bh2-archive-list {
+        display: grid;
+        gap: 10px;
     }
 
     .bh2-archive-item {
         display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(12rem, .55fr) auto;
-        gap: .9rem;
+        grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.5fr) auto;
+        gap: 12px;
         align-items: center;
-        padding: .95rem;
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        background: rgba(0, 0, 0, 0.28);
     }
 
-    .bh2-archive-item strong,
-    .bh2-task strong {
+    .bh2-archive-item strong {
         display: block;
         color: #fff;
         font-family: "Orbitron", sans-serif;
-        font-size: .68rem;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .11em;
+        letter-spacing: 0.11em;
     }
 
-    .bh2-archive-item span,
-    .bh2-task span {
+    .bh2-archive-item span {
         display: block;
-        margin-top: .4rem;
+        margin-top: 5px;
         color: var(--muted);
-        font-size: .8rem;
-        line-height: 1.5;
+        font-size: 11px;
+        line-height: 1.45;
         overflow-wrap: anywhere;
     }
+
 
     .bh2-btn-row {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        gap: .7rem;
-        margin-top: .25rem;
+        gap: 10px;
+        margin-top: 4px;
     }
 
     .bh2-btn-row .btn-primary,
     .bh2-btn-row .btn-secondary {
-        min-width: 10.75rem;
+        min-width: 170px;
     }
 
     .bh2-split {
         display: grid;
-        grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
-        gap: 1.4rem;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: 22px;
+    }
+
+    .bh2-task-list {
+        display: grid;
+        gap: 10px;
     }
 
     .bh2-task {
         display: flex;
         align-items: flex-start;
-        gap: .75rem;
-        padding: .9rem;
+        gap: 11px;
+        padding: 13px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        background: rgba(0, 0, 0, 0.28);
         cursor: pointer;
-        transition: border-color .18s ease, background .18s ease, opacity .18s ease;
+        transition: 180ms ease;
     }
 
     .bh2-task:hover {
-        border-color: rgba(var(--brand-green-rgb), .28);
-        background: rgba(var(--brand-green-rgb), .065);
+        border-color: rgba(var(--brand-green-rgb), 0.30);
+        background: rgba(var(--brand-green-rgb), 0.07);
     }
 
     .bh2-task input {
-        margin-top: .2rem;
+        margin-top: 3px;
         accent-color: var(--brand-green);
     }
 
+    .bh2-task strong {
+        display: block;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+
+    .bh2-task span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
     .bh2-task.done {
-        opacity: .56;
+        opacity: 0.56;
     }
 
     .bh2-task.done strong,
@@ -409,34 +434,55 @@
 
     .bh2-filter-grid {
         display: grid;
-        grid-template-columns: 1.2fr .8fr .8fr;
-        gap: .7rem;
-        margin-bottom: .95rem;
+        grid-template-columns: 1.2fr 0.8fr 0.8fr;
+        gap: 10px;
+        margin-bottom: 14px;
     }
 
     .bh2-table-wrap {
         width: 100%;
         max-width: 100%;
-        overflow-x: auto;
+        overflow-x: scroll;
         overflow-y: hidden;
-        border-radius: 1.25rem;
-        border: 1px solid rgba(255, 255, 255, .075);
-        background: rgba(0, 0, 0, .25);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(0, 0, 0, 0.28);
         scrollbar-width: thin;
-        scrollbar-color: rgba(var(--brand-green-rgb), .65) rgba(0, 0, 0, .25);
+        scrollbar-color: rgba(var(--brand-green-rgb), 0.65) rgba(0, 0, 0, 0.30);
         -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+    }
+
+    .bh2-table-wrap::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .bh2-table-wrap::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.30);
+        border-radius: 999px;
+    }
+
+    .bh2-table-wrap::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        border: 2px solid rgba(0, 0, 0, 0.30);
+        background: rgba(var(--brand-green-rgb), 0.65);
+    }
+
+    .bh2-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: rgba(var(--brand-green-rgb), 0.90);
     }
 
     .bh2-table {
         width: max-content;
-        min-width: 106rem;
+        min-width: 1680px;
         border-collapse: collapse;
     }
 
     .bh2-table th,
     .bh2-table td {
-        padding: .85rem .8rem;
-        border-bottom: 1px solid rgba(255, 255, 255, .065);
+        padding: 13px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.065);
         text-align: left;
         vertical-align: top;
     }
@@ -444,16 +490,16 @@
     .bh2-table th {
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: .56rem;
+        font-size: 8.5px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .12em;
-        background: rgba(0, 0, 0, .22);
+        letter-spacing: 0.13em;
+        background: rgba(0, 0, 0, 0.22);
     }
 
     .bh2-table td {
         color: var(--text);
-        font-size: .82rem;
+        font-size: 12px;
         line-height: 1.45;
     }
 
@@ -462,10 +508,10 @@
     }
 
     .bh2-empty {
-        padding: 1.6rem;
+        padding: 24px;
         color: var(--muted);
         text-align: center;
-        font-size: .9rem;
+        font-size: 13px;
         line-height: 1.65;
     }
 
@@ -473,127 +519,134 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 1.55rem;
-        padding: 0 .65rem;
+        min-height: 24px;
+        padding: 0 9px;
         border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, .1);
-        background: rgba(255, 255, 255, .045);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(255, 255, 255, 0.04);
         color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: .54rem;
+        font-size: 8px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .09em;
+        letter-spacing: 0.1em;
         white-space: nowrap;
     }
 
     .bh2-badge.good {
-        border-color: rgba(var(--brand-green-rgb), .36);
-        background: rgba(var(--brand-green-rgb), .1);
+        border-color: rgba(var(--brand-green-rgb), 0.36);
+        background: rgba(var(--brand-green-rgb), 0.10);
         color: var(--brand-green);
     }
 
     .bh2-badge.warn {
-        border-color: rgba(220, 226, 38, .34);
-        background: rgba(220, 226, 38, .08);
+        border-color: rgba(220, 226, 38, 0.34);
+        background: rgba(220, 226, 38, 0.08);
         color: var(--brand-yellow);
     }
 
     .bh2-badge.danger {
-        border-color: rgba(255, 159, 159, .34);
-        background: rgba(255, 159, 159, .08);
+        border-color: rgba(255, 159, 159, 0.34);
+        background: rgba(255, 159, 159, 0.08);
         color: var(--danger);
     }
 
     .bh2-row-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: .45rem;
+        gap: 7px;
     }
 
     .bh2-mini-btn {
-        min-height: 1.8rem;
+        min-height: 28px;
         border-radius: 999px;
-        padding: 0 .7rem;
-        border: 1px solid rgba(255, 255, 255, .11);
-        background: rgba(255, 255, 255, .04);
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.035);
         color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: .52rem;
+        font-size: 7.5px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .09em;
+        letter-spacing: 0.1em;
         cursor: pointer;
-        transition: .18s ease;
+        transition: 180ms ease;
     }
 
     .bh2-mini-btn:hover {
         color: #fff;
-        border-color: rgba(var(--brand-green-rgb), .38);
-        background: rgba(var(--brand-green-rgb), .1);
+        border-color: rgba(var(--brand-green-rgb), 0.38);
+        background: rgba(var(--brand-green-rgb), 0.10);
     }
 
     .bh2-mini-btn.danger:hover {
-        border-color: rgba(255, 159, 159, .38);
-        background: rgba(255, 159, 159, .08);
+        border-color: rgba(255, 159, 159, 0.38);
+        background: rgba(255, 159, 159, 0.08);
         color: var(--danger);
     }
 
     .bh2-report-box {
-        min-height: 16rem;
+        min-height: 260px;
         white-space: pre-wrap;
-        border-radius: 1.25rem;
-        border: 1px solid rgba(255, 255, 255, .075);
-        background: rgba(0, 0, 0, .28);
-        padding: 1.1rem;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(0, 0, 0, 0.34);
+        padding: 17px;
         color: var(--muted);
-        font-size: .84rem;
+        font-size: 12px;
         line-height: 1.7;
         overflow: auto;
     }
 
     .bh2-toast {
         position: fixed;
-        right: 1.35rem;
-        bottom: 1.35rem;
+        right: 22px;
+        bottom: 22px;
         z-index: 80;
-        max-width: 23rem;
+        max-width: 360px;
         display: none;
-        padding: 1rem;
-        border-radius: 1.15rem;
-        border: 1px solid rgba(var(--brand-green-rgb), .34);
-        background: rgba(6, 14, 8, .92);
+        padding: 15px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(6, 14, 8, 0.92);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         color: var(--text);
-        box-shadow: 0 1.2rem 3.75rem rgba(0, 0, 0, .5);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.50);
     }
 
     .bh2-toast.active {
         display: block;
-        animation: bh2ToastIn .22s ease-out forwards;
+        animation: bh2ToastIn 220ms ease-out forwards;
     }
 
     .bh2-toast strong {
         display: block;
-        margin-bottom: .35rem;
+        margin-bottom: 4px;
         color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: .62rem;
+        font-size: 9px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .14em;
+        letter-spacing: 0.14em;
     }
 
     .bh2-toast span {
         color: var(--muted);
-        font-size: .82rem;
+        font-size: 12px;
         line-height: 1.45;
     }
 
     @keyframes bh2ToastIn {
-        from { opacity: 0; transform: translateY(.65rem); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     @media (max-width: 1180px) {
@@ -610,6 +663,7 @@
     @media (max-width: 860px) {
         .bh2-hero {
             grid-template-columns: 1fr;
+            padding: 24px;
         }
 
         .bh2-hero-actions {
@@ -618,7 +672,10 @@
         }
 
         .bh2-field-grid,
-        .bh2-filter-grid,
+        .bh2-filter-grid {
+            grid-template-columns: 1fr;
+        }
+
         .bh2-archive-item {
             grid-template-columns: 1fr;
         }
@@ -629,13 +686,12 @@
             grid-template-columns: 1fr;
         }
 
-        .bh2-section-head {
-            display: grid;
+        .bh2-panel {
+            padding: 20px;
         }
 
         .bh2-hero-actions,
         .bh2-btn-row {
-            display: grid;
             grid-template-columns: 1fr;
         }
 
@@ -647,18 +703,13 @@
         }
 
         .bh2-toast {
-            left: .9rem;
-            right: .9rem;
-            bottom: .9rem;
+            left: 14px;
+            right: 14px;
+            bottom: 14px;
             max-width: none;
         }
     }
 </style>
-{% endblock %}
-
-{% block content %}
-{% set session_user = session.get('user', {}) %}
-{% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Buchhaltung' %}
 
 <div class="buchhaltung2-page" data-user="{{ display_name }}">
     <section class="glass-card bh2-hero">
@@ -992,11 +1043,9 @@ Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
 
     <div id="bh2-toast" class="bh2-toast" role="status" aria-live="polite"></div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
+    document.addEventListener("DOMContentLoaded", async () => {
         /*
             Wichtig:
             - Gemeinsame Daten für mehrere Benutzer funktionieren NICHT mit localStorage allein.
@@ -2099,4 +2148,5 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadInitialEntries();
     });
 </script>
+
 {% endblock %}
