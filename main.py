@@ -344,6 +344,7 @@ profile_gallery_collection = db["profile_gallery"]
 fahrer_registration_collection = db["fahrer_registration_requests"]
 token_request_collection = db["token_requests"]
 system_documents_collection = db["system_documents"]
+instruction_acknowledgements_collection = db["instruction_acknowledgements"]
 tasks_collection = db["tasks"]
 buchhaltung_requests_collection = db["buchhaltung_requests"]
 buchhaltung_entries_collection = db["buchhaltung_entries"]
@@ -430,6 +431,15 @@ def ensure_indexes():
         system_documents_collection.create_index([("discord_id", ASCENDING)], unique=False)
         system_documents_collection.create_index([("created_at", DESCENDING)], unique=False)
         system_documents_collection.create_index([("type", ASCENDING)], unique=False)
+        system_documents_collection.create_index([("expires_at", ASCENDING)], unique=False)
+        system_documents_collection.create_index([("fixed", ASCENDING)], unique=False)
+
+        instruction_acknowledgements_collection.create_index(
+            [("discord_id", ASCENDING), ("instruction_id", ASCENDING)],
+            unique=True,
+        )
+        instruction_acknowledgements_collection.create_index([("instruction_id", ASCENDING)], unique=False)
+        instruction_acknowledgements_collection.create_index([("acknowledged_at", DESCENDING)], unique=False)
         
         tasks_collection.create_index([("status", ASCENDING)], unique=False)
         tasks_collection.create_index([("created_at", DESCENDING)], unique=False)
@@ -2562,6 +2572,203 @@ def calculate_registration_deadline(start_time=None):
     return deadline, f"{hours} Stunde" if hours == 1 else f"{hours} Stunden"
 
 
+
+# ==========================================
+# TEMPORÄRE PFLICHTUNTERWEISUNG: UPDATE & WIPE INFO
+# ==========================================
+# Die App arbeitet intern mit UTC ohne tzinfo. 01.06.2026, 12:45 Uhr in
+# Deutschland entspricht während der Sommerzeit 10:45 UTC.
+# Das Dokument ist exakt sieben Tage aktiv und wird als virtuelles, fixiertes
+# System-Dokument ausgeliefert. Dadurch kann es weder manuell noch automatisch
+# archiviert werden und muss nicht für jeden Nutzer dupliziert werden.
+TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID = "system-update-wipe-info-2026-06-01-1245-v1"
+TEMPORARY_UPDATE_WIPE_INFO_START_AT = datetime(2026, 6, 1, 10, 45)
+TEMPORARY_UPDATE_WIPE_INFO_EXPIRES_AT = TEMPORARY_UPDATE_WIPE_INFO_START_AT + timedelta(days=7)
+TEMPORARY_UPDATE_WIPE_INFO_DISPLAY_DATE = "01.06.2026, 12:45 Uhr"
+TEMPORARY_UPDATE_WIPE_INFO_DISPLAY_EXPIRES = "08.06.2026, 12:45 Uhr"
+TEMPORARY_UPDATE_WIPE_INFO_TITLE = "Update & Wipe Info"
+TEMPORARY_UPDATE_WIPE_INFO_SENDER = "System"
+TEMPORARY_UPDATE_WIPE_INFO_CONTENT = r"""
+    <p><strong>Update &amp; Wipe Info</strong></p>
+    <p class="mt-2 text-xs text-gray-400">System • 01.06.2026, 12:45 Uhr • gültig bis 08.06.2026, 12:45 Uhr</p>
+
+    <div class="mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.055] p-4">
+        <p class="text-[10px] font-orbitron text-red-300 uppercase tracking-widest mb-2">Datenbank-Wipe</p>
+        <p>Die Datenbankstruktur wurde vollständig zurückgesetzt. Dadurch wurden sämtliche Benutzerkonten sowie alle bestehenden Fahrerkarten-Registrierungen entfernt.</p>
+    </div>
+
+    <div class="mt-4 rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.045] p-4">
+        <p class="text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest mb-2">Erforderliche Schritte</p>
+        <ul class="list-disc pl-5 space-y-2">
+            <li>Fahrerkarte erneut im <strong>ServiceCenter</strong> beantragen.</li>
+            <li><strong>Fahrer-Registrierung</strong> erneut durchführen.</li>
+        </ul>
+        <p class="mt-4">Der vollständige Datenbank-Reset wurde bewusst durchgeführt, um eine saubere Grundlage für die weitere Entwicklung zu schaffen.</p>
+    </div>
+
+    <div class="mt-4 rounded-2xl border border-[var(--brand-green)]/20 bg-[var(--brand-green)]/[0.045] p-4">
+        <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Direkte Neuerungen</p>
+        <ul class="list-disc pl-5 space-y-2">
+            <li>Das <strong>ServiceCenter</strong> wurde vollständig überarbeitet.</li>
+            <li>Im ServiceCenter stehen jetzt <strong>Weiterbildungen</strong> zur Verfügung.</li>
+            <li>Beim Herunterladen einer Fahrerkarten-PDF ist ein <strong>QR-Code</strong> abgebildet. Scanne diesen bei Bedarf mit der Kamera-App deines Handys oder einer sonstigen QR-Scanner-App.</li>
+        </ul>
+    </div>
+
+    <p class="mt-4 text-xs text-gray-400">Dieses temporäre Dokument ist während seiner 7-tägigen Laufzeit fixiert und kann nicht archiviert werden.</p>
+"""
+
+
+def temporary_update_wipe_info_is_active(reference_time=None):
+    """Gibt zurück, ob die zeitlich begrenzte Pflichtunterweisung ausgeliefert werden muss."""
+    reference_time = reference_time or now_utc()
+    return TEMPORARY_UPDATE_WIPE_INFO_START_AT <= reference_time < TEMPORARY_UPDATE_WIPE_INFO_EXPIRES_AT
+
+
+def get_instruction_acknowledgement(discord_id, instruction_id):
+    discord_id = safe_str(discord_id)
+    instruction_id = safe_str(instruction_id)
+    if not discord_id or not instruction_id:
+        return None
+    return instruction_acknowledgements_collection.find_one({
+        "discord_id": discord_id,
+        "instruction_id": instruction_id,
+    })
+
+
+def get_temporary_update_wipe_info_acknowledgement(discord_id):
+    return get_instruction_acknowledgement(discord_id, TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID)
+
+
+def build_temporary_update_wipe_info_document(discord_id=""):
+    """Erzeugt das virtuelle, nicht archivierbare Postfach-Dokument für einen Nutzer."""
+    discord_id = safe_str(discord_id)
+    acknowledgement = get_temporary_update_wipe_info_acknowledgement(discord_id) if discord_id else None
+    acknowledged_at = acknowledgement.get("acknowledged_at") if acknowledgement else None
+
+    return {
+        "document_id": TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID,
+        "discord_id": discord_id,
+        "title": TEMPORARY_UPDATE_WIPE_INFO_TITLE,
+        "sender": TEMPORARY_UPDATE_WIPE_INFO_SENDER,
+        "date": TEMPORARY_UPDATE_WIPE_INFO_DISPLAY_DATE,
+        "content": TEMPORARY_UPDATE_WIPE_INFO_CONTENT,
+        "description": "Temporäre Pflichtunterweisung zum Datenbank-Wipe und zu den direkten Neuerungen.",
+        "type": "mandatory_instruction",
+        "needs_signature": False,
+        "instruction_required": True,
+        "fixed": True,
+        "pinned": True,
+        "archiveable": False,
+        "created_at": TEMPORARY_UPDATE_WIPE_INFO_START_AT,
+        "expires_at": TEMPORARY_UPDATE_WIPE_INFO_EXPIRES_AT,
+        "read": bool(acknowledgement),
+        "acknowledged": bool(acknowledgement),
+        "acknowledged_at": acknowledged_at,
+        "is_alert": not bool(acknowledgement),
+    }
+
+
+def get_temporary_update_wipe_info_context(discord_id):
+    """Frontend-Zustand für das einmalige Pflicht-Popup und den Postfach-Eintrag."""
+    discord_id = safe_str(discord_id)
+    active = temporary_update_wipe_info_is_active()
+    acknowledgement = get_temporary_update_wipe_info_acknowledgement(discord_id) if discord_id else None
+    acknowledged_at = acknowledgement.get("acknowledged_at") if acknowledgement else None
+
+    return {
+        "document_id": TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID,
+        "title": TEMPORARY_UPDATE_WIPE_INFO_TITLE,
+        "sender": TEMPORARY_UPDATE_WIPE_INFO_SENDER,
+        "display_date": TEMPORARY_UPDATE_WIPE_INFO_DISPLAY_DATE,
+        "display_expires": TEMPORARY_UPDATE_WIPE_INFO_DISPLAY_EXPIRES,
+        "starts_at_iso": datetime_to_iso(TEMPORARY_UPDATE_WIPE_INFO_START_AT),
+        "expires_at_iso": datetime_to_iso(TEMPORARY_UPDATE_WIPE_INFO_EXPIRES_AT),
+        "active": bool(active),
+        "acknowledged": bool(acknowledgement),
+        "acknowledged_at": datetime_to_iso(acknowledged_at),
+        "required": bool(active and not acknowledgement),
+        "fixed": True,
+        "archiveable": False,
+        "acknowledge_url": "/api/dashboard/instructions/update-wipe-info/acknowledge",
+        "status_url": "/api/dashboard/instructions/update-wipe-info",
+    }
+
+
+def acknowledge_temporary_update_wipe_info(discord_id, session_user=None):
+    """Speichert die Kenntnisnahme revisionsfest und idempotent in MongoDB."""
+    discord_id = safe_str(discord_id)
+    if not discord_id:
+        raise ValueError("Discord-ID fehlt.")
+
+    if not temporary_update_wipe_info_is_active():
+        raise ValueError("Die Pflichtunterweisung ist nicht mehr aktiv.")
+
+    session_user = session_user or {}
+    now = now_utc()
+    actor = {
+        "discord_id": discord_id,
+        "username": safe_str(session_user.get("username") or session_user.get("discord_username")),
+        "discord_username": safe_str(session_user.get("discord_username")),
+    }
+    request_metadata = {
+        "ip": safe_str(request.headers.get("X-Forwarded-For") or request.remote_addr)[:255],
+        "user_agent": safe_str(request.headers.get("User-Agent"))[:512],
+    }
+
+    instruction_acknowledgements_collection.update_one(
+        {
+            "discord_id": discord_id,
+            "instruction_id": TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID,
+        },
+        {
+            "$setOnInsert": {
+                "discord_id": discord_id,
+                "instruction_id": TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID,
+                "instruction_title": TEMPORARY_UPDATE_WIPE_INFO_TITLE,
+                "acknowledged_at": now,
+                "created_at": now,
+                "first_actor": actor,
+                "first_request": request_metadata,
+            },
+            "$set": {
+                "last_confirmed_at": now,
+                "updated_at": now,
+                "last_actor": actor,
+                "last_request": request_metadata,
+            },
+            "$inc": {"confirmation_count": 1},
+        },
+        upsert=True,
+    )
+
+    # Zusätzlich im User-Datensatz spiegeln. Das Audit-Dokument oben bleibt die
+    # maßgebliche Quelle; die Spiegelung erleichtert spätere Auswertungen.
+    users_collection.update_one(
+        {"discord_id": discord_id},
+        {
+            "$set": {
+                f"system_instruction_acknowledgements.{TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID}": now,
+                "updated_at": now,
+            }
+        },
+    )
+
+    return get_temporary_update_wipe_info_acknowledgement(discord_id)
+
+
+def dashboard_instruction_csrf_is_valid(data=None):
+    """Prüft CSRF bei schreibenden Dashboard-Anfragen."""
+    data = data or {}
+    submitted = safe_str(
+        request.headers.get("X-CSRF-Token")
+        or data.get("csrfToken")
+        or data.get("csrf_token")
+        or request.form.get("csrf_token")
+    )
+    stored = safe_str(session.get("_csrf_token"))
+    return bool(submitted and stored and secrets.compare_digest(submitted, stored))
+
 def create_system_document_for_user(discord_id, title, sender, content, doc_type="system", needs_signature=False, extra=None):
     now = now_utc()
     doc = {
@@ -2585,6 +2792,9 @@ def create_system_document_for_user(discord_id, title, sender, content, doc_type
 
 
 def prepare_system_document_for_dashboard(document):
+    fixed = bool(document.get("fixed", False) or document.get("pinned", False))
+    archiveable = bool(document.get("archiveable", not fixed)) and not fixed
+
     return {
         "document_id": document.get("document_id") or "",
         "request_id": document.get("request_id") or document.get("fahrerkarte_request_id") or "",
@@ -2594,8 +2804,16 @@ def prepare_system_document_for_dashboard(document):
         "content": document.get("content") or "",
         "description": document.get("description") or "",
         "needs_signature": bool(document.get("needs_signature", False)),
+        "instruction_required": bool(document.get("instruction_required", False)),
+        "acknowledged": bool(document.get("acknowledged", False)),
+        "acknowledged_at": datetime_to_iso(document.get("acknowledged_at")),
+        "fixed": fixed,
+        "pinned": fixed,
+        "archiveable": archiveable,
+        "read": bool(document.get("read", False)),
+        "expires_at": datetime_to_iso(document.get("expires_at")),
         "type": document.get("type") or "system",
-        "is_alert": document.get("is_alert", False),
+        "is_alert": bool(document.get("is_alert", False)),
         "download_url": document.get("download_url") or "",
         "download_label": document.get("download_label") or "Download",
         "download_filename": document.get("download_filename") or document.get("file_name") or "",
@@ -2618,7 +2836,24 @@ def get_system_documents_for_user(discord_id, limit=30, user_doc=None, latest_re
 
     prepared_documents = []
 
+    if temporary_update_wipe_info_is_active():
+        prepared_documents.append(
+            prepare_system_document_for_dashboard(
+                build_temporary_update_wipe_info_document(discord_id)
+            )
+        )
+
     for document in documents:
+        # Das zeitlich begrenzte Wipe-Dokument ist virtuell und wird oben
+        # serverseitig erzeugt. Eine eventuell früher gespeicherte Kopie wird
+        # ignoriert, damit es im Postfach niemals doppelt auftaucht.
+        if safe_str(document.get("document_id")) == TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID:
+            continue
+
+        expires_at = document.get("expires_at")
+        if isinstance(expires_at, datetime) and expires_at <= now_utc():
+            continue
+
         if document_contains_tracker_code(document):
             if not registration_approved:
                 continue
@@ -14923,6 +15158,7 @@ def dashboard_state_api():
 
     dashboard_context = prepare_driver_dashboard_context(db_user)
     company_stats = dashboard_context.get("companyStats") or build_company_stats_payload()
+    temporary_instruction = get_temporary_update_wipe_info_context(discord_id)
 
     return jsonify({
         "success": True,
@@ -14937,6 +15173,8 @@ def dashboard_state_api():
         "companyStats": company_stats,
         "company_stats": company_stats,
         "company": company_stats,
+        "temporaryInstruction": temporary_instruction,
+        "temporary_instruction": temporary_instruction,
     })
 
 
@@ -17336,6 +17574,7 @@ def dashboard():
     registration_context = dashboard_registration_context(db_user, latest_registration)
     driver_dashboard_context = prepare_driver_dashboard_context(db_user)
     loa_upcoming_items = get_upcoming_loa_items(limit=10)
+    temporary_instruction = get_temporary_update_wipe_info_context(user_id_str)
 
     return render_template(
         "dashboard.html",
@@ -17345,9 +17584,91 @@ def dashboard():
         news_items=news_items,
         user_documents=user_documents,
         loa_upcoming_items=loa_upcoming_items,
+        temporary_instruction=temporary_instruction,
         **registration_context,
         **driver_dashboard_context
     )
+
+
+@app.route("/api/dashboard/instructions/update-wipe-info", methods=["GET", "OPTIONS"])
+def api_dashboard_update_wipe_info_status():
+    """Liefert den serverseitigen Status der temporären Pflichtunterweisung."""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if "user" not in session:
+        return jsonify({"success": False, "error": "Nicht eingeloggt."}), 401
+
+    session_user = session.get("user") or {}
+    user_roles = session_user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        return jsonify({"success": False, "error": "Zugriff verweigert."}), 403
+
+    discord_id = safe_str(session_user.get("id") or session_user.get("discord_id"))
+    state = get_temporary_update_wipe_info_context(discord_id)
+    document = None
+    if state.get("active"):
+        document = prepare_system_document_for_dashboard(
+            build_temporary_update_wipe_info_document(discord_id)
+        )
+
+    return jsonify({
+        "success": True,
+        "instruction": state,
+        "document": document,
+    })
+
+
+@app.route("/api/dashboard/instructions/update-wipe-info/acknowledge", methods=["POST", "OPTIONS"])
+def api_dashboard_acknowledge_update_wipe_info():
+    """Speichert die verpflichtende Kenntnisnahme des eingeloggten Nutzers."""
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if "user" not in session:
+        return jsonify({"success": False, "error": "Nicht eingeloggt."}), 401
+
+    session_user = session.get("user") or {}
+    user_roles = session_user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        return jsonify({"success": False, "error": "Zugriff verweigert."}), 403
+
+    data = request.get_json(silent=True) or {}
+    if not dashboard_instruction_csrf_is_valid(data):
+        return jsonify({"success": False, "error": "Ungültige Sitzung. Bitte lade das Dashboard neu."}), 403
+
+    submitted_instruction_id = safe_str(data.get("instructionId") or data.get("instruction_id"))
+    if submitted_instruction_id and submitted_instruction_id != TEMPORARY_UPDATE_WIPE_INFO_DOCUMENT_ID:
+        return jsonify({"success": False, "error": "Unbekannte Pflichtunterweisung."}), 400
+
+    if data.get("fullyRead") is not True and data.get("fully_read") is not True:
+        return jsonify({"success": False, "error": "Bitte lies die Unterweisung vollständig durch."}), 400
+
+    if not temporary_update_wipe_info_is_active():
+        return jsonify({
+            "success": False,
+            "error": "Die Pflichtunterweisung ist nicht mehr aktiv.",
+            "instruction": get_temporary_update_wipe_info_context(
+                safe_str(session_user.get("id") or session_user.get("discord_id"))
+            ),
+        }), 410
+
+    discord_id = safe_str(session_user.get("id") or session_user.get("discord_id"))
+    try:
+        acknowledgement = acknowledge_temporary_update_wipe_info(discord_id, session_user=session_user)
+    except ValueError as error:
+        return jsonify({"success": False, "error": safe_str(error)}), 400
+    except Exception:
+        app.logger.exception("Pflichtunterweisung konnte nicht bestätigt werden")
+        return jsonify({"success": False, "error": "Kenntnisnahme konnte nicht gespeichert werden."}), 500
+
+    state = get_temporary_update_wipe_info_context(discord_id)
+    return jsonify({
+        "success": True,
+        "message": "Kenntnisnahme wurde gespeichert.",
+        "instruction": state,
+        "acknowledgedAt": datetime_to_iso((acknowledgement or {}).get("acknowledged_at")),
+    })
 
 
 @app.route("/admin", methods=["GET"])
