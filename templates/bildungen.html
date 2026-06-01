@@ -1633,9 +1633,489 @@
             }
         }
 
+
+
+        /* === SERVICECENTER LIVE-TICKET: TOPIC + CHAT CLEAN-PASS === */
+        .request-modal-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.82rem;
+            width: min(980px, 100%);
+            max-height: min(940px, 95vh);
+            padding: 1rem;
+            overflow: hidden;
+        }
+
+        .request-modal-head {
+            flex: 0 0 auto;
+            padding: 0.18rem 0.18rem 0;
+        }
+
+        .request-topic-card {
+            flex: 0 0 auto;
+            padding: 0.9rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+            border-radius: 1rem;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(var(--brand-green-rgb), 0.10), transparent 36%),
+                linear-gradient(145deg, rgba(12, 27, 17, 0.94), rgba(3, 10, 6, 0.96));
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
+        }
+
+        .request-topic-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .request-topic-kicker {
+            color: var(--brand-yellow);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.57rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            line-height: 1.55;
+            text-transform: uppercase;
+        }
+
+        .request-topic-title {
+            margin: 0.34rem 0 0;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(0.98rem, 2vw, 1.2rem);
+            font-weight: 800;
+            letter-spacing: 0.015em;
+            line-height: 1.35;
+            text-transform: uppercase;
+            overflow-wrap: anywhere;
+        }
+
+        .request-topic-description {
+            margin: 0.72rem 0 0;
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.62;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-topic-grid {
+            margin-top: 0.82rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.52rem;
+        }
+
+        .request-topic-meta {
+            min-width: 0;
+            padding: 0.62rem;
+            border: 1px solid rgba(255, 255, 255, 0.065);
+            border-radius: 0.74rem;
+            background: rgba(0, 0, 0, 0.15);
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.48;
+            overflow-wrap: anywhere;
+        }
+
+        .request-topic-meta strong {
+            display: block;
+            margin-bottom: 0.2rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.52rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .request-topic-note {
+            margin-top: 0.55rem;
+            padding: 0.66rem;
+            border: 1px solid rgba(255, 212, 121, 0.22);
+            border-radius: 0.74rem;
+            color: var(--muted);
+            background: rgba(255, 212, 121, 0.045);
+            font-size: 0.74rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-topic-note strong {
+            display: block;
+            margin-bottom: 0.2rem;
+            color: var(--warning);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.54rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .request-status-chip {
+            flex: 0 0 auto;
+            max-width: 16rem;
+            padding: 0.5rem 0.62rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.34);
+            border-radius: 999px;
+            color: var(--brand-green);
+            background: rgba(var(--brand-green-rgb), 0.09);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.54rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            line-height: 1.4;
+            text-align: center;
+            text-transform: uppercase;
+            overflow-wrap: anywhere;
+        }
+
+        .request-status-chip.submitted,
+        .request-status-chip.in_review,
+        .request-status-chip.appointment_scheduled {
+            color: var(--warning);
+            border-color: rgba(255, 212, 121, 0.38);
+            background: rgba(255, 212, 121, 0.08);
+        }
+
+        .request-status-chip.rejected,
+        .request-status-chip.withdrawn,
+        .request-status-chip.cancelled {
+            color: var(--danger);
+            border-color: rgba(255, 159, 159, 0.38);
+            background: rgba(255, 159, 159, 0.08);
+        }
+
+        .request-modal-actions:empty { display: none; }
+        .request-modal-actions { margin-top: 0.7rem; }
+
+        .request-chat-panel {
+            min-height: 0;
+            margin-top: 0;
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            padding: 0.78rem;
+            overflow: hidden;
+        }
+
+        .request-chat-toolbar {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            padding-bottom: 0.64rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .request-chat-presence {
+            margin-top: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.42rem;
+            color: var(--muted);
+            font-size: 0.68rem;
+            line-height: 1.45;
+        }
+
+        .request-chat-presence .status-dot {
+            width: 0.42rem;
+            height: 0.42rem;
+            flex: 0 0 auto;
+        }
+
+        .request-chat-log {
+            min-height: 220px;
+            max-height: min(42vh, 430px);
+            margin-top: 0.68rem;
+            padding: 0.16rem 0.1rem 0.12rem;
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            gap: 0.54rem;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scroll-behavior: smooth;
+        }
+
+        .request-chat-message {
+            width: 100%;
+            max-width: 88%;
+            padding: 0;
+            display: flex;
+            align-items: flex-end;
+            gap: 0.48rem;
+            border: 0;
+            border-radius: 0;
+            color: inherit;
+            background: transparent;
+        }
+
+        .request-chat-message.user {
+            margin-left: auto;
+            flex-direction: row-reverse;
+            border: 0;
+            background: transparent;
+        }
+
+        .request-chat-message.staff { margin-right: auto; }
+
+        .request-chat-message.system {
+            max-width: 100%;
+            margin: 0.1rem auto;
+            justify-content: center;
+            text-align: center;
+            border: 0;
+            background: transparent;
+        }
+
+        .request-chat-avatar {
+            width: 1.95rem;
+            height: 1.95rem;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            border-radius: 999px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.045);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.56rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .request-chat-message.user .request-chat-avatar {
+            color: var(--brand-green);
+            border-color: rgba(var(--brand-green-rgb), 0.28);
+            background: rgba(var(--brand-green-rgb), 0.08);
+        }
+
+        .request-chat-bubble {
+            min-width: 0;
+            padding: 0.62rem 0.7rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 0.78rem 0.78rem 0.78rem 0.2rem;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.035);
+            font-size: 0.74rem;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .request-chat-message.user .request-chat-bubble {
+            border-color: rgba(var(--brand-green-rgb), 0.28);
+            border-radius: 0.78rem 0.78rem 0.2rem 0.78rem;
+            background: rgba(var(--brand-green-rgb), 0.075);
+        }
+
+        .request-chat-message.system .request-chat-bubble {
+            max-width: 100%;
+            padding: 0.5rem 0.66rem;
+            border-style: dashed;
+            border-radius: 0.72rem;
+            color: rgba(147, 164, 200, 0.86);
+            background: rgba(255, 255, 255, 0.022);
+            font-size: 0.68rem;
+        }
+
+        .request-chat-message-head {
+            margin-bottom: 0.24rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.32rem 0.65rem;
+        }
+
+        .request-chat-message-head strong {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.68rem;
+        }
+
+        .request-chat-message-head span {
+            margin: 0;
+            color: rgba(147, 164, 200, 0.72);
+            font-size: 0.61rem;
+        }
+
+        .request-chat-text {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-chat-empty,
+        .request-topic-loading {
+            padding: 1.2rem 0.8rem;
+            border: 1px dashed rgba(255, 255, 255, 0.09);
+            border-radius: 0.8rem;
+            color: var(--muted);
+            background: rgba(0, 0, 0, 0.11);
+            font-size: 0.76rem;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        .request-chat-compose {
+            flex: 0 0 auto;
+            margin-top: 0.62rem;
+            padding-top: 0.62rem;
+            align-items: stretch;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .request-chat-compose textarea {
+            min-height: 4.5rem;
+            max-height: 11rem;
+            margin-top: 0;
+        }
+
+        .request-chat-compose-side {
+            min-width: 150px;
+            display: flex;
+            flex: 0 0 auto;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.45rem;
+        }
+
+        .request-chat-hint {
+            color: rgba(147, 164, 200, 0.76);
+            font-size: 0.63rem;
+            line-height: 1.45;
+        }
+
+        .request-chat-send {
+            width: 100%;
+        }
+
+        .request-modal-message {
+            flex: 0 0 auto;
+            min-height: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary:disabled,
+        .btn-secondary:disabled,
+        .btn-danger:disabled,
+        textarea:disabled {
+            cursor: not-allowed;
+            opacity: 0.48;
+            transform: none !important;
+        }
+
+        @media (max-width: 820px) {
+            .request-modal-card {
+                max-height: calc(100svh - 1.2rem);
+                padding: 0.82rem;
+            }
+
+            .request-topic-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .request-chat-log {
+                min-height: 190px;
+                max-height: min(38vh, 360px);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .request-modal {
+                padding: max(0.55rem, env(safe-area-inset-top)) max(0.55rem, env(safe-area-inset-right)) max(0.55rem, env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-left));
+            }
+
+            .request-modal-card {
+                gap: 0.62rem;
+                max-height: calc(100svh - 1rem);
+                padding: 0.64rem;
+                border-radius: 1rem;
+            }
+
+            .request-modal-head {
+                gap: 0.48rem;
+            }
+
+            .request-modal-head .btn-secondary {
+                width: auto;
+                min-height: 38px;
+            }
+
+            .request-topic-card {
+                padding: 0.7rem;
+            }
+
+            .request-topic-head {
+                display: grid;
+                gap: 0.52rem;
+            }
+
+            .request-status-chip {
+                justify-self: start;
+                max-width: 100%;
+            }
+
+            .request-topic-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.42rem;
+            }
+
+            .request-topic-meta {
+                padding: 0.54rem;
+                font-size: 0.68rem;
+            }
+
+            .request-chat-panel {
+                padding: 0.64rem;
+            }
+
+            .request-chat-toolbar .btn-secondary {
+                width: auto;
+                min-height: 36px;
+            }
+
+            .request-chat-log {
+                min-height: 170px;
+                max-height: 35vh;
+            }
+
+            .request-chat-message {
+                max-width: 96%;
+            }
+
+            .request-chat-compose {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .request-chat-compose-side {
+                min-width: 0;
+            }
+
+            .request-chat-send {
+                min-height: 44px;
+            }
+        }
+
+
     </style>
 
     <script>
+        const bildungenState = {
+            activeRequestId: '',
+            chatPollTimer: null,
+            focusChatAfterLoad: false,
+            isLoading: false,
+            isSending: false,
+            lastChatSignature: '',
+            shouldStickToBottom: true,
+            isChatWritable: false
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             initPageTransitions();
             initMobileMenu();
@@ -1674,7 +2154,7 @@
             const button = document.getElementById('mobile-menu-btn');
             if (!menu || !button) return;
 
-            const setMobileMenuState = (isOpen) => {
+            const setMobileMenuState = isOpen => {
                 menu.classList.toggle('hidden', !isOpen);
                 menu.classList.toggle('flex', isOpen);
                 menu.setAttribute('aria-hidden', String(!isOpen));
@@ -1711,6 +2191,14 @@
             setMobileMenuState(false);
         }
 
+        function syncBodyLock() {
+            const hasOpenModal = ['security-modal', 'bildungen-detail-modal'].some(id => {
+                const modal = document.getElementById(id);
+                return modal && !modal.classList.contains('hidden');
+            });
+            document.body.classList.toggle('overflow-hidden', hasOpenModal);
+        }
+
         function initSecuritySystem() {
             const modal = document.getElementById('security-modal');
             if (!modal) return;
@@ -1722,7 +2210,7 @@
                 if (event) event.preventDefault();
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
-                document.body.classList.add('overflow-hidden');
+                syncBodyLock();
 
                 setTimeout(() => {
                     modal.classList.remove('opacity-0');
@@ -1737,19 +2225,19 @@
                 modal.classList.add('opacity-0');
                 modalCard.classList.remove('scale-100');
                 modalCard.classList.add('scale-95');
-                document.body.classList.remove('overflow-hidden');
 
                 setTimeout(() => {
                     modal.classList.remove('flex');
                     modal.classList.add('hidden');
+                    syncBodyLock();
                 }, 300);
             };
 
-            document.addEventListener('contextmenu', function(event) {
+            document.addEventListener('contextmenu', event => {
                 showSecurityAlert(event);
             }, false);
 
-            document.addEventListener('keydown', function(event) {
+            document.addEventListener('keydown', event => {
                 if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
                     closeSecurityAlert();
                     return;
@@ -1760,39 +2248,73 @@
                 }
 
                 if (event.ctrlKey) {
-                    if (
-                        event.shiftKey &&
-                        (
-                            event.key === 'I' || event.key === 'i' ||
-                            event.key === 'J' || event.key === 'j' ||
-                            event.key === 'C' || event.key === 'c' ||
-                            event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67
-                        )
-                    ) {
-                        showSecurityAlert(event);
-                    }
+                    const blocksDeveloperShortcut = event.shiftKey && (
+                        event.key === 'I' || event.key === 'i' ||
+                        event.key === 'J' || event.key === 'j' ||
+                        event.key === 'C' || event.key === 'c' ||
+                        event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67
+                    );
+                    const blocksSourceShortcut = event.key === 'U' || event.key === 'u' || event.keyCode === 85;
 
-                    if (event.key === 'U' || event.key === 'u' || event.keyCode === 85) {
+                    if (blocksDeveloperShortcut || blocksSourceShortcut) {
                         showSecurityAlert(event);
                     }
                 }
             }, false);
-
+        }
 
         function initBildungenRequestCenter() {
             const modal = document.getElementById('bildungen-detail-modal');
-            if (!modal) return;
-            window.bildungenActiveRequestId = '';
-            window.bildungenChatPollTimer = null;
-            window.bildungenFocusChatAfterLoad = false;
+            const chatLog = document.getElementById('bildungen-chat-log');
+            const input = document.getElementById('bildungen-chat-input');
+            const actions = document.getElementById('bildungen-topic-actions');
+            if (!modal || !chatLog || !input || !actions) return;
 
             document.addEventListener('keydown', event => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeBildungenDetails();
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeBildungenDetails();
+                }
+            });
+
+            input.addEventListener('keydown', event => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendBildungenChatMessage();
+                }
+            });
+
+            chatLog.addEventListener('scroll', () => {
+                bildungenState.shouldStickToBottom = isBildungenNearChatBottom(chatLog);
+            });
+
+            actions.addEventListener('click', event => {
+                const button = event.target.closest('[data-bildungen-action]');
+                if (!button) return;
+                const action = button.dataset.bildungenAction;
+                if (action === 'withdraw') withdrawBildungenRequest();
+                if (action === 'confirm-appointment') decideBildungenAppointment('confirm');
+                if (action === 'decline-appointment') decideBildungenAppointment('decline');
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (!bildungenState.activeRequestId) return;
+                if (document.hidden) {
+                    stopBildungenPolling();
+                } else {
+                    refreshBildungenDetails({ silent: true });
+                    startBildungenPolling();
+                }
             });
         }
 
         function bildungenEscape(value) {
-            return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
         }
 
         function bildungenApiUrl(requestId, suffix = '') {
@@ -1800,9 +2322,17 @@
         }
 
         async function bildungenFetch(url, options = {}) {
-            const response = await fetch(url, options);
-            const data = await response.json().catch(() => ({ success: false, message: 'Ungültige Serverantwort.' }));
-            if (!response.ok || data.success === false) throw new Error(data.message || 'Aktion fehlgeschlagen.');
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                ...options
+            });
+            const data = await response.json().catch(() => ({
+                success: false,
+                message: 'Ungültige Serverantwort.'
+            }));
+            if (!response.ok || data.success === false) {
+                throw new Error(data.message || 'Aktion fehlgeschlagen.');
+            }
             return data;
         }
 
@@ -1813,105 +2343,289 @@
             message.style.color = isError ? 'var(--danger)' : 'var(--brand-green)';
         }
 
+        function setBildungenPresence(text, isError = false) {
+            const presenceText = document.getElementById('bildungen-chat-presence-text');
+            const presenceDot = document.getElementById('bildungen-chat-presence-dot');
+            if (presenceText) presenceText.textContent = text || '';
+            if (presenceDot) {
+                presenceDot.style.background = isError ? 'var(--danger)' : 'var(--brand-green)';
+                presenceDot.style.boxShadow = isError
+                    ? '0 0 13px rgba(255, 159, 159, 0.75)'
+                    : '0 0 13px rgba(var(--brand-green-rgb), 0.8)';
+            }
+        }
+
+        function renderBildungenLoadingState() {
+            const topic = document.getElementById('bildungen-topic-content');
+            const chatLog = document.getElementById('bildungen-chat-log');
+            const actions = document.getElementById('bildungen-topic-actions');
+            if (topic) topic.innerHTML = '<div class="request-topic-loading">Topic und Ticket-Details werden geladen …</div>';
+            if (chatLog) chatLog.innerHTML = '<div class="request-chat-empty">Chat-Verlauf wird geladen …</div>';
+            if (actions) actions.innerHTML = '';
+            bildungenState.isChatWritable = false;
+            updateBildungenComposer();
+            setBildungenPresence('Ticket wird synchronisiert …');
+        }
+
+        function startBildungenPolling() {
+            stopBildungenPolling();
+            if (!bildungenState.activeRequestId || document.hidden) return;
+            bildungenState.chatPollTimer = window.setInterval(() => {
+                refreshBildungenDetails({ silent: true });
+            }, 3000);
+        }
+
+        function stopBildungenPolling() {
+            if (bildungenState.chatPollTimer) {
+                window.clearInterval(bildungenState.chatPollTimer);
+                bildungenState.chatPollTimer = null;
+            }
+        }
+
         async function openBildungenDetails(requestId, focusChat = false) {
             const modal = document.getElementById('bildungen-detail-modal');
-            window.bildungenActiveRequestId = requestId;
-            window.bildungenFocusChatAfterLoad = Boolean(focusChat);
+            if (!modal || !requestId) return;
+
+            stopBildungenPolling();
+            bildungenState.activeRequestId = String(requestId);
+            bildungenState.focusChatAfterLoad = Boolean(focusChat);
+            bildungenState.lastChatSignature = '';
+            bildungenState.shouldStickToBottom = true;
+            setBildungenModalMessage('');
+            renderBildungenLoadingState();
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            document.body.classList.add('overflow-hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            syncBodyLock();
+
             await refreshBildungenDetails();
-            clearInterval(window.bildungenChatPollTimer);
-            window.bildungenChatPollTimer = setInterval(refreshBildungenDetails, 3000);
+            startBildungenPolling();
         }
 
         function closeBildungenDetails() {
             const modal = document.getElementById('bildungen-detail-modal');
-            clearInterval(window.bildungenChatPollTimer);
-            window.bildungenChatPollTimer = null;
-            window.bildungenActiveRequestId = '';
+            if (!modal) return;
+
+            stopBildungenPolling();
+            bildungenState.activeRequestId = '';
+            bildungenState.focusChatAfterLoad = false;
+            bildungenState.lastChatSignature = '';
             modal.classList.remove('flex');
             modal.classList.add('hidden');
-            document.body.classList.remove('overflow-hidden');
+            modal.setAttribute('aria-hidden', 'true');
+            syncBodyLock();
         }
 
-        async function refreshBildungenDetails() {
-            if (!window.bildungenActiveRequestId) return;
+        async function refreshBildungenDetails({ silent = false } = {}) {
+            if (!bildungenState.activeRequestId || bildungenState.isLoading) return;
+            bildungenState.isLoading = true;
+            const requestId = bildungenState.activeRequestId;
+
             try {
-                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId));
+                const data = await bildungenFetch(bildungenApiUrl(requestId));
+                if (bildungenState.activeRequestId !== requestId) return;
                 renderBildungenDetails(data.request || {});
+                setBildungenPresence('Live synchronisiert · Aktualisierung alle 3 Sekunden');
+                if (!silent) setBildungenModalMessage('');
             } catch (error) {
-                setBildungenModalMessage(error.message, true);
+                setBildungenPresence('Synchronisierung fehlgeschlagen', true);
+                if (!silent) setBildungenModalMessage(error.message, true);
+            } finally {
+                bildungenState.isLoading = false;
             }
+        }
+
+        function bildungenStatusClass(value) {
+            const allowed = new Set([
+                'submitted', 'in_review', 'appointment_scheduled', 'approved',
+                'completed', 'rejected', 'withdrawn', 'cancelled'
+            ]);
+            const normalized = String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            return allowed.has(normalized) ? normalized : '';
+        }
+
+        function bildungenSenderType(value) {
+            const normalized = String(value || '').toLowerCase();
+            if (normalized === 'user') return 'user';
+            if (normalized === 'system') return 'system';
+            return 'staff';
+        }
+
+        function bildungenInitials(name, type) {
+            if (type === 'system') return 'i';
+            const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return type === 'user' ? 'DU' : 'EL';
+            return parts.slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase();
         }
 
         function renderBildungenDetails(item) {
-            document.getElementById('bildungen-detail-title').textContent = item.offer_title || 'Anfrage';
-            const details = document.getElementById('bildungen-detail-content');
-            const actions = [];
-            if (item.can_withdraw) actions.push('<button class="btn-danger btn-compact" type="button" onclick="withdrawBildungenRequest()">Anfrage zurückziehen</button>');
-            if (item.can_confirm_appointment) {
-                actions.push('<button class="btn-primary btn-compact" type="button" onclick="decideBildungenAppointment(\'confirm\')">Termin bestätigen</button>');
-                actions.push('<button class="btn-danger btn-compact" type="button" onclick="decideBildungenAppointment(\'decline\')">Termin ablehnen</button>');
-            }
-            details.innerHTML = `
-                <div class="request-detail-grid">
-                    <div class="request-detail-box"><strong>Status</strong>${bildungenEscape(item.status_label || '-')}</div>
-                    <div class="request-detail-box"><strong>Sachbearbeiter</strong>${bildungenEscape(item.claimed_by_name || 'Noch nicht zugewiesen')}</div>
-                    <div class="request-detail-box"><strong>Kategorie</strong>${bildungenEscape(item.category_label || '-')}</div>
-                    <div class="request-detail-box"><strong>Eingereicht</strong>${bildungenEscape(item.created_at_display || '-')}</div>
-                    <div class="request-detail-box" style="grid-column:1/-1"><strong>Beschreibung deiner Einreichung</strong>${bildungenEscape(item.message || 'Keine zusätzliche Beschreibung übermittelt.')}</div>
-                    <div class="request-detail-box"><strong>Terminvorschlag</strong>${bildungenEscape(item.appointment_at_display || 'Noch kein Termin vorgeschlagen')}</div>
-                    <div class="request-detail-box"><strong>Terminstatus</strong>${bildungenEscape(item.appointment_confirmation_label || '-')}</div>
-                    ${item.appointment_note ? `<div class="request-detail-box" style="grid-column:1/-1"><strong>Termin-Hinweis</strong>${bildungenEscape(item.appointment_note)}</div>` : ''}
-                </div>
-                <div class="request-modal-actions">${actions.join('')}</div>`;
+            const title = item.offer_title || 'ServiceCenter-Anfrage';
+            const requestId = item.ticket_number || item.reference || item.id || bildungenState.activeRequestId;
+            const statusClass = bildungenStatusClass(item.status);
+            const topic = document.getElementById('bildungen-topic-content');
+            const modalTitle = document.getElementById('bildungen-detail-title');
+            const actions = document.getElementById('bildungen-topic-actions');
+            if (!topic || !modalTitle || !actions) return;
 
+            modalTitle.textContent = title;
+            topic.innerHTML = `
+                <section class="request-topic-card" aria-label="Topic und Anfrage-Details">
+                    <div class="request-topic-head">
+                        <div>
+                            <div class="request-topic-kicker">Topic · Ticket ${bildungenEscape(requestId || '-')}</div>
+                            <h3 class="request-topic-title">${bildungenEscape(title)}</h3>
+                            <p class="request-topic-description">${bildungenEscape(item.message || 'Keine zusätzliche Beschreibung übermittelt.')}</p>
+                        </div>
+                        <div class="request-status-chip ${statusClass}">${bildungenEscape(item.status_label || 'Status offen')}</div>
+                    </div>
+                    <div class="request-topic-grid">
+                        ${bildungenTopicMeta('Kategorie', item.category_label || '-')}
+                        ${bildungenTopicMeta('Sachbearbeiter', item.claimed_by_name || 'Noch nicht zugewiesen')}
+                        ${bildungenTopicMeta('Eingereicht', item.created_at_display || '-')}
+                        ${bildungenTopicMeta('Aktualisiert', item.updated_at_display || '-')}
+                        ${bildungenTopicMeta('Terminvorschlag', item.appointment_at_display || 'Noch nicht vorgeschlagen')}
+                        ${bildungenTopicMeta('Terminstatus', item.appointment_confirmation_label || '-')}
+                    </div>
+                    ${item.appointment_note ? `<div class="request-topic-note"><strong>Termin-Hinweis</strong>${bildungenEscape(item.appointment_note)}</div>` : ''}
+                </section>`;
+
+            const actionButtons = [];
+            if (item.can_withdraw) {
+                actionButtons.push('<button class="btn-danger btn-compact" type="button" data-bildungen-action="withdraw">Anfrage zurückziehen</button>');
+            }
+            if (item.can_confirm_appointment) {
+                actionButtons.push('<button class="btn-primary btn-compact" type="button" data-bildungen-action="confirm-appointment">Termin bestätigen</button>');
+                actionButtons.push('<button class="btn-danger btn-compact" type="button" data-bildungen-action="decline-appointment">Termin ablehnen</button>');
+            }
+            actions.innerHTML = actionButtons.join('');
+
+            renderBildungenChat(item.chat_messages || []);
+            bildungenState.isChatWritable = Boolean(item.is_chat_writable);
+            updateBildungenComposer();
+
+            if (bildungenState.focusChatAfterLoad) {
+                bildungenState.focusChatAfterLoad = false;
+                const panel = document.getElementById('bildungen-chat-panel');
+                const input = document.getElementById('bildungen-chat-input');
+                if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (input && !input.disabled) input.focus();
+            }
+        }
+
+        function bildungenTopicMeta(label, value) {
+            return `<div class="request-topic-meta"><strong>${bildungenEscape(label)}</strong>${bildungenEscape(value)}</div>`;
+        }
+
+        function renderBildungenChat(messages) {
             const chatLog = document.getElementById('bildungen-chat-log');
-            const messages = item.chat_messages || [];
-            chatLog.innerHTML = messages.map(message => `<div class="request-chat-message ${bildungenEscape(message.sender_type)}"><strong>${bildungenEscape(message.sender_name)}</strong>${bildungenEscape(message.message)}<span>${bildungenEscape(message.created_at)}</span></div>`).join('') || '<div class="request-detail-box">Noch keine Nachrichten vorhanden.</div>';
-            chatLog.scrollTop = chatLog.scrollHeight;
+            if (!chatLog) return;
+
+            const signature = JSON.stringify(messages);
+            if (signature === bildungenState.lastChatSignature) return;
+
+            const shouldScroll = bildungenState.shouldStickToBottom || isBildungenNearChatBottom(chatLog);
+            bildungenState.lastChatSignature = signature;
+
+            if (!messages.length) {
+                chatLog.innerHTML = '<div class="request-chat-empty">Noch keine Nachrichten vorhanden. Starte den Verlauf mit deiner ersten Nachricht.</div>';
+            } else {
+                chatLog.innerHTML = messages.map(message => {
+                    const type = bildungenSenderType(message.sender_type);
+                    const name = message.sender_name || (type === 'user' ? 'Du' : type === 'system' ? 'System' : 'Sachbearbeiter');
+                    const avatar = bildungenInitials(name, type);
+                    const timestamp = message.created_at || message.created_at_display || '';
+                    return `
+                        <article class="request-chat-message ${type}">
+                            ${type === 'system' ? '' : `<div class="request-chat-avatar" aria-hidden="true">${bildungenEscape(avatar)}</div>`}
+                            <div class="request-chat-bubble">
+                                <div class="request-chat-message-head">
+                                    <strong>${bildungenEscape(name)}</strong>
+                                    ${timestamp ? `<span>${bildungenEscape(timestamp)}</span>` : ''}
+                                </div>
+                                <div class="request-chat-text">${bildungenEscape(message.message || '')}</div>
+                            </div>
+                        </article>`;
+                }).join('');
+            }
+
+            if (shouldScroll) {
+                chatLog.scrollTop = chatLog.scrollHeight;
+                bildungenState.shouldStickToBottom = true;
+            }
+        }
+
+        function isBildungenNearChatBottom(chatLog) {
+            return chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 80;
+        }
+
+        function updateBildungenComposer() {
             const input = document.getElementById('bildungen-chat-input');
             const sendButton = document.getElementById('bildungen-chat-send');
-            const isWritable = Boolean(item.is_chat_writable);
-            input.disabled = !isWritable;
-            sendButton.disabled = !isWritable;
-            input.placeholder = isWritable ? 'Nachricht an den Sachbearbeiter schreiben' : 'Für diese Anfrage ist der Chat geschlossen.';
-            if (window.bildungenFocusChatAfterLoad) {
-                window.bildungenFocusChatAfterLoad = false;
-                document.getElementById('bildungen-chat-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                if (isWritable) input.focus();
-            }
+            if (!input || !sendButton) return;
+
+            input.disabled = !bildungenState.isChatWritable || bildungenState.isSending;
+            sendButton.disabled = !bildungenState.isChatWritable || bildungenState.isSending;
+            input.placeholder = bildungenState.isChatWritable
+                ? 'Nachricht an den Sachbearbeiter schreiben'
+                : 'Für diese Anfrage ist der Chat geschlossen.';
+            sendButton.textContent = bildungenState.isSending ? 'Wird gesendet …' : 'Nachricht senden';
         }
 
         async function sendBildungenChatMessage() {
             const input = document.getElementById('bildungen-chat-input');
+            if (!input || bildungenState.isSending) return;
+
             const text = input.value.trim();
-            if (!window.bildungenActiveRequestId || !text) return;
+            if (!bildungenState.activeRequestId || !bildungenState.isChatWritable || !text) return;
+            const requestId = bildungenState.activeRequestId;
+
+            bildungenState.isSending = true;
+            updateBildungenComposer();
+            setBildungenModalMessage('Nachricht wird gesendet …');
+
             try {
-                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, '/chat'), {
+                const data = await bildungenFetch(bildungenApiUrl(requestId, '/chat'), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ message: text, csrfToken: '{{ csrf_token() }}' })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        message: text,
+                        csrfToken: '{{ csrf_token() }}'
+                    })
                 });
+                if (bildungenState.activeRequestId !== requestId) return;
                 input.value = '';
+                bildungenState.shouldStickToBottom = true;
+                bildungenState.lastChatSignature = '';
                 renderBildungenDetails(data.request || {});
                 setBildungenModalMessage(data.message || 'Nachricht wurde gesendet.');
             } catch (error) {
                 setBildungenModalMessage(error.message, true);
+            } finally {
+                bildungenState.isSending = false;
+                const currentInput = document.getElementById('bildungen-chat-input');
+                updateBildungenComposer();
+                if (currentInput && !currentInput.disabled) currentInput.focus();
             }
         }
 
         async function withdrawBildungenRequest() {
-            if (!window.bildungenActiveRequestId || !confirm('Möchtest du diese noch ungeclaimte Anfrage wirklich zurückziehen?')) return;
+            if (!bildungenState.activeRequestId || !confirm('Möchtest du diese noch ungeclaimte Anfrage wirklich zurückziehen?')) return;
+
             try {
-                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, '/withdraw'), {
+                const data = await bildungenFetch(bildungenApiUrl(bildungenState.activeRequestId, '/withdraw'), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token() }}'
+                    },
                     body: JSON.stringify({ csrfToken: '{{ csrf_token() }}' })
                 });
                 renderBildungenDetails(data.request || {});
-                setBildungenModalMessage(data.message);
+                setBildungenModalMessage(data.message || 'Anfrage wurde zurückgezogen.');
                 setTimeout(() => window.location.reload(), 700);
             } catch (error) {
                 setBildungenModalMessage(error.message, true);
@@ -1919,23 +2633,29 @@
         }
 
         async function decideBildungenAppointment(decision) {
-            if (!window.bildungenActiveRequestId) return;
+            if (!bildungenState.activeRequestId) return;
+
             const suffix = decision === 'confirm' ? '/appointment/confirm' : '/appointment/decline';
-            const promptText = decision === 'confirm' ? 'Diesen Termin verbindlich bestätigen?' : 'Diesen Terminvorschlag ablehnen?';
+            const promptText = decision === 'confirm'
+                ? 'Diesen Termin verbindlich bestätigen?'
+                : 'Diesen Terminvorschlag ablehnen?';
             if (!confirm(promptText)) return;
+
             try {
-                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, suffix), {
+                const data = await bildungenFetch(bildungenApiUrl(bildungenState.activeRequestId, suffix), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token() }}'
+                    },
                     body: JSON.stringify({ csrfToken: '{{ csrf_token() }}' })
                 });
                 renderBildungenDetails(data.request || {});
-                setBildungenModalMessage(data.message);
+                setBildungenModalMessage(data.message || 'Terminstatus wurde aktualisiert.');
                 setTimeout(() => window.location.reload(), 700);
             } catch (error) {
                 setBildungenModalMessage(error.message, true);
             }
-        }
         }
     </script>
 </head>
@@ -2234,8 +2954,8 @@
                                     <div class="history-side">
                                         <div class="history-status {{ item.status }}">{{ item.status_label }}</div>
                                         <div class="history-actions">
-                                            <button class="btn-secondary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}')">Weitere Details</button>
-                                            <button class="btn-primary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}', true)">Chat öffnen</button>
+                                            <button class="btn-secondary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}')">Topic & Details</button>
+                                            <button class="btn-primary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}', true)">Live-Chat öffnen</button>
                                         </div>
                                     </div>
                                 </article>
@@ -2275,26 +2995,48 @@
         </div>
     </footer>
 
-    <!-- ServiceCenter Anfrage-Details & Live-Chat -->
-    <div id="bildungen-detail-modal" class="request-modal hidden" role="dialog" aria-modal="true" aria-labelledby="bildungen-detail-title" onclick="if(event.target === this) closeBildungenDetails()">
+    <!-- ServiceCenter Live-Ticket: Topic, Details & Chat -->
+    <div id="bildungen-detail-modal" class="request-modal hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="bildungen-detail-title" onclick="if(event.target === this) closeBildungenDetails()">
         <div class="request-modal-card glass-card">
             <div class="request-modal-head">
                 <div>
-                    <div class="eyebrow">ServiceCenter-Anfrage</div>
+                    <div class="eyebrow">ServiceCenter Live-Ticket</div>
                     <h2 id="bildungen-detail-title" class="section-title" style="margin-top:0.35rem;">Anfrage</h2>
                 </div>
                 <button class="btn-secondary btn-compact" type="button" onclick="closeBildungenDetails()">Schließen</button>
             </div>
-            <div id="bildungen-detail-content"></div>
-            <div id="bildungen-chat-panel" class="request-chat-panel">
-                <div class="request-chat-title">Live-Chat mit dem Sachbearbeiter</div>
-                <div id="bildungen-chat-log" class="request-chat-log"></div>
-                <div class="request-chat-compose">
-                    <textarea id="bildungen-chat-input" maxlength="2400" placeholder="Nachricht an den Sachbearbeiter schreiben"></textarea>
-                    <button id="bildungen-chat-send" class="btn-primary btn-compact" type="button" onclick="sendBildungenChatMessage()">Nachricht senden</button>
-                </div>
-                <div id="bildungen-modal-message" class="request-modal-message"></div>
+
+            <!-- Das Topic steht bewusst direkt über dem Chat. -->
+            <div id="bildungen-topic-content">
+                <div class="request-topic-loading">Topic und Ticket-Details werden geladen …</div>
             </div>
+            <div id="bildungen-topic-actions" class="request-modal-actions" aria-label="Ticket-Aktionen"></div>
+
+            <section id="bildungen-chat-panel" class="request-chat-panel" aria-label="Live-Chat mit dem Sachbearbeiter">
+                <div class="request-chat-toolbar">
+                    <div>
+                        <div class="request-chat-title">Live-Chat mit dem Sachbearbeiter</div>
+                        <div class="request-chat-presence">
+                            <span id="bildungen-chat-presence-dot" class="status-dot" aria-hidden="true"></span>
+                            <span id="bildungen-chat-presence-text">Ticket wird synchronisiert …</span>
+                        </div>
+                    </div>
+                    <button class="btn-secondary btn-compact" type="button" onclick="refreshBildungenDetails()">Aktualisieren</button>
+                </div>
+
+                <div id="bildungen-chat-log" class="request-chat-log" aria-live="polite" aria-relevant="additions text">
+                    <div class="request-chat-empty">Chat-Verlauf wird geladen …</div>
+                </div>
+
+                <div class="request-chat-compose">
+                    <textarea id="bildungen-chat-input" maxlength="2400" placeholder="Nachricht an den Sachbearbeiter schreiben" aria-label="Nachricht an den Sachbearbeiter"></textarea>
+                    <div class="request-chat-compose-side">
+                        <div class="request-chat-hint">Enter sendet · Shift + Enter fügt eine neue Zeile ein.</div>
+                        <button id="bildungen-chat-send" class="btn-primary btn-compact request-chat-send" type="button" onclick="sendBildungenChatMessage()">Nachricht senden</button>
+                    </div>
+                </div>
+                <div id="bildungen-modal-message" class="request-modal-message" role="status" aria-live="polite"></div>
+            </section>
         </div>
     </div>
 
