@@ -12,6 +12,7 @@ import hmac
 import math
 import zlib
 import secrets
+from html import escape as html_escape
 import requests
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -518,6 +519,10 @@ def ensure_indexes():
         servicecenter_bildungen_requests_collection.create_index([("offer_id", ASCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("status", ASCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("appointment_at", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("archived", ASCENDING)], unique=False)
 
         tracker_driver_cards_collection.create_index([("discord_id", ASCENDING)], unique=False)
         tracker_driver_cards_collection.create_index([("user_id", ASCENDING)], unique=False)
@@ -17773,24 +17778,182 @@ def find_bildungen_angebot(category, offer_id):
     return None
 
 
+BILDUNGEN_ADMIN_CATEGORY_LABELS = {
+    "schulung": "Schulungsanmeldung",
+    "interne_bewerbung": "Interne Bewerbung",
+    "fahrer_service": "Fahrer-Service",
+}
+
+BILDUNGEN_ADMIN_STATUS_LABELS = {
+    "submitted": "Eingereicht",
+    "in_review": "In Prüfung",
+    "appointment_scheduled": "Termin geplant",
+    "approved": "Bestätigt",
+    "rejected": "Abgelehnt",
+    "completed": "Abgeschlossen",
+    "archived": "Archiviert",
+}
+
+BILDUNGEN_ADMIN_ALLOWED_STATUSES = set(BILDUNGEN_ADMIN_STATUS_LABELS) - {"archived"}
+
+
+def normalize_bildungen_status(value, fallback="submitted"):
+    value = safe_str(value).lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "pending": "submitted",
+        "open": "submitted",
+        "claimed": "in_review",
+        "review": "in_review",
+        "termin": "appointment_scheduled",
+        "appointment": "appointment_scheduled",
+        "scheduled": "appointment_scheduled",
+        "done": "completed",
+        "closed": "completed",
+    }
+    value = aliases.get(value, value)
+    if value in BILDUNGEN_ADMIN_STATUS_LABELS:
+        return value
+    return fallback
+
+
+def parse_servicecenter_datetime(value):
+    value = safe_str(value)
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def datetime_local_input_value(value):
+    if not value:
+        return ""
+    if not isinstance(value, datetime):
+        value = parse_servicecenter_datetime(value)
+    return value.strftime("%Y-%m-%dT%H:%M") if isinstance(value, datetime) else ""
+
+
+def find_bildungen_request(request_id):
+    request_id = safe_str(request_id)
+    if not request_id:
+        return None
+    return servicecenter_bildungen_requests_collection.find_one(request_lookup_query(request_id))
+
+
+def build_servicecenter_bildungen_reply_templates(item):
+    item = item or {}
+    display_name = safe_str(item.get("display_name") or item.get("username"), "Fahrer/in")
+    offer_title = safe_str(item.get("offer_title"), "deine Anfrage")
+    appointment_text = format_datetime_for_template(item.get("appointment_at")) or "[Termin einsetzen]"
+    handler_name = safe_str((item.get("claimed_by") or {}).get("display_name") or item.get("handler_name"), "Personalabteilung")
+
+    return [
+        {
+            "id": "eingang",
+            "label": "Eingang bestätigen",
+            "text": f"Hallo {display_name},\n\ndeine Anfrage zu „{offer_title}“ ist bei uns eingegangen. Wir prüfen die Angaben und melden uns mit dem nächsten Schritt.\n\nViele Grüße\n{handler_name}",
+        },
+        {
+            "id": "termin",
+            "label": "Termin bestätigen",
+            "text": f"Hallo {display_name},\n\nfür deine Anfrage zu „{offer_title}“ ist folgender Termin vorgesehen: {appointment_text}. Bitte gib kurz Bescheid, falls der Termin nicht passt.\n\nViele Grüße\n{handler_name}",
+        },
+        {
+            "id": "rueckfrage",
+            "label": "Rückfrage senden",
+            "text": f"Hallo {display_name},\n\nzu deiner Anfrage „{offer_title}“ benötigen wir noch eine kurze Rückmeldung: [Rückfrage ergänzen].\n\nViele Grüße\n{handler_name}",
+        },
+        {
+            "id": "zusage",
+            "label": "Bestätigung / Zusage",
+            "text": f"Hallo {display_name},\n\ndeine Anfrage zu „{offer_title}“ wurde bestätigt. Weitere organisatorische Hinweise erhältst du direkt über das ServiceCenter.\n\nViele Grüße\n{handler_name}",
+        },
+        {
+            "id": "absage",
+            "label": "Absage formulieren",
+            "text": f"Hallo {display_name},\n\nvielen Dank für deine Anfrage zu „{offer_title}“. Nach Prüfung können wir sie aktuell leider nicht bestätigen. Begründung: [Begründung ergänzen].\n\nViele Grüße\n{handler_name}",
+        },
+        {
+            "id": "abschluss",
+            "label": "Abschluss mitteilen",
+            "text": f"Hallo {display_name},\n\ndeine Anfrage zu „{offer_title}“ wurde abgeschlossen. Vielen Dank für deine Rückmeldung und Teilnahme.\n\nViele Grüße\n{handler_name}",
+        },
+    ]
+
+
 def prepare_bildungen_request_for_template(item):
     item = dict(item or {})
     item["id"] = safe_str(item.get("request_id") or item.get("_id"))
-    item["category_label"] = {
-        "schulung": "Schulungsanmeldung",
-        "interne_bewerbung": "Interne Bewerbung",
-        "fahrer_service": "Fahrer-Service",
-    }.get(safe_str(item.get("category")).lower(), "Anfrage")
+    item["category_label"] = BILDUNGEN_ADMIN_CATEGORY_LABELS.get(safe_str(item.get("category")).lower(), "Anfrage")
     item["created_at_display"] = format_datetime_for_template(item.get("created_at")) or "-"
-    item["status_label"] = {
-        "submitted": "Eingereicht",
-        "in_review": "In Prüfung",
-        "approved": "Bestätigt",
-        "rejected": "Abgelehnt",
-        "completed": "Abgeschlossen",
-    }.get(safe_str(item.get("status")).lower(), safe_str(item.get("status"), "Eingereicht"))
+    item["updated_at_display"] = format_datetime_for_template(item.get("updated_at")) or item["created_at_display"]
+    item["appointment_at_display"] = format_datetime_for_template(item.get("appointment_at")) or ""
+    item["appointment_note"] = safe_str(item.get("appointment_note"))
+    item["response_text"] = safe_str(item.get("response_text"))
+    item["status"] = normalize_bildungen_status(item.get("status"))
+    item["status_label"] = BILDUNGEN_ADMIN_STATUS_LABELS.get(item["status"], item["status"])
     item.pop("_id", None)
     return item
+
+
+def prepare_bildungen_request_for_personalabteilung(item):
+    item = dict(item or {})
+    raw_appointment_at = item.get("appointment_at")
+    mongo_id = item.get("_id")
+    mongo_id_str = str(mongo_id) if mongo_id else ""
+    item["_id"] = mongo_id_str
+    item["id"] = safe_str(item.get("request_id") or item.get("id") or mongo_id_str)
+    item["request_id"] = safe_str(item.get("request_id") or item["id"])
+    item["display_name"] = safe_str(item.get("display_name") or item.get("username"), "Unbekannter User")
+    item["username"] = safe_str(item.get("username") or item.get("display_name"), item["display_name"])
+    item["role"] = safe_str(item.get("role"), "Fahrer")
+    item["category"] = safe_str(item.get("category")).lower()
+    item["category_label"] = BILDUNGEN_ADMIN_CATEGORY_LABELS.get(item["category"], "Anfrage")
+    item["offer_title"] = safe_str(item.get("offer_title"), "Unbenannte Anfrage")
+    item["message"] = safe_str(item.get("message"))
+    item["status"] = normalize_bildungen_status(item.get("status"))
+    item["status_label"] = BILDUNGEN_ADMIN_STATUS_LABELS.get(item["status"], item["status"])
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["updated_at"] = format_datetime_for_template(item.get("updated_at")) or item["created_at"]
+    item["appointment_at"] = format_datetime_for_template(raw_appointment_at) or ""
+    item["appointment_at_input"] = datetime_local_input_value(raw_appointment_at)
+    item["appointment_note"] = safe_str(item.get("appointment_note"))
+    item["internal_note"] = safe_str(item.get("internal_note"))
+    item["response_text"] = safe_str(item.get("response_text"))
+    item["last_published_at"] = format_datetime_for_template(item.get("last_published_at")) or ""
+    claimed_by = item.get("claimed_by") or {}
+    item["claimed_by_name"] = safe_str(claimed_by.get("display_name") or claimed_by.get("username") or item.get("handler_name"), "Noch nicht geclaimt")
+    item["claimed_by_discord_id"] = safe_str(claimed_by.get("discord_id"))
+    item["handler_name"] = item["claimed_by_name"]
+    item["reply_templates"] = build_servicecenter_bildungen_reply_templates({**item, "appointment_at": raw_appointment_at})
+    item["archived"] = bool(item.get("archived"))
+    return item
+
+
+def servicecenter_bildungen_document_content(request_doc, response_text, actor):
+    request_doc = request_doc or {}
+    response_text = safe_str(response_text)
+    handler_name = safe_str(actor.get("display_name") or actor.get("username"), "Personalabteilung")
+    offer_title = safe_str(request_doc.get("offer_title"), "Weiterbildungsanfrage")
+    status_label = BILDUNGEN_ADMIN_STATUS_LABELS.get(normalize_bildungen_status(request_doc.get("status")), "In Bearbeitung")
+    appointment_display = format_datetime_for_template(request_doc.get("appointment_at")) or "Noch nicht festgelegt"
+    appointment_note = safe_str(request_doc.get("appointment_note"))
+    response_html = html_escape(response_text).replace("\n", "<br>") if response_text else "Wir haben deine Anfrage aktualisiert."
+    appointment_note_html = html_escape(appointment_note).replace("\n", "<br>") if appointment_note else "-"
+    return f'''
+        <p><strong>Update zu deiner ServiceCenter-Anfrage</strong></p>
+        <p class="mt-4">{response_html}</p>
+        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Weiterbildung & interne Entwicklung</p>
+            <p><strong>Anfrage:</strong> {html_escape(offer_title)}</p>
+            <p><strong>Status:</strong> {html_escape(status_label)}</p>
+            <p><strong>Termin:</strong> {html_escape(appointment_display)}</p>
+            <p><strong>Termin-Hinweis:</strong><br>{appointment_note_html}</p>
+            <p><strong>Sachbearbeiter:</strong> {html_escape(handler_name)}</p>
+        </div>
+    '''
 
 
 @app.route("/bildungen", methods=["GET"])
@@ -22925,8 +23088,18 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
       box-shadow:0 18px 45px rgba(7,18,31,.22);
     }
     header h1 { margin:0; font-size:24px; letter-spacing:.08em; text-transform:uppercase; }
-    header p { margin:6px 0 0; color:#d8e8f7; line-height:1.45; }
-    header a { color:white; font-weight:900; text-decoration:none; border-bottom:1px solid rgba(255,255,255,.35); }
+    header a { color:white; font-weight:900; text-decoration:none; }
+    .header-stack { display:grid; gap:13px; }
+    .service-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+    .service-tab {
+      display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:9px 14px;
+      border:1px solid rgba(255,255,255,.22); border-radius:999px; color:#d8e8f7;
+      background:rgba(255,255,255,.06); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+      transition:background .16s ease, border-color .16s ease, transform .16s ease;
+    }
+    .service-tab:hover { transform:translateY(-1px); background:rgba(255,255,255,.13); border-color:rgba(255,255,255,.42); }
+    .service-tab.active { color:#102946; background:#fff; border-color:#fff; }
+    .personal-link { border-bottom:1px solid rgba(255,255,255,.35); }
     main { max-width:1280px; margin:0 auto; padding:28px; }
     .toolbar {
       display:flex;
@@ -23223,11 +23396,14 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 </head>
 <body>
 <header>
-  <div>
-    <h1>ServiceCenter Fahrerkarte</h1>
-    <p>Web-only: claimen, genehmigen, signieren, ausstellen und PDF im User-Postfach bereitstellen.</p>
+  <div class="header-stack">
+    <h1>ServiceCenter</h1>
+    <nav class="service-tabs" aria-label="ServiceCenter Bereiche">
+      <a class="service-tab active" href="{{ fahrerkarten_url }}">Fahrerkarten</a>
+      <a class="service-tab" href="{{ weiterbildungen_url }}">Weiterbildungen</a>
+    </nav>
   </div>
-  <a href="{{ personal_url }}">Zur Personalabteilung</a>
+  <a class="personal-link" href="{{ personal_url }}">Zur Personalabteilung</a>
 </header>
 <main>
   <div class="toolbar">
@@ -23451,7 +23627,551 @@ def personalabteilung_servicecenter_fahrerkarte_web():
         actions_json=json.dumps(actions),
         staff_name_json=json.dumps(actor.get("display_name") or actor.get("username") or "Personalabteilung"),
         personal_url=url_for("personalabteilung"),
+        fahrerkarten_url=url_for("personalabteilung_servicecenter_fahrerkarte_web"),
+        weiterbildungen_url=url_for("personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web"),
     )
+
+
+# ==========================================
+# SERVICECENTER / PERSONALABTEILUNG WEITERBILDUNGEN
+# ==========================================
+
+WEITERBILDUNGEN_WEB_ADMIN_TEMPLATE = r"""
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceCenter Weiterbildungen</title>
+  <style>
+    :root {
+      --blue:#17345f;
+      --blue-2:#244878;
+      --line:#9bb5cf;
+      --bg:#eef5fb;
+      --green:#27d263;
+      --green-dark:#146c2e;
+      --red:#9f1d17;
+      --yellow:#8a5a00;
+      --muted:#52697f;
+      --shadow:0 18px 38px rgba(23,52,95,.12);
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      margin:0;
+      min-height:100vh;
+      color:#112;
+      font-family:Inter,Arial,sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%,rgba(39,210,99,.13),transparent 28%),
+        radial-gradient(circle at 100% 0%,rgba(23,52,95,.18),transparent 30%),
+        linear-gradient(135deg,#eef5fb,#d9e9f6);
+    }
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:24px 32px;
+      color:#fff;
+      background:linear-gradient(135deg,#17345f,#102946);
+      box-shadow:0 18px 45px rgba(7,18,31,.22);
+    }
+    header h1 { margin:0; font-size:24px; letter-spacing:.08em; text-transform:uppercase; }
+    header a { color:#fff; font-weight:900; text-decoration:none; }
+    .header-stack { display:grid; gap:13px; }
+    .service-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+    .service-tab {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:36px;
+      padding:9px 14px;
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:999px;
+      color:#d8e8f7;
+      background:rgba(255,255,255,.06);
+      font-size:12px;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      transition:background .16s ease,border-color .16s ease,transform .16s ease;
+    }
+    .service-tab:hover { transform:translateY(-1px); background:rgba(255,255,255,.13); border-color:rgba(255,255,255,.42); }
+    .service-tab.active { color:#102946; background:#fff; border-color:#fff; }
+    .personal-link { border-bottom:1px solid rgba(255,255,255,.35); }
+    main { max-width:1480px; margin:0 auto; padding:28px; }
+    .intro {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:18px;
+      align-items:center;
+      margin-bottom:18px;
+      padding:18px;
+      border:1px solid rgba(155,181,207,.78);
+      border-radius:20px;
+      background:rgba(255,255,255,.70);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(12px);
+    }
+    .intro h2 { margin:0; color:#17345f; font-size:20px; }
+    .intro p { margin:6px 0 0; color:#52697f; line-height:1.55; }
+    .stats { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+    .stat { min-width:90px; padding:10px 12px; border:1px solid #c4d4e4; border-radius:15px; background:#f7fbff; text-align:center; }
+    .stat strong { display:block; color:#17345f; font-size:19px; }
+    .stat span { display:block; margin-top:2px; color:#52697f; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .toolbar {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-bottom:18px;
+      padding:14px;
+      border:1px solid rgba(155,181,207,.78);
+      border-radius:20px;
+      background:rgba(255,255,255,.62);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(12px);
+    }
+    button,select,input,textarea { border:1px solid #a8bfd7; border-radius:11px; padding:10px 12px; font:inherit; outline:none; }
+    input:focus,textarea:focus,select:focus { border-color:rgba(20,108,46,.65); box-shadow:0 0 0 3px rgba(39,210,99,.12); }
+    textarea { width:100%; min-height:80px; resize:vertical; line-height:1.45; }
+    button {
+      cursor:pointer;
+      color:#fff;
+      background:#17345f;
+      border-color:#17345f;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+      transition:.16s ease;
+    }
+    button:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 10px 22px rgba(23,52,95,.18); }
+    button.secondary { color:#17345f; background:#fff; }
+    button.success { background:#146c2e; border-color:#146c2e; }
+    button.danger { background:#9f1d17; border-color:#9f1d17; }
+    button.ghost { color:#17345f; background:#f5f9fc; border-color:#b8cbe0; }
+    button:disabled { opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+    .grow { flex:1 1 240px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:18px; align-items:start; }
+    .case { overflow:hidden; border:1px solid #b5c9dd; border-radius:22px; background:rgba(255,255,255,.95); box-shadow:var(--shadow); }
+    .case-head { display:flex; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid #dde8f1; background:linear-gradient(135deg,#f9fcff,#eff7fd); }
+    .case-head h3 { margin:0; color:#17345f; font-size:17px; overflow-wrap:anywhere; }
+    .case-head p { margin:5px 0 0; color:#52697f; font-size:12px; }
+    .pill { display:inline-flex; align-items:center; align-self:flex-start; padding:5px 9px; border:1px solid #9edbb0; border-radius:999px; color:#146c2e; background:#e9f9ee; font-size:10px; font-weight:900; letter-spacing:.04em; white-space:nowrap; }
+    .pill.submitted,.pill.in_review,.pill.appointment_scheduled { color:#8a5a00; border-color:#edcd84; background:#fff7e4; }
+    .pill.rejected { color:#9f1d17; border-color:#e6a09a; background:#ffe9e7; }
+    .case-body { display:grid; gap:13px; padding:16px; }
+    .meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; color:#26394c; font-size:12px; }
+    .meta strong { color:#17345f; }
+    .message { padding:12px; border:1px solid #d2e0ed; border-radius:14px; color:#26394c; background:#f7fbff; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .section { display:grid; gap:8px; padding:12px; border:1px solid #d8e4ef; border-radius:15px; background:#fbfdff; }
+    .section-title { margin:0; color:#17345f; font-size:11px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    label { display:grid; gap:5px; color:#475b70; font-size:12px; font-weight:800; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .template-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; }
+    .msg { min-height:20px; margin:0 0 14px; color:#146c2e; font-weight:900; }
+    .small { color:#52697f; font-size:11px; line-height:1.45; }
+    .empty { padding:28px; border:1px dashed #9bb5cf; border-radius:18px; color:#52697f; background:rgba(255,255,255,.72); text-align:center; }
+    @media (max-width:700px) {
+      header { align-items:flex-start; flex-direction:column; padding:20px; }
+      main { padding:18px; }
+      .intro { grid-template-columns:1fr; }
+      .stats { justify-content:flex-start; }
+      .grid { grid-template-columns:1fr; }
+      .fields,.template-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-stack">
+    <h1>ServiceCenter</h1>
+    <nav class="service-tabs" aria-label="ServiceCenter Bereiche">
+      <a class="service-tab" href="{{ fahrerkarten_url }}">Fahrerkarten</a>
+      <a class="service-tab active" href="{{ weiterbildungen_url }}">Weiterbildungen</a>
+    </nav>
+  </div>
+  <a class="personal-link" href="{{ personal_url }}">Zur Personalabteilung</a>
+</header>
+<main>
+  <section class="intro">
+    <div>
+      <h2>Weiterbildungen & interne Entwicklung</h2>
+      <p>Anträge prüfen, die Bearbeitung übernehmen, Termine vergeben und fertige Antworttexte direkt in das User-Postfach senden.</p>
+    </div>
+    <div id="stats" class="stats"></div>
+  </section>
+  <div class="toolbar">
+    <select id="filter-status">
+      <option value="">Alle Status</option>
+      <option value="submitted">Eingereicht</option>
+      <option value="in_review">In Prüfung</option>
+      <option value="appointment_scheduled">Termin geplant</option>
+      <option value="approved">Bestätigt</option>
+      <option value="completed">Abgeschlossen</option>
+      <option value="rejected">Abgelehnt</option>
+    </select>
+    <select id="filter-category">
+      <option value="">Alle Kategorien</option>
+      <option value="schulung">Schulungen</option>
+      <option value="interne_bewerbung">Interne Bewerbungen</option>
+      <option value="fahrer_service">Fahrer-Services</option>
+    </select>
+    <input class="grow" id="filter-search" placeholder="Name, Angebot oder Nachricht suchen">
+    <button type="button" onclick="loadRequests()">Aktualisieren</button>
+  </div>
+  <p id="msg" class="msg"></p>
+  <section id="requests" class="grid"></section>
+</main>
+<script>
+const actions = {{ actions_json | safe }};
+const requestTemplates = {};
+const requestsEl = document.getElementById('requests');
+const msgEl = document.getElementById('msg');
+const statsEl = document.getElementById('stats');
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+function cleanId(v){ return String(v ?? '').replace(/[^a-zA-Z0-9_-]/g,'_'); }
+function setMsg(text,error=false){ msgEl.textContent=text||''; msgEl.style.color=error?'#9f1d17':'#146c2e'; }
+function statusOptions(value){
+  const options=[['submitted','Eingereicht'],['in_review','In Prüfung'],['appointment_scheduled','Termin geplant'],['approved','Bestätigt'],['completed','Abgeschlossen'],['rejected','Abgelehnt']];
+  return options.map(([id,label])=>`<option value="${id}" ${id===value?'selected':''}>${label}</option>`).join('');
+}
+async function api(url,payload){
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
+  const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
+  if(!res.ok||data.success===false) throw new Error(data.message||'Aktion fehlgeschlagen');
+  return data;
+}
+function renderStats(stats){
+  const items=[['Offen',stats.open||0],['Termine',stats.appointments||0],['Erledigt',stats.completed||0],['Gesamt',stats.total||0]];
+  statsEl.innerHTML=items.map(([label,value])=>`<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');
+}
+async function loadRequests(){
+  const params=new URLSearchParams();
+  const status=document.getElementById('filter-status').value;
+  const category=document.getElementById('filter-category').value;
+  const q=document.getElementById('filter-search').value.trim();
+  if(status) params.set('status',status);
+  if(category) params.set('category',category);
+  if(q) params.set('q',q);
+  try{
+    const res=await fetch(actions.list+(params.toString()?('?'+params.toString()):''));
+    const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
+    if(!res.ok||data.success===false) throw new Error(data.message||'Anträge konnten nicht geladen werden.');
+    const items=data.requests||data.items||[];
+    requestsEl.innerHTML=items.map(renderRequest).join('')||'<div class="empty">Keine Weiterbildungs-Anträge gefunden.</div>';
+    renderStats(data.stats||{});
+    setMsg(items.length+' Antrag/Anträge geladen.');
+  }catch(error){ setMsg(error.message,true); }
+}
+function renderRequest(item){
+  const id=String(item.request_id||item.id||'');
+  const safeId=cleanId(id);
+  requestTemplates[safeId]=item.reply_templates||[];
+  const templates=(item.reply_templates||[]).map((tpl,index)=>`<option value="${index}">${esc(tpl.label)}</option>`).join('');
+  const claimedByOther=Boolean(item.claimed_by_discord_id&&item.claimed_by_discord_id!==actions.actorDiscordId);
+  const claimLabel=item.claimed_by_discord_id?(claimedByOther?'Von anderem Sachbearbeiter geclaimt':'Bereits geclaimt'):'Bearbeitung claimen';
+  return `<article class="case" id="case-${safeId}">
+    <div class="case-head">
+      <div><h3>${esc(item.offer_title)}</h3><p>${esc(item.category_label)} · ${esc(item.display_name)} · ${esc(item.role)}</p></div>
+      <span class="pill ${esc(item.status)}">${esc(item.status_label)}</span>
+    </div>
+    <div class="case-body">
+      <div class="meta">
+        <div><strong>User:</strong> ${esc(item.display_name)}<br><span class="small">${esc(item.username)} · ${esc(item.discord_id||'-')}</span></div>
+        <div><strong>Eingang:</strong> ${esc(item.created_at)}<br><span class="small">Aktualisiert: ${esc(item.updated_at)}</span></div>
+        <div><strong>Sachbearbeiter:</strong> ${esc(item.claimed_by_name)}</div>
+        <div><strong>Quelle:</strong> ${esc(item.source||'servicecenter_bildungen')}</div>
+      </div>
+      <div class="section"><p class="section-title">Anfrage ansehen</p><div class="message">${esc(item.message||'Keine zusätzliche Nachricht übermittelt.')}</div></div>
+      <div class="section">
+        <p class="section-title">Bearbeitung & Terminvergabe</p>
+        <div class="fields">
+          <label>Status<select id="status-${safeId}">${statusOptions(item.status)}</select></label>
+          <label>Termin<input id="appointment-${safeId}" type="datetime-local" value="${esc(item.appointment_at_input||'')}"></label>
+        </div>
+        <label>Termin-Hinweis<textarea id="appointment-note-${safeId}" placeholder="Zum Beispiel Treffpunkt, Dauer oder Ablauf">${esc(item.appointment_note||'')}</textarea></label>
+        <label>Interne Notiz<textarea id="internal-note-${safeId}" placeholder="Nur für die Personalabteilung sichtbar">${esc(item.internal_note||'')}</textarea></label>
+      </div>
+      <div class="section">
+        <p class="section-title">Antworttext direkt verwenden</p>
+        <div class="template-row"><select id="template-${safeId}">${templates}</select><button class="ghost" type="button" onclick="applyTemplate('${safeId}')">Vorlage einsetzen</button><button class="secondary" type="button" onclick="copyReply('${safeId}')">Kopieren</button></div>
+        <textarea id="response-${safeId}" placeholder="Antwort für das User-Postfach">${esc(item.response_text||'')}</textarea>
+        <span class="small">„Speichern & senden“ legt die Nachricht als ServiceCenter-Dokument im User-Postfach ab.</span>
+      </div>
+      <div class="row">
+        <button type="button" ${item.claimed_by_discord_id?'disabled':''} onclick="claimRequest('${esc(id)}')">${esc(claimLabel)}</button>
+        <button class="success" type="button" ${claimedByOther?'disabled':''} onclick="saveRequest('${esc(id)}','${safeId}',false)">Speichern</button>
+        <button class="success" type="button" ${claimedByOther?'disabled':''} onclick="saveRequest('${esc(id)}','${safeId}',true)">Speichern & senden</button>
+        <button class="danger" type="button" ${claimedByOther?'disabled':''} onclick="archiveRequest('${esc(id)}')">Archivieren</button>
+      </div>
+      ${item.last_published_at?`<span class="small">Letzte Nachricht an User: ${esc(item.last_published_at)}</span>`:''}
+    </div>
+  </article>`;
+}
+function applyTemplate(safeId){
+  const list=requestTemplates[safeId]||[];
+  const select=document.getElementById('template-'+safeId);
+  const textarea=document.getElementById('response-'+safeId);
+  if(!select||!textarea||!list.length) return;
+  textarea.value=(list[Number(select.value)]||{}).text||'';
+}
+async function copyReply(safeId){
+  const textarea=document.getElementById('response-'+safeId);
+  if(!textarea) return;
+  try{ await navigator.clipboard.writeText(textarea.value||''); setMsg('Antworttext wurde kopiert.'); }
+  catch(error){ textarea.select(); document.execCommand('copy'); setMsg('Antworttext wurde kopiert.'); }
+}
+async function claimRequest(id){
+  try{ const data=await api(actions.claim,{requestId:id}); setMsg(data.message); await loadRequests(); }
+  catch(error){ setMsg(error.message,true); }
+}
+async function saveRequest(id,safeId,publishToUser){
+  try{
+    const payload={
+      requestId:id,
+      status:document.getElementById('status-'+safeId).value,
+      appointmentAt:document.getElementById('appointment-'+safeId).value,
+      appointmentNote:document.getElementById('appointment-note-'+safeId).value,
+      internalNote:document.getElementById('internal-note-'+safeId).value,
+      responseText:document.getElementById('response-'+safeId).value,
+      publishToUser
+    };
+    const data=await api(actions.update,payload);
+    setMsg(data.message);
+    await loadRequests();
+  }catch(error){ setMsg(error.message,true); }
+}
+async function archiveRequest(id){
+  if(!confirm('Diesen Weiterbildungs-Antrag archivieren?')) return;
+  try{ const data=await api(actions.archive,{requestId:id}); setMsg(data.message); await loadRequests(); }
+  catch(error){ setMsg(error.message,true); }
+}
+document.getElementById('filter-search').addEventListener('keydown',event=>{ if(event.key==='Enter') loadRequests(); });
+loadRequests();
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/personalabteilung/servicecenter/fahrerkarte/weiterbildungen", methods=["GET"])
+@app.route("/servicecenter/admin/fahrerkarte/weiterbildungen", methods=["GET"])
+def personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web():
+    permission_response = require_personalabteilung_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_staff_identity()
+    actions = {
+        "list": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list"),
+        "claim": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_claim"),
+        "update": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update"),
+        "archive": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_archive"),
+        "actorDiscordId": safe_str(actor.get("discord_id")),
+    }
+    return render_template_string(
+        WEITERBILDUNGEN_WEB_ADMIN_TEMPLATE,
+        actions_json=json.dumps(actions),
+        personal_url=url_for("personalabteilung"),
+        fahrerkarten_url=url_for("personalabteilung_servicecenter_fahrerkarte_web"),
+        weiterbildungen_url=url_for("personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web"),
+    )
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen", methods=["GET"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    status = safe_str(request.args.get("status")).lower()
+    category = safe_str(request.args.get("category")).lower()
+    search_text = safe_str(request.args.get("q"))[:120]
+    query = {"archived": {"$ne": True}}
+    if status:
+        normalized_status = normalize_bildungen_status(status, fallback="")
+        if normalized_status:
+            query["status"] = normalized_status
+    if category in BILDUNGEN_ADMIN_CATEGORY_LABELS:
+        query["category"] = category
+    if search_text:
+        pattern = re.escape(search_text)
+        query["$or"] = [
+            {"display_name": {"$regex": pattern, "$options": "i"}},
+            {"username": {"$regex": pattern, "$options": "i"}},
+            {"offer_title": {"$regex": pattern, "$options": "i"}},
+            {"message": {"$regex": pattern, "$options": "i"}},
+        ]
+
+    items = [
+        prepare_bildungen_request_for_personalabteilung(item)
+        for item in servicecenter_bildungen_requests_collection.find(query).sort([("created_at", DESCENDING)]).limit(300)
+    ]
+    stats = {
+        "total": servicecenter_bildungen_requests_collection.count_documents({"archived": {"$ne": True}}),
+        "open": servicecenter_bildungen_requests_collection.count_documents({"archived": {"$ne": True}, "status": {"$in": ["submitted", "in_review"]}}),
+        "appointments": servicecenter_bildungen_requests_collection.count_documents({"archived": {"$ne": True}, "status": "appointment_scheduled"}),
+        "completed": servicecenter_bildungen_requests_collection.count_documents({"archived": {"$ne": True}, "status": {"$in": ["approved", "completed"]}}),
+    }
+    return jsonify({"success": True, "requests": items, "items": items, "stats": stats})
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/claim", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_claim():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+    request_doc = find_bildungen_request(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Weiterbildungs-Antrag wurde nicht gefunden."}), 404
+
+    actor = current_staff_identity()
+    claimed_by = request_doc.get("claimed_by") or {}
+    if safe_str(claimed_by.get("discord_id")):
+        if request_is_claimed_by_actor(request_doc, actor):
+            return jsonify({"success": True, "message": "Du hast diesen Weiterbildungs-Antrag bereits geclaimt.", "request": prepare_bildungen_request_for_personalabteilung(request_doc)})
+        claimed_name = safe_str(claimed_by.get("display_name") or claimed_by.get("username"), "einem anderen Sachbearbeiter")
+        return jsonify({"success": False, "message": f"Dieser Weiterbildungs-Antrag ist bereits von {claimed_name} geclaimt."}), 409
+
+    now = now_utc()
+    current_status = normalize_bildungen_status(request_doc.get("status"))
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": {
+            "status": "in_review" if current_status == "submitted" else current_status,
+            "claimed_by": actor,
+            "claimed_at": now,
+            "handler_name": actor.get("display_name") or actor.get("username") or "Personalabteilung",
+            "updated_at": now,
+        }},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+    return jsonify({"success": True, "message": "Weiterbildungs-Antrag wurde geclaimt.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/update", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+    request_doc = find_bildungen_request(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Weiterbildungs-Antrag wurde nicht gefunden."}), 404
+
+    actor = current_staff_identity()
+    claimed_by = request_doc.get("claimed_by") or {}
+    claimed_discord_id = safe_str(claimed_by.get("discord_id"))
+    if claimed_discord_id and not request_is_claimed_by_actor(request_doc, actor):
+        claimed_name = safe_str(claimed_by.get("display_name") or claimed_by.get("username"), "einem anderen Sachbearbeiter")
+        return jsonify({"success": False, "message": f"Dieser Weiterbildungs-Antrag wird bereits von {claimed_name} bearbeitet."}), 403
+
+    raw_status = safe_str(data.get("status")).lower()
+    status = normalize_bildungen_status(raw_status, fallback="") if raw_status else normalize_bildungen_status(request_doc.get("status"))
+    if not status or status not in BILDUNGEN_ADMIN_ALLOWED_STATUSES:
+        return jsonify({"success": False, "message": "Ungültiger Bearbeitungsstatus."}), 400
+
+    appointment_field_present = "appointmentAt" in data or "appointment_at" in data
+    appointment_raw = safe_str(data.get("appointmentAt") or data.get("appointment_at"))
+    appointment_at = parse_servicecenter_datetime(appointment_raw) if appointment_raw else None
+    if appointment_field_present and appointment_raw and not appointment_at:
+        return jsonify({"success": False, "message": "Der Termin konnte nicht gelesen werden. Bitte Datum und Uhrzeit prüfen."}), 400
+
+    now = now_utc()
+    handler_name = actor.get("display_name") or actor.get("username") or "Personalabteilung"
+    update_set = {
+        "status": status,
+        "appointment_note": safe_str(data.get("appointmentNote") or data.get("appointment_note"))[:1600],
+        "internal_note": safe_str(data.get("internalNote") or data.get("internal_note"))[:2400],
+        "response_text": safe_str(data.get("responseText") or data.get("response_text"))[:4000],
+        "claimed_by": actor,
+        "handler_name": handler_name,
+        "updated_at": now,
+        "updated_by": actor,
+    }
+    if not claimed_discord_id:
+        update_set["claimed_at"] = now
+    update_doc = {"$set": update_set}
+    if appointment_field_present:
+        if appointment_at:
+            update_set["appointment_at"] = appointment_at
+            if status in {"submitted", "in_review"}:
+                update_set["status"] = "appointment_scheduled"
+        else:
+            update_doc["$unset"] = {"appointment_at": ""}
+            if status == "appointment_scheduled":
+                update_set["status"] = "in_review"
+
+    servicecenter_bildungen_requests_collection.update_one({"_id": request_doc["_id"]}, update_doc)
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    publish_to_user = bool_from_payload(data.get("publishToUser") or data.get("publish_to_user"), fallback=False)
+    if publish_to_user:
+        create_system_document_for_user(
+            fresh_request.get("discord_id"),
+            f"ServiceCenter-Update: {safe_str(fresh_request.get('offer_title'), 'Weiterbildung')}",
+            handler_name,
+            servicecenter_bildungen_document_content(fresh_request, fresh_request.get("response_text"), actor),
+            doc_type="servicecenter_bildungen_update",
+            needs_signature=False,
+            extra={
+                "important": True,
+                "request_id": fresh_request.get("request_id"),
+                "bildungen_request_id": fresh_request.get("request_id"),
+                "servicecenter_area": "weiterbildungen",
+            },
+        )
+        servicecenter_bildungen_requests_collection.update_one(
+            {"_id": request_doc["_id"]},
+            {"$set": {"last_published_at": now, "last_published_by": actor, "updated_at": now}},
+        )
+        fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Weiterbildungs-Antrag wurde gespeichert und an den User gesendet." if publish_to_user else "Weiterbildungs-Antrag wurde gespeichert.",
+        "request": prepare_bildungen_request_for_personalabteilung(fresh_request),
+    })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/archive", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_archive():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+    request_doc = find_bildungen_request(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Weiterbildungs-Antrag wurde nicht gefunden."}), 404
+
+    actor = current_staff_identity()
+    claimed_by = request_doc.get("claimed_by") or {}
+    if safe_str(claimed_by.get("discord_id")) and not request_is_claimed_by_actor(request_doc, actor):
+        claimed_name = safe_str(claimed_by.get("display_name") or claimed_by.get("username"), "einem anderen Sachbearbeiter")
+        return jsonify({"success": False, "message": f"Dieser Weiterbildungs-Antrag wird bereits von {claimed_name} bearbeitet."}), 403
+
+    now = now_utc()
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": {"archived": True, "archived_at": now, "archived_by": actor, "updated_at": now}},
+    )
+    return jsonify({"success": True, "message": "Weiterbildungs-Antrag wurde archiviert."})
 
 
 # ==========================================
