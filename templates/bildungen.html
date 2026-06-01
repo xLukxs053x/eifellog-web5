@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ description }}">
+    <title>{{ title }}</title>
+    <style>
+        :root {
+            --navy-950: #061526;
+            --navy-900: #081d32;
+            --navy-850: #0b263f;
+            --navy-800: #10314d;
+            --green-500: #18a85d;
+            --green-400: #29c773;
+            --green-100: #dff8e9;
+            --paper: #f3f7f5;
+            --white: #ffffff;
+            --ink: #0a1f31;
+            --muted: #577084;
+            --line: #d5e1e2;
+            --shadow: 0 18px 45px rgba(6, 21, 38, .12);
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--paper);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        a { color: inherit; text-decoration: none; }
+        button, textarea { font: inherit; }
+
+        .topbar {
+            background: var(--navy-950);
+            border-bottom: 5px solid var(--green-500);
+            color: var(--white);
+        }
+        .topbar-inner, .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            min-height: 74px;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .04em; }
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border: 1px solid rgba(41,199,115,.75);
+            border-radius: 10px;
+            color: var(--green-400);
+            font-size: 14px;
+        }
+        .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+        .nav a {
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 9px;
+            color: #d6e7ef;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .nav a:hover { border-color: var(--green-400); color: var(--white); }
+
+        .page { padding: 34px 0 56px; }
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+            gap: 22px;
+            margin-bottom: 30px;
+        }
+        .hero-main, .identity-card, .panel, .offer-card, .request-card {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: var(--white);
+            box-shadow: var(--shadow);
+        }
+        .hero-main {
+            position: relative;
+            overflow: hidden;
+            padding: 34px;
+            color: var(--white);
+            background: linear-gradient(125deg, var(--navy-950), var(--navy-850));
+        }
+        .hero-main::after {
+            content: "";
+            position: absolute;
+            right: -45px;
+            bottom: -78px;
+            width: 240px;
+            height: 240px;
+            border: 34px solid rgba(41,199,115,.16);
+            border-radius: 50%;
+        }
+        .eyebrow { color: var(--green-400); font-size: 11px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+        h1 { max-width: 760px; margin: 11px 0 12px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.03; }
+        .lead { max-width: 760px; margin: 0; color: #c8dce7; font-size: 16px; line-height: 1.72; }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 10px 14px;
+            border: 1px solid transparent;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 900;
+        }
+        .button-primary { color: var(--white); background: var(--green-500); }
+        .button-primary:hover { background: #14894d; }
+        .button-secondary { color: var(--ink); background: #eaf1f1; border-color: var(--line); }
+        .button-secondary:hover { background: #dce9e8; }
+        .button-hero { color: var(--navy-950); background: var(--green-400); }
+        .button-ghost { color: #d7e8ef; border-color: rgba(255,255,255,.25); background: transparent; }
+
+        .identity-card { padding: 22px; }
+        .identity-label { color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        .identity-name { margin: 9px 0 4px; font-size: 22px; font-weight: 900; }
+        .identity-role { color: var(--green-500); font-size: 13px; font-weight: 900; }
+        .identity-note { margin: 16px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 16px;
+            padding: 7px 9px;
+            border-radius: 999px;
+            color: #087239;
+            background: var(--green-100);
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green-500); }
+
+        .flash-stack { display: grid; gap: 10px; margin: 0 0 22px; }
+        .flash { padding: 13px 15px; border-radius: 10px; font-size: 14px; font-weight: 700; }
+        .flash-success { color: #075c30; background: #dff8e9; border: 1px solid #9be0b9; }
+        .flash-error { color: #842828; background: #fff0f0; border: 1px solid #f2b9b9; }
+        .flash-info { color: #174e70; background: #edf7fc; border: 1px solid #badbed; }
+
+        .section { margin-top: 34px; }
+        .section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
+        .section-head h2 { margin: 5px 0 0; font-size: clamp(22px, 3vw, 31px); }
+        .section-head p { max-width: 620px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+        .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+        .offer-card { display: flex; flex-direction: column; min-height: 100%; padding: 19px; box-shadow: 0 10px 30px rgba(6,21,38,.07); }
+        .offer-card h3 { margin: 8px 0 8px; font-size: 18px; line-height: 1.22; }
+        .offer-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.62; }
+        .meta { margin-top: 13px; color: var(--green-500); font-size: 12px; font-weight: 900; }
+        .offer-card form { margin-top: auto; padding-top: 17px; }
+        details { border-top: 1px solid var(--line); padding-top: 11px; }
+        summary { cursor: pointer; color: var(--navy-800); font-size: 12px; font-weight: 900; }
+        textarea {
+            width: 100%;
+            min-height: 76px;
+            margin: 10px 0;
+            padding: 10px;
+            resize: vertical;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--ink);
+            background: #fbfdfd;
+            line-height: 1.5;
+        }
+        textarea:focus { outline: 2px solid rgba(24,168,93,.22); border-color: var(--green-500); }
+
+        .panel { padding: 19px; box-shadow: 0 10px 30px rgba(6,21,38,.07); }
+        .requests { display: grid; gap: 10px; }
+        .request-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px; box-shadow: none; }
+        .request-title { font-weight: 900; }
+        .request-meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
+        .request-status { padding: 7px 9px; border-radius: 999px; color: #087239; background: var(--green-100); font-size: 12px; font-weight: 900; }
+        .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 14px; }
+        footer { margin-top: 36px; padding-top: 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+        @media (max-width: 900px) {
+            .hero { grid-template-columns: 1fr; }
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 620px) {
+            .topbar-inner { display: block; padding: 15px 0; }
+            .nav { justify-content: flex-start; margin-top: 12px; }
+            .hero-main { padding: 24px; }
+            .grid { grid-template-columns: 1fr; }
+            .section-head { display: block; }
+            .section-head p { margin-top: 8px; }
+            .request-card { grid-template-columns: 1fr; }
+            .request-status { justify-self: start; }
+        }
+    </style>
+</head>
+<body>
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" href="{{ url_for('dashboard') }}">
+            <span class="brand-mark">EL</span>
+            <span>EIFELLOG · SERVICECENTER</span>
+        </a>
+        <nav class="nav" aria-label="Hauptnavigation">
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('servicecenter') }}">ServiceCenter</a>
+            <a href="{{ url_for('logout') }}">Abmelden</a>
+        </nav>
+    </div>
+</header>
+
+<main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-stack" aria-live="polite">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category if category in ['success', 'error', 'info'] else 'info' }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <section class="hero">
+        <div class="hero-main">
+            <div class="eyebrow">Fahrerkarte · Checkcode-Ziel</div>
+            <h1>Weiterbildung & interne Entwicklung</h1>
+            <p class="lead">Hier findest du aktuelle Weiterbildungsmaßnahmen, neue Fahrer-Services und interne Möglichkeiten, für die du dich direkt über das ServiceCenter anmelden oder bewerben kannst.</p>
+            <div class="hero-actions">
+                <a class="button button-hero" href="#schulungen">Schulungen ansehen</a>
+                <a class="button button-ghost" href="#bewerbungen">Interne Möglichkeiten</a>
+            </div>
+        </div>
+        <aside class="identity-card">
+            <div class="identity-label">Angemeldeter Fahrer</div>
+            <div class="identity-name">{{ user.display_name or user.username or current_user.username }}</div>
+            <div class="identity-role">{{ primary_role_name }}</div>
+            <p class="identity-note">Die Anmeldung wird deinem internen ServiceCenter-Profil zugeordnet und zur Bearbeitung gespeichert.</p>
+            <div class="status">ServiceCenter aktiv</div>
+        </aside>
+    </section>
+
+    <section class="section" id="schulungen">
+        <div class="section-head">
+            <div>
+                <div class="eyebrow">Weiterbildungsmaßnahmen</div>
+                <h2>Weitere Schulungen</h2>
+            </div>
+            <p>Melde dich direkt für eine Maßnahme an. Ein zusätzlicher Hinweis ist optional und hilft bei der Planung.</p>
+        </div>
+        <div class="grid">
+            {% for angebot in bildungen_angebote.get('schulung', []) %}
+                <article class="offer-card">
+                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                    <h3>{{ angebot.title }}</h3>
+                    <p>{{ angebot.description }}</p>
+                    <div class="meta">{{ angebot.meta }}</div>
+                    <form method="post" action="{{ bildungen_submit_url }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="category" value="schulung">
+                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                        <details>
+                            <summary>Optionalen Hinweis ergänzen</summary>
+                            <textarea name="message" maxlength="1200" placeholder="Zum Beispiel Terminwunsch oder Rückfrage"></textarea>
+                        </details>
+                        <button class="button button-primary" type="submit">Für Schulung anmelden</button>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section" id="bewerbungen">
+        <div class="section-head">
+            <div>
+                <div class="eyebrow">Interne Entwicklung</div>
+                <h2>Interne Möglichkeiten</h2>
+            </div>
+            <p>Reiche dein Interesse an einer internen Rolle oder projektbezogenen Mitarbeit ein. Die zuständige Stelle prüft deine Anfrage.</p>
+        </div>
+        <div class="grid">
+            {% for angebot in bildungen_angebote.get('interne_bewerbung', []) %}
+                <article class="offer-card">
+                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                    <h3>{{ angebot.title }}</h3>
+                    <p>{{ angebot.description }}</p>
+                    <div class="meta">{{ angebot.meta }}</div>
+                    <form method="post" action="{{ bildungen_submit_url }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="category" value="interne_bewerbung">
+                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                        <details>
+                            <summary>Kurze Nachricht ergänzen</summary>
+                            <textarea name="message" maxlength="1200" placeholder="Warum interessiert dich diese Möglichkeit?"></textarea>
+                        </details>
+                        <button class="button button-primary" type="submit">Intern bewerben</button>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section" id="services">
+        <div class="section-head">
+            <div>
+                <div class="eyebrow">Fahrer-Services</div>
+                <h2>Neue Services</h2>
+            </div>
+            <p>Nutze vorhandene Angebote oder sende einen Vorschlag für einen zusätzlichen Service, der Fahrern intern bereitgestellt werden soll.</p>
+        </div>
+        <div class="grid">
+            {% for angebot in bildungen_angebote.get('fahrer_service', []) %}
+                <article class="offer-card">
+                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                    <h3>{{ angebot.title }}</h3>
+                    <p>{{ angebot.description }}</p>
+                    <div class="meta">{{ angebot.meta }}</div>
+                    <form method="post" action="{{ bildungen_submit_url }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="category" value="fahrer_service">
+                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                        <details open>
+                            <summary>Details zur Anfrage</summary>
+                            <textarea name="message" maxlength="1200" placeholder="Beschreibe deine Anfrage oder deinen Service-Vorschlag"></textarea>
+                        </details>
+                        <button class="button button-primary" type="submit">Service-Anfrage senden</button>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section" id="anfragen">
+        <div class="section-head">
+            <div>
+                <div class="eyebrow">ServiceCenter-Verlauf</div>
+                <h2>Meine Anfragen</h2>
+            </div>
+            <p>Die letzten Einreichungen aus diesem Bereich werden hier angezeigt.</p>
+        </div>
+        <div class="panel">
+            {% if bildungen_requests %}
+                <div class="requests">
+                    {% for item in bildungen_requests %}
+                        <article class="request-card">
+                            <div>
+                                <div class="request-title">{{ item.offer_title }}</div>
+                                <div class="request-meta">{{ item.category_label }} · {{ item.created_at_display }}</div>
+                            </div>
+                            <div class="request-status">{{ item.status_label }}</div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty">Du hast über diesen Bereich noch keine Anfrage eingereicht.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <footer>
+        EifelLog ServiceCenter · Interne Fahrer-Services, Weiterbildungsmaßnahmen und Entwicklungsmöglichkeiten
+    </footer>
+</main>
+</body>
+</html>

@@ -10,6 +10,7 @@ import uuid
 import hashlib
 import hmac
 import math
+import zlib
 import secrets
 import requests
 from io import BytesIO
@@ -32,6 +33,16 @@ except Exception:
     Image = None
     ImageOps = None
     PIL_AVAILABLE = False
+
+
+try:
+    import qrcode
+    from qrcode.constants import ERROR_CORRECT_M
+    QRCODE_AVAILABLE = True
+except Exception:
+    qrcode = None
+    ERROR_CORRECT_M = None
+    QRCODE_AVAILABLE = False
 
 
 try:
@@ -219,7 +230,7 @@ TRACKER_PDF_DOWNLOAD_SIGNING_KEY = env_first(
 # Version des serverseitigen Fahrerkarten-Auszug-Layouts.
 # Bei einer Aenderung werden bereits gespeicherte Alt-PDFs beim naechsten Abruf neu erzeugt.
 TRACKER_SHIFT_PDF_LAYOUT_VERSION = "eifellog-ticket-theme-v3"
-SERVICECENTER_FAHRERKARTE_PDF_LAYOUT_VERSION = "eifellog-fahrerkarte-bestaetigung-v5"
+SERVICECENTER_FAHRERKARTE_PDF_LAYOUT_VERSION = "eifellog-fahrerkarte-bestaetigung-v6-qr-bildungen"
 
 TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
     "TOUR_START_DUPLICATE_WINDOW_MINUTES",
@@ -347,6 +358,8 @@ fahrerkarte_beantragungen_collection = db[env_first(
     "FAHRERKARTE_BEANTRAGUNGEN_COLLECTION",
     default="FahrerkarteBeantragungen"
 )]
+
+servicecenter_bildungen_requests_collection = db["servicecenter_bildungen_requests"]
 
 tracker_driver_cards_collection = db["tracker_driver_cards"]
 tracker_work_sessions_collection = db["tracker_work_sessions"]
@@ -498,6 +511,13 @@ def ensure_indexes():
         fahrerkarte_beantragungen_collection.create_index([("source_user_mongo_id", ASCENDING)], unique=False)
         fahrerkarte_beantragungen_collection.create_index([("created_at", DESCENDING)], unique=False)
         fahrerkarte_beantragungen_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        servicecenter_bildungen_requests_collection.create_index([("request_id", ASCENDING)], unique=True)
+        servicecenter_bildungen_requests_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("category", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("offer_id", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("status", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
 
         tracker_driver_cards_collection.create_index([("discord_id", ASCENDING)], unique=False)
         tracker_driver_cards_collection.create_index([("user_id", ASCENDING)], unique=False)
@@ -676,6 +696,12 @@ SERVICECENTER_PUBLIC_BASE_URL = env_first(
     "TOUR_RECEIPT_PUBLIC_BASE_URL",
     default=""
 ).rstrip("/")
+SERVICECENTER_BILDUNGEN_PATH = "/bildungen.html"
+SERVICECENTER_BILDUNGEN_PUBLIC_URL = env_first(
+    "SERVICECENTER_BILDUNGEN_PUBLIC_URL",
+    "BILDUNGEN_PUBLIC_URL",
+    default=""
+).strip()
 SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW = env_first(
     "SERVICECENTER_DISCORD_REVIEW_ROLE_IDS",
     "SERVICECENTER_REVIEW_ROLE_IDS",
@@ -1221,6 +1247,76 @@ def make_external_url(possible_url):
     if possible_url.startswith("http://") or possible_url.startswith("https://"): return possible_url
     if possible_url.startswith("/"): return request.host_url.rstrip("/") + possible_url
     return request.host_url.rstrip("/") + "/" + possible_url.lstrip("/")
+
+
+
+def get_servicecenter_bildungen_url():
+    """Absolute Ziel-URL fuer den scanbaren QR-Code auf der Fahrerkarte.
+
+    In Produktion bevorzugt SERVICECENTER_BILDUNGEN_PUBLIC_URL in der .env setzen,
+    z. B. https://www.eifellog.de/bildungen.html. Ohne explizite Konfiguration
+    wird die ServiceCenter-Basis-URL oder der aktuelle Request-Host genutzt.
+    """
+    configured_url = safe_str(SERVICECENTER_BILDUNGEN_PUBLIC_URL)
+    if configured_url:
+        if configured_url.startswith("http://") or configured_url.startswith("https://"):
+            return configured_url
+        return configured_url if configured_url.startswith("/") else f"/{configured_url}"
+
+    base_url = safe_str(SERVICECENTER_PUBLIC_BASE_URL or TOUR_RECEIPT_PUBLIC_BASE_URL).rstrip("/")
+    if not base_url:
+        try:
+            base_url = request.host_url.rstrip("/")
+        except RuntimeError:
+            base_url = ""
+
+    if base_url:
+        return f"{base_url}{SERVICECENTER_BILDUNGEN_PATH}"
+
+    # Stabile Produktions-Fallback-URL, falls die PDF-Erzeugung ausserhalb eines
+    # HTTP-Requests laeuft und keine .env-Basis-URL gesetzt wurde.
+    return f"https://www.eifellog.de{SERVICECENTER_BILDUNGEN_PATH}"
+
+
+def build_qr_pdf_image(payload, image_name="QrCode1", size_px=420):
+    """Erzeugt ein echtes, scanner-kompatibles QR-Code-XObject fuer das PDF.
+
+    Das Bild wird verlustfrei mit FlateDecode eingebettet. Dadurch bleiben die
+    Modul-Kanten scharf; ein JPEG-bedingter Scanfehler wird vermieden.
+    """
+    payload = safe_str(payload)
+    if not payload:
+        raise ValueError("QR-Code-Ziel fehlt.")
+    if not QRCODE_AVAILABLE or not PIL_AVAILABLE:
+        raise RuntimeError(
+            "Für den echten Fahrerkarte-QR-Code fehlt die Python-Abhängigkeit. "
+            "Bitte `pip install qrcode[pil]` ausführen."
+        )
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(payload)
+    qr.make(fit=True)
+
+    image = qr.make_image(fill_color="#071B30", back_color="white").convert("RGB")
+    size_px = max(160, min(1200, int(size_px or 420)))
+    resampling = getattr(Image, "Resampling", Image)
+    image = image.resize((size_px, size_px), resample=resampling.NEAREST)
+
+    return {
+        "name": safe_str(image_name, "QrCode1"),
+        "width": size_px,
+        "height": size_px,
+        "data": zlib.compress(image.tobytes(), level=9),
+        "filter": "FlateDecode",
+        "color_space": "DeviceRGB",
+        "bits_per_component": 8,
+        "payload": payload,
+    }
 
 
 def format_datetime_for_template(value):
@@ -4283,10 +4379,19 @@ def build_pdf_single_page(stream, page_width=595, page_height=842, images=None):
             continue
         object_number = len(objects) + 1
         xobject_entries.append(f"/{image_name} {object_number} 0 R")
+        image_filter = safe_str(image.get("filter"), "DCTDecode")
+        if image_filter not in {"DCTDecode", "FlateDecode"}:
+            image_filter = "DCTDecode"
+        image_color_space = safe_str(image.get("color_space"), "DeviceRGB")
+        if image_color_space not in {"DeviceRGB", "DeviceGray"}:
+            image_color_space = "DeviceRGB"
+        image_bits = int(image.get("bits_per_component") or 8)
+        if image_bits not in {1, 2, 4, 8, 16}:
+            image_bits = 8
         objects.append(
             (
                 f"<< /Type /XObject /Subtype /Image /Width {image_width} /Height {image_height} "
-                f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(image_data)} >>\nstream\n"
+                f"/ColorSpace /{image_color_space} /BitsPerComponent {image_bits} /Filter /{image_filter} /Length {len(image_data)} >>\nstream\n"
             ).encode("ascii") + image_data + b"\nendstream"
         )
 
@@ -4430,8 +4535,10 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
         or "Die Fahrerkarte wurde digital geprüft und im EifelLog ServiceCenter bereitgestellt."
     )
 
+    bildungen_url = get_servicecenter_bildungen_url()
+    qr_image = build_qr_pdf_image(bildungen_url, image_name="QrCode1", size_px=420)
     avatar_image = load_fahrerkarte_avatar_jpeg(request_doc, user_doc=user_doc, size=180)
-    pdf_images = [avatar_image] if avatar_image else []
+    pdf_images = [image for image in (avatar_image, qr_image) if image]
 
     # Farbwelt: dokumentenartig, technisch und hochwertig.
     navy = (0.035, 0.105, 0.185)
@@ -4516,19 +4623,13 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     pdf_stream_text(stream, data_x + 188, card_y + 44, "5b  KARTEN-ID", size=7, bold=True, color=green_dark)
     pdf_stream_text(stream, data_x + 188, card_y + 29, card_id[:34], size=9, bold=True, color=ink)
 
-    # Checkcode auf der Karte.
-    qr_x, qr_y, cell = card_x + card_w - 80, card_y + 72, 3
-    grid_size = 17
-    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, grid_size * cell + 12, grid_size * cell + 12, fill_rgb=white, stroke_rgb=navy_soft, line_width=0.7)
-    digest = hashlib.sha256(f"{card_id}|{request_id}|{verification_code}".encode("utf-8")).digest()
-    for row in range(grid_size):
-        for col in range(grid_size):
-            byte = digest[(row * grid_size + col) % len(digest)]
-            border = row in {0, grid_size - 1} or col in {0, grid_size - 1}
-            should_fill = border or ((byte >> (col % 8)) & 1)
-            if should_fill:
-                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 0.7, cell - 0.7, fill_rgb=navy)
-    pdf_stream_text(stream, qr_x + 1, qr_y - 19, "CHECKCODE", size=6, bold=True, color=navy)
+    # Echter scanner-kompatibler QR-Code auf der Karte.
+    # Ziel: interne Seite fuer Weiterbildungsmaßnahmen, neue Fahrer-Services
+    # und interne Bewerbungen. Der QR-Code enthaelt bewusst keine PIN.
+    qr_x, qr_y, qr_size = card_x + card_w - 83, card_y + 67, 68
+    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, qr_size + 12, qr_size + 12, fill_rgb=white, stroke_rgb=navy_soft, line_width=0.7)
+    pdf_stream_image(stream, "QrCode1", qr_x, qr_y, qr_size, qr_size)
+    pdf_stream_text(stream, qr_x + 7, qr_y - 18, "CHECKCODE", size=6, bold=True, color=navy)
 
     # Kartenfuß mit Signatur und Zuordnung.
     pdf_stream_line(stream, card_x + 18, card_y + 18, card_x + 121, card_y + 18, stroke_rgb=navy_soft, line_width=0.5)
@@ -14662,6 +14763,9 @@ def callback():
     }
 
     flash("Erfolgreich eingeloggt!", "success")
+    post_login_redirect = safe_str(session.pop("post_login_redirect", ""))
+    if post_login_redirect.startswith("/") and not post_login_redirect.startswith("//"):
+        return redirect(post_login_redirect)
     return redirect(url_for("dashboard"))
 
 @app.route("/logout")
@@ -17587,6 +17691,201 @@ def dashboard_abgeschlossene_touren_details():
         return denied_response
 
     return render_template("abgeschlossene_touren_details.html", **build_dashboard_detail_context(logbook_limit=100))
+
+
+
+# ==========================================
+# WEITERBILDUNG / INTERNE ENTWICKLUNG
+# ==========================================
+
+BILDUNGEN_ANGEBOTE = {
+    "schulung": [
+        {
+            "id": "schulung-tracker-fahrerkarte",
+            "title": "Tracker & digitale Fahrerkarte",
+            "eyebrow": "Schulung",
+            "description": "Sicherer Umgang mit Tracker, Fahrerkarte, PIN-Prüfung, Tagesauszügen und Tour-Abgabe.",
+            "meta": "Digital · ca. 45 Minuten",
+        },
+        {
+            "id": "schulung-eco-driving",
+            "title": "Eco-Driving & Wirtschaftlichkeit",
+            "eyebrow": "Weiterbildungsmaßnahme",
+            "description": "Verbrauch, vorausschauendes Fahren und wirtschaftliche Tourenplanung im Speditionsalltag.",
+            "meta": "Workshop · ca. 60 Minuten",
+        },
+        {
+            "id": "schulung-dispo-kommunikation",
+            "title": "Disposition & Kommunikation",
+            "eyebrow": "Aufbaukurs",
+            "description": "Saubere Übergaben, Eskalationswege und strukturierte Kommunikation bei laufenden Touren.",
+            "meta": "Digital · ca. 50 Minuten",
+        },
+    ],
+    "interne_bewerbung": [
+        {
+            "id": "bewerbung-mentor-probefahrer",
+            "title": "Mentor/in für Probefahrer",
+            "eyebrow": "Interne Bewerbung",
+            "description": "Begleite neue Fahrer in der Einarbeitung und unterstütze bei den ersten Touren.",
+            "meta": "Interne Entwicklungsrolle",
+        },
+        {
+            "id": "bewerbung-konvoi-organisation",
+            "title": "Unterstützung Konvoi-Organisation",
+            "eyebrow": "Interne Bewerbung",
+            "description": "Wirke bei Vorbereitung, Ablauf und Nachbereitung interner Speditions-Events mit.",
+            "meta": "Projektbezogene Mitarbeit",
+        },
+        {
+            "id": "bewerbung-fuhrpark-support",
+            "title": "Fuhrpark-Support",
+            "eyebrow": "Interne Bewerbung",
+            "description": "Unterstütze bei Dokumentation, Fahrzeugübersicht und internen Fuhrpark-Prozessen.",
+            "meta": "Interne Mitarbeit",
+        },
+    ],
+    "fahrer_service": [
+        {
+            "id": "service-schulungsberatung",
+            "title": "Persönliche Schulungsberatung",
+            "eyebrow": "Fahrer-Service",
+            "description": "Lass dir passende Weiterbildungen und nächste Entwicklungsschritte empfehlen.",
+            "meta": "ServiceCenter-Anfrage",
+        },
+        {
+            "id": "service-neuer-vorschlag",
+            "title": "Neuen Service vorschlagen",
+            "eyebrow": "Fahrer-Service",
+            "description": "Reiche eine Idee für einen zusätzlichen internen Fahrer-Service ein.",
+            "meta": "Ideen & Verbesserungen",
+        },
+    ],
+}
+
+
+def find_bildungen_angebot(category, offer_id):
+    category = safe_str(category).lower()
+    offer_id = safe_str(offer_id)
+    for angebot in BILDUNGEN_ANGEBOTE.get(category, []):
+        if safe_str(angebot.get("id")) == offer_id:
+            return dict(angebot)
+    return None
+
+
+def prepare_bildungen_request_for_template(item):
+    item = dict(item or {})
+    item["id"] = safe_str(item.get("request_id") or item.get("_id"))
+    item["category_label"] = {
+        "schulung": "Schulungsanmeldung",
+        "interne_bewerbung": "Interne Bewerbung",
+        "fahrer_service": "Fahrer-Service",
+    }.get(safe_str(item.get("category")).lower(), "Anfrage")
+    item["created_at_display"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["status_label"] = {
+        "submitted": "Eingereicht",
+        "in_review": "In Prüfung",
+        "approved": "Bestätigt",
+        "rejected": "Abgelehnt",
+        "completed": "Abgeschlossen",
+    }.get(safe_str(item.get("status")).lower(), safe_str(item.get("status"), "Eingereicht"))
+    item.pop("_id", None)
+    return item
+
+
+@app.route("/bildungen", methods=["GET"])
+@app.route("/bildungen.html", methods=["GET"])
+@app.route("/servicecenter/bildungen", methods=["GET"])
+def bildungen():
+    if "user" not in session:
+        session["post_login_redirect"] = request.path
+        flash("Bitte logge dich zuerst ein, um die Weiterbildungsmaßnahmen zu öffnen.", "error")
+        return redirect(url_for("hub"))
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die internen Angebote zu öffnen.", "error")
+        return redirect(url_for("home"))
+
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    db_user = users_collection.find_one({"discord_id": discord_id}) or {
+        "discord_id": discord_id,
+        "username": user.get("username"),
+        "display_name": user.get("discord_username") or user.get("username"),
+        "roles": user_roles,
+    }
+
+    submissions = [
+        prepare_bildungen_request_for_template(item)
+        for item in servicecenter_bildungen_requests_collection.find({"discord_id": discord_id})
+        .sort("created_at", DESCENDING)
+        .limit(12)
+    ]
+
+    return render_template(
+        "bildungen.html",
+        title="Weiterbildung & interne Entwicklung - EifelLog",
+        description="Interne Weiterbildungsmaßnahmen, Fahrer-Services und Entwicklungsmöglichkeiten.",
+        current_user=user,
+        user=db_user,
+        primary_role_name=get_primary_role_name(user_roles),
+        bildungen_angebote=BILDUNGEN_ANGEBOTE,
+        bildungen_requests=submissions,
+        bildungen_submit_url=url_for("bildungen_anmelden"),
+    )
+
+
+@app.route("/servicecenter/bildungen/anmelden", methods=["POST"])
+def bildungen_anmelden():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert.", "error")
+        return redirect(url_for("home"))
+
+    submitted_csrf = safe_str(request.form.get("csrf_token"))
+    stored_csrf = safe_str(session.get("_csrf_token"))
+    if not submitted_csrf or not stored_csrf or not secrets.compare_digest(submitted_csrf, stored_csrf):
+        flash("Die Anfrage konnte aus Sicherheitsgründen nicht gesendet werden. Bitte lade die Seite neu.", "error")
+        return redirect(url_for("bildungen"))
+
+    category = safe_str(request.form.get("category")).lower()
+    offer_id = safe_str(request.form.get("offer_id"))
+    message = safe_str(request.form.get("message"))[:1200]
+    angebot = find_bildungen_angebot(category, offer_id)
+    if not angebot:
+        flash("Das ausgewählte Angebot wurde nicht gefunden.", "error")
+        return redirect(url_for("bildungen"))
+
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    db_user = users_collection.find_one({"discord_id": discord_id}) or {}
+    now = now_utc()
+    request_id = uuid.uuid4().hex
+
+    servicecenter_bildungen_requests_collection.insert_one({
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": safe_str(db_user.get("username") or user.get("username")),
+        "display_name": safe_str(db_user.get("display_name") or user.get("discord_username") or user.get("username")),
+        "role": get_primary_role_name(user_roles),
+        "category": category,
+        "offer_id": offer_id,
+        "offer_title": safe_str(angebot.get("title")),
+        "message": message,
+        "status": "submitted",
+        "source": "fahrerkarte_qr_bildungen",
+        "created_at": now,
+        "updated_at": now,
+    })
+
+    flash("Deine Anfrage wurde im ServiceCenter eingereicht.", "success")
+    return redirect(url_for("bildungen"))
 
 
 @app.route("/servicecenter", methods=["GET"])
