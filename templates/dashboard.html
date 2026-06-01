@@ -21,6 +21,7 @@
 {% set safe_news_items = news_items|default([], true) %}
 {% set safe_loa_items = loa_upcoming_items|default(upcoming_loa_items|default(upcoming_loa|default(loa_items|default(loa_records|default([], true), true), true), true), true) %}
 {% set needs_signature_flag = needs_signature|default(false, true) %}
+{% set temporary_instruction = temporary_instruction|default({}, true) %}
 
 {% set fahrer_reg_status_raw = (fahrer_registration_status|default('none', true))|lower %}
 {% if fahrer_reg_status_raw == 'open' %}
@@ -2681,64 +2682,6 @@
         </div>
 
         <div id="postfach-container" data-view="active" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
-            <button id="update-wipe-info-doc" class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.07] border border-[var(--brand-yellow)]/35 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.11] hover:-translate-y-0.5 transition-all duration-300 group relative"
-                    data-title="Update &amp; Wipe Info"
-                    data-sender="System"
-                    data-date="01.06.2026, 12:45"
-                    data-needs-signature="false"
-                    data-fixed-doc="true"
-                    data-archiveable="false"
-                    data-temporary-until="2026-06-08T12:45:00+02:00"
-                    data-doc-id="system-update-wipe-info-2026-06-01-1245-v1">
-                <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
-
-                <div class="flex items-center gap-4 pr-5">
-                    <div class="p-3 rounded-xl bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)] border border-[var(--brand-yellow)]/25 group-hover:scale-105 transition-transform">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
-                        </svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h4 class="text-sm font-bold font-orbitron text-white truncate">Update &amp; Wipe Info</h4>
-                            <span class="rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 px-2 py-1 text-[9px] font-orbitron font-bold uppercase tracking-widest text-[var(--brand-yellow)]">Fixiert</span>
-                        </div>
-                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">System • 01.06.2026, 12:45 Uhr</p>
-                        <p class="text-[10px] text-[var(--brand-yellow)] font-orbitron uppercase tracking-widest mt-2">Pflichtunterweisung • 7 Tage • Nicht archivierbar</p>
-                    </div>
-                </div>
-
-                <div class="hidden doc-data-content">
-                    <p><strong>Update &amp; Wipe Info</strong></p>
-                    <p class="mt-2 text-xs text-gray-400">System • 01.06.2026, 12:45 Uhr • gültig bis 08.06.2026, 12:45 Uhr</p>
-
-                    <div class="mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.055] p-4">
-                        <p class="text-[10px] font-orbitron text-red-300 uppercase tracking-widest mb-2">Datenbank-Wipe</p>
-                        <p>Die Datenbankstruktur wurde vollständig zurückgesetzt. Dadurch wurden sämtliche Benutzerkonten sowie alle bestehenden Fahrerkarten-Registrierungen entfernt.</p>
-                    </div>
-
-                    <div class="mt-4 rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.045] p-4">
-                        <p class="text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest mb-2">Erforderliche Schritte</p>
-                        <ul class="list-disc pl-5 space-y-2">
-                            <li>Fahrerkarte erneut im <strong>ServiceCenter</strong> beantragen.</li>
-                            <li><strong>Fahrer-Registrierung</strong> erneut durchführen.</li>
-                        </ul>
-                        <p class="mt-4">Der vollständige Datenbank-Reset wurde bewusst durchgeführt, um eine saubere Grundlage für die weitere Entwicklung zu schaffen.</p>
-                    </div>
-
-                    <div class="mt-4 rounded-2xl border border-[var(--brand-green)]/20 bg-[var(--brand-green)]/[0.045] p-4">
-                        <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Direkte Neuerungen</p>
-                        <ul class="list-disc pl-5 space-y-2">
-                            <li>Das <strong>ServiceCenter</strong> wurde vollständig überarbeitet.</li>
-                            <li>Im ServiceCenter stehen jetzt <strong>Weiterbildungen</strong> zur Verfügung.</li>
-                            <li>Beim Herunterladen einer Fahrerkarten-PDF ist ein <strong>QR-Code</strong> abgebildet. Scanne diesen bei Bedarf mit der Kamera-App deines Handys oder einer sonstigen QR-Scanner-App.</li>
-                        </ul>
-                    </div>
-
-                    <p class="mt-4 text-xs text-gray-400">Dieses temporäre Dokument ist während seiner 7-tägigen Laufzeit fixiert und kann nicht archiviert werden.</p>
-                </div>
-            </button>
-
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="Fahrerkarten jetzt verfügbar"
                     data-sender="Servicecenter"
@@ -2852,6 +2795,9 @@
                     {% set doc_type_lc = (doc.type|default('', true))|lower %}
                     {% set is_token_doc = ('token' in doc_title_lc) or ('tracker' in doc_title_lc) or (doc_type_lc in ['driver_token', 'tracker_token', 'token']) %}
                     {% set is_fixed_doc = doc.fixed|default(doc.pinned|default(false, true), true) %}
+                    {% set is_instruction_doc = doc.instruction_required|default(false, true) %}
+                    {% set is_acknowledged_doc = doc.acknowledged|default(false, true) %}
+                    {% set is_archiveable_doc = doc.archiveable|default(not is_fixed_doc, true) %}
                     {% if not is_token_doc or fahrer_reg_status == 'approved' %}
                     <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.06] border border-[var(--brand-yellow)]/25 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                             data-title="{{ doc.title }}"
@@ -2859,10 +2805,12 @@
                             data-date="{{ doc.date }}"
                             data-needs-signature="{{ 'true' if doc.needs_signature else 'false' }}"
                             data-fixed-doc="{{ 'true' if is_fixed_doc or doc.needs_signature else 'false' }}"
-                            data-archiveable="{{ 'false' if is_fixed_doc or doc.needs_signature else 'true' }}"
-                            data-doc-id="{{ ('doc-' ~ loop.index ~ '-' ~ doc.title ~ '-' ~ doc.sender ~ '-' ~ doc.date)|e }}">
+                            data-archiveable="{{ 'true' if is_archiveable_doc and not is_fixed_doc and not doc.needs_signature else 'false' }}"
+                            data-instruction-required="{{ 'true' if is_instruction_doc else 'false' }}"
+                            data-temporary-until="{{ doc.expires_at|default('', true) }}"
+                            data-doc-id="{{ (doc.document_id|default('doc-' ~ loop.index ~ '-' ~ doc.title ~ '-' ~ doc.sender ~ '-' ~ doc.date, true))|e }}">
 
-                        {% if doc.needs_signature %}
+                        {% if doc.needs_signature or (is_instruction_doc and not is_acknowledged_doc) %}
                         <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
                         {% endif %}
 
@@ -2875,8 +2823,8 @@
                             <div class="min-w-0 flex-1">
                                 <h4 class="text-sm font-bold font-orbitron text-white truncate">{{ doc.title }}</h4>
                                 <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">{{ doc.sender }} • {{ doc.date }}</p>
-                                <p class="text-[10px] {% if doc.needs_signature %}text-[var(--brand-yellow)]{% else %}text-[var(--brand-green)]{% endif %} font-orbitron uppercase tracking-widest mt-2">
-                                    {% if doc.needs_signature %}Signatur erforderlich{% else %}Dokument{% endif %}
+                                <p class="text-[10px] {% if doc.needs_signature or is_instruction_doc %}text-[var(--brand-yellow)]{% else %}text-[var(--brand-green)]{% endif %} font-orbitron uppercase tracking-widest mt-2">
+                                    {% if is_instruction_doc %}Pflichtunterweisung • 7 Tage • Nicht archivierbar{% elif doc.needs_signature %}Signatur erforderlich{% elif is_fixed_doc %}Fixiertes Dokument{% else %}Dokument{% endif %}
                                 </p>
                             </div>
                         </div>
@@ -3219,9 +3167,15 @@
         const temporaryInstructionContent = document.getElementById('temporary-instruction-content');
         const temporaryInstructionConfirm = document.getElementById('temporary-instruction-confirm');
         const temporaryInstructionReadStatus = document.getElementById('temporary-instruction-read-status');
-        const temporaryInstructionDocId = 'system-update-wipe-info-2026-06-01-1245-v1';
-        const temporaryInstructionExpiresAt = new Date('2026-06-08T12:45:00+02:00').getTime();
+        const temporaryInstructionState = {{ temporary_instruction | tojson }};
+        const temporaryInstructionDocId = temporaryInstructionState.document_id || 'system-update-wipe-info-2026-06-01-1245-v1';
+        const temporaryInstructionExpiresAt = new Date(temporaryInstructionState.expires_at_iso || '2026-06-08T10:45:00Z').getTime();
+        const temporaryInstructionAcknowledgeUrl = temporaryInstructionState.acknowledge_url || '/api/dashboard/instructions/update-wipe-info/acknowledge';
+        const temporaryInstructionCsrfToken = {{ csrf_token() | tojson }};
         const temporaryInstructionSeenStorageKey = `eifellog.notice.updateWipeInfo20260601.seen.${currentUserKey || 'user'}`;
+        let temporaryInstructionActiveServerSide = temporaryInstructionState.active === true;
+        let temporaryInstructionAcknowledgedServerSide = temporaryInstructionState.acknowledged === true;
+        let temporaryInstructionAcknowledgePending = false;
 
         const alertBell = document.getElementById('alert-bell');
         const alertBadge = document.getElementById('alert-badge');
@@ -3496,13 +3450,17 @@
         let startupInstructionCheckPending = true;
 
         function isTemporaryInstructionActive() {
-            return Date.now() < temporaryInstructionExpiresAt;
+            return temporaryInstructionActiveServerSide && Date.now() < temporaryInstructionExpiresAt;
+        }
+
+        function getTemporaryInstructionDocumentButton() {
+            return document.querySelector(`.doc-trigger[data-doc-id="${temporaryInstructionDocId}"]`);
         }
 
         function removeExpiredTemporaryInstructionDocument() {
             if (isTemporaryInstructionActive()) return;
 
-            const temporaryDocument = document.getElementById('update-wipe-info-doc');
+            const temporaryDocument = getTemporaryInstructionDocumentButton();
             if (temporaryDocument) temporaryDocument.remove();
         }
 
@@ -3510,12 +3468,13 @@
             if (!temporaryInstructionContent || !temporaryInstructionConfirm) return;
 
             const reachedBottom = temporaryInstructionContent.scrollHeight - temporaryInstructionContent.scrollTop <= temporaryInstructionContent.clientHeight + 10;
-            temporaryInstructionConfirm.disabled = !reachedBottom;
+            temporaryInstructionConfirm.disabled = temporaryInstructionAcknowledgePending || !reachedBottom;
 
             if (temporaryInstructionReadStatus) {
                 temporaryInstructionReadStatus.textContent = reachedBottom
                     ? 'Unterweisung vollständig gelesen. Bitte bestätige die Kenntnisnahme.'
                     : 'Bitte lies die Unterweisung vollständig durch und scrolle bis zum Ende.';
+                temporaryInstructionReadStatus.classList.remove('text-red-300');
                 temporaryInstructionReadStatus.classList.toggle('text-[var(--brand-green)]', reachedBottom);
                 temporaryInstructionReadStatus.classList.toggle('text-[var(--brand-yellow)]', !reachedBottom);
             }
@@ -3526,14 +3485,7 @@
 
             if (!isTemporaryInstructionActive()) return false;
 
-            let alreadySeen = false;
-            try {
-                alreadySeen = window.localStorage.getItem(temporaryInstructionSeenStorageKey) === 'true';
-            } catch (error) {
-                console.warn('Pflichtunterweisungs-Status konnte nicht gelesen werden:', error);
-            }
-
-            if (alreadySeen) return false;
+            if (temporaryInstructionAcknowledgedServerSide) return false;
 
             isTemporaryInstructionShowing = true;
             openAnimatedModal(temporaryInstructionWrapper, temporaryInstructionPanel);
@@ -3573,26 +3525,69 @@
         }
 
         if (temporaryInstructionConfirm) {
-            temporaryInstructionConfirm.addEventListener('click', () => {
-                if (temporaryInstructionConfirm.disabled) return;
+            temporaryInstructionConfirm.addEventListener('click', async () => {
+                if (temporaryInstructionConfirm.disabled || temporaryInstructionAcknowledgePending) return;
 
-                try {
-                    window.localStorage.setItem(temporaryInstructionSeenStorageKey, 'true');
-                } catch (error) {
-                    console.warn('Pflichtunterweisungs-Status konnte nicht gespeichert werden:', error);
+                temporaryInstructionAcknowledgePending = true;
+                updateTemporaryInstructionConfirmState();
+
+                if (temporaryInstructionReadStatus) {
+                    temporaryInstructionReadStatus.textContent = 'Kenntnisnahme wird sicher gespeichert …';
+                    temporaryInstructionReadStatus.classList.remove('text-[var(--brand-green)]');
+                    temporaryInstructionReadStatus.classList.add('text-[var(--brand-yellow)]');
                 }
 
-                readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
-                const temporaryDocument = document.getElementById('update-wipe-info-doc');
-                if (temporaryDocument) markDocumentAsRead(temporaryDocument);
+                try {
+                    const response = await fetch(temporaryInstructionAcknowledgeUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': temporaryInstructionCsrfToken
+                        },
+                        body: JSON.stringify({
+                            instructionId: temporaryInstructionDocId,
+                            fullyRead: true,
+                            csrfToken: temporaryInstructionCsrfToken
+                        })
+                    });
+                    const payload = await response.json().catch(() => ({}));
 
-                closeAnimatedModal(temporaryInstructionWrapper, temporaryInstructionPanel, () => {
-                    isTemporaryInstructionShowing = false;
-
-                    if (!openTutorialAlertIfNeeded()) {
-                        initializeInboxNotifications(true);
+                    if (!response.ok || payload.success !== true) {
+                        throw new Error(payload.error || 'Kenntnisnahme konnte nicht gespeichert werden.');
                     }
-                });
+
+                    temporaryInstructionAcknowledgedServerSide = true;
+                    try {
+                        window.localStorage.setItem(temporaryInstructionSeenStorageKey, 'true');
+                    } catch (error) {
+                        console.warn('Lokaler Pflichtunterweisungs-Cache konnte nicht gespeichert werden:', error);
+                    }
+
+                    readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
+                    const temporaryDocument = getTemporaryInstructionDocumentButton();
+                    if (temporaryDocument) markDocumentAsRead(temporaryDocument);
+
+                    closeAnimatedModal(temporaryInstructionWrapper, temporaryInstructionPanel, () => {
+                        isTemporaryInstructionShowing = false;
+                        temporaryInstructionAcknowledgePending = false;
+
+                        if (!openTutorialAlertIfNeeded()) {
+                            initializeInboxNotifications(true);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Pflichtunterweisung konnte nicht bestätigt werden:', error);
+                    temporaryInstructionAcknowledgePending = false;
+                    updateTemporaryInstructionConfirmState();
+
+                    if (temporaryInstructionReadStatus) {
+                        temporaryInstructionReadStatus.textContent = error.message || 'Kenntnisnahme konnte nicht gespeichert werden. Bitte versuche es erneut.';
+                        temporaryInstructionReadStatus.classList.remove('text-[var(--brand-green)]');
+                        temporaryInstructionReadStatus.classList.add('text-red-300');
+                    }
+                }
             });
         }
 
