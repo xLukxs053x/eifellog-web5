@@ -217,7 +217,7 @@ TRACKER_PDF_DOWNLOAD_SIGNING_KEY = env_first(
 
 # Version des serverseitigen Fahrerkarten-Auszug-Layouts.
 # Bei einer Aenderung werden bereits gespeicherte Alt-PDFs beim naechsten Abruf neu erzeugt.
-TRACKER_SHIFT_PDF_LAYOUT_VERSION = "tachograph-v2"
+TRACKER_SHIFT_PDF_LAYOUT_VERSION = "eifellog-ticket-theme-v3"
 
 TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
     "TOUR_START_DUPLICATE_WINDOW_MINUTES",
@@ -10074,7 +10074,7 @@ def generate_shift_log_pdf(shift_doc):
         sections.append(("Zeitsegmente", entry_rows))
 
     signature_state = "Signatur geprueft" if bool((card_doc or {}).get("signature_verified")) else "Signatur ungeprueft"
-    pdf_bytes = build_simple_pdf(
+    pdf_bytes = build_driver_card_shift_pdf(
         "Auszug Fahrerkarte / Schichtprotokoll",
         sections,
         footer_text="EifelLog Fahrerkarte / digitaler PDF-Auszug",
@@ -10209,6 +10209,548 @@ def _build_simple_pdf_minimal(title, sections, footer_text="Eifel LOG Tour-Beleg
     )
     return bytes(pdf)
 
+
+
+def _build_driver_card_pdf_minimal(
+    title,
+    sections,
+    footer_text="EifelLog Fahrerkarte / digitaler PDF-Auszug",
+    document_reference="",
+    document_category="FAHRERKARTE / SCHICHTPROTOKOLL",
+    signature_state="",
+):
+    """Erzeugt einen gebrandeten PDF-Fallback ohne ReportLab.
+
+    Der Fallback bleibt bewusst kompakt, übernimmt aber die wesentlichen
+    EifelLog-Merkmale des Ticket-Plugins: grüner Kopfbereich, helle
+    Abschnittskarten, Akzentlinie und Seitenfuß. Dadurch fällt der Tracker
+    auch auf Servern ohne ReportLab nicht mehr auf das ungestaltete
+    Schwarz-Weiß-Protokoll zurück.
+    """
+    page_width = 595
+    page_height = 842
+    margin_left = 46
+    margin_right = 46
+    content_width = page_width - margin_left - margin_right
+    y_start = 754
+    y_min = 64
+
+    brand_dark = (0.102, 0.388, 0.165)      # #1A632A
+    brand = (0.169, 0.627, 0.267)           # #2BA044
+    body = (0.106, 0.153, 0.208)            # #1B2735
+    muted = (0.431, 0.502, 0.588)           # #6E8096
+    section_bg = (0.914, 0.941, 0.973)      # #E9F0F8
+    grid = (0.835, 0.878, 0.925)            # #D5E0EC
+    warning = (0.980, 0.651, 0.102)         # #FAA61A
+    success = (0.231, 0.647, 0.365)         # #3BA55D
+
+    reference = safe_str(document_reference) or f"EL-SHIFT-{now_utc().strftime('%Y%m%d%H%M%S')}"
+    category = safe_str(document_category, "FAHRERKARTE / SCHICHTPROTOKOLL")
+    signature = safe_str(signature_state, "Signatur ungeprueft")
+    signature_color = success if "ungepr" not in signature.lower() and "nicht" not in signature.lower() else warning
+
+    pages = []
+    current = []
+    used_height = 0
+
+    def reserve(height):
+        nonlocal current, used_height
+        available = y_start - y_min
+        if current and used_height + height > available:
+            pages.append(current)
+            current = []
+            used_height = 0
+
+    def add_operation(kind, **kwargs):
+        nonlocal used_height
+        height = int(kwargs.pop("height", 16))
+        reserve(height)
+        current.append({"kind": kind, "height": height, **kwargs})
+        used_height += height
+
+    add_operation("intro", height=50, title=safe_str(title), reference=reference, category=category, signature=signature)
+    for section_title, rows in sections or []:
+        add_operation("section", height=24, text=safe_str(section_title))
+        for label, value in rows or []:
+            wrapped = wrap_pdf_line(label, value, max_chars=90)
+            for line_index, line in enumerate(wrapped):
+                add_operation("row", height=15, text=line, continuation=line_index > 0)
+        add_operation("spacer", height=8)
+    if current:
+        pages.append(current)
+
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+    ]
+    page_object_numbers = []
+
+    def rgb(color):
+        return f"{color[0]:.3f} {color[1]:.3f} {color[2]:.3f}"
+
+    def draw_text(stream, x, y, value, font="F1", size=9, color=body):
+        stream.extend(b"BT\n")
+        stream.extend(f"/{font} {size} Tf\n".encode("ascii"))
+        stream.extend(f"{rgb(color)} rg\n".encode("ascii"))
+        stream.extend(f"1 0 0 1 {x:.1f} {y:.1f} Tm\n".encode("ascii"))
+        stream.extend(b"(" + pdf_text_bytes(value) + b") Tj\nET\n")
+
+    generated_display = now_utc().strftime("%d.%m.%Y %H:%M UTC")
+    for page_index, operations in enumerate(pages, start=1):
+        stream = bytearray()
+        stream.extend(b"q\n")
+        stream.extend(b"1 1 1 rg\n0 0 595 842 re f\n")
+        stream.extend(f"{rgb(brand_dark)} rg\n0 802 595 40 re f\n".encode("ascii"))
+        stream.extend(f"{rgb(brand)} rg\n0 798 595 4 re f\n".encode("ascii"))
+        draw_text(stream, margin_left, 818, "EifelLog", font="F2", size=10, color=(1, 1, 1))
+        draw_text(stream, margin_left + 55, 818, "FAHRERKARTE / TRACKER", font="F1", size=8, color=(1, 1, 1))
+        draw_text(stream, page_width - margin_right - 132, 818, f"Seite {page_index}", font="F1", size=8, color=(1, 1, 1))
+
+        stream.extend(f"{rgb(grid)} RG\n0.8 w\n{margin_left} 40 m {page_width - margin_right} 40 l S\n".encode("ascii"))
+        draw_text(stream, margin_left, 26, safe_str(footer_text)[:92], font="F1", size=7, color=muted)
+        draw_text(stream, page_width - margin_right - 92, 26, f"EifelLog | Seite {page_index}", font="F1", size=7, color=muted)
+
+        y = y_start
+        for operation in operations:
+            kind = operation["kind"]
+            height = operation["height"]
+            if kind == "intro":
+                stream.extend(f"{rgb(brand_dark)} rg\n{margin_left} {y - 43} 314 43 re f\n".encode("ascii"))
+                stream.extend(f"{rgb(section_bg)} rg\n{margin_left + 320} {y - 43} {content_width - 320} 43 re f\n".encode("ascii"))
+                draw_text(stream, margin_left + 10, y - 18, safe_str(operation['title'])[:52], font="F2", size=14, color=(1, 1, 1))
+                draw_text(stream, margin_left + 10, y - 32, "Digitaler Auszug aus dem EifelLog Tracker", font="F1", size=8, color=(1, 1, 1))
+                draw_text(stream, margin_left + 330, y - 14, f"Referenz: {safe_str(operation['reference'])[:30]}", font="F2", size=7, color=body)
+                draw_text(stream, margin_left + 330, y - 26, f"Erstellt: {generated_display}", font="F1", size=7, color=body)
+                draw_text(stream, margin_left + 330, y - 38, f"Status: {safe_str(operation['signature'])[:28]}", font="F2", size=7, color=signature_color)
+            elif kind == "section":
+                stream.extend(f"{rgb(section_bg)} rg\n{margin_left} {y - 18} {content_width} 18 re f\n".encode("ascii"))
+                stream.extend(f"{rgb(brand)} rg\n{margin_left} {y - 18} 4 18 re f\n".encode("ascii"))
+                draw_text(stream, margin_left + 10, y - 13, safe_str(operation['text']).upper(), font="F2", size=10, color=brand_dark)
+            elif kind == "row":
+                draw_text(stream, margin_left + (12 if operation.get('continuation') else 8), y - 11, safe_str(operation['text'])[:118], font="F1", size=8, color=body)
+                stream.extend(f"{rgb(grid)} RG\n0.35 w\n{margin_left} {y - 15} m {page_width - margin_right} {y - 15} l S\n".encode("ascii"))
+            y -= height
+
+        stream.extend(b"Q\n")
+        content_object_number = len(objects) + 1
+        objects.append(f"<< /Length {len(stream)} >>\nstream\n".encode("ascii") + bytes(stream) + b"\nendstream")
+        page_object_number = len(objects) + 1
+        page_object_numbers.append(page_object_number)
+        objects.append((
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+            f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> "
+            f"/Contents {content_object_number} 0 R >>"
+        ).encode("ascii"))
+
+    kids = " ".join(f"{number} 0 R" for number in page_object_numbers)
+    objects[1] = f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_numbers)} >>".encode("ascii")
+
+    pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend((
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+    ).encode("ascii"))
+    return bytes(pdf)
+
+
+def build_driver_card_shift_pdf(
+    title,
+    sections,
+    footer_text="EifelLog Fahrerkarte / digitaler PDF-Auszug",
+    document_reference="",
+    document_category="FAHRERKARTE / SCHICHTPROTOKOLL",
+    signature_state="",
+):
+    """Erstellt den Fahrerkarten-Auszug im EifelLog-Ticket-Plugin-Stil.
+
+    Das Layout ist gezielt nur für die Tracker-Fahrerkarte vorgesehen. Andere
+    PDF-Belege behalten ihre bisherige Darstellung. Bei fehlendem ReportLab
+    greift ein gebrandeter Minimal-Fallback mit derselben visuellen Richtung.
+    """
+    try:
+        from html import escape
+        from reportlab.lib import colors
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        generated_at = now_utc()
+        raw_reference = safe_str(document_reference)
+        if not raw_reference:
+            digest = hashlib.sha256(
+                f"{safe_str(title)}|{generated_at.isoformat()}|{safe_str(footer_text)}".encode("utf-8")
+            ).hexdigest()[:12].upper()
+            raw_reference = f"EL-SHIFT-{generated_at.strftime('%Y%m%d')}-{digest}"
+
+        category = safe_str(document_category, "FAHRERKARTE / SCHICHTPROTOKOLL").upper()
+        signature_label = safe_str(signature_state, "Signatur ungeprueft")
+
+        PDF_BRAND_COLOR = HexColor("#2BA044")
+        PDF_BRAND_DARK = HexColor("#1A632A")
+        PDF_BODY_TEXT_COLOR = HexColor("#1B2735")
+        PDF_MUTED_TEXT_COLOR = HexColor("#6E8096")
+        PDF_SOFT_BG_COLOR = HexColor("#F5F8FC")
+        PDF_SECTION_BG_COLOR = HexColor("#E9F0F8")
+        PDF_PAGE_BG_COLOR = HexColor("#FFFFFF")
+        PDF_GRID_COLOR = HexColor("#D5E0EC")
+        PDF_SUCCESS_COLOR = HexColor("#3BA55D")
+        PDF_DANGER_COLOR = HexColor("#D83C3E")
+        PDF_WARNING_COLOR = HexColor("#FAA61A")
+
+        page_width, page_height = A4
+        left_right_margin = 16 * mm
+        content_width = 178 * mm
+
+        def clean(value, fallback="-"):
+            value = safe_str(value, fallback)
+            if not value:
+                value = fallback
+            return escape(value).replace("\n", "<br/>")
+
+        def status_color(value):
+            normalized = safe_str(value).lower()
+            if any(token in normalized for token in ("fehler", "verstoss", "verstoß", "ungueltig", "ungültig", "abgelaufen", "abgelehnt")):
+                return PDF_DANGER_COLOR
+            if any(token in normalized for token in ("ungeprueft", "ungeprüft", "nicht", "offen", "warn", "kein feierabend")):
+                return PDF_WARNING_COLOR
+            return PDF_SUCCESS_COLOR
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "DriverCardTicketTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=17,
+            leading=20,
+            textColor=colors.white,
+            alignment=0,
+        )
+        subtitle_style = ParagraphStyle(
+            "DriverCardTicketSubtitle",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9.2,
+            leading=11.4,
+            textColor=colors.white,
+        )
+        meta_style = ParagraphStyle(
+            "DriverCardTicketMeta",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=7.8,
+            leading=9.5,
+            textColor=PDF_BODY_TEXT_COLOR,
+        )
+        section_style = ParagraphStyle(
+            "DriverCardTicketSection",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=11.2,
+            leading=13.5,
+            textColor=PDF_BRAND_DARK,
+            spaceBefore=5,
+            spaceAfter=5,
+        )
+        body_style = ParagraphStyle(
+            "DriverCardTicketBody",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=9.2,
+            leading=11.8,
+            textColor=PDF_BODY_TEXT_COLOR,
+        )
+        label_style = ParagraphStyle(
+            "DriverCardTicketLabel",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=10.2,
+            textColor=PDF_BRAND_DARK,
+        )
+        value_style = ParagraphStyle(
+            "DriverCardTicketValue",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.6,
+            leading=10.7,
+            textColor=PDF_BODY_TEXT_COLOR,
+        )
+        card_title_style = ParagraphStyle(
+            "DriverCardTicketCardTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=9.7,
+            leading=11.2,
+            textColor=PDF_BRAND_DARK,
+            spaceAfter=2,
+        )
+        card_value_style = ParagraphStyle(
+            "DriverCardTicketCardValue",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=10.2,
+            textColor=PDF_BODY_TEXT_COLOR,
+        )
+        metric_title_style = ParagraphStyle(
+            "DriverCardTicketMetricTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=7.6,
+            leading=9,
+            textColor=PDF_MUTED_TEXT_COLOR,
+        )
+        metric_value_style = ParagraphStyle(
+            "DriverCardTicketMetricValue",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=14,
+            leading=16,
+            textColor=PDF_BRAND_DARK,
+        )
+        micro_style = ParagraphStyle(
+            "DriverCardTicketMicro",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=7.4,
+            leading=9,
+            textColor=PDF_MUTED_TEXT_COLOR,
+        )
+
+        def paragraph(value, style=value_style):
+            return Paragraph(clean(value), style)
+
+        def section_map(section_name):
+            target = safe_str(section_name).lower()
+            for raw_title, raw_rows in sections or []:
+                if target in safe_str(raw_title).lower():
+                    return {safe_str(label).lower(): safe_str(value, "-") for label, value in (raw_rows or [])}
+            return {}
+
+        fahrer_data = section_map("fahrerdaten")
+        signature_data = section_map("signatur")
+        driver_name = fahrer_data.get("name", "-")
+        driver_card_id = signature_data.get("fahrerkarte-id", "-")
+        issuer = signature_data.get("aussteller", "EifelLog")
+        document_status = signature_data.get("status") or signature_label or "Nachweis erzeugt"
+        document_status_color = status_color(document_status)
+        reference_display = raw_reference if len(raw_reference) <= 16 else f"{raw_reference[:12]}..."
+        category_display = category.split("/", 1)[0].strip() or category
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=left_right_margin,
+            rightMargin=left_right_margin,
+            topMargin=19 * mm,
+            bottomMargin=18 * mm,
+            title=safe_str(title),
+            author="EifelLog",
+            subject=category,
+        )
+
+        def draw_page_background(canvas_obj, pdf_doc):
+            canvas_obj.saveState()
+            canvas_obj.setFillColor(PDF_PAGE_BG_COLOR)
+            canvas_obj.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+            canvas_obj.setFillColor(PDF_BRAND_DARK)
+            canvas_obj.rect(0, page_height - 14 * mm, page_width, 14 * mm, fill=1, stroke=0)
+            canvas_obj.setFillColor(PDF_BRAND_COLOR)
+            canvas_obj.rect(0, page_height - 14.9 * mm, page_width, 0.9 * mm, fill=1, stroke=0)
+            canvas_obj.setFillColor(colors.white)
+            canvas_obj.setFont("Helvetica-Bold", 9)
+            canvas_obj.drawString(left_right_margin, page_height - 9.5 * mm, "EifelLog")
+            canvas_obj.setFont("Helvetica", 7.6)
+            canvas_obj.drawRightString(page_width - left_right_margin, page_height - 9.5 * mm, "Fahrerkarte | Tracker-Auszug")
+            canvas_obj.setStrokeColor(PDF_GRID_COLOR)
+            canvas_obj.setLineWidth(0.8)
+            canvas_obj.line(left_right_margin, 14 * mm, page_width - left_right_margin, 14 * mm)
+            canvas_obj.setFont("Helvetica", 7.6)
+            canvas_obj.setFillColor(PDF_MUTED_TEXT_COLOR)
+            canvas_obj.drawString(left_right_margin, 9 * mm, safe_str(footer_text)[:94])
+            canvas_obj.drawRightString(page_width - left_right_margin, 9 * mm, f"Seite {canvas_obj.getPageNumber()}")
+            canvas_obj.restoreState()
+
+        def build_data_card(card_title, card_value, accent):
+            card = Table(
+                [[Paragraph(clean(card_title), card_title_style)], [Paragraph(clean(card_value), card_value_style)]],
+                colWidths=[56 * mm],
+            )
+            card.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("BOX", (0, 0), (-1, -1), 0.8, PDF_GRID_COLOR),
+                ("LINEABOVE", (0, 0), (-1, 0), 2.5, accent),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ]))
+            return card
+
+        def build_key_value_table(rows, accent=PDF_BRAND_COLOR, background=colors.white, header=False):
+            data = []
+            if header:
+                data.append([paragraph("ZEITRAUM", label_style), paragraph("AKTIVITÄT / DAUER", label_style)])
+            for label, value in rows:
+                data.append([paragraph(label, label_style), paragraph(value, value_style)])
+            table = Table(data, colWidths=[48 * mm, 130 * mm], repeatRows=1 if header else 0)
+            commands = [
+                ("BACKGROUND", (0, 0), (-1, -1), background),
+                ("BOX", (0, 0), (-1, -1), 0.55, PDF_GRID_COLOR),
+                ("INNERGRID", (0, 0), (-1, -1), 0.35, PDF_GRID_COLOR),
+                ("LINEBEFORE", (0, 0), (0, -1), 3.2, accent),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 5.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5.5),
+            ]
+            if header:
+                commands.extend([
+                    ("BACKGROUND", (0, 0), (-1, 0), PDF_SECTION_BG_COLOR),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), PDF_BRAND_DARK),
+                ])
+            table.setStyle(TableStyle(commands))
+            return table
+
+        def build_metric_grid(rows):
+            cells = []
+            for label, value in rows:
+                card = Table(
+                    [[Paragraph(clean(label).upper(), metric_title_style)], [Paragraph(clean(value), metric_value_style)]],
+                    colWidths=[56 * mm],
+                )
+                card.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                    ("BOX", (0, 0), (-1, -1), 0.8, PDF_GRID_COLOR),
+                    ("LINEABOVE", (0, 0), (-1, 0), 2.5, PDF_BRAND_COLOR),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]))
+                cells.append(card)
+            grid_rows = []
+            for index in range(0, len(cells), 3):
+                row = cells[index:index + 3]
+                while len(row) < 3:
+                    row.append("")
+                grid_rows.append(row)
+            grid = Table(grid_rows, colWidths=[59 * mm, 59 * mm, 59 * mm])
+            grid.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            return grid
+
+        story = []
+        left_cell = Table(
+            [[Paragraph("EifelLog Fahrerkarten-Auszug", title_style)], [Paragraph("Digitales Schichtprotokoll aus dem Tracker", subtitle_style)]],
+            colWidths=[113 * mm],
+        )
+        left_cell.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), PDF_BRAND_DARK),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 9),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ]))
+        right_cell = Table([
+            [Paragraph(f"<b>Referenz</b><br/>{clean(reference_display)}", meta_style), Paragraph(f"<b>Datum</b><br/>{generated_at.strftime('%d.%m.%Y %H:%M')}", meta_style)],
+            [Paragraph(f"<b>Typ</b><br/>{clean(category_display)}", meta_style), Paragraph(f"<b>Status</b><br/>{clean(document_status)}", meta_style)],
+        ], colWidths=[32.5 * mm, 32.5 * mm])
+        right_cell.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), PDF_SECTION_BG_COLOR),
+            ("BACKGROUND", (0, 1), (0, 1), PDF_BRAND_COLOR),
+            ("BACKGROUND", (1, 1), (1, 1), document_status_color),
+            ("TEXTCOLOR", (0, 1), (-1, 1), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.8, PDF_GRID_COLOR),
+            ("INNERGRID", (0, 0), (-1, -1), 0.4, PDF_GRID_COLOR),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(Table([[left_cell, right_cell]], colWidths=[113 * mm, 65 * mm]))
+        story.append(Spacer(1, 8))
+
+        story.append(Table([[
+            build_data_card("Fahrer", driver_name, PDF_BRAND_DARK),
+            build_data_card("Fahrerkarte-ID", driver_card_id, PDF_BRAND_COLOR),
+            build_data_card("Prüfstatus", document_status, document_status_color),
+        ]], colWidths=[59 * mm, 59 * mm, 59 * mm]))
+        story.append(Spacer(1, 8))
+
+        for section_title, raw_rows in sections or []:
+            rows = [(safe_str(label), safe_str(value, "-")) for label, value in (raw_rows or [])]
+            normalized = safe_str(section_title).lower()
+            story.append(Paragraph(clean(section_title), section_style))
+            if "summen" in normalized:
+                story.append(build_metric_grid(rows))
+            elif "zeitsegmente" in normalized:
+                story.append(build_key_value_table(rows, accent=PDF_BRAND_COLOR, background=colors.white, header=True))
+            elif "signatur" in normalized or "pruefvermerk" in normalized or "prüfvermerk" in normalized:
+                story.append(build_key_value_table(rows, accent=document_status_color, background=PDF_SOFT_BG_COLOR))
+            elif "ruhezeit" in normalized or "auffaellig" in normalized or "auffällig" in normalized:
+                local_status = rows[0][1] if rows else ""
+                story.append(build_key_value_table(rows, accent=status_color(local_status), background=PDF_SOFT_BG_COLOR))
+            else:
+                story.append(build_key_value_table(rows, accent=PDF_BRAND_COLOR, background=colors.white))
+            story.append(Spacer(1, 5))
+
+        story.append(Spacer(1, 3))
+        disclaimer = Table([[Paragraph(
+            "Dieser Fahrerkarten-Auszug wurde serverseitig aus den im EifelLog-Tracker gespeicherten Daten erzeugt. "
+            "Der sichtbare EifelLog-Prüfvermerk dient als interner Nachweis. Eine qualifizierte kryptografische "
+            "Zertifikats-Signatur muss serverseitig mit einem echten Zertifikat erzeugt werden.",
+            micro_style,
+        )]], colWidths=[content_width])
+        disclaimer.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), PDF_SECTION_BG_COLOR),
+            ("BOX", (0, 0), (-1, -1), 0.55, PDF_GRID_COLOR),
+            ("LINEBEFORE", (0, 0), (0, -1), 3, PDF_BRAND_COLOR),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(disclaimer)
+
+        doc.build(story, onFirstPage=draw_page_background, onLaterPages=draw_page_background)
+        return buffer.getvalue()
+    except Exception:
+        try:
+            app.logger.exception("EifelLog-Ticket-Layout fuer Fahrerkarten-Auszug konnte nicht erzeugt werden, nutze gebrandeten Fallback.")
+        except Exception:
+            pass
+        return _build_driver_card_pdf_minimal(
+            title,
+            sections,
+            footer_text=footer_text,
+            document_reference=document_reference,
+            document_category=document_category,
+            signature_state=signature_state,
+        )
 
 def build_simple_pdf(
     title,
