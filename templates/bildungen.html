@@ -1151,6 +1151,219 @@
             }
         }
 
+
+        /* === FINALER CLEAN-PASS: CONTENT + RESPONSIVE SLIDESHOW === */
+        /*
+           Desktop: Das scharfe Motiv läuft flächig bis zum Rand. Dadurch entsteht
+           kein sichtbarer "Bild-im-Bild"-Rahmen. Auf schmalen Hochformat-Geräten
+           wird wieder auf contain umgeschaltet; die unscharfe Ebene füllt dort die
+           freien Flächen ruhig auf.
+        */
+        .hero-bg {
+            --slide-safe-inset: 0px;
+        }
+
+        .hero-bg .bg-slide-frame::before {
+            inset: -12%;
+            background-position: var(--slide-position, center center);
+            background-repeat: no-repeat;
+            background-size: cover;
+            filter: blur(34px) saturate(1.02) brightness(0.31);
+            transform: scale(1.18);
+        }
+
+        .hero-bg .bg-slide {
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: var(--slide-position, center center);
+            filter: saturate(0.98) brightness(0.43) contrast(1.02);
+            transform-origin: center center;
+            animation-name: cleanDesktopSlideZoom;
+        }
+
+        @keyframes cleanDesktopSlideZoom {
+            from { transform: scale(1.005); }
+            to { transform: scale(1.035); }
+        }
+
+        .hero-overlay {
+            background:
+                radial-gradient(circle at 50% 30%, rgba(6, 16, 10, 0.22) 0%, rgba(3, 10, 6, 0.62) 56%, rgba(1, 4, 2, 0.88) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.55) 54%, rgba(0, 0, 0, 0.72) 100%);
+        }
+
+        /* Ruhigere Inhaltsflächen: klarere Hierarchie, weniger visuelle Konkurrenz. */
+        .base-main {
+            padding-top: 8.25rem;
+            padding-bottom: 4.75rem;
+        }
+
+        .base-shell {
+            max-width: 1280px;
+        }
+
+        .page-grid {
+            gap: 1rem;
+        }
+
+        .glass-card {
+            background: linear-gradient(145deg, rgba(13, 24, 17, 0.84) 0%, rgba(4, 10, 6, 0.92) 100%);
+            border-color: rgba(255, 255, 255, 0.07);
+            border-top-color: rgba(var(--brand-green-rgb), 0.24);
+            border-left-color: rgba(var(--brand-green-rgb), 0.18);
+            backdrop-filter: blur(26px);
+            -webkit-backdrop-filter: blur(26px);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+        }
+
+        .section-block {
+            position: relative;
+            margin-top: 1.35rem;
+            padding: 1.15rem;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            border-top-color: rgba(var(--brand-green-rgb), 0.15);
+            border-radius: 24px;
+            background: linear-gradient(145deg, rgba(8, 17, 11, 0.68), rgba(3, 8, 5, 0.82));
+            backdrop-filter: blur(19px);
+            -webkit-backdrop-filter: blur(19px);
+            box-shadow: 0 20px 52px rgba(0, 0, 0, 0.24);
+        }
+
+        .section-block::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background: radial-gradient(circle at 0% 0%, rgba(var(--brand-green-rgb), 0.055), transparent 34%);
+        }
+
+        .section-block > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .section-head {
+            margin-bottom: 0.95rem;
+            align-items: center;
+        }
+
+        .section-copy {
+            max-width: 590px;
+        }
+
+        .offer-grid {
+            gap: 0.85rem;
+        }
+
+        .offer-card {
+            padding: 1.1rem;
+            border-color: rgba(255, 255, 255, 0.075);
+            border-top-color: rgba(var(--brand-green-rgb), 0.31);
+            background: linear-gradient(145deg, rgba(8, 19, 12, 0.94), rgba(2, 7, 4, 0.97));
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 15px 34px rgba(0, 0, 0, 0.28);
+        }
+
+        .offer-card:hover {
+            border-color: rgba(var(--brand-green-rgb), 0.48);
+            box-shadow: 0 20px 46px rgba(0, 0, 0, 0.36), 0 0 20px rgba(var(--brand-green-rgb), 0.075);
+        }
+
+        .history-card {
+            background: linear-gradient(145deg, rgba(8, 19, 12, 0.91), rgba(2, 7, 4, 0.96));
+        }
+
+        @media (min-width: 1536px) {
+            .base-main {
+                padding-top: 8.25rem;
+            }
+
+            .base-shell {
+                max-width: 1280px;
+            }
+        }
+
+        @media (max-width: 1050px) {
+            .base-main {
+                padding-top: 7.3rem;
+            }
+        }
+
+        /* Hochformat und Mobile: Motiv vollständig zeigen, Rand weich auffüllen. */
+        @media (max-width: 820px), (max-aspect-ratio: 4 / 5) {
+            .hero-bg {
+                --slide-safe-inset: clamp(0.25rem, 1.5vw, 0.75rem);
+            }
+
+            .hero-bg .bg-slide-frame::before {
+                inset: -15%;
+                filter: blur(34px) saturate(1) brightness(0.29);
+                transform: scale(1.20);
+            }
+
+            .hero-bg .bg-slide {
+                inset: var(--slide-safe-inset);
+                width: calc(100% - var(--slide-safe-inset) - var(--slide-safe-inset));
+                height: calc(100% - var(--slide-safe-inset) - var(--slide-safe-inset));
+                object-fit: contain;
+                filter: saturate(0.98) brightness(0.43) contrast(1.01);
+                animation-name: cleanMobileSlideZoom;
+            }
+
+            @keyframes cleanMobileSlideZoom {
+                from { transform: scale(0.975); }
+                to { transform: scale(0.995); }
+            }
+
+            .hero-overlay {
+                background:
+                    radial-gradient(circle at 50% 24%, rgba(6, 16, 10, 0.20) 0%, rgba(3, 10, 6, 0.66) 56%, rgba(1, 4, 2, 0.90) 100%),
+                    linear-gradient(180deg, rgba(0, 0, 0, 0.36) 0%, rgba(0, 0, 0, 0.61) 58%, rgba(0, 0, 0, 0.76) 100%);
+            }
+        }
+
+        @media (max-width: 820px) {
+            .base-main {
+                padding-top: calc(6.65rem + env(safe-area-inset-top));
+            }
+
+            .section-block {
+                margin-top: 1rem;
+                padding: 0.95rem;
+                border-radius: 20px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .base-main {
+                padding-top: calc(5.9rem + env(safe-area-inset-top));
+                padding-bottom: 2.6rem;
+            }
+
+            .section-block {
+                margin-top: 0.9rem;
+                padding: 0.72rem;
+                border-radius: 17px;
+            }
+
+            .section-head {
+                padding: 0.12rem 0.12rem 0;
+            }
+
+            .offer-grid {
+                gap: 0.72rem;
+            }
+
+            .offer-card {
+                padding: 0.95rem;
+            }
+        }
+
     </style>
 
     <script>
