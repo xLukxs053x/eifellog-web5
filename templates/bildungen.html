@@ -3,365 +3,1189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ description }}">
-    <title>{{ title }}</title>
+
+    <title>{{ title|default('Weiterbildung & interne Entwicklung - Eifel LOG', true) }}</title>
+
+    <!-- SEO / Discord / Social Preview -->
+    <meta name="description" content="{{ description|default('Interne Weiterbildungsmaßnahmen, Fahrer-Services und Entwicklungsmöglichkeiten bei Eifel LOG.', true)|e }}">
+    <meta name="theme-color" content="#89be32">
+
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="de_DE">
+    <meta property="og:site_name" content="Eifel LOG">
+    <meta property="og:title" content="{{ title|default('Weiterbildung & interne Entwicklung - Eifel LOG', true)|e }}">
+    <meta property="og:description" content="{{ description|default('Interne Weiterbildungsmaßnahmen, Fahrer-Services und Entwicklungsmöglichkeiten bei Eifel LOG.', true)|e }}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
+    <meta property="og:image:secure_url" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:alt" content="Eifel LOG Logo">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ title|default('Weiterbildung & interne Entwicklung - Eifel LOG', true)|e }}">
+    <meta name="twitter:description" content="{{ description|default('Interne Weiterbildungsmaßnahmen, Fahrer-Services und Entwicklungsmöglichkeiten bei Eifel LOG.', true)|e }}">
+    <meta name="twitter:image" content="{{ url_for('static', filename='eifellog.jpg', _external=True) }}">
+
+    <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Sci-Fi & Clean Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --navy-950: #061526;
-            --navy-900: #081d32;
-            --navy-850: #0b263f;
-            --navy-800: #10314d;
-            --green-500: #18a85d;
-            --green-400: #29c773;
-            --green-100: #dff8e9;
-            --paper: #f3f7f5;
-            --white: #ffffff;
-            --ink: #0a1f31;
-            --muted: #577084;
-            --line: #d5e1e2;
-            --shadow: 0 18px 45px rgba(6, 21, 38, .12);
+            --bg-1: #040a06;
+            --bg-2: #08140c;
+            --panel: rgba(10, 20, 15, 0.45);
+            --panel-strong: rgba(7, 16, 10, 0.80);
+            --line: rgba(255, 255, 255, 0.08);
+            --text: #edf3ff;
+            --muted: #93a4c8;
+            --brand-yellow: #dce226;
+            --brand-green: #89be32;
+            --brand-green-rgb: 137, 190, 50;
+            --danger: #ff9f9f;
+            --warning: #ffd479;
+            --shadow: 0 36px 100px rgba(0, 0, 0, 0.60);
+            --site-max-width: 1280px;
+            --nav-max-width: 1280px;
         }
 
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
+        html {
+            font-size: 14.5px;
+            scroll-behavior: smooth;
+        }
+
+        @media (min-width: 1280px) {
+            html { font-size: 14px; }
+        }
+
+        @media (min-width: 1536px) {
+            html { font-size: 13.6px; }
+        }
+
+        @media (max-width: 768px) {
+            html { font-size: 14px; }
+        }
+
+        ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            box-sizing: border-box;
+        }
+
         body {
+            min-height: 100vh;
             margin: 0;
-            color: var(--ink);
-            background: var(--paper);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        a { color: inherit; text-decoration: none; }
-        button, textarea { font: inherit; }
-
-        .topbar {
-            background: var(--navy-950);
-            border-bottom: 5px solid var(--green-500);
-            color: var(--white);
-        }
-        .topbar-inner, .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
-        .topbar-inner {
+            overflow-x: hidden;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
-            min-height: 74px;
+            flex-direction: column;
+            color: var(--text);
+            background-color: var(--bg-1);
+            font-family: 'Inter', sans-serif;
         }
-        .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .04em; }
-        .brand-mark {
-            display: grid;
-            place-items: center;
-            width: 42px;
-            height: 42px;
-            border: 1px solid rgba(41,199,115,.75);
-            border-radius: 10px;
-            color: var(--green-400);
-            font-size: 14px;
-        }
-        .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-        .nav a {
-            padding: 10px 12px;
-            border: 1px solid rgba(255,255,255,.12);
-            border-radius: 9px;
-            color: #d6e7ef;
-            font-size: 13px;
-            font-weight: 700;
-        }
-        .nav a:hover { border-color: var(--green-400); color: var(--white); }
 
-        .page { padding: 34px 0 56px; }
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
-            gap: 22px;
-            margin-bottom: 30px;
+        body.overflow-hidden { overflow: hidden; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+        /* === HINTERGRUND SLIDESHOW === */
+        .hero-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -10;
+            overflow: hidden;
+            background-color: var(--bg-1);
         }
-        .hero-main, .identity-card, .panel, .offer-card, .request-card {
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            background: var(--white);
+
+        .hero-bg .bg-slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            filter: saturate(1.05) brightness(0.50);
+            opacity: 0;
+            animation: fadeZoom 24s infinite;
+        }
+
+        .hero-bg .slide-1 { animation-delay: 0s; }
+        .hero-bg .slide-2 { animation-delay: 8s; }
+        .hero-bg .slide-3 { animation-delay: 16s; }
+
+        @keyframes fadeZoom {
+            0% { opacity: 0; transform: scale(1); }
+            10% { opacity: 1; }
+            33% { opacity: 1; }
+            45% { opacity: 0; transform: scale(1.045); }
+            100% { opacity: 0; transform: scale(1.045); }
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
+        }
+
+        /* === BASIS-KOMPONENTEN === */
+        .glass-nav {
+            background: rgba(10, 20, 15, 0.58);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.20);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.50);
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(20, 30, 20, 0.36) 0%, rgba(5, 10, 5, 0.76) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.20);
+            border-left: 1px solid rgba(137, 190, 50, 0.20);
+            border-radius: 28px;
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
             box-shadow: var(--shadow);
         }
-        .hero-main {
-            position: relative;
-            overflow: hidden;
-            padding: 34px;
-            color: var(--white);
-            background: linear-gradient(125deg, var(--navy-950), var(--navy-850));
+
+        .glass-card-danger {
+            border-top-color: rgba(255, 159, 159, 0.30);
+            border-left-color: rgba(255, 159, 159, 0.30);
         }
-        .hero-main::after {
-            content: "";
-            position: absolute;
-            right: -45px;
-            bottom: -78px;
-            width: 240px;
-            height: 240px;
-            border: 34px solid rgba(41,199,115,.16);
-            border-radius: 50%;
-        }
-        .eyebrow { color: var(--green-400); font-size: 11px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-        h1 { max-width: 760px; margin: 11px 0 12px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.03; }
-        .lead { max-width: 760px; margin: 0; color: #c8dce7; font-size: 16px; line-height: 1.72; }
-        .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-        .button {
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            min-height: 40px;
+            padding: 11px 21px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 42px;
-            padding: 10px 14px;
-            border: 1px solid transparent;
-            border-radius: 9px;
+            gap: 8px;
+            border-radius: 12px;
             cursor: pointer;
-            font-size: 13px;
-            font-weight: 900;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.15em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: all 0.30s ease;
         }
-        .button-primary { color: var(--white); background: var(--green-500); }
-        .button-primary:hover { background: #14894d; }
-        .button-secondary { color: var(--ink); background: #eaf1f1; border-color: var(--line); }
-        .button-secondary:hover { background: #dce9e8; }
-        .button-hero { color: var(--navy-950); background: var(--green-400); }
-        .button-ghost { color: #d7e8ef; border-color: rgba(255,255,255,.25); background: transparent; }
 
-        .identity-card { padding: 22px; }
-        .identity-label { color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-        .identity-name { margin: 9px 0 4px; font-size: 22px; font-weight: 900; }
-        .identity-role { color: var(--green-500); font-size: 13px; font-weight: 900; }
-        .identity-note { margin: 16px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
-        .status {
+        .btn-primary {
+            color: var(--brand-green);
+            background: rgba(var(--brand-green-rgb), 0.15);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.50);
+            box-shadow: 0 0 15px rgba(var(--brand-green-rgb), 0.10);
+        }
+
+        .btn-primary:hover {
+            color: #fff;
+            background: rgba(var(--brand-green-rgb), 0.30);
+            box-shadow: 0 0 25px rgba(var(--brand-green-rgb), 0.30);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            color: var(--danger);
+            background: rgba(255, 159, 159, 0.15);
+            border: 1px solid rgba(255, 159, 159, 0.40);
+            box-shadow: 0 0 15px rgba(255, 159, 159, 0.10);
+        }
+
+        .btn-danger:hover {
+            color: #fff;
+            background: rgba(255, 159, 159, 0.30);
+            box-shadow: 0 0 25px rgba(255, 159, 159, 0.40);
+            transform: translateY(-2px);
+        }
+
+        .nav-link {
+            padding: 8px 14px;
+            color: var(--muted);
+            border-radius: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.15em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: all 0.30s ease;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .base-shell {
+            width: 100%;
+            max-width: var(--site-max-width);
+            margin-right: auto;
+            margin-left: auto;
+            padding-right: 1.25rem;
+            padding-left: 1.25rem;
+        }
+
+        .base-main {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            padding-top: 7.5rem;
+            padding-bottom: 4rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .base-content {
+            width: 100%;
+            margin-right: auto;
+            margin-left: auto;
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+        }
+
+        /* === SEITENSPEZIFISCH: BILDUNGEN === */
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            padding: clamp(1.5rem, 4vw, 3rem);
+        }
+
+        .page-hero::before {
+            content: '';
+            position: absolute;
+            right: -8rem;
+            bottom: -11rem;
+            width: 28rem;
+            height: 28rem;
+            border-radius: 999px;
+            border: 3rem solid rgba(var(--brand-green-rgb), 0.08);
+            pointer-events: none;
+        }
+
+        .page-hero::after {
+            content: '';
+            position: absolute;
+            top: -5rem;
+            right: 16%;
+            width: 14rem;
+            height: 14rem;
+            border-radius: 999px;
+            background: rgba(var(--brand-green-rgb), 0.09);
+            filter: blur(70px);
+            pointer-events: none;
+        }
+
+        .page-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(255px, 330px);
+            gap: 1.25rem;
+        }
+
+        .eyebrow {
+            color: var(--brand-yellow);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+        }
+
+        .hero-title {
+            max-width: 850px;
+            margin: 0.85rem 0 1rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2rem, 5vw, 4.65rem);
+            font-weight: 800;
+            line-height: 1.04;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+        }
+
+        .hero-lead {
+            max-width: 810px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .hero-actions,
+        .quick-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .hero-actions { margin-top: 1.55rem; }
+        .quick-nav { margin-top: 1.15rem; }
+
+        .quick-link {
+            padding: 0.6rem 0.85rem;
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            margin-top: 16px;
-            padding: 7px 9px;
+            gap: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 999px;
-            color: #087239;
-            background: var(--green-100);
-            font-size: 12px;
-            font-weight: 900;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.025);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: 0.25s ease;
         }
-        .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green-500); }
 
-        .flash-stack { display: grid; gap: 10px; margin: 0 0 22px; }
-        .flash { padding: 13px 15px; border-radius: 10px; font-size: 14px; font-weight: 700; }
-        .flash-success { color: #075c30; background: #dff8e9; border: 1px solid #9be0b9; }
-        .flash-error { color: #842828; background: #fff0f0; border: 1px solid #f2b9b9; }
-        .flash-info { color: #174e70; background: #edf7fc; border: 1px solid #badbed; }
+        .quick-link:hover {
+            color: var(--brand-green);
+            border-color: rgba(var(--brand-green-rgb), 0.45);
+            background: rgba(var(--brand-green-rgb), 0.08);
+        }
 
-        .section { margin-top: 34px; }
-        .section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
-        .section-head h2 { margin: 5px 0 0; font-size: clamp(22px, 3vw, 31px); }
-        .section-head p { max-width: 620px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
-        .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
-        .offer-card { display: flex; flex-direction: column; min-height: 100%; padding: 19px; box-shadow: 0 10px 30px rgba(6,21,38,.07); }
-        .offer-card h3 { margin: 8px 0 8px; font-size: 18px; line-height: 1.22; }
-        .offer-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.62; }
-        .meta { margin-top: 13px; color: var(--green-500); font-size: 12px; font-weight: 900; }
-        .offer-card form { margin-top: auto; padding-top: 17px; }
-        details { border-top: 1px solid var(--line); padding-top: 11px; }
-        summary { cursor: pointer; color: var(--navy-800); font-size: 12px; font-weight: 900; }
+        .quick-dot,
+        .status-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 999px;
+            background: var(--brand-green);
+            box-shadow: 0 0 13px rgba(var(--brand-green-rgb), 0.8);
+        }
+
+        .identity-card {
+            position: relative;
+            overflow: hidden;
+            padding: 1.35rem;
+        }
+
+        .identity-card::after {
+            content: '';
+            position: absolute;
+            right: -3.8rem;
+            bottom: -4.2rem;
+            width: 9rem;
+            height: 9rem;
+            border-radius: 999px;
+            background: rgba(var(--brand-green-rgb), 0.11);
+            filter: blur(30px);
+            pointer-events: none;
+        }
+
+        .identity-label {
+            color: var(--muted);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .identity-name {
+            margin-top: 0.85rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.22rem;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .identity-role {
+            margin-top: 0.45rem;
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.11em;
+            text-transform: uppercase;
+        }
+
+        .identity-note {
+            margin-top: 1.15rem;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.7;
+        }
+
+        .system-status {
+            margin-top: 1.2rem;
+            padding-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .section-block {
+            margin-top: 2.2rem;
+            scroll-margin-top: 8rem;
+        }
+
+        .section-head {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .section-title {
+            margin: 0.45rem 0 0;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.35rem, 3vw, 2rem);
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            text-transform: uppercase;
+        }
+
+        .section-copy {
+            max-width: 650px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.75;
+        }
+
+        .offer-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .offer-card {
+            min-height: 100%;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-top-color: rgba(var(--brand-green-rgb), 0.28);
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(15, 26, 17, 0.65), rgba(4, 9, 5, 0.83));
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            box-shadow: 0 17px 40px rgba(0, 0, 0, 0.24);
+            transition: 0.28s ease;
+        }
+
+        .offer-card:hover {
+            border-color: rgba(var(--brand-green-rgb), 0.44);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 46px rgba(0, 0, 0, 0.34), 0 0 20px rgba(var(--brand-green-rgb), 0.07);
+        }
+
+        .offer-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .offer-icon {
+            width: 2.65rem;
+            height: 2.65rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.35);
+            border-radius: 0.9rem;
+            color: var(--brand-green);
+            background: rgba(var(--brand-green-rgb), 0.08);
+        }
+
+        .offer-icon svg { width: 1.25rem; height: 1.25rem; }
+
+        .offer-card h3 {
+            margin: 1rem 0 0.55rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.98rem;
+            font-weight: 800;
+            line-height: 1.35;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+        }
+
+        .offer-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.83rem;
+            line-height: 1.7;
+        }
+
+        .offer-meta {
+            margin-top: 0.9rem;
+            color: var(--brand-yellow);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.13em;
+            line-height: 1.55;
+            text-transform: uppercase;
+        }
+
+        .offer-form {
+            margin-top: auto;
+            padding-top: 1rem;
+        }
+
+        .offer-details {
+            margin-bottom: 0.9rem;
+            padding-top: 0.8rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .offer-details summary {
+            cursor: pointer;
+            color: var(--muted);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.11em;
+            text-transform: uppercase;
+            transition: color 0.2s ease;
+        }
+
+        .offer-details summary:hover { color: var(--brand-green); }
+
         textarea {
             width: 100%;
-            min-height: 76px;
-            margin: 10px 0;
-            padding: 10px;
+            min-height: 6.4rem;
+            margin-top: 0.8rem;
+            padding: 0.85rem;
             resize: vertical;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            color: var(--ink);
-            background: #fbfdfd;
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 0.8rem;
+            outline: none;
+            color: var(--text);
+            background: rgba(0, 0, 0, 0.22);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            transition: 0.2s ease;
+        }
+
+        textarea::placeholder { color: rgba(147, 164, 200, 0.62); }
+
+        textarea:focus {
+            border-color: rgba(var(--brand-green-rgb), 0.65);
+            box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.10);
+        }
+
+        .offer-form .btn-primary { width: 100%; }
+
+        .history-card {
+            overflow: hidden;
+            padding: 0.55rem;
+        }
+
+        .history-list { display: grid; gap: 0.55rem; }
+
+        .history-item {
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .history-title {
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .history-meta {
+            margin-top: 0.45rem;
+            color: var(--muted);
+            font-size: 0.77rem;
             line-height: 1.5;
         }
-        textarea:focus { outline: 2px solid rgba(24,168,93,.22); border-color: var(--green-500); }
 
-        .panel { padding: 19px; box-shadow: 0 10px 30px rgba(6,21,38,.07); }
-        .requests { display: grid; gap: 10px; }
-        .request-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px; box-shadow: none; }
-        .request-title { font-weight: 900; }
-        .request-meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
-        .request-status { padding: 7px 9px; border-radius: 999px; color: #087239; background: var(--green-100); font-size: 12px; font-weight: 900; }
-        .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 14px; }
-        footer { margin-top: 36px; padding-top: 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-
-        @media (max-width: 900px) {
-            .hero { grid-template-columns: 1fr; }
-            .grid { grid-template-columns: 1fr 1fr; }
+        .history-status {
+            padding: 0.55rem 0.7rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.30);
+            border-radius: 999px;
+            color: var(--brand-green);
+            background: rgba(var(--brand-green-rgb), 0.08);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.58rem;
+            font-weight: 700;
+            letter-spacing: 0.10em;
+            text-align: center;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
-        @media (max-width: 620px) {
-            .topbar-inner { display: block; padding: 15px 0; }
-            .nav { justify-content: flex-start; margin-top: 12px; }
-            .hero-main { padding: 24px; }
-            .grid { grid-template-columns: 1fr; }
+
+        .empty-state {
+            padding: 2rem 1rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.7;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            width: 3rem;
+            height: 3rem;
+            margin: 0 auto 0.85rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.28);
+            border-radius: 999px;
+            color: var(--brand-green);
+            background: rgba(var(--brand-green-rgb), 0.06);
+        }
+
+        .flash-stack {
+            width: 100%;
+            margin-bottom: 1.3rem;
+            display: grid;
+            gap: 0.7rem;
+        }
+
+        .flash-item {
+            padding: 0.95rem 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.32);
+            border-radius: 0.9rem;
+            color: var(--text);
+            background: rgba(3, 9, 5, 0.72);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .flash-item.error { border-color: rgba(255, 159, 159, 0.38); }
+        .flash-item.info { border-color: rgba(147, 164, 200, 0.35); }
+
+        .flash-label {
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.61rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .flash-item.error .flash-label { color: var(--danger); }
+        .flash-item.info .flash-label { color: var(--muted); }
+
+        .flash-message {
+            color: var(--text);
+            font-size: 0.82rem;
+            line-height: 1.55;
+        }
+
+        .fade-enter { animation: fadeIn 0.4s ease-out forwards; }
+        .fade-leave { animation: fadeOut 0.3s ease-in forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-12px); }
+        }
+
+        @media (min-width: 1536px) {
+            .base-main { padding-top: 7rem; }
+            .base-shell { max-width: 1220px; }
+        }
+
+        @media (max-width: 1050px) {
+            .base-main { padding-top: 7rem; }
+            .offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 820px) {
+            .page-grid { grid-template-columns: 1fr; }
             .section-head { display: block; }
-            .section-head p { margin-top: 8px; }
-            .request-card { grid-template-columns: 1fr; }
-            .request-status { justify-self: start; }
+            .section-copy { margin-top: 0.7rem; }
+        }
+
+        @media (max-width: 640px) {
+            .base-main {
+                padding-top: 6.5rem;
+                padding-bottom: 3rem;
+            }
+
+            .base-shell {
+                padding-right: 1rem;
+                padding-left: 1rem;
+            }
+
+            .offer-grid { grid-template-columns: 1fr; }
+            .btn-primary, .btn-secondary, .btn-danger { width: 100%; }
+            .history-item { grid-template-columns: 1fr; }
+            .history-status { justify-self: start; }
+            .flash-item { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
         }
     </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not(.no-fade)');
+
+            links.forEach(link => {
+                link.addEventListener('click', event => {
+                    if (link.closest('#mobile-menu-btn')) return;
+                    if (link.hostname !== window.location.hostname) return;
+
+                    event.preventDefault();
+                    const href = link.href;
+                    document.body.classList.remove('fade-enter');
+                    document.body.classList.add('fade-leave');
+                    setTimeout(() => { window.location = href; }, 300);
+                });
+            });
+
+            initSecuritySystem();
+        });
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            if (!menu) return;
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
+
+        function initSecuritySystem() {
+            const modal = document.getElementById('security-modal');
+            if (!modal) return;
+
+            const modalCard = modal.querySelector('.glass-card');
+            if (!modalCard) return;
+
+            window.showSecurityAlert = function(event) {
+                if (event) event.preventDefault();
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.classList.add('opacity-100');
+                    modalCard.classList.remove('scale-95');
+                    modalCard.classList.add('scale-100');
+                }, 10);
+            };
+
+            window.closeSecurityAlert = function() {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0');
+                modalCard.classList.remove('scale-100');
+                modalCard.classList.add('scale-95');
+
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 300);
+            };
+
+            document.addEventListener('contextmenu', function(event) {
+                showSecurityAlert(event);
+            }, false);
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'F12' || event.keyCode === 123) {
+                    showSecurityAlert(event);
+                }
+
+                if (event.ctrlKey) {
+                    if (
+                        event.shiftKey &&
+                        (
+                            event.key === 'I' || event.key === 'i' ||
+                            event.key === 'J' || event.key === 'j' ||
+                            event.key === 'C' || event.key === 'c' ||
+                            event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67
+                        )
+                    ) {
+                        showSecurityAlert(event);
+                    }
+
+                    if (event.key === 'U' || event.key === 'u' || event.keyCode === 85) {
+                        showSecurityAlert(event);
+                    }
+                }
+            }, false);
+        }
+    </script>
 </head>
-<body>
-<header class="topbar">
-    <div class="topbar-inner">
-        <a class="brand" href="{{ url_for('dashboard') }}">
-            <span class="brand-mark">EL</span>
-            <span>EIFELLOG · SERVICECENTER</span>
-        </a>
-        <nav class="nav" aria-label="Hauptnavigation">
-            <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('servicecenter') }}">ServiceCenter</a>
-            <a href="{{ url_for('logout') }}">Abmelden</a>
-        </nav>
+
+<body class="fade-enter antialiased flex flex-col overflow-x-hidden">
+    <!-- Hintergrund Slideshow -->
+    <div class="hero-bg" aria-hidden="true">
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="">
+        <div class="hero-overlay"></div>
     </div>
-</header>
 
-<main class="page">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-stack" aria-live="polite">
-                {% for category, message in messages %}
-                    <div class="flash flash-{{ category if category in ['success', 'error', 'info'] else 'info' }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+    <!-- Navigation -->
+    <header class="fixed top-0 left-0 w-full z-50 px-4 py-4 md:py-5 pointer-events-none">
+        <div class="w-full max-w-[1280px] mx-auto pointer-events-auto">
+            <nav class="glass-nav px-4 md:px-5 py-2.5 rounded-full flex justify-between items-center transition-all">
+                <a href="/" class="flex items-center gap-3 group shrink-0">
+                    <div class="w-9 h-9 rounded-full overflow-hidden border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.3)] group-hover:shadow-[0_0_25px_rgba(137,190,50,0.6)] transition-all duration-300">
+                        <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-full h-full object-cover">
+                    </div>
+                    <div class="hidden sm:flex flex-col leading-none">
+                        <span class="text-[13px] font-orbitron font-bold tracking-widest text-[var(--text)] uppercase">Eifel LOG</span>
+                        <span class="text-[7px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-[0.2em] mt-1">ServiceCenter Node</span>
+                    </div>
+                </a>
 
-    <section class="hero">
-        <div class="hero-main">
-            <div class="eyebrow">Fahrerkarte · Checkcode-Ziel</div>
-            <h1>Weiterbildung & interne Entwicklung</h1>
-            <p class="lead">Hier findest du aktuelle Weiterbildungsmaßnahmen, neue Fahrer-Services und interne Möglichkeiten, für die du dich direkt über das ServiceCenter anmelden oder bewerben kannst.</p>
-            <div class="hero-actions">
-                <a class="button button-hero" href="#schulungen">Schulungen ansehen</a>
-                <a class="button button-ghost" href="#bewerbungen">Interne Möglichkeiten</a>
-            </div>
-        </div>
-        <aside class="identity-card">
-            <div class="identity-label">Angemeldeter Fahrer</div>
-            <div class="identity-name">{{ user.display_name or user.username or current_user.username }}</div>
-            <div class="identity-role">{{ primary_role_name }}</div>
-            <p class="identity-note">Die Anmeldung wird deinem internen ServiceCenter-Profil zugeordnet und zur Bearbeitung gespeichert.</p>
-            <div class="status">ServiceCenter aktiv</div>
-        </aside>
-    </section>
+                <div class="hidden lg:flex items-center gap-2">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/servicecenter" class="nav-link active">ServiceCenter</a>
+                    <a href="#schulungen" class="nav-link no-fade">Schulungen</a>
+                    <a href="#bewerbungen" class="nav-link no-fade">Entwicklung</a>
+                    <a href="#services" class="nav-link no-fade">Services</a>
+                </div>
 
-    <section class="section" id="schulungen">
-        <div class="section-head">
-            <div>
-                <div class="eyebrow">Weiterbildungsmaßnahmen</div>
-                <h2>Weitere Schulungen</h2>
-            </div>
-            <p>Melde dich direkt für eine Maßnahme an. Ein zusätzlicher Hinweis ist optional und hilft bei der Planung.</p>
-        </div>
-        <div class="grid">
-            {% for angebot in bildungen_angebote.get('schulung', []) %}
-                <article class="offer-card">
-                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
-                    <h3>{{ angebot.title }}</h3>
-                    <p>{{ angebot.description }}</p>
-                    <div class="meta">{{ angebot.meta }}</div>
-                    <form method="post" action="{{ bildungen_submit_url }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="category" value="schulung">
-                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
-                        <details>
-                            <summary>Optionalen Hinweis ergänzen</summary>
-                            <textarea name="message" maxlength="1200" placeholder="Zum Beispiel Terminwunsch oder Rückfrage"></textarea>
-                        </details>
-                        <button class="button button-primary" type="submit">Für Schulung anmelden</button>
-                    </form>
-                </article>
-            {% endfor %}
-        </div>
-    </section>
+                <div class="hidden lg:flex shrink-0 items-center gap-3">
+                    <a href="/dashboard" class="btn-primary">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        Dashboard
+                    </a>
+                    <a href="/logout" class="btn-secondary" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        Logout
+                    </a>
+                </div>
 
-    <section class="section" id="bewerbungen">
-        <div class="section-head">
-            <div>
-                <div class="eyebrow">Interne Entwicklung</div>
-                <h2>Interne Möglichkeiten</h2>
-            </div>
-            <p>Reiche dein Interesse an einer internen Rolle oder projektbezogenen Mitarbeit ein. Die zuständige Stelle prüft deine Anfrage.</p>
-        </div>
-        <div class="grid">
-            {% for angebot in bildungen_angebote.get('interne_bewerbung', []) %}
-                <article class="offer-card">
-                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
-                    <h3>{{ angebot.title }}</h3>
-                    <p>{{ angebot.description }}</p>
-                    <div class="meta">{{ angebot.meta }}</div>
-                    <form method="post" action="{{ bildungen_submit_url }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="category" value="interne_bewerbung">
-                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
-                        <details>
-                            <summary>Kurze Nachricht ergänzen</summary>
-                            <textarea name="message" maxlength="1200" placeholder="Warum interessiert dich diese Möglichkeit?"></textarea>
-                        </details>
-                        <button class="button button-primary" type="submit">Intern bewerben</button>
-                    </form>
-                </article>
-            {% endfor %}
-        </div>
-    </section>
+                <div class="lg:hidden flex items-center">
+                    <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="w-10 h-10 rounded-full bg-black/50 border border-white/10 text-[var(--text)] flex items-center justify-center focus:outline-none" type="button" aria-label="Menü öffnen">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </nav>
 
-    <section class="section" id="services">
-        <div class="section-head">
-            <div>
-                <div class="eyebrow">Fahrer-Services</div>
-                <h2>Neue Services</h2>
+            <div id="mobile-menu" class="hidden flex-col gap-3 mt-4 p-6 glass-nav rounded-3xl lg:hidden pointer-events-auto">
+                <a href="/dashboard" class="nav-link text-center w-full bg-white/5 border border-white/5">Dashboard</a>
+                <a href="/servicecenter" class="nav-link active text-center w-full bg-white/5 border border-white/5">ServiceCenter</a>
+                <a href="#schulungen" class="nav-link no-fade text-center w-full bg-white/5 border border-white/5">Schulungen</a>
+                <a href="#bewerbungen" class="nav-link no-fade text-center w-full bg-white/5 border border-white/5">Entwicklung</a>
+                <a href="#services" class="nav-link no-fade text-center w-full bg-white/5 border border-white/5">Services</a>
+                <a href="#anfragen" class="nav-link no-fade text-center w-full bg-white/5 border border-white/5">Meine Anfragen</a>
+                <div class="h-px w-full bg-white/10 my-2"></div>
+                <a href="/logout" class="btn-secondary w-full justify-center" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">Logout</a>
             </div>
-            <p>Nutze vorhandene Angebote oder sende einen Vorschlag für einen zusätzlichen Service, der Fahrern intern bereitgestellt werden soll.</p>
         </div>
-        <div class="grid">
-            {% for angebot in bildungen_angebote.get('fahrer_service', []) %}
-                <article class="offer-card">
-                    <div class="eyebrow">{{ angebot.eyebrow }}</div>
-                    <h3>{{ angebot.title }}</h3>
-                    <p>{{ angebot.description }}</p>
-                    <div class="meta">{{ angebot.meta }}</div>
-                    <form method="post" action="{{ bildungen_submit_url }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="category" value="fahrer_service">
-                        <input type="hidden" name="offer_id" value="{{ angebot.id }}">
-                        <details open>
-                            <summary>Details zur Anfrage</summary>
-                            <textarea name="message" maxlength="1200" placeholder="Beschreibe deine Anfrage oder deinen Service-Vorschlag"></textarea>
-                        </details>
-                        <button class="button button-primary" type="submit">Service-Anfrage senden</button>
-                    </form>
-                </article>
-            {% endfor %}
-        </div>
-    </section>
+    </header>
 
-    <section class="section" id="anfragen">
-        <div class="section-head">
-            <div>
-                <div class="eyebrow">ServiceCenter-Verlauf</div>
-                <h2>Meine Anfragen</h2>
-            </div>
-            <p>Die letzten Einreichungen aus diesem Bereich werden hier angezeigt.</p>
-        </div>
-        <div class="panel">
-            {% if bildungen_requests %}
-                <div class="requests">
-                    {% for item in bildungen_requests %}
-                        <article class="request-card">
-                            <div>
-                                <div class="request-title">{{ item.offer_title }}</div>
-                                <div class="request-meta">{{ item.category_label }} · {{ item.created_at_display }}</div>
+    <!-- Main Content -->
+    <main class="base-main">
+        <div class="base-shell base-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-stack" aria-live="polite">
+                        {% for category, message in messages %}
+                            <div class="flash-item {{ category if category in ['error', 'info'] else 'success' }}">
+                                <span class="flash-label">{% if category == 'error' %}System Alert{% elif category == 'info' %}System Info{% else %}Übertragen{% endif %}</span>
+                                <span class="flash-message">{{ message }}</span>
                             </div>
-                            <div class="request-status">{{ item.status_label }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="page-grid">
+                <div class="page-hero glass-card">
+                    <div class="relative z-10">
+                        <div class="eyebrow">Fahrerkarte · Checkcode-Ziel</div>
+                        <h1 class="hero-title">Weiterbildung & interne Entwicklung</h1>
+                        <p class="hero-lead">
+                            Über den QR-Code deiner digitalen Fahrerkarte erreichst du den internen ServiceCenter-Bereich. Hier kannst du dich für Schulungen anmelden, dein Interesse an internen Aufgaben einreichen und neue Fahrer-Services anfragen.
+                        </p>
+
+                        <div class="hero-actions">
+                            <a class="btn-primary no-fade" href="#schulungen">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"></path>
+                                </svg>
+                                Schulungen ansehen
+                            </a>
+                            <a class="btn-secondary no-fade" href="#bewerbungen">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                                Interne Möglichkeiten
+                            </a>
+                        </div>
+
+                        <div class="quick-nav" aria-label="Bereichsnavigation">
+                            <a href="#schulungen" class="quick-link no-fade"><span class="quick-dot"></span> Schulungen</a>
+                            <a href="#bewerbungen" class="quick-link no-fade"><span class="quick-dot"></span> Entwicklung</a>
+                            <a href="#services" class="quick-link no-fade"><span class="quick-dot"></span> Fahrer-Services</a>
+                            <a href="#anfragen" class="quick-link no-fade"><span class="quick-dot"></span> Verlauf</a>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="identity-card glass-card">
+                    <div class="identity-label">Angemeldeter Fahrer</div>
+                    <div class="identity-name">{{ user.display_name or user.username or current_user.username or 'Fahrer' }}</div>
+                    <div class="identity-role">{{ primary_role_name or 'Fahrer' }}</div>
+                    <p class="identity-note">
+                        Deine Einreichung wird deinem internen ServiceCenter-Profil zugeordnet und zur Bearbeitung gespeichert.
+                    </p>
+                    <div class="system-status">
+                        <span class="status-dot"></span>
+                        ServiceCenter aktiv
+                    </div>
+                </aside>
+            </section>
+
+            <!-- Schulungen -->
+            <section class="section-block" id="schulungen">
+                <div class="section-head">
+                    <div>
+                        <div class="eyebrow">Weiterbildungsmaßnahmen</div>
+                        <h2 class="section-title">Weitere Schulungen</h2>
+                    </div>
+                    <p class="section-copy">Melde dich direkt für eine Maßnahme an. Ein zusätzlicher Hinweis ist optional und hilft bei der Planung.</p>
+                </div>
+
+                <div class="offer-grid">
+                    {% for angebot in bildungen_angebote.get('schulung', []) %}
+                        <article class="offer-card">
+                            <div class="offer-topline">
+                                <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                                <div class="offer-icon" aria-hidden="true">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h3>{{ angebot.title }}</h3>
+                            <p>{{ angebot.description }}</p>
+                            <div class="offer-meta">{{ angebot.meta }}</div>
+
+                            <form class="offer-form" method="post" action="{{ bildungen_submit_url }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="category" value="schulung">
+                                <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                                <details class="offer-details">
+                                    <summary>Optionalen Hinweis ergänzen</summary>
+                                    <textarea name="message" maxlength="1200" placeholder="Zum Beispiel Terminwunsch oder Rückfrage"></textarea>
+                                </details>
+                                <button class="btn-primary" type="submit">Für Schulung anmelden</button>
+                            </form>
                         </article>
                     {% endfor %}
                 </div>
-            {% else %}
-                <div class="empty">Du hast über diesen Bereich noch keine Anfrage eingereicht.</div>
-            {% endif %}
-        </div>
-    </section>
+            </section>
 
-    <footer>
-        EifelLog ServiceCenter · Interne Fahrer-Services, Weiterbildungsmaßnahmen und Entwicklungsmöglichkeiten
+            <!-- Interne Entwicklung -->
+            <section class="section-block" id="bewerbungen">
+                <div class="section-head">
+                    <div>
+                        <div class="eyebrow">Interne Entwicklung</div>
+                        <h2 class="section-title">Interne Möglichkeiten</h2>
+                    </div>
+                    <p class="section-copy">Reiche dein Interesse an einer internen Rolle oder projektbezogenen Mitarbeit ein. Die zuständige Stelle prüft deine Anfrage.</p>
+                </div>
+
+                <div class="offer-grid">
+                    {% for angebot in bildungen_angebote.get('interne_bewerbung', []) %}
+                        <article class="offer-card">
+                            <div class="offer-topline">
+                                <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                                <div class="offer-icon" aria-hidden="true">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h3>{{ angebot.title }}</h3>
+                            <p>{{ angebot.description }}</p>
+                            <div class="offer-meta">{{ angebot.meta }}</div>
+
+                            <form class="offer-form" method="post" action="{{ bildungen_submit_url }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="category" value="interne_bewerbung">
+                                <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                                <details class="offer-details">
+                                    <summary>Kurze Nachricht ergänzen</summary>
+                                    <textarea name="message" maxlength="1200" placeholder="Warum interessiert dich diese Möglichkeit?"></textarea>
+                                </details>
+                                <button class="btn-primary" type="submit">Intern bewerben</button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Fahrer-Services -->
+            <section class="section-block" id="services">
+                <div class="section-head">
+                    <div>
+                        <div class="eyebrow">Fahrer-Services</div>
+                        <h2 class="section-title">Neue Services</h2>
+                    </div>
+                    <p class="section-copy">Nutze vorhandene Angebote oder sende einen Vorschlag für einen zusätzlichen internen Fahrer-Service.</p>
+                </div>
+
+                <div class="offer-grid">
+                    {% for angebot in bildungen_angebote.get('fahrer_service', []) %}
+                        <article class="offer-card">
+                            <div class="offer-topline">
+                                <div class="eyebrow">{{ angebot.eyebrow }}</div>
+                                <div class="offer-icon" aria-hidden="true">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.663 17h4.673M12 3v1m6.364.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.375 3.375 0 0014 18.477V19a2 2 0 11-4 0v-.523c0-.895-.356-1.754-.988-2.387l-.548-.547z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h3>{{ angebot.title }}</h3>
+                            <p>{{ angebot.description }}</p>
+                            <div class="offer-meta">{{ angebot.meta }}</div>
+
+                            <form class="offer-form" method="post" action="{{ bildungen_submit_url }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="category" value="fahrer_service">
+                                <input type="hidden" name="offer_id" value="{{ angebot.id }}">
+                                <details class="offer-details" open>
+                                    <summary>Details zur Anfrage</summary>
+                                    <textarea name="message" maxlength="1200" placeholder="Beschreibe deine Anfrage oder deinen Service-Vorschlag"></textarea>
+                                </details>
+                                <button class="btn-primary" type="submit">Service-Anfrage senden</button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Verlauf -->
+            <section class="section-block" id="anfragen">
+                <div class="section-head">
+                    <div>
+                        <div class="eyebrow">ServiceCenter-Verlauf</div>
+                        <h2 class="section-title">Meine Anfragen</h2>
+                    </div>
+                    <p class="section-copy">Die letzten Einreichungen aus diesem Bereich werden hier mit dem aktuellen Bearbeitungsstatus angezeigt.</p>
+                </div>
+
+                <div class="history-card glass-card">
+                    {% if bildungen_requests %}
+                        <div class="history-list">
+                            {% for item in bildungen_requests %}
+                                <article class="history-item">
+                                    <div>
+                                        <div class="history-title">{{ item.offer_title }}</div>
+                                        <div class="history-meta">{{ item.category_label }} · {{ item.created_at_display }}</div>
+                                    </div>
+                                    <div class="history-status">{{ item.status_label }}</div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon" aria-hidden="true">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            Du hast über diesen Bereich noch keine Anfrage eingereicht.
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 border-t border-[var(--line)] py-7 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="w-full max-w-[1280px] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
+                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">Eifel LOG</p>
+            </div>
+
+            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
+                ServiceCenter · Weiterbildung · Entwicklung
+            </p>
+
+            <div class="flex flex-col items-center md:items-end gap-1">
+                <p class="text-[10px] font-inter text-[var(--muted)]">&copy; 2026 Eifel LOG. Fahre mit Leidenschaft.</p>
+                <a href="/impressum" class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest hover:text-[var(--brand-green)] transition-colors">Impressum</a>
+            </div>
+        </div>
     </footer>
-</main>
+
+    <!-- Security Modal -->
+    <div id="security-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 backdrop-blur-md opacity-0 transition-opacity duration-300 pointer-events-auto">
+        <div class="glass-card glass-card-danger max-w-md w-full mx-4 p-8 text-center transform scale-95 transition-transform duration-300 relative">
+            <div class="absolute -inset-2 bg-[var(--danger)]/10 blur-2xl rounded-full z-[-1]"></div>
+
+            <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--danger)]/50 flex items-center justify-center bg-[var(--danger)]/10 text-[var(--danger)] shadow-[0_0_15px_rgba(255,159,159,0.3)]">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+
+            <h2 class="font-orbitron text-lg font-bold text-[var(--text)] tracking-widest mb-3 uppercase">Zugriff blockiert</h2>
+            <p class="font-inter text-[var(--muted)] text-sm mb-8 leading-relaxed">
+                Quellcode-Inspektion und das Kontextmenü sind aus Sicherheitsgründen deaktiviert.<br>
+                <span class="text-[11px] uppercase tracking-wider text-[var(--danger)]/80 mt-2 block font-orbitron">Sicherheitsrichtlinie Eifel LOG</span>
+            </p>
+
+            <button onclick="closeSecurityAlert()" class="btn-danger w-full justify-center" type="button">System Alert schließen</button>
+        </div>
+    </div>
 </body>
 </html>
