@@ -9,7 +9,6 @@ import time
 import uuid
 import hashlib
 import hmac
-import math
 import secrets
 import requests
 from io import BytesIO
@@ -1239,64 +1238,14 @@ def datetime_to_iso(value):
 
 
 def parse_number(value, fallback=0.0):
-    """Parst JSON-, MongoDB- und deutsch formatierte Zahlen ohne Dezimalstellen zu verlieren.
+    if value is None: return fallback
+    if isinstance(value, (int, float)): return float(value)
 
-    Beispiele: 123.45, "123.45", "123,45" und "1.234,56 €".
-    """
-    if value is None:
-        return fallback
-    if isinstance(value, bool):
-        return 1.0 if value else 0.0
-    if isinstance(value, (int, float)):
-        number = float(value)
-        return number if math.isfinite(number) else fallback
-
-    text = str(value).strip()
-    if not text:
-        return fallback
-
-    text = text.replace("\u00a0", " ").replace("€", "").replace("%", "")
-    text = re.sub(r"(?i)km", "", text)
-    text = text.replace(" ", "").replace("'", "")
-    text = re.sub(r"[^0-9,.+\-]", "", text)
-
-    if text in {"", "+", "-", ".", ",", "+.", "-.", "+,", "-,"}:
-        return fallback
-
-    if "," in text and "." in text:
-        # Das zuletzt vorkommende Trennzeichen ist die Dezimalstelle.
-        if text.rfind(",") > text.rfind("."):
-            text = text.replace(".", "").replace(",", ".")
-        else:
-            text = text.replace(",", "")
-    elif "," in text:
-        parts = text.split(",")
-        if len(parts) > 2:
-            text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
-        else:
-            text = text.replace(",", ".")
-    elif text.count(".") > 1:
-        parts = text.split(".")
-        text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
-
+    value = str(value).replace("km", "").replace("KM", "").replace("€", "").replace("%", "").replace(".", "").replace(",", ".").strip()
     try:
-        number = float(text)
-        return number if math.isfinite(number) else fallback
+        return float(value)
     except Exception:
         return fallback
-
-
-def first_present_value(source, *keys, fallback=None):
-    """Liest den ersten gesetzten Wert. Anders als `or` bleiben 0 und False erhalten."""
-    source = source or {}
-    for key in keys:
-        if key in source and source.get(key) not in [None, ""]:
-            return source.get(key)
-    return fallback
-
-
-def first_present_number(source, *keys, fallback=0.0):
-    return parse_number(first_present_value(source, *keys, fallback=fallback), fallback)
 
 
 def parse_int(value, fallback=0):
@@ -1350,13 +1299,12 @@ def first_number_from_dict(source, *keys, fallback=0.0):
 
 
 def company_stat_number(source, *keys, fallback=0.0):
-    """Liest nicht-negative Company-Metriken robust, ohne 0-Werte zu überspringen."""
-    return positive_number(first_present_value(source, *keys, fallback=fallback), fallback)
-
-
-def company_stat_money(source, *keys, fallback=0.0):
-    """Liest Geldwerte robust. Netto-Einnahmen dürfen nach Abzügen auch negativ sein."""
-    return parse_number(first_present_value(source, *keys, fallback=fallback), fallback)
+    """Liest Company-Stats robust, ohne 0-Werte wegen Python-`or` zu überspringen."""
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) not in [None, ""]:
+            return positive_number(source.get(key), fallback)
+    return positive_number(fallback, 0.0)
 
 
 def company_stat_int(source, *keys, fallback=0):
@@ -1364,64 +1312,54 @@ def company_stat_int(source, *keys, fallback=0):
 
 
 def get_user_all_time_km(user_doc):
-    return positive_number(first_present_value(
-        user_doc,
-        "tracker_all_time_km",
-        "profile_all_time_km",
-        "all_time_km",
-        "profile_km",
-        fallback=0.0,
-    ), 0.0)
+    user_doc = user_doc or {}
+    return positive_number(
+        user_doc.get("tracker_all_time_km")
+        or user_doc.get("profile_all_time_km")
+        or user_doc.get("all_time_km")
+        or user_doc.get("profile_km"),
+        0.0
+    )
 
 
 def get_user_all_time_income(user_doc):
-    return parse_number(first_present_value(
-        user_doc,
-        "tracker_all_time_income",
-        "profile_all_time_income",
-        "all_time_income",
-        "profile_income",
-        "profile_revenue",
-        fallback=0.0,
-    ), 0.0)
+    user_doc = user_doc or {}
+    return positive_number(
+        user_doc.get("tracker_all_time_income")
+        or user_doc.get("profile_all_time_income")
+        or user_doc.get("all_time_income")
+        or user_doc.get("profile_income")
+        or user_doc.get("profile_revenue"),
+        0.0
+    )
 
 
 def get_receipt_distance_km(receipt_doc):
     receipt_doc = receipt_doc or {}
     tour = receipt_doc.get("tour") or {}
-    return positive_number(first_present_value(
-        tour,
-        "driven_distance_km",
-        fallback=first_present_value(
-            receipt_doc,
-            "completedDistanceKm",
-            "completed_distance_km",
-            "drivenDistanceKm",
-            "driven_distance_km",
-            "distanceKm",
-            "distance_km",
-            fallback=0.0,
-        ),
-    ), 0.0)
+
+    return positive_number(
+        tour.get("driven_distance_km")
+        or receipt_doc.get("completedDistanceKm")
+        or receipt_doc.get("completed_distance_km")
+        or receipt_doc.get("drivenDistanceKm")
+        or receipt_doc.get("distanceKm")
+        or receipt_doc.get("distance_km"),
+        0.0
+    )
 
 
 def get_receipt_income(receipt_doc):
     receipt_doc = receipt_doc or {}
     billing = receipt_doc.get("billing") or {}
-    return parse_number(first_present_value(
-        billing,
-        "total_amount",
-        "totalAmount",
-        fallback=first_present_value(
-            receipt_doc,
-            "totalAmount",
-            "total_amount",
-            "income",
-            "revenue",
-            "money",
-            fallback=0.0,
-        ),
-    ), 0.0)
+
+    return positive_number(
+        billing.get("total_amount")
+        or receipt_doc.get("income")
+        or receipt_doc.get("revenue")
+        or receipt_doc.get("money"),
+        0.0
+    )
 
 
 def receipt_counts_as_completed(receipt_doc):
@@ -1496,7 +1434,7 @@ def normalize_company_stats_doc(stats_doc):
     empty = empty_company_stats_doc(updated_at=stats_doc.get("updated_at") if isinstance(stats_doc.get("updated_at"), datetime) else now_utc())
 
     all_time_km = round(company_stat_number(stats_doc, "all_time_km", "allTimeKilometers", "allTimeKm", "kilometers"), 1)
-    all_time_income = round(company_stat_money(stats_doc, "all_time_income", "companyIncome", "income", "revenue"), 2)
+    all_time_income = round(company_stat_number(stats_doc, "all_time_income", "companyIncome", "income", "revenue"), 2)
     jobs_all_time = company_stat_int(stats_doc, "jobs_all_time", "jobsAllTime", "jobs", "totalJobs")
     deliveries_all_time = company_stat_int(stats_doc, "deliveries_all_time", "deliveries", "totalDeliveries")
 
@@ -7329,20 +7267,16 @@ def tracker_profile_payload(user_doc):
         }
     }
 
-def tracker_request_has_valid_api_key():
-    if not TRACKER_API_KEY:
-        return False
-    provided_key = request.headers.get("X-Tracker-Api-Key") or request.args.get("api_key")
-    return secure_compare(provided_key, TRACKER_API_KEY)
-
-
 def tracker_api_key_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not TRACKER_API_KEY:
             return jsonify({"success": False, "error": "TRACKER_API_KEY ist serverseitig nicht konfiguriert."}), 500
-        if not tracker_request_has_valid_api_key():
+
+        provided_key = request.headers.get("X-Tracker-Api-Key") or request.args.get("api_key")
+        if not secure_compare(provided_key, TRACKER_API_KEY):
             return jsonify({"success": False, "error": "Ungültiger API-Key."}), 401
+
         return func(*args, **kwargs)
     return wrapper
 
@@ -8227,6 +8161,14 @@ def find_ets2_city_coordinate(city_name):
     return None
 
 
+def first_present_value(source, *keys, fallback=""):
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) is not None and str(source.get(key)).strip():
+            return source.get(key)
+    return fallback
+
+
 def normalize_ets2_route_point(point, index=0, default_name="", default_kind="stop", default_time=""):
     if not isinstance(point, dict):
         city_name = safe_str(point or default_name)
@@ -8716,7 +8658,7 @@ def build_company_stats_payload():
         "allTimeKilometers",
         fallback=0.0
     )
-    company_income = company_stat_money(
+    company_income = company_stat_number(
         persistent_stats,
         "all_time_income",
         "companyIncome",
@@ -8805,7 +8747,7 @@ def build_tracker_driver_stats_payload(user_doc):
     """Liefert Fahrer-All-Time-Werte mit stabilen Aliasen fuer Desktop und WebView."""
     stats = get_profile_stats(user_doc or {})
     km = round(positive_number(stats.get("km") or stats.get("all_time_km"), 0), 1)
-    income = round(parse_number(first_present_value(stats, "income", "revenue", fallback=0), 0), 2)
+    income = round(positive_number(stats.get("income") or stats.get("revenue"), 0), 2)
     deliveries = parse_int(stats.get("deliveries") or stats.get("tours"), 0)
     jobs = parse_int(stats.get("jobs"), deliveries)
 
@@ -12006,35 +11948,44 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta") or active_job.get("eta"), "-")
     driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
 
-    planned_distance = first_present_number(
-        payload,
-        "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km",
-        "completedDistanceKm", "completed_distance_km", "distanceKm",
-        fallback=first_present_number(
-            telemetry,
-            "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km",
-            fallback=first_present_number(active_job, "distanceKm", fallback=first_present_number(live_state, "plannedDistanceKm", fallback=0)),
-        ),
+    planned_distance = parse_number(
+        payload.get("plannedDistanceKm")
+        or payload.get("planned_distance_km")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("distanceKm")
+        or telemetry.get("plannedDistanceKm")
+        or active_job.get("distanceKm")
+        or live_state.get("plannedDistanceKm"),
+        0
     )
-    driven_distance = first_present_number(
-        payload,
-        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
-        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "tripDistanceKm",
-        fallback=first_present_number(
-            telemetry,
-            "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
-            "distanceKm", "tripDistanceKm",
-            fallback=first_present_number(live_state, "completedDistanceKm", "drivenDistanceKm", "tripDistanceKm", fallback=0),
-        ),
+    driven_distance = parse_number(
+        payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("drivenDistanceKm")
+        or payload.get("driven_distance_km")
+        or payload.get("distanceKm")
+        or payload.get("distance")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("tripDistanceKm")
+        or telemetry.get("completedDistanceKm")
+        or telemetry.get("drivenDistanceKm")
+        or telemetry.get("distanceKm")
+        or telemetry.get("tripDistanceKm")
+        or live_state.get("completedDistanceKm")
+        or live_state.get("drivenDistanceKm")
+        or live_state.get("tripDistanceKm"),
+        0
     )
-    remaining_distance = first_present_number(
-        payload,
-        "remainingDistanceKm", "remaining_distance_km",
-        fallback=first_present_number(
-            telemetry,
-            "remainingDistanceKm", "remaining_distance_km",
-            fallback=first_present_number(active_job, "remainingDistanceKm", fallback=first_present_number(live_state, "remainingDistanceKm", fallback=0)),
-        ),
+    remaining_distance = parse_number(
+        payload.get("remainingDistanceKm")
+        or telemetry.get("remainingDistanceKm")
+        or active_job.get("remainingDistanceKm")
+        or live_state.get("remainingDistanceKm"),
+        0
     )
 
     if driven_distance <= 0 and planned_distance > 0:
@@ -12050,29 +12001,15 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     planned_distance = round(max(planned_distance, driven_distance, 0.0), 1)
     remaining_distance = round(max(0.0, remaining_distance), 1)
 
-    rate_per_km = first_present_number(payload, "ratePerKm", "rate_per_km", fallback=TOUR_RECEIPT_RATE_PER_KM)
-    bonus = first_present_number(payload, "bonus", fallback=0)
-    penalty = abs(first_present_number(payload, "penalty", "deduction", fallback=0))
-
-    # `income` ist im Tracker ein Netto-/Gesamtwert. `baseAmount` ist der Wert vor Bonus/Abzug.
-    # Wenn beides geliefert wird, muss totalAmount unverändert bleiben; sonst würden Bonus
-    # und Abzug beim Backend ein zweites Mal verrechnet.
-    explicit_base_amount = first_present_value(payload, "baseAmount", "base_amount", fallback=None)
-    explicit_total_amount = first_present_value(payload, "totalAmount", "total_amount", "income", "revenue", "money", fallback=None)
-
-    if explicit_base_amount is not None:
-        base_amount = round(parse_number(explicit_base_amount, 0), 2)
-    elif explicit_total_amount is not None:
-        base_amount = round(parse_number(explicit_total_amount, 0) - bonus + penalty, 2)
-    else:
+    rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
+    base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
+    if base_amount <= 0:
         base_amount = round(driven_distance * rate_per_km, 2)
 
-    if explicit_total_amount is not None:
-        total_amount = round(parse_number(explicit_total_amount, base_amount + bonus - penalty), 2)
-    else:
-        total_amount = round(base_amount + bonus - penalty, 2)
-
-    currency = safe_str(first_present_value(payload, "currency", fallback=TOUR_RECEIPT_CURRENCY), TOUR_RECEIPT_CURRENCY).upper()
+    bonus = parse_number(payload.get("bonus"), 0)
+    penalty = abs(parse_number(payload.get("penalty") or payload.get("deduction"), 0))
+    total_amount = round(base_amount + bonus - penalty, 2)
+    currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
 
     receipt_number = safe_str(payload.get("receiptNumber") or payload.get("receipt_number"))
     if not receipt_number:
@@ -12106,14 +12043,6 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "completedDistanceKm": driven_distance,
         "completed_distance_km": driven_distance,
         "income": total_amount,
-        "revenue": total_amount,
-        "totalAmount": total_amount,
-        "total_amount": total_amount,
-        "baseAmount": base_amount,
-        "base_amount": base_amount,
-        "bonus": bonus,
-        "penalty": penalty,
-        "currency": currency,
         "submitted_at": submitted_at,
         "created_at": submitted_at,
         "driver": {
@@ -12137,12 +12066,12 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "planned_distance_km": planned_distance,
             "driven_distance_km": driven_distance,
             "remaining_distance_km": remaining_distance,
-            "route_progress_percent": first_present_number(payload, "routeProgressPercent", fallback=first_present_number(telemetry, "routeProgressPercent", fallback=100)),
-            "damage_percent": first_present_number(payload, "damagePercent", fallback=first_present_number(telemetry, "damagePercent", fallback=0)),
-            "fuel_percent": first_present_number(payload, "fuelPercent", fallback=first_present_number(telemetry, "fuelPercent", fallback=0)),
-            "fuel_liters": first_present_number(payload, "fuelLiters", "fuel_liters", fallback=first_present_number(telemetry, "fuelLiters", fallback=-1)),
-            "speed_kmh": first_present_number(payload, "speedKmh", fallback=first_present_number(telemetry, "speedKmh", fallback=0)),
-            "rpm": first_present_number(payload, "rpm", "engineRpm", fallback=first_present_number(telemetry, "rpm", fallback=0))
+            "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
+            "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
+            "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
+            "fuel_liters": parse_number(payload.get("fuelLiters") or payload.get("fuel_liters") or telemetry.get("fuelLiters"), -1),
+            "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
+            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0)
         },
         "billing": {
             "rate_per_km": rate_per_km,
@@ -12417,16 +12346,14 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
     )
 
     try:
-        logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
+        persist_receipt_to_driver_logbook(user_doc, receipt_doc)
     except Exception as error:
         app.logger.exception("Tourabschluss konnte nicht vollständig ins Fahrer-Logbook gespiegelt werden: %s", error)
-        logbook_result = {"stored": False, "error": str(error)}
 
     # Eigener Company-All-Time-Datenbankeintrag: company_stats/company_all_time
     # wird nur um den frisch gespeicherten Beleg erhoeht. Alte Belege werden nicht
     # automatisch neu aggregiert, damit ein Reset im Company-Tab stabil bleibt.
     add_receipt_to_company_all_time_stats(receipt_doc)
-    return logbook_result
 
 
 
@@ -12450,14 +12377,6 @@ def complete_tracker_tour_from_request():
     # Restdistanz-/Fortschrittsdaten vor, werden diese weiterhin serverseitig geprüft;
     # fehlt ein Distanzsignal vollständig, zählt die authentifizierte Abgabe als Zielsignal.
     if not client_token:
-        # Service-zu-Service-Abgaben ohne Fahrer-Token sind nur mit TRACKER_API_KEY erlaubt.
-        # Damit kann niemand von außen fremde offene Touren über den Complete-Endpunkt abschließen.
-        if not tracker_request_has_valid_api_key():
-            return jsonify({
-                "success": False,
-                "error": "Tracker-Token oder gültiger X-Tracker-Api-Key fehlt.",
-            }), 401
-
         payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
         payload.setdefault("event", "tour_completed")
         payload.setdefault("type", "tour_completed")
@@ -12499,11 +12418,7 @@ def complete_tracker_tour_from_request():
             "database": database_result,
             "discord": discord_result,
             "companyStats": company_stats_payload,
-            "company_stats": company_stats_payload,
             "company": company_stats_payload,
-            "companyAllTimeIncome": company_stats_payload.get("companyIncome", 0),
-            "jobsAllTime": company_stats_payload.get("jobsAllTime", 0),
-            "deliveriesAllTime": company_stats_payload.get("deliveriesAllTime", 0),
             "dashboardRefresh": True,
             "receipt": {
                 "receiptId": database_result.get("receiptId"),
@@ -12512,9 +12427,6 @@ def complete_tracker_tour_from_request():
                 "jobStartKey": database_result.get("jobStartKey"),
                 "driverName": database_result.get("driverName"),
                 "distanceKm": database_result.get("distanceKm"),
-                "income": database_result.get("income"),
-                "totalAmount": database_result.get("totalAmount"),
-                "currency": database_result.get("currency") or TOUR_RECEIPT_CURRENCY,
                 "pdf": database_result.get("pdf"),
                 "discord": discord_result,
             }
@@ -12586,14 +12498,9 @@ def complete_tracker_tour_from_request():
         "allTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
         "companyAllTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
-        "driverAllTimeIncome": round(get_user_all_time_income(fresh_user), 2),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "companyStats": company_stats_payload,
-        "company_stats": company_stats_payload,
         "company": company_stats_payload,
-        "companyAllTimeIncome": company_stats_payload.get("companyIncome", 0),
-        "jobsAllTime": company_stats_payload.get("jobsAllTime", 0),
-        "deliveriesAllTime": company_stats_payload.get("deliveriesAllTime", 0),
         "dashboardRefresh": True,
         "receipt": {
             "receiptId": database_result.get("receiptId"),
@@ -12602,9 +12509,6 @@ def complete_tracker_tour_from_request():
             "jobStartKey": database_result.get("jobStartKey"),
             "driverName": database_result.get("driverName"),
             "distanceKm": database_result.get("distanceKm"),
-            "income": database_result.get("income"),
-            "totalAmount": database_result.get("totalAmount"),
-            "currency": database_result.get("currency") or TOUR_RECEIPT_CURRENCY,
             "destinationConfirmed": database_result.get("destinationConfirmed"),
             "destinationConfirmationReason": database_result.get("destinationConfirmationReason"),
             "pdf": database_result.get("pdf"),
@@ -13986,16 +13890,10 @@ def store_tracker_webhook_completed_job(payload):
             "jobStartKey": existing.get("job_start_key"),
             "receiptId": existing.get("receipt_id"),
             "receiptNumber": existing.get("receipt_number"),
-            "driverName": (existing.get("driver") or {}).get("name"),
-            "currency": safe_str((existing.get("billing") or {}).get("currency"), TOUR_RECEIPT_CURRENCY).upper(),
             "pdf": existing.get("pdf"),
             "discord": existing.get("discord") or {},
-            "distanceKm": round(get_receipt_distance_km(existing), 1),
-            "income": round(get_receipt_income(existing), 2),
-            "totalAmount": round(get_receipt_income(existing), 2),
             "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
             "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
-            "companyAllTimeIncome": round(company_stat_money(company_stats, "all_time_income", "companyIncome", fallback=0), 2),
             "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
             "companyStats": company_stats_payload,
             "company": company_stats_payload,
@@ -14019,7 +13917,12 @@ def store_tracker_webhook_completed_job(payload):
     # write_receipt_into_user_stats ruft dieselbe Funktion aus Kompatibilitätsgründen
     # ebenfalls auf; processed_receipt_keys verhindert dabei jede Doppelzählung.
     add_receipt_to_company_all_time_stats(receipt_doc)
-    logbook_result = write_receipt_into_user_stats(user_doc, receipt_doc)
+    write_receipt_into_user_stats(user_doc, receipt_doc)
+    try:
+        logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
+    except Exception as error:
+        app.logger.exception("Tourabschluss konnte nach Receipt-Speicherung nicht ins Logbook gespiegelt werden: %s", error)
+        logbook_result = {"stored": False, "error": str(error)}
     mark_tracker_job_start_completed(user_doc, payload_for_db, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed", completed_job_key=current_job_key)
 
@@ -14038,13 +13941,8 @@ def store_tracker_webhook_completed_job(payload):
         "destinationConfirmed": True,
         "destinationConfirmationReason": allowed_reason,
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
-        "driverAllTimeIncome": round(get_user_all_time_income(fresh_user), 2),
-        "income": round(get_receipt_income(receipt_doc), 2),
-        "totalAmount": round(get_receipt_income(receipt_doc), 2),
-        "currency": safe_str((receipt_doc.get("billing") or {}).get("currency"), TOUR_RECEIPT_CURRENCY).upper(),
         "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
         "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
-        "companyAllTimeIncome": round(company_stat_money(company_stats, "all_time_income", "companyIncome", fallback=0), 2),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "companyStats": company_stats_payload,
         "company": company_stats_payload,
@@ -14083,17 +13981,12 @@ def tracker_local_webhook():
 
         success = bool(database_result.get("stored")) or bool(database_result.get("alreadyStored")) or bool(discord_result.get("sent"))
         status_code = 200 if success else (409 if database_result.get("notAtDestination") else 502)
-        company_stats_payload = build_company_stats_payload()
         return jsonify({
             "success": success,
             "message": "Tour abgeschlossen: PDF-Beleg wurde verarbeitet." if success else safe_str(database_result.get("reason"), "Tour-Abschluss erkannt, aber Verarbeitung fehlgeschlagen."),
             "event": "tour_completed" if success else "tour_completion_blocked",
             "database": database_result,
-            "discord": discord_result,
-            "companyStats": company_stats_payload,
-            "company_stats": company_stats_payload,
-            "company": company_stats_payload,
-            "dashboardRefresh": True,
+            "discord": discord_result
         }), status_code
 
     # Startmeldungen niemals roh weiterleiten, sondern dedupliziert über die Backend-Logik senden.
