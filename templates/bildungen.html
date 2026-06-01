@@ -821,6 +821,144 @@
             text-transform: uppercase;
         }
 
+        .history-side {
+            display: grid;
+            justify-items: end;
+            gap: 0.62rem;
+        }
+
+        .history-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.45rem;
+        }
+
+        .btn-compact {
+            min-height: 32px;
+            padding: 0.58rem 0.72rem;
+            border-radius: 0.7rem;
+            font-size: 0.54rem;
+            letter-spacing: 0.1em;
+        }
+
+        .history-reply-preview {
+            margin-top: 0.75rem;
+            padding: 0.7rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.18);
+            border-radius: 0.75rem;
+            color: var(--muted);
+            background: rgba(var(--brand-green-rgb), 0.045);
+            font-size: 0.73rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .history-reply-preview strong {
+            display: block;
+            margin-bottom: 0.22rem;
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.56rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+        }
+
+        .request-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9500;
+            padding: 1rem;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.76);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .request-modal-card {
+            width: min(920px, 100%);
+            max-height: min(920px, 94vh);
+            overflow: auto;
+            padding: 1rem;
+            border-radius: 1.25rem;
+        }
+
+        .request-modal-head,
+        .request-modal-actions,
+        .request-chat-compose {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .request-modal-head { justify-content: space-between; }
+        .request-modal-actions { margin-top: 0.85rem; }
+
+        .request-detail-grid {
+            margin-top: 0.85rem;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.62rem;
+        }
+
+        .request-detail-box,
+        .request-chat-panel {
+            padding: 0.8rem;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 0.85rem;
+            color: var(--muted);
+            background: rgba(0, 0, 0, 0.18);
+            font-size: 0.77rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-detail-box strong,
+        .request-chat-title {
+            display: block;
+            margin-bottom: 0.28rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.57rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .request-chat-panel { margin-top: 0.85rem; }
+        .request-chat-log {
+            max-height: 300px;
+            overflow: auto;
+            display: grid;
+            gap: 0.52rem;
+            padding: 0.2rem;
+        }
+
+        .request-chat-message {
+            max-width: 84%;
+            padding: 0.68rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 0.74rem;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.035);
+            font-size: 0.73rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .request-chat-message.user { margin-left: auto; border-color: rgba(var(--brand-green-rgb), 0.25); background: rgba(var(--brand-green-rgb), 0.07); }
+        .request-chat-message.staff { margin-right: auto; }
+        .request-chat-message.system { max-width: 100%; text-align: center; border-style: dashed; }
+        .request-chat-message strong { display: block; margin-bottom: 0.2rem; color: var(--text); font-size: 0.68rem; }
+        .request-chat-message span { display: block; margin-top: 0.24rem; color: rgba(147, 164, 200, 0.72); font-size: 0.63rem; }
+        .request-chat-compose { margin-top: 0.65rem; }
+        .request-chat-compose textarea { flex: 1 1 320px; min-height: 4.3rem; margin-top: 0; }
+        .request-modal-message { min-height: 1.1rem; margin-top: 0.65rem; color: var(--brand-green); font-size: 0.72rem; font-weight: 700; }
+
         .empty-state {
             padding: 2rem 1rem;
             color: var(--muted);
@@ -928,7 +1066,10 @@
             .service-switcher { display: grid; grid-template-columns: 1fr 1fr; }
             .service-switcher-link { width: 100%; padding-right: 0.7rem; padding-left: 0.7rem; font-size: 0.58rem; letter-spacing: 0.09em; }
             .history-item { grid-template-columns: 1fr; }
+            .history-side { justify-items: start; }
+            .history-actions { justify-content: flex-start; }
             .history-status { justify-self: start; }
+            .request-detail-grid { grid-template-columns: 1fr; }
             .flash-item { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
         }
 
@@ -1499,6 +1640,7 @@
             initPageTransitions();
             initMobileMenu();
             initSecuritySystem();
+            initBildungenRequestCenter();
         });
 
         function initPageTransitions() {
@@ -1635,6 +1777,165 @@
                     }
                 }
             }, false);
+
+
+        function initBildungenRequestCenter() {
+            const modal = document.getElementById('bildungen-detail-modal');
+            if (!modal) return;
+            window.bildungenActiveRequestId = '';
+            window.bildungenChatPollTimer = null;
+            window.bildungenFocusChatAfterLoad = false;
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeBildungenDetails();
+            });
+        }
+
+        function bildungenEscape(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        }
+
+        function bildungenApiUrl(requestId, suffix = '') {
+            return '/api/servicecenter/bildungen/' + encodeURIComponent(requestId) + suffix;
+        }
+
+        async function bildungenFetch(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await response.json().catch(() => ({ success: false, message: 'Ungültige Serverantwort.' }));
+            if (!response.ok || data.success === false) throw new Error(data.message || 'Aktion fehlgeschlagen.');
+            return data;
+        }
+
+        function setBildungenModalMessage(text, isError = false) {
+            const message = document.getElementById('bildungen-modal-message');
+            if (!message) return;
+            message.textContent = text || '';
+            message.style.color = isError ? 'var(--danger)' : 'var(--brand-green)';
+        }
+
+        async function openBildungenDetails(requestId, focusChat = false) {
+            const modal = document.getElementById('bildungen-detail-modal');
+            window.bildungenActiveRequestId = requestId;
+            window.bildungenFocusChatAfterLoad = Boolean(focusChat);
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+            await refreshBildungenDetails();
+            clearInterval(window.bildungenChatPollTimer);
+            window.bildungenChatPollTimer = setInterval(refreshBildungenDetails, 3000);
+        }
+
+        function closeBildungenDetails() {
+            const modal = document.getElementById('bildungen-detail-modal');
+            clearInterval(window.bildungenChatPollTimer);
+            window.bildungenChatPollTimer = null;
+            window.bildungenActiveRequestId = '';
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        async function refreshBildungenDetails() {
+            if (!window.bildungenActiveRequestId) return;
+            try {
+                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId));
+                renderBildungenDetails(data.request || {});
+            } catch (error) {
+                setBildungenModalMessage(error.message, true);
+            }
+        }
+
+        function renderBildungenDetails(item) {
+            document.getElementById('bildungen-detail-title').textContent = item.offer_title || 'Anfrage';
+            const details = document.getElementById('bildungen-detail-content');
+            const actions = [];
+            if (item.can_withdraw) actions.push('<button class="btn-danger btn-compact" type="button" onclick="withdrawBildungenRequest()">Anfrage zurückziehen</button>');
+            if (item.can_confirm_appointment) {
+                actions.push('<button class="btn-primary btn-compact" type="button" onclick="decideBildungenAppointment(\'confirm\')">Termin bestätigen</button>');
+                actions.push('<button class="btn-danger btn-compact" type="button" onclick="decideBildungenAppointment(\'decline\')">Termin ablehnen</button>');
+            }
+            details.innerHTML = `
+                <div class="request-detail-grid">
+                    <div class="request-detail-box"><strong>Status</strong>${bildungenEscape(item.status_label || '-')}</div>
+                    <div class="request-detail-box"><strong>Sachbearbeiter</strong>${bildungenEscape(item.claimed_by_name || 'Noch nicht zugewiesen')}</div>
+                    <div class="request-detail-box"><strong>Kategorie</strong>${bildungenEscape(item.category_label || '-')}</div>
+                    <div class="request-detail-box"><strong>Eingereicht</strong>${bildungenEscape(item.created_at_display || '-')}</div>
+                    <div class="request-detail-box" style="grid-column:1/-1"><strong>Beschreibung deiner Einreichung</strong>${bildungenEscape(item.message || 'Keine zusätzliche Beschreibung übermittelt.')}</div>
+                    <div class="request-detail-box"><strong>Terminvorschlag</strong>${bildungenEscape(item.appointment_at_display || 'Noch kein Termin vorgeschlagen')}</div>
+                    <div class="request-detail-box"><strong>Terminstatus</strong>${bildungenEscape(item.appointment_confirmation_label || '-')}</div>
+                    ${item.appointment_note ? `<div class="request-detail-box" style="grid-column:1/-1"><strong>Termin-Hinweis</strong>${bildungenEscape(item.appointment_note)}</div>` : ''}
+                </div>
+                <div class="request-modal-actions">${actions.join('')}</div>`;
+
+            const chatLog = document.getElementById('bildungen-chat-log');
+            const messages = item.chat_messages || [];
+            chatLog.innerHTML = messages.map(message => `<div class="request-chat-message ${bildungenEscape(message.sender_type)}"><strong>${bildungenEscape(message.sender_name)}</strong>${bildungenEscape(message.message)}<span>${bildungenEscape(message.created_at)}</span></div>`).join('') || '<div class="request-detail-box">Noch keine Nachrichten vorhanden.</div>';
+            chatLog.scrollTop = chatLog.scrollHeight;
+            const input = document.getElementById('bildungen-chat-input');
+            const sendButton = document.getElementById('bildungen-chat-send');
+            const isWritable = Boolean(item.is_chat_writable);
+            input.disabled = !isWritable;
+            sendButton.disabled = !isWritable;
+            input.placeholder = isWritable ? 'Nachricht an den Sachbearbeiter schreiben' : 'Für diese Anfrage ist der Chat geschlossen.';
+            if (window.bildungenFocusChatAfterLoad) {
+                window.bildungenFocusChatAfterLoad = false;
+                document.getElementById('bildungen-chat-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (isWritable) input.focus();
+            }
+        }
+
+        async function sendBildungenChatMessage() {
+            const input = document.getElementById('bildungen-chat-input');
+            const text = input.value.trim();
+            if (!window.bildungenActiveRequestId || !text) return;
+            try {
+                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, '/chat'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ message: text, csrfToken: '{{ csrf_token() }}' })
+                });
+                input.value = '';
+                renderBildungenDetails(data.request || {});
+                setBildungenModalMessage(data.message || 'Nachricht wurde gesendet.');
+            } catch (error) {
+                setBildungenModalMessage(error.message, true);
+            }
+        }
+
+        async function withdrawBildungenRequest() {
+            if (!window.bildungenActiveRequestId || !confirm('Möchtest du diese noch ungeclaimte Anfrage wirklich zurückziehen?')) return;
+            try {
+                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, '/withdraw'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ csrfToken: '{{ csrf_token() }}' })
+                });
+                renderBildungenDetails(data.request || {});
+                setBildungenModalMessage(data.message);
+                setTimeout(() => window.location.reload(), 700);
+            } catch (error) {
+                setBildungenModalMessage(error.message, true);
+            }
+        }
+
+        async function decideBildungenAppointment(decision) {
+            if (!window.bildungenActiveRequestId) return;
+            const suffix = decision === 'confirm' ? '/appointment/confirm' : '/appointment/decline';
+            const promptText = decision === 'confirm' ? 'Diesen Termin verbindlich bestätigen?' : 'Diesen Terminvorschlag ablehnen?';
+            if (!confirm(promptText)) return;
+            try {
+                const data = await bildungenFetch(bildungenApiUrl(window.bildungenActiveRequestId, suffix), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ csrfToken: '{{ csrf_token() }}' })
+                });
+                renderBildungenDetails(data.request || {});
+                setBildungenModalMessage(data.message);
+                setTimeout(() => window.location.reload(), 700);
+            } catch (error) {
+                setBildungenModalMessage(error.message, true);
+            }
+        }
         }
     </script>
 </head>
@@ -1914,7 +2215,7 @@
                         <div class="eyebrow">ServiceCenter-Verlauf</div>
                         <h2 class="section-title">Meine Anfragen</h2>
                     </div>
-                    <p class="section-copy">Die letzten Einreichungen aus diesem Bereich werden hier mit dem aktuellen Bearbeitungsstatus angezeigt.</p>
+                    <p class="section-copy">Öffne die Details einer Anfrage, lies Antworten direkt im Verlauf, chatte live mit dem Sachbearbeiter und bestätige vorgeschlagene Termine.</p>
                 </div>
 
                 <div class="history-card glass-card">
@@ -1926,28 +2227,17 @@
                                         <div class="history-title">{{ item.offer_title }}</div>
                                         <div class="history-meta">{{ item.category_label }} · Eingereicht am {{ item.created_at_display }}</div>
                                         <div class="history-updated">Letzte Aktualisierung: {{ item.updated_at_display }}</div>
-
-                                        {% if item.appointment_at_display or item.appointment_note %}
-                                            <details class="history-details" {% if item.appointment_at_display %}open{% endif %}>
-                                                <summary>Termin-Informationen</summary>
-                                                <div class="history-detail-grid">
-                                                    {% if item.appointment_at_display %}
-                                                        <div class="history-detail">
-                                                            <strong>Vorgesehener Termin</strong>
-                                                            {{ item.appointment_at_display }}
-                                                        </div>
-                                                    {% endif %}
-                                                    {% if item.appointment_note %}
-                                                        <div class="history-detail">
-                                                            <strong>Hinweis der Personalabteilung</strong>
-                                                            {{ item.appointment_note }}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </details>
+                                        {% if item.latest_reply_text %}
+                                            <div class="history-reply-preview"><strong>Letzte Antwort im Verlauf</strong>{{ item.latest_reply_text }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="history-status {{ item.status }}">{{ item.status_label }}</div>
+                                    <div class="history-side">
+                                        <div class="history-status {{ item.status }}">{{ item.status_label }}</div>
+                                        <div class="history-actions">
+                                            <button class="btn-secondary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}')">Weitere Details</button>
+                                            <button class="btn-primary btn-compact" type="button" onclick="openBildungenDetails('{{ item.id|e }}', true)">Chat öffnen</button>
+                                        </div>
+                                    </div>
                                 </article>
                             {% endfor %}
                         </div>
@@ -1984,6 +2274,29 @@
             </div>
         </div>
     </footer>
+
+    <!-- ServiceCenter Anfrage-Details & Live-Chat -->
+    <div id="bildungen-detail-modal" class="request-modal hidden" role="dialog" aria-modal="true" aria-labelledby="bildungen-detail-title" onclick="if(event.target === this) closeBildungenDetails()">
+        <div class="request-modal-card glass-card">
+            <div class="request-modal-head">
+                <div>
+                    <div class="eyebrow">ServiceCenter-Anfrage</div>
+                    <h2 id="bildungen-detail-title" class="section-title" style="margin-top:0.35rem;">Anfrage</h2>
+                </div>
+                <button class="btn-secondary btn-compact" type="button" onclick="closeBildungenDetails()">Schließen</button>
+            </div>
+            <div id="bildungen-detail-content"></div>
+            <div id="bildungen-chat-panel" class="request-chat-panel">
+                <div class="request-chat-title">Live-Chat mit dem Sachbearbeiter</div>
+                <div id="bildungen-chat-log" class="request-chat-log"></div>
+                <div class="request-chat-compose">
+                    <textarea id="bildungen-chat-input" maxlength="2400" placeholder="Nachricht an den Sachbearbeiter schreiben"></textarea>
+                    <button id="bildungen-chat-send" class="btn-primary btn-compact" type="button" onclick="sendBildungenChatMessage()">Nachricht senden</button>
+                </div>
+                <div id="bildungen-modal-message" class="request-modal-message"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Security Modal -->
     <div id="security-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 backdrop-blur-md opacity-0 transition-opacity duration-300 pointer-events-auto" role="dialog" aria-modal="true" aria-labelledby="security-modal-title">

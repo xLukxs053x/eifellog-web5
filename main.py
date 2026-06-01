@@ -521,6 +521,7 @@ def ensure_indexes():
         servicecenter_bildungen_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("updated_at", DESCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("appointment_at", ASCENDING)], unique=False)
+        servicecenter_bildungen_requests_collection.create_index([("appointment_confirmation_status", ASCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
         servicecenter_bildungen_requests_collection.create_index([("archived", ASCENDING)], unique=False)
 
@@ -17791,10 +17792,19 @@ BILDUNGEN_ADMIN_STATUS_LABELS = {
     "approved": "Bestätigt",
     "rejected": "Abgelehnt",
     "completed": "Abgeschlossen",
+    "withdrawn": "Zurückgezogen",
     "archived": "Archiviert",
 }
 
-BILDUNGEN_ADMIN_ALLOWED_STATUSES = set(BILDUNGEN_ADMIN_STATUS_LABELS) - {"archived"}
+BILDUNGEN_ADMIN_ALLOWED_STATUSES = set(BILDUNGEN_ADMIN_STATUS_LABELS) - {"archived", "withdrawn"}
+
+BILDUNGEN_APPOINTMENT_CONFIRMATION_LABELS = {
+    "": "Noch kein Terminvorschlag",
+    "none": "Noch kein Terminvorschlag",
+    "pending": "Bestätigung ausstehend",
+    "confirmed": "Vom User bestätigt",
+    "declined": "Vom User abgelehnt",
+}
 
 
 def normalize_bildungen_status(value, fallback="submitted"):
@@ -17809,6 +17819,10 @@ def normalize_bildungen_status(value, fallback="submitted"):
         "scheduled": "appointment_scheduled",
         "done": "completed",
         "closed": "completed",
+        "cancelled": "withdrawn",
+        "canceled": "withdrawn",
+        "zurueckgezogen": "withdrawn",
+        "zurückgezogen": "withdrawn",
     }
     value = aliases.get(value, value)
     if value in BILDUNGEN_ADMIN_STATUS_LABELS:
@@ -17883,6 +17897,105 @@ def build_servicecenter_bildungen_reply_templates(item):
     ]
 
 
+def normalize_bildungen_appointment_confirmation(value):
+    value = safe_str(value).lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "open": "pending",
+        "waiting": "pending",
+        "accepted": "confirmed",
+        "approved": "confirmed",
+        "rejected": "declined",
+        "denied": "declined",
+    }
+    value = aliases.get(value, value)
+    return value if value in BILDUNGEN_APPOINTMENT_CONFIRMATION_LABELS else "none"
+
+
+def prepare_bildungen_chat_message_for_json(message):
+    message = dict(message or {})
+    created_at = message.get("created_at")
+    return {
+        "id": safe_str(message.get("id") or message.get("message_id") or uuid.uuid4().hex),
+        "sender_type": safe_str(message.get("sender_type"), "system"),
+        "sender_name": safe_str(message.get("sender_name"), "ServiceCenter"),
+        "sender_discord_id": safe_str(message.get("sender_discord_id")),
+        "message": safe_str(message.get("message"))[:2400],
+        "system_code": safe_str(message.get("system_code")),
+        "created_at": format_datetime_for_template(created_at) or "-",
+        "created_at_iso": created_at.isoformat() if isinstance(created_at, datetime) else safe_str(created_at),
+    }
+
+
+def prepare_bildungen_chat_messages_for_json(item):
+    item = item or {}
+    messages = list(item.get("chat_messages") or [])
+    prepared = [prepare_bildungen_chat_message_for_json(message) for message in messages]
+
+    # Legacy-Kompatibilität: Vor der Live-Chat-Erweiterung versendete Antworten
+    # lagen nur in response_text. Sie bleiben im User-Verlauf sichtbar.
+    legacy_response = safe_str(item.get("response_text"))
+    if legacy_response and not any(safe_str(message.get("message")) == legacy_response for message in prepared):
+        created_at = item.get("last_published_at") or item.get("updated_at")
+        prepared.append(prepare_bildungen_chat_message_for_json({
+            "id": f"legacy-{safe_str(item.get('request_id') or item.get('_id'))}",
+            "sender_type": "staff",
+            "sender_name": safe_str(item.get("handler_name"), "Personalabteilung"),
+            "message": legacy_response,
+            "system_code": "legacy_response_text",
+            "created_at": created_at,
+        }))
+
+    return prepared[-250:]
+
+
+def build_bildungen_chat_message(sender_type, sender_name, sender_discord_id, message, system_code=""):
+    return {
+        "id": uuid.uuid4().hex,
+        "sender_type": safe_str(sender_type, "system"),
+        "sender_name": safe_str(sender_name, "ServiceCenter"),
+        "sender_discord_id": safe_str(sender_discord_id),
+        "message": safe_str(message)[:2400],
+        "system_code": safe_str(system_code),
+        "created_at": now_utc(),
+    }
+
+
+def latest_bildungen_reply_text(item):
+    for message in reversed(list((item or {}).get("chat_messages") or [])):
+        sender_type = safe_str(message.get("sender_type"))
+        system_code = safe_str(message.get("system_code"))
+        if sender_type in {"staff", "system"} and system_code != "request_submitted" and safe_str(message.get("message")):
+            return safe_str(message.get("message"))[:360]
+    return safe_str((item or {}).get("response_text"))[:360]
+
+
+def servicecenter_bildungen_csrf_valid(data=None):
+    data = data or {}
+    submitted = safe_str(
+        request.headers.get("X-CSRF-Token")
+        or data.get("csrfToken")
+        or data.get("csrf_token")
+        or request.form.get("csrf_token")
+    )
+    stored = safe_str(session.get("_csrf_token"))
+    return bool(submitted and stored and secrets.compare_digest(submitted, stored))
+
+
+def find_bildungen_request_for_logged_in_user(request_id):
+    if "user" not in session:
+        return None
+    user = session.get("user") or {}
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    if not discord_id:
+        return None
+    return servicecenter_bildungen_requests_collection.find_one({
+        "$and": [
+            request_lookup_query(request_id),
+            {"discord_id": discord_id},
+        ]
+    })
+
+
 def prepare_bildungen_request_for_template(item):
     item = dict(item or {})
     item["id"] = safe_str(item.get("request_id") or item.get("_id"))
@@ -17892,10 +18005,49 @@ def prepare_bildungen_request_for_template(item):
     item["appointment_at_display"] = format_datetime_for_template(item.get("appointment_at")) or ""
     item["appointment_note"] = safe_str(item.get("appointment_note"))
     item["response_text"] = safe_str(item.get("response_text"))
+    item["message"] = safe_str(item.get("message"))
     item["status"] = normalize_bildungen_status(item.get("status"))
     item["status_label"] = BILDUNGEN_ADMIN_STATUS_LABELS.get(item["status"], item["status"])
+    item["appointment_confirmation_status"] = normalize_bildungen_appointment_confirmation(item.get("appointment_confirmation_status"))
+    item["appointment_confirmation_label"] = BILDUNGEN_APPOINTMENT_CONFIRMATION_LABELS.get(item["appointment_confirmation_status"], "-")
+    claimed_by = item.get("claimed_by") or {}
+    item["claimed_by_name"] = safe_str(claimed_by.get("display_name") or claimed_by.get("username") or item.get("handler_name"), "Noch nicht zugewiesen")
+    item["has_claimed_handler"] = bool(safe_str(claimed_by.get("discord_id")))
+    item["can_withdraw"] = not item["has_claimed_handler"] and item["status"] == "submitted" and item.get("archived") is not True
+    item["can_confirm_appointment"] = item["status"] == "appointment_scheduled" and item["appointment_confirmation_status"] == "pending" and bool(item["appointment_at_display"])
+    item["latest_reply_text"] = latest_bildungen_reply_text(item)
+    item["chat_message_count"] = len(list(item.get("chat_messages") or []))
     item.pop("_id", None)
     return item
+
+
+def prepare_bildungen_request_for_user_json(item):
+    item = item or {}
+    prepared = prepare_bildungen_request_for_template(item)
+    return {
+        "id": prepared.get("id"),
+        "request_id": prepared.get("id"),
+        "offer_title": safe_str(item.get("offer_title"), "Unbenannte Anfrage"),
+        "category": safe_str(item.get("category")),
+        "category_label": prepared.get("category_label"),
+        "message": prepared.get("message"),
+        "status": prepared.get("status"),
+        "status_label": prepared.get("status_label"),
+        "created_at_display": prepared.get("created_at_display"),
+        "updated_at_display": prepared.get("updated_at_display"),
+        "appointment_at_display": prepared.get("appointment_at_display"),
+        "appointment_note": prepared.get("appointment_note"),
+        "appointment_confirmation_status": prepared.get("appointment_confirmation_status"),
+        "appointment_confirmation_label": prepared.get("appointment_confirmation_label"),
+        "claimed_by_name": prepared.get("claimed_by_name"),
+        "has_claimed_handler": prepared.get("has_claimed_handler"),
+        "can_withdraw": prepared.get("can_withdraw"),
+        "can_confirm_appointment": prepared.get("can_confirm_appointment"),
+        "latest_reply_text": prepared.get("latest_reply_text"),
+        "chat_message_count": prepared.get("chat_message_count"),
+        "chat_messages": prepare_bildungen_chat_messages_for_json(item),
+        "is_chat_writable": prepared.get("status") not in {"withdrawn", "archived", "completed"} and item.get("archived") is not True,
+    }
 
 
 def prepare_bildungen_request_for_personalabteilung(item):
@@ -17920,6 +18072,8 @@ def prepare_bildungen_request_for_personalabteilung(item):
     item["appointment_at"] = format_datetime_for_template(raw_appointment_at) or ""
     item["appointment_at_input"] = datetime_local_input_value(raw_appointment_at)
     item["appointment_note"] = safe_str(item.get("appointment_note"))
+    item["appointment_confirmation_status"] = normalize_bildungen_appointment_confirmation(item.get("appointment_confirmation_status"))
+    item["appointment_confirmation_label"] = BILDUNGEN_APPOINTMENT_CONFIRMATION_LABELS.get(item["appointment_confirmation_status"], "-")
     item["internal_note"] = safe_str(item.get("internal_note"))
     item["response_text"] = safe_str(item.get("response_text"))
     item["last_published_at"] = format_datetime_for_template(item.get("last_published_at")) or ""
@@ -17927,6 +18081,8 @@ def prepare_bildungen_request_for_personalabteilung(item):
     item["claimed_by_name"] = safe_str(claimed_by.get("display_name") or claimed_by.get("username") or item.get("handler_name"), "Noch nicht geclaimt")
     item["claimed_by_discord_id"] = safe_str(claimed_by.get("discord_id"))
     item["handler_name"] = item["claimed_by_name"]
+    item["chat_messages"] = prepare_bildungen_chat_messages_for_json(item)
+    item["chat_message_count"] = len(item["chat_messages"])
     item["reply_templates"] = build_servicecenter_bildungen_reply_templates({**item, "appointment_at": raw_appointment_at})
     item["archived"] = bool(item.get("archived"))
     return item
@@ -18043,12 +18199,159 @@ def bildungen_anmelden():
         "message": message,
         "status": "submitted",
         "source": "fahrerkarte_qr_bildungen",
+        "appointment_confirmation_status": "none",
+        "chat_messages": [build_bildungen_chat_message(
+            "system",
+            "ServiceCenter",
+            "",
+            "Deine Anfrage wurde eingereicht. Sobald ein Sachbearbeiter die Bearbeitung übernimmt oder dir schreibt, erscheint die Nachricht direkt in diesem Verlauf.",
+            system_code="request_submitted",
+        )],
         "created_at": now,
         "updated_at": now,
     })
 
     flash("Deine Anfrage wurde im ServiceCenter eingereicht.", "success")
     return redirect(url_for("bildungen"))
+
+
+@app.route("/api/servicecenter/bildungen/<request_id>", methods=["GET"])
+def api_servicecenter_bildungen_request_detail(request_id):
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    request_doc = find_bildungen_request_for_logged_in_user(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Die Anfrage wurde nicht gefunden."}), 404
+
+    return jsonify({"success": True, "request": prepare_bildungen_request_for_user_json(request_doc)})
+
+
+@app.route("/api/servicecenter/bildungen/<request_id>/chat", methods=["POST"])
+def api_servicecenter_bildungen_user_chat_send(request_id):
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    data = request.get_json(silent=True) or {}
+    if not servicecenter_bildungen_csrf_valid(data):
+        return jsonify({"success": False, "message": "Ungültige Sitzung. Bitte lade die Seite neu."}), 403
+
+    request_doc = find_bildungen_request_for_logged_in_user(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Die Anfrage wurde nicht gefunden."}), 404
+
+    status = normalize_bildungen_status(request_doc.get("status"))
+    if status in {"withdrawn", "archived", "completed"}:
+        return jsonify({"success": False, "message": "Für diese Anfrage kann keine neue Nachricht mehr gesendet werden."}), 409
+
+    message_text = safe_str(data.get("message"))[:2400]
+    if not message_text:
+        return jsonify({"success": False, "message": "Bitte gib eine Nachricht ein."}), 400
+
+    user = session.get("user") or {}
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    db_user = users_collection.find_one({"discord_id": discord_id}) or {}
+    sender_name = safe_str(db_user.get("display_name") or user.get("discord_username") or db_user.get("username") or user.get("username"), "User")
+    now = now_utc()
+    message = build_bildungen_chat_message("user", sender_name, discord_id, message_text)
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$push": {"chat_messages": message}, "$set": {"updated_at": now, "last_user_message_at": now}},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+    return jsonify({"success": True, "message": "Nachricht wurde gesendet.", "request": prepare_bildungen_request_for_user_json(fresh_request)})
+
+
+@app.route("/api/servicecenter/bildungen/<request_id>/withdraw", methods=["POST"])
+def api_servicecenter_bildungen_withdraw(request_id):
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    data = request.get_json(silent=True) or {}
+    if not servicecenter_bildungen_csrf_valid(data):
+        return jsonify({"success": False, "message": "Ungültige Sitzung. Bitte lade die Seite neu."}), 403
+
+    request_doc = find_bildungen_request_for_logged_in_user(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Die Anfrage wurde nicht gefunden."}), 404
+
+    claimed_by = request_doc.get("claimed_by") or {}
+    if safe_str(claimed_by.get("discord_id")):
+        return jsonify({"success": False, "message": "Die Anfrage wurde bereits geclaimt und kann nicht mehr zurückgezogen werden."}), 409
+
+    if normalize_bildungen_status(request_doc.get("status")) != "submitted":
+        return jsonify({"success": False, "message": "Diese Anfrage kann in ihrem aktuellen Status nicht zurückgezogen werden."}), 409
+
+    now = now_utc()
+    user = session.get("user") or {}
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    system_message = build_bildungen_chat_message(
+        "system", "ServiceCenter", "", "Die Anfrage wurde vom User zurückgezogen.", system_code="request_withdrawn"
+    )
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": {"status": "withdrawn", "withdrawn_at": now, "withdrawn_by": discord_id, "updated_at": now}, "$push": {"chat_messages": system_message}},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+    return jsonify({"success": True, "message": "Deine Anfrage wurde zurückgezogen.", "request": prepare_bildungen_request_for_user_json(fresh_request)})
+
+
+def update_bildungen_appointment_from_user(request_id, decision):
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
+
+    data = request.get_json(silent=True) or {}
+    if not servicecenter_bildungen_csrf_valid(data):
+        return jsonify({"success": False, "message": "Ungültige Sitzung. Bitte lade die Seite neu."}), 403
+
+    request_doc = find_bildungen_request_for_logged_in_user(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Die Anfrage wurde nicht gefunden."}), 404
+
+    confirmation_status = normalize_bildungen_appointment_confirmation(request_doc.get("appointment_confirmation_status"))
+    if normalize_bildungen_status(request_doc.get("status")) != "appointment_scheduled" or confirmation_status != "pending" or not request_doc.get("appointment_at"):
+        return jsonify({"success": False, "message": "Für diese Anfrage liegt kein offener Terminvorschlag vor."}), 409
+
+    now = now_utc()
+    user = session.get("user") or {}
+    discord_id = safe_str(user.get("id") or user.get("discord_id"))
+    is_confirmed = decision == "confirmed"
+    status = "approved" if is_confirmed else "in_review"
+    decision_text = "bestätigt" if is_confirmed else "abgelehnt"
+    system_message = build_bildungen_chat_message(
+        "system",
+        "ServiceCenter",
+        "",
+        f"Der Terminvorschlag wurde vom User {decision_text}.",
+        system_code=f"appointment_{decision}",
+    )
+    update_set = {
+        "status": status,
+        "appointment_confirmation_status": decision,
+        "appointment_decided_at": now,
+        "appointment_decided_by": discord_id,
+        "updated_at": now,
+    }
+    if is_confirmed:
+        update_set["appointment_confirmed_at"] = now
+    else:
+        update_set["appointment_declined_at"] = now
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": update_set, "$push": {"chat_messages": system_message}},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+    return jsonify({"success": True, "message": f"Der Termin wurde {decision_text}.", "request": prepare_bildungen_request_for_user_json(fresh_request)})
+
+
+@app.route("/api/servicecenter/bildungen/<request_id>/appointment/confirm", methods=["POST"])
+def api_servicecenter_bildungen_appointment_confirm(request_id):
+    return update_bildungen_appointment_from_user(request_id, "confirmed")
+
+
+@app.route("/api/servicecenter/bildungen/<request_id>/appointment/decline", methods=["POST"])
+def api_servicecenter_bildungen_appointment_decline(request_id):
+    return update_bildungen_appointment_from_user(request_id, "declined")
 
 
 @app.route("/servicecenter", methods=["GET"])
@@ -23644,313 +23947,41 @@ WEITERBILDUNGEN_WEB_ADMIN_TEMPLATE = r"""
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ServiceCenter Weiterbildungen</title>
   <style>
-    :root {
-      --blue:#17345f;
-      --blue-2:#244878;
-      --line:#9bb5cf;
-      --bg:#eef5fb;
-      --green:#27d263;
-      --green-dark:#146c2e;
-      --red:#9f1d17;
-      --yellow:#8a5a00;
-      --muted:#52697f;
-      --shadow:0 18px 38px rgba(23,52,95,.12);
-    }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    body {
-      margin:0;
-      min-height:100vh;
-      color:#112;
-      font-family:Inter,Arial,sans-serif;
-      background:
-        radial-gradient(circle at 8% 0%,rgba(39,210,99,.13),transparent 28%),
-        radial-gradient(circle at 100% 0%,rgba(23,52,95,.18),transparent 30%),
-        linear-gradient(135deg,#eef5fb,#d9e9f6);
-    }
-    header {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:16px;
-      padding:24px 32px;
-      color:#fff;
-      background:linear-gradient(135deg,#17345f,#102946);
-      box-shadow:0 18px 45px rgba(7,18,31,.22);
-    }
-    header h1 { margin:0; font-size:24px; letter-spacing:.08em; text-transform:uppercase; }
-    header a { color:#fff; font-weight:900; text-decoration:none; }
-    .header-stack { display:grid; gap:13px; }
-    .service-tabs { display:flex; flex-wrap:wrap; gap:8px; }
-    .service-tab {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      min-height:36px;
-      padding:9px 14px;
-      border:1px solid rgba(255,255,255,.22);
-      border-radius:999px;
-      color:#d8e8f7;
-      background:rgba(255,255,255,.06);
-      font-size:12px;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      transition:background .16s ease,border-color .16s ease,transform .16s ease;
-    }
-    .service-tab:hover { transform:translateY(-1px); background:rgba(255,255,255,.13); border-color:rgba(255,255,255,.42); }
-    .service-tab.active { color:#102946; background:#fff; border-color:#fff; }
-    .personal-link { border-bottom:1px solid rgba(255,255,255,.35); }
-    main { max-width:1480px; margin:0 auto; padding:28px; }
-    .intro {
-      display:grid;
-      grid-template-columns:minmax(0,1fr) auto;
-      gap:18px;
-      align-items:center;
-      margin-bottom:18px;
-      padding:18px;
-      border:1px solid rgba(155,181,207,.78);
-      border-radius:20px;
-      background:rgba(255,255,255,.70);
-      box-shadow:var(--shadow);
-      backdrop-filter:blur(12px);
-    }
-    .intro h2 { margin:0; color:#17345f; font-size:20px; }
-    .intro p { margin:6px 0 0; color:#52697f; line-height:1.55; }
-    .stats { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
-    .stat { min-width:90px; padding:10px 12px; border:1px solid #c4d4e4; border-radius:15px; background:#f7fbff; text-align:center; }
-    .stat strong { display:block; color:#17345f; font-size:19px; }
-    .stat span { display:block; margin-top:2px; color:#52697f; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
-    .toolbar {
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      margin-bottom:18px;
-      padding:14px;
-      border:1px solid rgba(155,181,207,.78);
-      border-radius:20px;
-      background:rgba(255,255,255,.62);
-      box-shadow:var(--shadow);
-      backdrop-filter:blur(12px);
-    }
-    button,select,input,textarea { border:1px solid #a8bfd7; border-radius:11px; padding:10px 12px; font:inherit; outline:none; }
-    input:focus,textarea:focus,select:focus { border-color:rgba(20,108,46,.65); box-shadow:0 0 0 3px rgba(39,210,99,.12); }
-    textarea { width:100%; min-height:80px; resize:vertical; line-height:1.45; }
-    button {
-      cursor:pointer;
-      color:#fff;
-      background:#17345f;
-      border-color:#17345f;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.05em;
-      transition:.16s ease;
-    }
-    button:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 10px 22px rgba(23,52,95,.18); }
-    button.secondary { color:#17345f; background:#fff; }
-    button.success { background:#146c2e; border-color:#146c2e; }
-    button.danger { background:#9f1d17; border-color:#9f1d17; }
-    button.ghost { color:#17345f; background:#f5f9fc; border-color:#b8cbe0; }
-    button:disabled { opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
-    .grow { flex:1 1 240px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:18px; align-items:start; }
-    .case { overflow:hidden; border:1px solid #b5c9dd; border-radius:22px; background:rgba(255,255,255,.95); box-shadow:var(--shadow); }
-    .case-head { display:flex; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid #dde8f1; background:linear-gradient(135deg,#f9fcff,#eff7fd); }
-    .case-head h3 { margin:0; color:#17345f; font-size:17px; overflow-wrap:anywhere; }
-    .case-head p { margin:5px 0 0; color:#52697f; font-size:12px; }
-    .pill { display:inline-flex; align-items:center; align-self:flex-start; padding:5px 9px; border:1px solid #9edbb0; border-radius:999px; color:#146c2e; background:#e9f9ee; font-size:10px; font-weight:900; letter-spacing:.04em; white-space:nowrap; }
-    .pill.submitted,.pill.in_review,.pill.appointment_scheduled { color:#8a5a00; border-color:#edcd84; background:#fff7e4; }
-    .pill.rejected { color:#9f1d17; border-color:#e6a09a; background:#ffe9e7; }
-    .case-body { display:grid; gap:13px; padding:16px; }
-    .meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; color:#26394c; font-size:12px; }
-    .meta strong { color:#17345f; }
-    .message { padding:12px; border:1px solid #d2e0ed; border-radius:14px; color:#26394c; background:#f7fbff; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .section { display:grid; gap:8px; padding:12px; border:1px solid #d8e4ef; border-radius:15px; background:#fbfdff; }
-    .section-title { margin:0; color:#17345f; font-size:11px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
-    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
-    label { display:grid; gap:5px; color:#475b70; font-size:12px; font-weight:800; }
-    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .template-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; }
-    .msg { min-height:20px; margin:0 0 14px; color:#146c2e; font-weight:900; }
-    .small { color:#52697f; font-size:11px; line-height:1.45; }
-    .empty { padding:28px; border:1px dashed #9bb5cf; border-radius:18px; color:#52697f; background:rgba(255,255,255,.72); text-align:center; }
-    @media (max-width:700px) {
-      header { align-items:flex-start; flex-direction:column; padding:20px; }
-      main { padding:18px; }
-      .intro { grid-template-columns:1fr; }
-      .stats { justify-content:flex-start; }
-      .grid { grid-template-columns:1fr; }
-      .fields,.template-row { grid-template-columns:1fr; }
-    }
+    :root{--blue:#17345f;--blue-2:#244878;--line:#9bb5cf;--bg:#eef5fb;--green:#27d263;--green-dark:#146c2e;--red:#9f1d17;--yellow:#8a5a00;--muted:#52697f;--shadow:0 18px 38px rgba(23,52,95,.12)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;color:#112;font-family:Inter,Arial,sans-serif;background:radial-gradient(circle at 8% 0%,rgba(39,210,99,.13),transparent 28%),radial-gradient(circle at 100% 0%,rgba(23,52,95,.18),transparent 30%),linear-gradient(135deg,#eef5fb,#d9e9f6)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px 32px;color:#fff;background:linear-gradient(135deg,#17345f,#102946);box-shadow:0 18px 45px rgba(7,18,31,.22)}header h1{margin:0;font-size:24px;letter-spacing:.08em;text-transform:uppercase}header a{color:#fff;font-weight:900;text-decoration:none}.header-stack{display:grid;gap:13px}.service-tabs{display:flex;flex-wrap:wrap;gap:8px}.service-tab{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:9px 14px;border:1px solid rgba(255,255,255,.22);border-radius:999px;color:#d8e8f7;background:rgba(255,255,255,.06);font-size:12px;letter-spacing:.06em;text-transform:uppercase;transition:.16s ease}.service-tab:hover{transform:translateY(-1px);background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.42)}.service-tab.active{color:#102946;background:#fff;border-color:#fff}.personal-link{border-bottom:1px solid rgba(255,255,255,.35)}
+    main{max-width:1480px;margin:0 auto;padding:28px}.intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;margin-bottom:18px;padding:18px;border:1px solid rgba(155,181,207,.78);border-radius:20px;background:rgba(255,255,255,.70);box-shadow:var(--shadow);backdrop-filter:blur(12px)}.intro h2{margin:0;color:#17345f;font-size:20px}.intro p{margin:6px 0 0;color:#52697f;line-height:1.55}.stats{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.stat{min-width:90px;padding:10px 12px;border:1px solid #c4d4e4;border-radius:15px;background:#f7fbff;text-align:center}.stat strong{display:block;color:#17345f;font-size:19px}.stat span{display:block;margin-top:2px;color:#52697f;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;padding:14px;border:1px solid rgba(155,181,207,.78);border-radius:20px;background:rgba(255,255,255,.62);box-shadow:var(--shadow);backdrop-filter:blur(12px)}button,select,input,textarea{border:1px solid #a8bfd7;border-radius:11px;padding:10px 12px;font:inherit;outline:none}input:focus,textarea:focus,select:focus{border-color:rgba(20,108,46,.65);box-shadow:0 0 0 3px rgba(39,210,99,.12)}textarea{width:100%;min-height:80px;resize:vertical;line-height:1.45}button{cursor:pointer;color:#fff;background:#17345f;border-color:#17345f;font-weight:900;text-transform:uppercase;letter-spacing:.05em;transition:.16s ease}button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 22px rgba(23,52,95,.18)}button.secondary{color:#17345f;background:#fff}button.success{background:#146c2e;border-color:#146c2e}button.danger{background:#9f1d17;border-color:#9f1d17}button.ghost{color:#17345f;background:#f5f9fc;border-color:#b8cbe0}button:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}.grow{flex:1 1 240px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:18px;align-items:start}.case{overflow:hidden;border:1px solid #b5c9dd;border-radius:22px;background:rgba(255,255,255,.95);box-shadow:var(--shadow)}.case-head{display:flex;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #dde8f1;background:linear-gradient(135deg,#f9fcff,#eff7fd)}.case-head h3{margin:0;color:#17345f;font-size:17px;overflow-wrap:anywhere}.case-head p{margin:5px 0 0;color:#52697f;font-size:12px}.pill{display:inline-flex;align-items:center;align-self:flex-start;padding:5px 9px;border:1px solid #9edbb0;border-radius:999px;color:#146c2e;background:#e9f9ee;font-size:10px;font-weight:900;letter-spacing:.04em;white-space:nowrap}.pill.submitted,.pill.in_review,.pill.appointment_scheduled{color:#8a5a00;border-color:#edcd84;background:#fff7e4}.pill.rejected,.pill.withdrawn{color:#9f1d17;border-color:#e6a09a;background:#ffe9e7}.case-body{display:grid;gap:13px;padding:16px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;color:#26394c;font-size:12px}.meta strong{color:#17345f}.message{padding:12px;border:1px solid #d2e0ed;border-radius:14px;color:#26394c;background:#f7fbff;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}.section{display:grid;gap:8px;padding:12px;border:1px solid #d8e4ef;border-radius:15px;background:#fbfdff}.section-title{margin:0;color:#17345f;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}label{display:grid;gap:5px;color:#475b70;font-size:12px;font-weight:800}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.msg{min-height:20px;margin:0 0 14px;color:#146c2e;font-weight:900}.small{color:#52697f;font-size:11px;line-height:1.45}.empty{padding:28px;border:1px dashed #9bb5cf;border-radius:18px;color:#52697f;background:rgba(255,255,255,.72);text-align:center}
+    .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(7,18,31,.68);backdrop-filter:blur(8px)}.modal.open{display:flex}.modal-card{width:min(860px,100%);max-height:min(880px,94vh);overflow:auto;border:1px solid #b5c9dd;border-radius:22px;background:#fff;box-shadow:0 28px 80px rgba(7,18,31,.34)}.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid #dde8f1;background:#f7fbff}.modal-head h3{margin:0;color:#17345f}.modal-body{display:grid;gap:12px;padding:16px}.chat-log{display:grid;gap:8px;max-height:430px;overflow:auto;padding:10px;border:1px solid #d8e4ef;border-radius:15px;background:#f7fbff}.chat-message{max-width:82%;padding:10px 11px;border:1px solid #d5e1ed;border-radius:14px;background:#fff;white-space:pre-wrap;overflow-wrap:anywhere}.chat-message.staff{margin-left:auto;border-color:#a9d9b4;background:#eefaf1}.chat-message.user{margin-right:auto}.chat-message.system{max-width:100%;border-style:dashed;color:#52697f;background:#f3f7fb;text-align:center}.chat-message strong{display:block;margin-bottom:4px;color:#17345f;font-size:11px}.chat-message span{display:block;margin-top:5px;color:#718398;font-size:10px}.chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.chat-compose textarea{min-height:68px}.appointment-state{padding:10px;border:1px solid #d2e0ed;border-radius:12px;color:#475b70;background:#f7fbff;font-size:12px;line-height:1.5}
+    @media(max-width:700px){header{align-items:flex-start;flex-direction:column;padding:20px}main{padding:18px}.intro{grid-template-columns:1fr}.stats{justify-content:flex-start}.grid{grid-template-columns:1fr}.fields,.chat-compose{grid-template-columns:1fr}.modal{padding:10px}.modal-card{max-height:96vh}}
   </style>
 </head>
 <body>
-<header>
-  <div class="header-stack">
-    <h1>ServiceCenter</h1>
-    <nav class="service-tabs" aria-label="ServiceCenter Bereiche">
-      <a class="service-tab" href="{{ fahrerkarten_url }}">Fahrerkarten</a>
-      <a class="service-tab active" href="{{ weiterbildungen_url }}">Weiterbildungen</a>
-    </nav>
-  </div>
-  <a class="personal-link" href="{{ personal_url }}">Zur Personalabteilung</a>
-</header>
+<header><div class="header-stack"><h1>ServiceCenter</h1><nav class="service-tabs" aria-label="ServiceCenter Bereiche"><a class="service-tab" href="{{ fahrerkarten_url }}">Fahrerkarten</a><a class="service-tab active" href="{{ weiterbildungen_url }}">Weiterbildungen</a></nav></div><a class="personal-link" href="{{ personal_url }}">Zur Personalabteilung</a></header>
 <main>
-  <section class="intro">
-    <div>
-      <h2>Weiterbildungen & interne Entwicklung</h2>
-      <p>Anträge prüfen, die Bearbeitung übernehmen, Termine vergeben und fertige Antworttexte direkt in das User-Postfach senden.</p>
-    </div>
-    <div id="stats" class="stats"></div>
-  </section>
-  <div class="toolbar">
-    <select id="filter-status">
-      <option value="">Alle Status</option>
-      <option value="submitted">Eingereicht</option>
-      <option value="in_review">In Prüfung</option>
-      <option value="appointment_scheduled">Termin geplant</option>
-      <option value="approved">Bestätigt</option>
-      <option value="completed">Abgeschlossen</option>
-      <option value="rejected">Abgelehnt</option>
-    </select>
-    <select id="filter-category">
-      <option value="">Alle Kategorien</option>
-      <option value="schulung">Schulungen</option>
-      <option value="interne_bewerbung">Interne Bewerbungen</option>
-      <option value="fahrer_service">Fahrer-Services</option>
-    </select>
-    <input class="grow" id="filter-search" placeholder="Name, Angebot oder Nachricht suchen">
-    <button type="button" onclick="loadRequests()">Aktualisieren</button>
-  </div>
-  <p id="msg" class="msg"></p>
-  <section id="requests" class="grid"></section>
+  <section class="intro"><div><h2>Weiterbildungen & interne Entwicklung</h2><p>Anträge claimen, interne Notizen speichern, verbindliche Terminvorschläge senden und direkt mit dem jeweiligen User chatten.</p></div><div id="stats" class="stats"></div></section>
+  <div class="toolbar"><select id="filter-status"><option value="">Alle Status</option><option value="submitted">Eingereicht</option><option value="in_review">In Prüfung</option><option value="appointment_scheduled">Termin geplant</option><option value="approved">Bestätigt</option><option value="completed">Abgeschlossen</option><option value="rejected">Abgelehnt</option><option value="withdrawn">Zurückgezogen</option></select><select id="filter-category"><option value="">Alle Kategorien</option><option value="schulung">Schulungen</option><option value="interne_bewerbung">Interne Bewerbungen</option><option value="fahrer_service">Fahrer-Services</option></select><input class="grow" id="filter-search" placeholder="Name, Angebot oder Nachricht suchen"><button type="button" onclick="loadRequests()">Aktualisieren</button></div>
+  <p id="msg" class="msg"></p><section id="requests" class="grid"></section>
 </main>
+<div id="chat-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="chat-title" onclick="if(event.target===this)closeChat()"><div class="modal-card"><div class="modal-head"><h3 id="chat-title">Live-Chat</h3><button class="secondary" type="button" onclick="closeChat()">Schließen</button></div><div class="modal-body"><div id="chat-case-info" class="appointment-state"></div><div id="chat-log" class="chat-log"></div><div class="chat-compose"><textarea id="chat-input" maxlength="2400" placeholder="Nachricht an den User schreiben"></textarea><button class="success" type="button" onclick="sendChatMessage()">Nachricht senden</button></div><span class="small">Der Verlauf aktualisiert sich automatisch alle drei Sekunden.</span></div></div></div>
 <script>
-const actions = {{ actions_json | safe }};
-const requestTemplates = {};
-const requestsEl = document.getElementById('requests');
-const msgEl = document.getElementById('msg');
-const statsEl = document.getElementById('stats');
-function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-function cleanId(v){ return String(v ?? '').replace(/[^a-zA-Z0-9_-]/g,'_'); }
-function setMsg(text,error=false){ msgEl.textContent=text||''; msgEl.style.color=error?'#9f1d17':'#146c2e'; }
-function statusOptions(value){
-  const options=[['submitted','Eingereicht'],['in_review','In Prüfung'],['appointment_scheduled','Termin geplant'],['approved','Bestätigt'],['completed','Abgeschlossen'],['rejected','Abgelehnt']];
-  return options.map(([id,label])=>`<option value="${id}" ${id===value?'selected':''}>${label}</option>`).join('');
-}
-async function api(url,payload){
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
-  const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
-  if(!res.ok||data.success===false) throw new Error(data.message||'Aktion fehlgeschlagen');
-  return data;
-}
-function renderStats(stats){
-  const items=[['Offen',stats.open||0],['Termine',stats.appointments||0],['Erledigt',stats.completed||0],['Gesamt',stats.total||0]];
-  statsEl.innerHTML=items.map(([label,value])=>`<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');
-}
-async function loadRequests(){
-  const params=new URLSearchParams();
-  const status=document.getElementById('filter-status').value;
-  const category=document.getElementById('filter-category').value;
-  const q=document.getElementById('filter-search').value.trim();
-  if(status) params.set('status',status);
-  if(category) params.set('category',category);
-  if(q) params.set('q',q);
-  try{
-    const res=await fetch(actions.list+(params.toString()?('?'+params.toString()):''));
-    const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));
-    if(!res.ok||data.success===false) throw new Error(data.message||'Anträge konnten nicht geladen werden.');
-    const items=data.requests||data.items||[];
-    requestsEl.innerHTML=items.map(renderRequest).join('')||'<div class="empty">Keine Weiterbildungs-Anträge gefunden.</div>';
-    renderStats(data.stats||{});
-    setMsg(items.length+' Antrag/Anträge geladen.');
-  }catch(error){ setMsg(error.message,true); }
-}
-function renderRequest(item){
-  const id=String(item.request_id||item.id||'');
-  const safeId=cleanId(id);
-  requestTemplates[safeId]=item.reply_templates||[];
-  const templates=(item.reply_templates||[]).map((tpl,index)=>`<option value="${index}">${esc(tpl.label)}</option>`).join('');
-  const claimedByOther=Boolean(item.claimed_by_discord_id&&item.claimed_by_discord_id!==actions.actorDiscordId);
-  const claimLabel=item.claimed_by_discord_id?(claimedByOther?'Von anderem Sachbearbeiter geclaimt':'Bereits geclaimt'):'Bearbeitung claimen';
-  return `<article class="case" id="case-${safeId}">
-    <div class="case-head">
-      <div><h3>${esc(item.offer_title)}</h3><p>${esc(item.category_label)} · ${esc(item.display_name)} · ${esc(item.role)}</p></div>
-      <span class="pill ${esc(item.status)}">${esc(item.status_label)}</span>
-    </div>
-    <div class="case-body">
-      <div class="meta">
-        <div><strong>User:</strong> ${esc(item.display_name)}<br><span class="small">${esc(item.username)} · ${esc(item.discord_id||'-')}</span></div>
-        <div><strong>Eingang:</strong> ${esc(item.created_at)}<br><span class="small">Aktualisiert: ${esc(item.updated_at)}</span></div>
-        <div><strong>Sachbearbeiter:</strong> ${esc(item.claimed_by_name)}</div>
-        <div><strong>Quelle:</strong> ${esc(item.source||'servicecenter_bildungen')}</div>
-      </div>
-      <div class="section"><p class="section-title">Anfrage ansehen</p><div class="message">${esc(item.message||'Keine zusätzliche Nachricht übermittelt.')}</div></div>
-      <div class="section">
-        <p class="section-title">Bearbeitung & Terminvergabe</p>
-        <div class="fields">
-          <label>Status<select id="status-${safeId}">${statusOptions(item.status)}</select></label>
-          <label>Termin<input id="appointment-${safeId}" type="datetime-local" value="${esc(item.appointment_at_input||'')}"></label>
-        </div>
-        <label>Termin-Hinweis<textarea id="appointment-note-${safeId}" placeholder="Zum Beispiel Treffpunkt, Dauer oder Ablauf">${esc(item.appointment_note||'')}</textarea></label>
-        <label>Interne Notiz<textarea id="internal-note-${safeId}" placeholder="Nur für die Personalabteilung sichtbar">${esc(item.internal_note||'')}</textarea></label>
-      </div>
-      <div class="section">
-        <p class="section-title">Antworttext direkt verwenden</p>
-        <div class="template-row"><select id="template-${safeId}">${templates}</select><button class="ghost" type="button" onclick="applyTemplate('${safeId}')">Vorlage einsetzen</button><button class="secondary" type="button" onclick="copyReply('${safeId}')">Kopieren</button></div>
-        <textarea id="response-${safeId}" placeholder="Antwort für das User-Postfach">${esc(item.response_text||'')}</textarea>
-        <span class="small">„Speichern & senden“ legt die Nachricht als ServiceCenter-Dokument im User-Postfach ab.</span>
-      </div>
-      <div class="row">
-        <button type="button" ${item.claimed_by_discord_id?'disabled':''} onclick="claimRequest('${esc(id)}')">${esc(claimLabel)}</button>
-        <button class="success" type="button" ${claimedByOther?'disabled':''} onclick="saveRequest('${esc(id)}','${safeId}',false)">Speichern</button>
-        <button class="success" type="button" ${claimedByOther?'disabled':''} onclick="saveRequest('${esc(id)}','${safeId}',true)">Speichern & senden</button>
-        <button class="danger" type="button" ${claimedByOther?'disabled':''} onclick="archiveRequest('${esc(id)}')">Archivieren</button>
-      </div>
-      ${item.last_published_at?`<span class="small">Letzte Nachricht an User: ${esc(item.last_published_at)}</span>`:''}
-    </div>
-  </article>`;
-}
-function applyTemplate(safeId){
-  const list=requestTemplates[safeId]||[];
-  const select=document.getElementById('template-'+safeId);
-  const textarea=document.getElementById('response-'+safeId);
-  if(!select||!textarea||!list.length) return;
-  textarea.value=(list[Number(select.value)]||{}).text||'';
-}
-async function copyReply(safeId){
-  const textarea=document.getElementById('response-'+safeId);
-  if(!textarea) return;
-  try{ await navigator.clipboard.writeText(textarea.value||''); setMsg('Antworttext wurde kopiert.'); }
-  catch(error){ textarea.select(); document.execCommand('copy'); setMsg('Antworttext wurde kopiert.'); }
-}
-async function claimRequest(id){
-  try{ const data=await api(actions.claim,{requestId:id}); setMsg(data.message); await loadRequests(); }
-  catch(error){ setMsg(error.message,true); }
-}
-async function saveRequest(id,safeId,publishToUser){
-  try{
-    const payload={
-      requestId:id,
-      status:document.getElementById('status-'+safeId).value,
-      appointmentAt:document.getElementById('appointment-'+safeId).value,
-      appointmentNote:document.getElementById('appointment-note-'+safeId).value,
-      internalNote:document.getElementById('internal-note-'+safeId).value,
-      responseText:document.getElementById('response-'+safeId).value,
-      publishToUser
-    };
-    const data=await api(actions.update,payload);
-    setMsg(data.message);
-    await loadRequests();
-  }catch(error){ setMsg(error.message,true); }
-}
-async function archiveRequest(id){
-  if(!confirm('Diesen Weiterbildungs-Antrag archivieren?')) return;
-  try{ const data=await api(actions.archive,{requestId:id}); setMsg(data.message); await loadRequests(); }
-  catch(error){ setMsg(error.message,true); }
-}
-document.getElementById('filter-search').addEventListener('keydown',event=>{ if(event.key==='Enter') loadRequests(); });
-loadRequests();
+const actions={{ actions_json | safe }};const requestsEl=document.getElementById('requests');const msgEl=document.getElementById('msg');const statsEl=document.getElementById('stats');let activeChatRequestId='';let chatPollTimer=null;
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}function cleanId(v){return String(v??'').replace(/[^a-zA-Z0-9_-]/g,'_')}function setMsg(text,error=false){msgEl.textContent=text||'';msgEl.style.color=error?'#9f1d17':'#146c2e'}function statusOptions(value){const options=[['submitted','Eingereicht'],['in_review','In Prüfung'],['appointment_scheduled','Termin geplant'],['approved','Bestätigt'],['completed','Abgeschlossen'],['rejected','Abgelehnt']];return options.map(([id,label])=>`<option value="${id}" ${id===value?'selected':''}>${label}</option>`).join('')}
+async function api(url,payload,method='POST'){const options={method,headers:{'Content-Type':'application/json'}};if(method!=='GET')options.body=JSON.stringify(payload||{});const res=await fetch(url,options);const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));if(!res.ok||data.success===false)throw new Error(data.message||'Aktion fehlgeschlagen');return data}function chatUrl(id){return actions.chatBase.replace('__REQUEST_ID__',encodeURIComponent(id))}
+function renderStats(stats){const items=[['Offen',stats.open||0],['Termine',stats.appointments||0],['Erledigt',stats.completed||0],['Gesamt',stats.total||0]];statsEl.innerHTML=items.map(([label,value])=>`<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('')}
+async function loadRequests(){const params=new URLSearchParams();const status=document.getElementById('filter-status').value;const category=document.getElementById('filter-category').value;const q=document.getElementById('filter-search').value.trim();if(status)params.set('status',status);if(category)params.set('category',category);if(q)params.set('q',q);try{const res=await fetch(actions.list+(params.toString()?('?'+params.toString()):''));const data=await res.json().catch(()=>({success:false,message:'Ungültige Serverantwort'}));if(!res.ok||data.success===false)throw new Error(data.message||'Anträge konnten nicht geladen werden.');const items=data.requests||data.items||[];requestsEl.innerHTML=items.map(renderRequest).join('')||'<div class="empty">Keine Weiterbildungs-Anträge gefunden.</div>';renderStats(data.stats||{});setMsg(items.length+' Antrag/Anträge geladen.')}catch(error){setMsg(error.message,true)}}
+function renderRequest(item){const id=String(item.request_id||item.id||'');const safeId=cleanId(id);const claimedByOther=Boolean(item.claimed_by_discord_id&&item.claimed_by_discord_id!==actions.actorDiscordId);const claimLabel=item.claimed_by_discord_id?(claimedByOther?'Von anderem Sachbearbeiter geclaimt':'Bereits geclaimt'):'Bearbeitung claimen';const closed=['withdrawn'].includes(item.status);return `<article class="case" id="case-${safeId}"><div class="case-head"><div><h3>${esc(item.offer_title)}</h3><p>${esc(item.category_label)} · ${esc(item.display_name)} · ${esc(item.role)}</p></div><span class="pill ${esc(item.status)}">${esc(item.status_label)}</span></div><div class="case-body"><div class="meta"><div><strong>User:</strong> ${esc(item.display_name)}<br><span class="small">${esc(item.username)} · ${esc(item.discord_id||'-')}</span></div><div><strong>Eingang:</strong> ${esc(item.created_at)}<br><span class="small">Aktualisiert: ${esc(item.updated_at)}</span></div><div><strong>Sachbearbeiter:</strong> ${esc(item.claimed_by_name)}</div><div><strong>Chat:</strong> ${esc(item.chat_message_count||0)} Nachricht(en)</div></div><div class="section"><p class="section-title">Eingereichte Beschreibung</p><div class="message">${esc(item.message||'Keine zusätzliche Nachricht übermittelt.')}</div></div><div class="section"><p class="section-title">Bearbeitung & Terminvergabe</p><div class="fields"><label>Status<select id="status-${safeId}" ${closed?'disabled':''}>${statusOptions(item.status)}</select></label><label>Termin<input id="appointment-${safeId}" type="datetime-local" value="${esc(item.appointment_at_input||'')}" ${closed?'disabled':''}></label></div><label>Termin-Hinweis<textarea id="appointment-note-${safeId}" placeholder="Zum Beispiel Treffpunkt, Dauer oder Ablauf" ${closed?'disabled':''}>${esc(item.appointment_note||'')}</textarea></label><div class="appointment-state"><strong>Terminstatus:</strong> ${esc(item.appointment_confirmation_label||'Noch kein Terminvorschlag')}</div><label>Interne Notiz<textarea id="internal-note-${safeId}" placeholder="Nur für die Personalabteilung sichtbar" ${closed?'disabled':''}>${esc(item.internal_note||'')}</textarea></label></div><div class="row"><button type="button" ${item.claimed_by_discord_id||closed?'disabled':''} onclick="claimRequest('${esc(id)}')">${esc(claimLabel)}</button><button class="success" type="button" ${claimedByOther||closed?'disabled':''} onclick="saveRequest('${esc(id)}','${safeId}')">Speichern</button><button class="success" type="button" ${claimedByOther||closed?'disabled':''} onclick="sendAppointmentProposal('${esc(id)}','${safeId}')">Terminvorschlag senden</button><button class="secondary" type="button" ${claimedByOther?'disabled':''} onclick="openChat('${esc(id)}')">Chat öffnen</button><button class="danger" type="button" ${claimedByOther?'disabled':''} onclick="archiveRequest('${esc(id)}')">Archivieren</button></div></div></article>`}
+async function claimRequest(id){try{const data=await api(actions.claim,{requestId:id});setMsg(data.message);await loadRequests()}catch(error){setMsg(error.message,true)}}
+function requestPayload(id,safeId){return{requestId:id,status:document.getElementById('status-'+safeId).value,appointmentAt:document.getElementById('appointment-'+safeId).value,appointmentNote:document.getElementById('appointment-note-'+safeId).value,internalNote:document.getElementById('internal-note-'+safeId).value}}
+async function saveRequest(id,safeId){try{const data=await api(actions.update,requestPayload(id,safeId));setMsg(data.message);await loadRequests()}catch(error){setMsg(error.message,true)}}
+async function sendAppointmentProposal(id,safeId){const payload=requestPayload(id,safeId);if(!payload.appointmentAt){setMsg('Bitte zuerst Datum und Uhrzeit für den Terminvorschlag eintragen.',true);return}if(!confirm('Diesen Terminvorschlag speichern und direkt an den User senden?'))return;try{const data=await api(actions.appointmentProposal,payload);setMsg(data.message);await loadRequests();await openChat(id)}catch(error){setMsg(error.message,true)}}
+async function archiveRequest(id){if(!confirm('Diesen Weiterbildungs-Antrag archivieren?'))return;try{const data=await api(actions.archive,{requestId:id});setMsg(data.message);await loadRequests()}catch(error){setMsg(error.message,true)}}
+function renderChat(item){document.getElementById('chat-title').textContent='Live-Chat · '+(item.offer_title||'Anfrage');document.getElementById('chat-case-info').innerHTML=`<strong>User:</strong> ${esc(item.display_name)} · <strong>Status:</strong> ${esc(item.status_label)} · <strong>Termin:</strong> ${esc(item.appointment_at||'Noch nicht festgelegt')} · <strong>Terminstatus:</strong> ${esc(item.appointment_confirmation_label||'-')}`;const log=document.getElementById('chat-log');const messages=item.chat_messages||[];log.innerHTML=messages.map(message=>`<div class="chat-message ${esc(message.sender_type)}"><strong>${esc(message.sender_name)}</strong>${esc(message.message)}<span>${esc(message.created_at)}</span></div>`).join('')||'<div class="empty">Noch keine Nachrichten vorhanden.</div>';log.scrollTop=log.scrollHeight}
+async function refreshChat(){if(!activeChatRequestId)return;try{const data=await api(chatUrl(activeChatRequestId),null,'GET');renderChat(data.request)}catch(error){setMsg(error.message,true)}}
+async function openChat(id){activeChatRequestId=id;document.getElementById('chat-modal').classList.add('open');await refreshChat();clearInterval(chatPollTimer);chatPollTimer=setInterval(refreshChat,3000)}function closeChat(){activeChatRequestId='';clearInterval(chatPollTimer);chatPollTimer=null;document.getElementById('chat-modal').classList.remove('open')}
+async function sendChatMessage(){const input=document.getElementById('chat-input');const text=input.value.trim();if(!activeChatRequestId||!text)return;try{const data=await api(chatUrl(activeChatRequestId),{message:text});input.value='';renderChat(data.request);setMsg(data.message)}catch(error){setMsg(error.message,true)}}
+document.getElementById('filter-search').addEventListener('keydown',event=>{if(event.key==='Enter')loadRequests()});document.addEventListener('keydown',event=>{if(event.key==='Escape')closeChat()});loadRequests();
 </script>
 </body>
 </html>
@@ -23969,6 +24000,8 @@ def personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web():
         "list": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list"),
         "claim": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_claim"),
         "update": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update"),
+        "appointmentProposal": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_appointment_proposal"),
+        "chatBase": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_chat", request_id="__REQUEST_ID__"),
         "archive": url_for("api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_archive"),
         "actorDiscordId": safe_str(actor.get("discord_id")),
     }
@@ -24004,6 +24037,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list():
             {"username": {"$regex": pattern, "$options": "i"}},
             {"offer_title": {"$regex": pattern, "$options": "i"}},
             {"message": {"$regex": pattern, "$options": "i"}},
+            {"chat_messages.message": {"$regex": pattern, "$options": "i"}},
         ]
 
     items = [
@@ -24106,9 +24140,9 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update():
     update_doc = {"$set": update_set}
     if appointment_field_present:
         if appointment_at:
+            # Reines Speichern legt den Termin intern ab. Erst der explizite Button
+            # „Terminvorschlag senden“ veröffentlicht ihn und setzt pending.
             update_set["appointment_at"] = appointment_at
-            if status in {"submitted", "in_review"}:
-                update_set["status"] = "appointment_scheduled"
         else:
             update_doc["$unset"] = {"appointment_at": ""}
             if status == "appointment_scheduled":
@@ -24144,6 +24178,135 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update():
         "message": "Weiterbildungs-Antrag wurde gespeichert und an den User gesendet." if publish_to_user else "Weiterbildungs-Antrag wurde gespeichert.",
         "request": prepare_bildungen_request_for_personalabteilung(fresh_request),
     })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/appointment-proposal", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_appointment_proposal():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_bildungen_request(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Weiterbildungs-Antrag wurde nicht gefunden."}), 404
+    if normalize_bildungen_status(request_doc.get("status")) == "withdrawn":
+        return jsonify({"success": False, "message": "Die Anfrage wurde vom User zurückgezogen."}), 409
+
+    appointment_raw = safe_str(data.get("appointmentAt") or data.get("appointment_at"))
+    appointment_at = parse_servicecenter_datetime(appointment_raw)
+    if not appointment_at:
+        return jsonify({"success": False, "message": "Bitte einen gültigen Termin mit Datum und Uhrzeit eintragen."}), 400
+
+    actor = current_staff_identity()
+    claimed_by = request_doc.get("claimed_by") or {}
+    claimed_discord_id = safe_str(claimed_by.get("discord_id"))
+    if claimed_discord_id and not request_is_claimed_by_actor(request_doc, actor):
+        claimed_name = safe_str(claimed_by.get("display_name") or claimed_by.get("username"), "einem anderen Sachbearbeiter")
+        return jsonify({"success": False, "message": f"Dieser Weiterbildungs-Antrag wird bereits von {claimed_name} bearbeitet."}), 403
+
+    appointment_note = safe_str(data.get("appointmentNote") or data.get("appointment_note"))[:1600]
+    internal_note = safe_str(data.get("internalNote") or data.get("internal_note"))[:2400]
+    handler_name = safe_str(actor.get("display_name") or actor.get("username"), "Personalabteilung")
+    appointment_display = format_datetime_for_template(appointment_at) or appointment_raw
+    chat_text = f"Terminvorschlag: {appointment_display}. Bitte bestätige oder lehne den Termin direkt in den Details deiner Anfrage ab."
+    if appointment_note:
+        chat_text += f"\nHinweis: {appointment_note}"
+    system_message = build_bildungen_chat_message("staff", handler_name, actor.get("discord_id"), chat_text, system_code="appointment_proposal")
+    now = now_utc()
+    update_set = {
+        "status": "appointment_scheduled",
+        "appointment_at": appointment_at,
+        "appointment_note": appointment_note,
+        "appointment_confirmation_status": "pending",
+        "appointment_proposed_at": now,
+        "appointment_proposed_by": actor,
+        "claimed_by": actor,
+        "handler_name": handler_name,
+        "internal_note": internal_note,
+        "updated_at": now,
+        "updated_by": actor,
+        "last_published_at": now,
+        "last_published_by": actor,
+    }
+    if not claimed_discord_id:
+        update_set["claimed_at"] = now
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": update_set, "$push": {"chat_messages": system_message}},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    create_system_document_for_user(
+        fresh_request.get("discord_id"),
+        f"Terminvorschlag: {safe_str(fresh_request.get('offer_title'), 'Weiterbildung')}",
+        handler_name,
+        servicecenter_bildungen_document_content(fresh_request, chat_text, actor),
+        doc_type="servicecenter_bildungen_appointment_proposal",
+        needs_signature=False,
+        extra={
+            "important": True,
+            "request_id": fresh_request.get("request_id"),
+            "bildungen_request_id": fresh_request.get("request_id"),
+            "servicecenter_area": "weiterbildungen",
+            "appointment_confirmation_status": "pending",
+        },
+    )
+    return jsonify({"success": True, "message": "Terminvorschlag wurde gespeichert und direkt an den User gesendet.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/<request_id>/chat", methods=["GET", "POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_chat(request_id):
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    request_doc = find_bildungen_request(request_id)
+    if not request_doc or request_doc.get("archived") is True:
+        return jsonify({"success": False, "message": "Weiterbildungs-Antrag wurde nicht gefunden."}), 404
+
+    if request.method == "GET":
+        return jsonify({"success": True, "request": prepare_bildungen_request_for_personalabteilung(request_doc)})
+
+    if normalize_bildungen_status(request_doc.get("status")) in {"withdrawn", "archived", "completed"}:
+        return jsonify({"success": False, "message": "Für diesen Antrag kann keine neue Chat-Nachricht mehr gesendet werden."}), 409
+
+    data = request.get_json(silent=True) or {}
+    message_text = safe_str(data.get("message"))[:2400]
+    if not message_text:
+        return jsonify({"success": False, "message": "Bitte gib eine Nachricht ein."}), 400
+
+    actor = current_staff_identity()
+    claimed_by = request_doc.get("claimed_by") or {}
+    claimed_discord_id = safe_str(claimed_by.get("discord_id"))
+    if claimed_discord_id and not request_is_claimed_by_actor(request_doc, actor):
+        claimed_name = safe_str(claimed_by.get("display_name") or claimed_by.get("username"), "einem anderen Sachbearbeiter")
+        return jsonify({"success": False, "message": f"Dieser Weiterbildungs-Antrag wird bereits von {claimed_name} bearbeitet."}), 403
+
+    now = now_utc()
+    handler_name = safe_str(actor.get("display_name") or actor.get("username"), "Personalabteilung")
+    chat_message = build_bildungen_chat_message("staff", handler_name, actor.get("discord_id"), message_text)
+    update_set = {
+        "claimed_by": actor,
+        "handler_name": handler_name,
+        "updated_at": now,
+        "updated_by": actor,
+        "last_staff_message_at": now,
+    }
+    if not claimed_discord_id:
+        update_set["claimed_at"] = now
+    if normalize_bildungen_status(request_doc.get("status")) == "submitted":
+        update_set["status"] = "in_review"
+    servicecenter_bildungen_requests_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {"$set": update_set, "$push": {"chat_messages": chat_message}},
+    )
+    fresh_request = servicecenter_bildungen_requests_collection.find_one({"_id": request_doc["_id"]})
+    return jsonify({"success": True, "message": "Chat-Nachricht wurde gesendet.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
 
 
 @app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/archive", methods=["POST"])
