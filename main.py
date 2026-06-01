@@ -4333,6 +4333,12 @@ def fahrerkarte_pdf_value(request_doc, user_doc, *keys, fallback="-"):
 
 
 def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None):
+    """Erzeugt einen professionellen, aber eindeutig internen Fahrerkarte-Auszug.
+
+    Das Layout ist bewusst neutral gehalten. Es verwendet keine Marken, Logos oder
+    Gestaltungsmerkmale amtlicher Prüfstellen und bleibt durchgehend als MUSTER /
+    NICHT AMTLICH gekennzeichnet.
+    """
     user_doc = user_doc or {}
     actor = actor or {}
 
@@ -4368,7 +4374,12 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     if not signature_hash:
         signature_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}|{signature_name}".encode("utf-8")).hexdigest().upper()
     short_signature_hash = signature_hash[:32]
-    note = safe_str(request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")
+    note = safe_str(
+        request_doc.get("issue_note")
+        or request_doc.get("approval_note")
+        or request_doc.get("notes")
+        or "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt."
+    )
 
     avatar_image = load_fahrerkarte_avatar_jpeg(request_doc, user_doc=user_doc, size=180)
     pdf_images = [avatar_image] if avatar_image else []
@@ -4376,91 +4387,105 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     stream = bytearray()
     stream.extend(b"q\n")
 
-    # Seite bewusst als interne ServiceCenter-Karte, nicht als amtliches Dokument.
-    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.940, 0.965, 0.980))
-    pdf_stream_rect(stream, 0, 790, 595, 52, fill_rgb=(0.120, 0.250, 0.460))
-    pdf_stream_text(stream, 42, 814, "EIFELLOG SERVICECENTER", size=10, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 42, 796, "Digitale Fahrerkarte / Web-Ausstellung", size=18, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 390, 812, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.890, 0.940, 1.000))
+    # Neutraler gruen-weisser Auszug im Stil eines internen Fahrerdatenblatts.
+    # Die Kennzeichnung MUSTER / NICHT AMTLICH darf nicht entfernt werden.
+    green_dark = (0.035, 0.310, 0.155)
+    green = (0.080, 0.520, 0.240)
+    green_soft = (0.900, 0.965, 0.920)
+    green_pale = (0.955, 0.985, 0.965)
+    line_green = (0.210, 0.590, 0.330)
+    ink = (0.045, 0.105, 0.075)
+    muted = (0.260, 0.390, 0.320)
+    warning = (0.690, 0.080, 0.060)
 
-    # Kartenkörper nach hellblauem Fahrerkarte-Layout, klar als interne EifelLog-Karte markiert.
+    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.965, 0.975, 0.970))
+    pdf_stream_rect(stream, 0, 790, 595, 52, fill_rgb=green_dark)
+    pdf_stream_rect(stream, 0, 786, 595, 4, fill_rgb=green)
+    pdf_stream_text(stream, 42, 814, "EIFELLOG FAHRERKARTE", size=10, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 42, 796, "Interner Fahrerkarten-Auszug", size=18, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 390, 812, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.900, 1.000, 0.930))
+    pdf_stream_text(stream, 390, 797, "MUSTER / NICHT AMTLICH", size=9, bold=True, color=(1.000, 0.930, 0.900))
+
+    # Kartenkoerper: professionelles internes Layout ohne amtliche oder fremde Markenanmutung.
     card_x, card_y, card_w, card_h = 34, 493, 527, 262
-    pdf_stream_rect(stream, card_x + 5, card_y - 7, card_w, card_h, fill_rgb=(0.640, 0.720, 0.780))
-    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(0.820, 0.910, 0.965), stroke_rgb=(0.260, 0.410, 0.620), line_width=1.5)
-    pdf_stream_rect(stream, card_x, card_y + card_h - 38, card_w, 38, fill_rgb=(0.650, 0.780, 0.900))
-    pdf_stream_rect(stream, card_x + 10, card_y + card_h - 34, 54, 30, fill_rgb=(0.060, 0.190, 0.510), stroke_rgb=(1, 1, 1), line_width=0.8)
-    pdf_stream_text(stream, card_x + 20, card_y + card_h - 23, "EL", size=13, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, card_x + 78, card_y + card_h - 18, "FAHRERKARTE", size=17, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, card_x + 250, card_y + card_h - 15, "EifelLog Web-ServiceCenter", size=9, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, card_x + 395, card_y + card_h - 29, "KEIN AMTLICHES DOKUMENT", size=8, bold=True, color=(0.580, 0.060, 0.060))
+    pdf_stream_rect(stream, card_x + 5, card_y - 7, card_w, card_h, fill_rgb=(0.730, 0.790, 0.750))
+    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=1.5)
+    pdf_stream_rect(stream, card_x, card_y + card_h - 42, card_w, 42, fill_rgb=green_soft)
+    pdf_stream_rect(stream, card_x + 10, card_y + card_h - 36, 54, 30, fill_rgb=green_dark, stroke_rgb=(1, 1, 1), line_width=0.8)
+    pdf_stream_text(stream, card_x + 20, card_y + card_h - 25, "EL", size=13, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, card_x + 78, card_y + card_h - 19, "FAHRERKARTE", size=17, bold=True, color=green_dark)
+    pdf_stream_text(stream, card_x + 250, card_y + card_h - 16, "EifelLog Fahrerkartenverwaltung", size=9, bold=True, color=green_dark)
+    pdf_stream_text(stream, card_x + 389, card_y + card_h - 31, "MUSTER / NICHT AMTLICH", size=8, bold=True, color=warning)
 
     # Avatar des Users
     avatar_x, avatar_y, avatar_w, avatar_h = card_x + 24, card_y + 69, 108, 126
-    pdf_stream_rect(stream, avatar_x - 2, avatar_y - 2, avatar_w + 4, avatar_h + 4, fill_rgb=(0.920, 0.955, 0.980), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.8)
+    pdf_stream_rect(stream, avatar_x - 2, avatar_y - 2, avatar_w + 4, avatar_h + 4, fill_rgb=green_pale, stroke_rgb=line_green, line_width=0.8)
     if avatar_image:
         pdf_stream_image(stream, "Avatar1", avatar_x, avatar_y + 9, avatar_w, avatar_w)
     else:
-        pdf_stream_rect(stream, avatar_x, avatar_y + 9, avatar_w, avatar_w, fill_rgb=(0.730, 0.820, 0.880), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+        pdf_stream_rect(stream, avatar_x, avatar_y + 9, avatar_w, avatar_w, fill_rgb=(0.860, 0.930, 0.880), stroke_rgb=line_green, line_width=0.5)
         initials = "".join([part[:1] for part in name.split()[:2]]).upper() or "EL"
-        pdf_stream_text(stream, avatar_x + 31, avatar_y + 65, initials[:3], size=24, bold=True, color=(0.120, 0.250, 0.460))
-    pdf_stream_text(stream, avatar_x + 14, avatar_y + 7, "USER AVATAR", size=7, bold=True, color=(0.190, 0.300, 0.430))
+        pdf_stream_text(stream, avatar_x + 31, avatar_y + 65, initials[:3], size=24, bold=True, color=green_dark)
+    pdf_stream_text(stream, avatar_x + 14, avatar_y + 7, "USER AVATAR", size=7, bold=True, color=muted)
 
-    # Datenfelder im Stil der Referenz, aber mit internen Feldern.
+    # Fahrerkartendaten
     data_x = card_x + 154
     line_y = card_y + 184
-    pdf_stream_text(stream, data_x, line_y, f"1. {name[:46]}", size=15, bold=True, color=(0.050, 0.080, 0.120), max_chars=58)
-    pdf_stream_text(stream, data_x, line_y - 26, f"2. {role[:50]}", size=11, bold=True, color=(0.050, 0.080, 0.120), max_chars=62)
-    pdf_stream_text(stream, data_x, line_y - 49, f"3. {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x + 138, line_y - 49, f"4a {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x + 272, line_y - 49, f"4b {valid_until.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x, line_y - 72, "4c EifelLog ServiceCenter", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=60)
-    pdf_stream_text(stream, data_x, line_y - 95, f"5a {system_id}", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=64)
-    pdf_stream_text(stream, data_x, line_y - 118, f"5b {card_id}", size=10, bold=True, color=(0.050, 0.080, 0.120), max_chars=64)
-    pdf_stream_text(stream, data_x, line_y - 141, f"User: {username}  |  Fahrer-Nr.: {driver_number}", size=8, bold=False, color=(0.220, 0.310, 0.420), max_chars=76)
+    pdf_stream_text(stream, data_x, line_y, f"1. {name[:46]}", size=15, bold=True, color=ink, max_chars=58)
+    pdf_stream_text(stream, data_x, line_y - 26, f"2. {role[:50]}", size=11, bold=True, color=ink, max_chars=62)
+    pdf_stream_text(stream, data_x, line_y - 49, f"3. {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x + 138, line_y - 49, f"4a {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x + 272, line_y - 49, f"4b {valid_until.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x, line_y - 72, "4c EifelLog Fahrerkartenverwaltung", size=10, bold=False, color=ink, max_chars=60)
+    pdf_stream_text(stream, data_x, line_y - 95, f"5a {system_id}", size=10, bold=False, color=ink, max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 118, f"5b {card_id}", size=10, bold=True, color=ink, max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 141, f"User: {username}  |  Fahrer-Nr.: {driver_number}", size=8, bold=False, color=muted, max_chars=76)
 
     # Interner Checkcode
     qr_x, qr_y, cell = card_x + card_w - 90, card_y + 55, 4
-    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, 68, 68, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, 68, 68, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=0.5)
     digest = hashlib.sha256(f"{card_id}|{request_id}".encode("utf-8")).digest()
     for row in range(14):
         for col in range(14):
             byte = digest[(row * 14 + col) % len(digest)]
             should_fill = ((byte >> (col % 8)) & 1) or row in {0, 13} or col in {0, 13}
             if should_fill:
-                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=(0.040, 0.080, 0.150))
-    pdf_stream_text(stream, qr_x - 1, qr_y - 20, "CHECKCODE", size=7, bold=True, color=(0.090, 0.180, 0.330))
+                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=green_dark)
+    pdf_stream_text(stream, qr_x - 1, qr_y - 20, "CHECKCODE", size=7, bold=True, color=green_dark)
 
     # Signaturzeile auf Karte
-    pdf_stream_line(stream, card_x + 155, card_y + 23, card_x + 375, card_y + 23, stroke_rgb=(0.090, 0.180, 0.330), line_width=0.6)
-    pdf_stream_text(stream, card_x + 155, card_y + 9, f"Signiert: {signature_name[:36]}", size=8, bold=False, color=(0.050, 0.080, 0.120), max_chars=54)
-    pdf_stream_text(stream, card_x + 405, card_y + 9, "INTERN / WEB", size=8, bold=True, color=(0.580, 0.060, 0.060))
+    pdf_stream_line(stream, card_x + 155, card_y + 23, card_x + 375, card_y + 23, stroke_rgb=green_dark, line_width=0.6)
+    pdf_stream_text(stream, card_x + 155, card_y + 9, f"Signiert: {signature_name[:36]}", size=8, bold=False, color=ink, max_chars=54)
+    pdf_stream_text(stream, card_x + 391, card_y + 9, "INTERN / MUSTER", size=8, bold=True, color=warning)
 
     # Detailbereiche unterhalb der Karte
     box_y = 250
-    pdf_stream_rect(stream, 48, box_y, 499, 188, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=1)
-    pdf_stream_text(stream, 66, box_y + 158, "Postfach & Download", size=13, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, 66, box_y + 133, f"Antrags-ID: {request_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 116, f"Karten-ID: {card_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 99, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 82, "Bereitstellung: Postfach im ServiceCenter + PDF-Download", size=9, bold=True, color=(0.090, 0.180, 0.330), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 58, f"Hinweis: {note}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=62)
+    pdf_stream_rect(stream, 48, box_y, 499, 188, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=1)
+    pdf_stream_rect(stream, 48, box_y + 172, 499, 16, fill_rgb=green_soft)
+    pdf_stream_text(stream, 66, box_y + 158, "Fahrerkartendaten", size=13, bold=True, color=green_dark)
+    pdf_stream_text(stream, 66, box_y + 133, f"Vorgangs-ID: {request_id}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 116, f"Karten-ID: {card_id}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 99, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 82, "Bereitstellung: internes Fahrerportal + PDF-Download", size=9, bold=True, color=green_dark, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 58, f"Hinweis: {note}", size=9, bold=False, color=ink, max_chars=62)
 
-    pdf_stream_text(stream, 315, box_y + 158, "Digitale Signatur", size=13, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, 315, box_y + 133, f"Sachbearbeiter: {handler}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 116, f"Signatur: {signature_name}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 99, f"Zeitpunkt: {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 82, f"Hash: {short_signature_hash}", size=8, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 58, "Verifikation: Web-ServiceCenter / MongoDB-Antrag", size=8, bold=True, color=(0.090, 0.180, 0.330), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 158, "Digitale Signatur", size=13, bold=True, color=green_dark)
+    pdf_stream_text(stream, 315, box_y + 133, f"Sachbearbeiter: {handler}", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 116, f"Signatur: {signature_name}", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 99, f"Zeitpunkt: {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 82, f"Hash: {short_signature_hash}", size=8, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 58, "Verifikation: internes Fahrerportal", size=8, bold=True, color=green_dark, max_chars=42)
 
-    pdf_stream_rect(stream, 48, 116, 499, 88, fill_rgb=(0.120, 0.250, 0.460), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.9)
-    pdf_stream_text(stream, 66, 175, "Interne Fahrerkarte", size=12, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 66, 154, "Dieses Dokument ist eine interne EifelLog-ServiceCenter-Karte und ersetzt keine amtliche Fahrerkarte.", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=92)
+    # Deutlicher Schutz gegen Verwechslung mit amtlichen Nachweisen.
+    pdf_stream_rect(stream, 48, 116, 499, 88, fill_rgb=green_dark, stroke_rgb=line_green, line_width=0.9)
+    pdf_stream_text(stream, 66, 175, "MUSTER - INTERNE FAHRERKARTE", size=12, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 66, 154, "Kein amtliches Dokument. Kein Nachweis gegenueber Behoerden oder Kontrollstellen.", size=8, bold=True, color=(0.950, 1.000, 0.960), max_chars=92)
     verify_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}".encode("utf-8")).hexdigest()[:24].upper()
-    pdf_stream_text(stream, 66, 136, f"Pruefhash: {verify_hash}", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=80)
-    pdf_stream_text(stream, 66, 120, "Download: ServiceCenter / Postfach / Fahrerkarte", size=8, bold=True, color=(1, 1, 1), max_chars=80)
+    pdf_stream_text(stream, 66, 136, f"Pruefhash: {verify_hash}", size=8, bold=False, color=(0.900, 1.000, 0.930), max_chars=80)
+    pdf_stream_text(stream, 66, 120, "Ablage: internes Fahrerportal / Fahrerkarte", size=8, bold=True, color=(1, 1, 1), max_chars=80)
 
-    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - webbasierte Fahrerkarte-Ausstellung", size=8, bold=False, color=(0.220, 0.310, 0.420))
-    pdf_stream_text(stream, 42, 48, "Bei falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=(0.220, 0.310, 0.420))
+    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - interne Fahrerkartenverwaltung", size=8, bold=False, color=muted)
+    pdf_stream_text(stream, 42, 48, "Bei falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=muted)
     stream.extend(b"Q\n")
     return build_pdf_single_page(stream, images=pdf_images)
 
@@ -4507,7 +4532,7 @@ def build_fahrerkarte_pdf_sections(request_doc, user_doc=None, actor=None):
 
     sections.append(("Personalabteilung", [
         ("Sachbearbeiter", handler),
-        ("Ausstellungsvermerk", request_doc.get("issue_note") or request_doc.get("approval_note") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt."),
+        ("Ausstellungsvermerk", request_doc.get("issue_note") or request_doc.get("approval_note") or "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt."),
         ("Tracker Upload", "Dieses PDF ist für den späteren Upload im Tracker vorgesehen."),
     ]))
     return sections
@@ -4536,7 +4561,7 @@ def save_fahrerkarte_pdf(request_doc, user_doc=None, actor=None, force=False):
     driver_name = request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or "fahrer"
     safe_driver = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(driver_name, "fahrer"))[:60].strip("_") or "fahrer"
     safe_card_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", card_id)[:80]
-    filename = f"EifelLog_ServiceCenter_Fahrerkarte_{safe_card_id}_{safe_driver}_{request_id[:8]}.pdf"
+    filename = f"EifelLog_Fahrerkarte_{safe_card_id}_{safe_driver}_{request_id[:8]}.pdf"
     file_path = os.path.join(target_folder, filename)
 
     pdf_doc = dict(request_doc)
@@ -4568,7 +4593,7 @@ def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
     username = request_doc.get("username") or request_doc.get("discord_username") or "-"
     role = request_doc.get("role") or request_doc.get("role_name") or "Fahrer"
     issued_at = format_datetime_for_template(request_doc.get("issued_at")) or now_utc().strftime("%d.%m.%Y %H:%M")
-    description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im EifelLog ServiceCenter bereitgestellt.")
+    description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im internen Fahrerportal bereitgestellt.")
     return f"""
         <p><strong>Personalisierte Fahrerkarte ausgestellt</strong></p>
         <p class="mt-4">{description}</p>
@@ -4594,7 +4619,7 @@ def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
             </div>
 
             <p class="mt-5 text-xs text-gray-400">
-                Das PDF wurde automatisch generiert und ist als Download für Dashboard, ServiceCenter und späteren Tracker-Upload bereit.
+                Das PDF wurde automatisch generiert und ist als Download für Dashboard, Fahrerportal und späteren Tracker-Upload bereit.
             </p>
 
             <a href="{download_url}" class="inline-flex items-center justify-center mt-5 px-5 py-3 rounded-xl bg-[var(--brand-green)] text-black font-orbitron font-bold uppercase tracking-widest hover:opacity-90" download>
@@ -4610,7 +4635,7 @@ def create_fahrerkarte_pdf_dashboard_document(request_doc, actor=None, descripti
         return None
 
     actor = actor or current_staff_identity()
-    handler_name = actor.get("display_name") or actor.get("username") or "EifelLog ServiceCenter"
+    handler_name = actor.get("display_name") or actor.get("username") or "EifelLog Fahrerkartenverwaltung"
     download_url = servicecenter_fahrerkarte_download_url(request_id)
     pdf_filename = request_doc.get("pdf_filename") or request_doc.get("file_name") or "EifelLog_Fahrerkarte.pdf"
     document_description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF ausgestellt und ist bereit für den Tracker-Upload.")
@@ -22443,7 +22468,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ServiceCenter Fahrerkarte</title>
+  <title>EifelLog Fahrerkarte</title>
   <style>
     :root {
       --blue:#17345f;
@@ -22573,7 +22598,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
       font-family:Arial, Inter, system-ui, sans-serif;
     }
     .driver-card::before {
-      content:"EIFELLOG EIFELLOG EIFELLOG EIFELLOG";
+      content:"MUSTER NICHT AMTLICH MUSTER NICHT AMTLICH";
       position:absolute;
       inset:0;
       z-index:-1;
@@ -22779,7 +22804,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 <body>
 <header>
   <div>
-    <h1>ServiceCenter Fahrerkarte</h1>
+    <h1>EifelLog Fahrerkarte</h1>
     <p>Web-only: claimen, genehmigen, signieren, ausstellen und PDF im User-Postfach bereitstellen.</p>
   </div>
   <a href="{{ personal_url }}">Zur Personalabteilung</a>
@@ -22832,7 +22857,7 @@ function renderDriverCard(item, id){
   const cardId = esc(item.card_id || 'Wird bei Ausstellung erzeugt');
   const issuedAt = esc(item.issued_at || item.created_at || '-');
   const expiry = esc(item.expiry_at || '5 Jahre nach Ausstellung');
-  const authority = esc(item.authority || 'EifelLog ServiceCenter');
+  const authority = esc(item.authority || 'EifelLog Fahrerkartenverwaltung');
   const licenseNumber = esc(item.license_number || ('EL-FS-' + (item.system_id || id)));
   const name = esc(item.display_name || item.name || 'Unbekannter User');
   const role = esc(item.role || item.role_name || 'Fahrer');
@@ -22846,7 +22871,7 @@ function renderDriverCard(item, id){
           <div class="eu">EU</div>
           <div class="driver-title">
             <strong>Fahrerkarte</strong>
-            <span>Driver Card · Bundesrepublik EifelLog</span>
+            <span>Interne Ausgabe · Muster / nicht amtlich</span>
           </div>
           <div class="chip" aria-hidden="true"></div>
         </div>
@@ -22883,13 +22908,13 @@ function renderServiceCard(item, id){
   const serviceCardId = esc(item.service_card_id || item.fahrerkarte_service_card_id || ('SC-' + (item.system_id || id)));
   return `
     <div id="service-card-${cleanId(id)}" class="service-card-panel" aria-hidden="true">
-      <div class="preview-title"><span>ServiceCenter Karte</span><span>Intern aktiv</span></div>
+      <div class="preview-title"><span>Interne Fahrerkarte</span><span>Muster / nicht amtlich</span></div>
       <div class="service-card">
         <div class="service-head">
           <div class="service-logo">EL</div>
           <div>
             <strong>Servicekarte</strong>
-            <span>EifelLog ServiceCenter</span>
+            <span>EifelLog Fahrerkartenverwaltung</span>
           </div>
           <div class="service-badge">Intern</div>
         </div>
@@ -22900,14 +22925,14 @@ function renderServiceCard(item, id){
             <p><b>1.</b> ${role}</p>
             <p><b>2.</b> ${esc(item.system_id || '-')}</p>
             <p><b>3.</b> ${esc(item.issued_at || item.created_at || '-')}</p>
-            <p><b>4a.</b> Web-ServiceCenter</p>
+            <p><b>4a.</b> Internes Fahrerportal</p>
             <p><b>4b.</b> Aktiv</p>
             <p><b>5a.</b> ${serviceCardId}</p>
             <p><b>5b.</b> Interne digitale Ausgabe</p>
           </div>
         </div>
         <div class="service-foot">
-          <span>Interne Servicekarte</span>
+          <span>Interne Fahrerkarte</span>
           <span>Verknüpft mit Fahrerkarte</span>
         </div>
       </div>
@@ -22921,7 +22946,7 @@ function renderCase(item){
   const canIssue = ['claimed','approved'].includes(item.status);
   const twoCardsAvailable = item.status === 'issued' && item.has_servicecenter_card !== false;
   const download = item.download_url ? `<a href="${esc(item.download_url)}" download><button class="success" type="button">PDF herunterladen</button></a>` : '';
-  const serviceButton = twoCardsAvailable ? `<div class="service-toggle-row"><button class="ghost" type="button" onclick="toggleServiceCard('${safeId}', this)">ServiceCenter Karte ansehen</button></div>` : '';
+  const serviceButton = twoCardsAvailable ? `<div class="service-toggle-row"><button class="ghost" type="button" onclick="toggleServiceCard('${safeId}', this)">Interne Fahrerkarte ansehen</button></div>` : '';
   return `
   <article class="case" id="case-${safeId}">
     <div class="preview-shell">
@@ -22945,7 +22970,7 @@ function renderCase(item){
       <div class="signature">
         <label>Digitale Signatur des Sachbearbeiters</label>
         <input id="sig-${safeId}" value="${esc(staffName)}" placeholder="${esc(staffName)}">
-        <textarea id="note-${safeId}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde im EifelLog Web-ServiceCenter ausgestellt.</textarea>
+        <textarea id="note-${safeId}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt.</textarea>
         <label class="small"><input id="confirm-${safeId}" type="checkbox"> Ich bestätige die korrekte Web-Signatur und Ausstellung.</label>
         <button class="success" ${canIssue?'':'disabled'} onclick="issueCase('${id}', '${safeId}')">Signieren & ausstellen</button>
       </div>
@@ -22961,7 +22986,7 @@ function toggleServiceCard(safeId, button){
   if(!panel) return;
   const open = panel.classList.toggle('is-open');
   panel.setAttribute('aria-hidden', open ? 'false' : 'true');
-  button.textContent = open ? 'ServiceCenter Karte ausblenden' : 'ServiceCenter Karte ansehen';
+  button.textContent = open ? 'Interne Fahrerkarte ausblenden' : 'Interne Fahrerkarte ansehen';
 }
 async function claimCase(id){ try{ const d=await api(actions.claim,{requestId:id}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
 async function approveCase(id){ try{ const note=prompt('Genehmigungsvermerk','Fahrerkarte geprüft und genehmigt.')||''; const d=await api(actions.approve,{requestId:id,note}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
@@ -24364,7 +24389,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
 
     data = request.get_json(silent=True) or {}
     request_id = safe_str(data.get("requestId") or data.get("id"))
-    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("description"), "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")[:1000]
+    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("description"), "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt.")[:1000]
     force_pdf = bool_from_payload(data.get("force"), fallback=False)
     if not request_id:
         return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
