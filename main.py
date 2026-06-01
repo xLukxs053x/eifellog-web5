@@ -9,6 +9,7 @@ import time
 import uuid
 import hashlib
 import hmac
+import math
 import secrets
 import requests
 from io import BytesIO
@@ -1238,14 +1239,64 @@ def datetime_to_iso(value):
 
 
 def parse_number(value, fallback=0.0):
-    if value is None: return fallback
-    if isinstance(value, (int, float)): return float(value)
+    """Parst JSON-, MongoDB- und deutsch formatierte Zahlen ohne Dezimalstellen zu verlieren.
 
-    value = str(value).replace("km", "").replace("KM", "").replace("€", "").replace("%", "").replace(".", "").replace(",", ".").strip()
+    Beispiele: 123.45, "123.45", "123,45" und "1.234,56 €".
+    """
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return number if math.isfinite(number) else fallback
+
+    text = str(value).strip()
+    if not text:
+        return fallback
+
+    text = text.replace("\u00a0", " ").replace("€", "").replace("%", "")
+    text = re.sub(r"(?i)km", "", text)
+    text = text.replace(" ", "").replace("'", "")
+    text = re.sub(r"[^0-9,.+\-]", "", text)
+
+    if text in {"", "+", "-", ".", ",", "+.", "-.", "+,", "-,"}:
+        return fallback
+
+    if "," in text and "." in text:
+        # Das zuletzt vorkommende Trennzeichen ist die Dezimalstelle.
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif "," in text:
+        parts = text.split(",")
+        if len(parts) > 2:
+            text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
+        else:
+            text = text.replace(",", ".")
+    elif text.count(".") > 1:
+        parts = text.split(".")
+        text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
+
     try:
-        return float(value)
+        number = float(text)
+        return number if math.isfinite(number) else fallback
     except Exception:
         return fallback
+
+
+def first_present_value(source, *keys, fallback=None):
+    """Liest den ersten gesetzten Wert. Anders als `or` bleiben 0 und False erhalten."""
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) not in [None, ""]:
+            return source.get(key)
+    return fallback
+
+
+def first_present_number(source, *keys, fallback=0.0):
+    return parse_number(first_present_value(source, *keys, fallback=fallback), fallback)
 
 
 def parse_int(value, fallback=0):
@@ -1299,12 +1350,13 @@ def first_number_from_dict(source, *keys, fallback=0.0):
 
 
 def company_stat_number(source, *keys, fallback=0.0):
-    """Liest Company-Stats robust, ohne 0-Werte wegen Python-`or` zu überspringen."""
-    source = source or {}
-    for key in keys:
-        if key in source and source.get(key) not in [None, ""]:
-            return positive_number(source.get(key), fallback)
-    return positive_number(fallback, 0.0)
+    """Liest nicht-negative Company-Metriken robust, ohne 0-Werte zu überspringen."""
+    return positive_number(first_present_value(source, *keys, fallback=fallback), fallback)
+
+
+def company_stat_money(source, *keys, fallback=0.0):
+    """Liest Geldwerte robust. Netto-Einnahmen dürfen nach Abzügen auch negativ sein."""
+    return parse_number(first_present_value(source, *keys, fallback=fallback), fallback)
 
 
 def company_stat_int(source, *keys, fallback=0):
@@ -1312,54 +1364,64 @@ def company_stat_int(source, *keys, fallback=0):
 
 
 def get_user_all_time_km(user_doc):
-    user_doc = user_doc or {}
-    return positive_number(
-        user_doc.get("tracker_all_time_km")
-        or user_doc.get("profile_all_time_km")
-        or user_doc.get("all_time_km")
-        or user_doc.get("profile_km"),
-        0.0
-    )
+    return positive_number(first_present_value(
+        user_doc,
+        "tracker_all_time_km",
+        "profile_all_time_km",
+        "all_time_km",
+        "profile_km",
+        fallback=0.0,
+    ), 0.0)
 
 
 def get_user_all_time_income(user_doc):
-    user_doc = user_doc or {}
-    return positive_number(
-        user_doc.get("tracker_all_time_income")
-        or user_doc.get("profile_all_time_income")
-        or user_doc.get("all_time_income")
-        or user_doc.get("profile_income")
-        or user_doc.get("profile_revenue"),
-        0.0
-    )
+    return parse_number(first_present_value(
+        user_doc,
+        "tracker_all_time_income",
+        "profile_all_time_income",
+        "all_time_income",
+        "profile_income",
+        "profile_revenue",
+        fallback=0.0,
+    ), 0.0)
 
 
 def get_receipt_distance_km(receipt_doc):
     receipt_doc = receipt_doc or {}
     tour = receipt_doc.get("tour") or {}
-
-    return positive_number(
-        tour.get("driven_distance_km")
-        or receipt_doc.get("completedDistanceKm")
-        or receipt_doc.get("completed_distance_km")
-        or receipt_doc.get("drivenDistanceKm")
-        or receipt_doc.get("distanceKm")
-        or receipt_doc.get("distance_km"),
-        0.0
-    )
+    return positive_number(first_present_value(
+        tour,
+        "driven_distance_km",
+        fallback=first_present_value(
+            receipt_doc,
+            "completedDistanceKm",
+            "completed_distance_km",
+            "drivenDistanceKm",
+            "driven_distance_km",
+            "distanceKm",
+            "distance_km",
+            fallback=0.0,
+        ),
+    ), 0.0)
 
 
 def get_receipt_income(receipt_doc):
     receipt_doc = receipt_doc or {}
     billing = receipt_doc.get("billing") or {}
-
-    return positive_number(
-        billing.get("total_amount")
-        or receipt_doc.get("income")
-        or receipt_doc.get("revenue")
-        or receipt_doc.get("money"),
-        0.0
-    )
+    return parse_number(first_present_value(
+        billing,
+        "total_amount",
+        "totalAmount",
+        fallback=first_present_value(
+            receipt_doc,
+            "totalAmount",
+            "total_amount",
+            "income",
+            "revenue",
+            "money",
+            fallback=0.0,
+        ),
+    ), 0.0)
 
 
 def receipt_counts_as_completed(receipt_doc):
@@ -1434,7 +1496,7 @@ def normalize_company_stats_doc(stats_doc):
     empty = empty_company_stats_doc(updated_at=stats_doc.get("updated_at") if isinstance(stats_doc.get("updated_at"), datetime) else now_utc())
 
     all_time_km = round(company_stat_number(stats_doc, "all_time_km", "allTimeKilometers", "allTimeKm", "kilometers"), 1)
-    all_time_income = round(company_stat_number(stats_doc, "all_time_income", "companyIncome", "income", "revenue"), 2)
+    all_time_income = round(company_stat_money(stats_doc, "all_time_income", "companyIncome", "income", "revenue"), 2)
     jobs_all_time = company_stat_int(stats_doc, "jobs_all_time", "jobsAllTime", "jobs", "totalJobs")
     deliveries_all_time = company_stat_int(stats_doc, "deliveries_all_time", "deliveries", "totalDeliveries")
 
@@ -4271,6 +4333,12 @@ def fahrerkarte_pdf_value(request_doc, user_doc, *keys, fallback="-"):
 
 
 def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None):
+    """Erzeugt einen professionellen, aber eindeutig internen Fahrerkarte-Auszug.
+
+    Das Layout ist bewusst neutral gehalten. Es verwendet keine Marken, Logos oder
+    Gestaltungsmerkmale amtlicher Prüfstellen und bleibt durchgehend als MUSTER /
+    NICHT AMTLICH gekennzeichnet.
+    """
     user_doc = user_doc or {}
     actor = actor or {}
 
@@ -4306,7 +4374,12 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     if not signature_hash:
         signature_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}|{signature_name}".encode("utf-8")).hexdigest().upper()
     short_signature_hash = signature_hash[:32]
-    note = safe_str(request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")
+    note = safe_str(
+        request_doc.get("issue_note")
+        or request_doc.get("approval_note")
+        or request_doc.get("notes")
+        or "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt."
+    )
 
     avatar_image = load_fahrerkarte_avatar_jpeg(request_doc, user_doc=user_doc, size=180)
     pdf_images = [avatar_image] if avatar_image else []
@@ -4314,91 +4387,105 @@ def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None
     stream = bytearray()
     stream.extend(b"q\n")
 
-    # Seite bewusst als interne ServiceCenter-Karte, nicht als amtliches Dokument.
-    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.940, 0.965, 0.980))
-    pdf_stream_rect(stream, 0, 790, 595, 52, fill_rgb=(0.120, 0.250, 0.460))
-    pdf_stream_text(stream, 42, 814, "EIFELLOG SERVICECENTER", size=10, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 42, 796, "Digitale Fahrerkarte / Web-Ausstellung", size=18, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 390, 812, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.890, 0.940, 1.000))
+    # Neutraler gruen-weisser Auszug im Stil eines internen Fahrerdatenblatts.
+    # Die Kennzeichnung MUSTER / NICHT AMTLICH darf nicht entfernt werden.
+    green_dark = (0.035, 0.310, 0.155)
+    green = (0.080, 0.520, 0.240)
+    green_soft = (0.900, 0.965, 0.920)
+    green_pale = (0.955, 0.985, 0.965)
+    line_green = (0.210, 0.590, 0.330)
+    ink = (0.045, 0.105, 0.075)
+    muted = (0.260, 0.390, 0.320)
+    warning = (0.690, 0.080, 0.060)
 
-    # Kartenkörper nach hellblauem Fahrerkarte-Layout, klar als interne EifelLog-Karte markiert.
+    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.965, 0.975, 0.970))
+    pdf_stream_rect(stream, 0, 790, 595, 52, fill_rgb=green_dark)
+    pdf_stream_rect(stream, 0, 786, 595, 4, fill_rgb=green)
+    pdf_stream_text(stream, 42, 814, "EIFELLOG FAHRERKARTE", size=10, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 42, 796, "Interner Fahrerkarten-Auszug", size=18, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 390, 812, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.900, 1.000, 0.930))
+    pdf_stream_text(stream, 390, 797, "MUSTER / NICHT AMTLICH", size=9, bold=True, color=(1.000, 0.930, 0.900))
+
+    # Kartenkoerper: professionelles internes Layout ohne amtliche oder fremde Markenanmutung.
     card_x, card_y, card_w, card_h = 34, 493, 527, 262
-    pdf_stream_rect(stream, card_x + 5, card_y - 7, card_w, card_h, fill_rgb=(0.640, 0.720, 0.780))
-    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(0.820, 0.910, 0.965), stroke_rgb=(0.260, 0.410, 0.620), line_width=1.5)
-    pdf_stream_rect(stream, card_x, card_y + card_h - 38, card_w, 38, fill_rgb=(0.650, 0.780, 0.900))
-    pdf_stream_rect(stream, card_x + 10, card_y + card_h - 34, 54, 30, fill_rgb=(0.060, 0.190, 0.510), stroke_rgb=(1, 1, 1), line_width=0.8)
-    pdf_stream_text(stream, card_x + 20, card_y + card_h - 23, "EL", size=13, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, card_x + 78, card_y + card_h - 18, "FAHRERKARTE", size=17, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, card_x + 250, card_y + card_h - 15, "EifelLog Web-ServiceCenter", size=9, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, card_x + 395, card_y + card_h - 29, "KEIN AMTLICHES DOKUMENT", size=8, bold=True, color=(0.580, 0.060, 0.060))
+    pdf_stream_rect(stream, card_x + 5, card_y - 7, card_w, card_h, fill_rgb=(0.730, 0.790, 0.750))
+    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=1.5)
+    pdf_stream_rect(stream, card_x, card_y + card_h - 42, card_w, 42, fill_rgb=green_soft)
+    pdf_stream_rect(stream, card_x + 10, card_y + card_h - 36, 54, 30, fill_rgb=green_dark, stroke_rgb=(1, 1, 1), line_width=0.8)
+    pdf_stream_text(stream, card_x + 20, card_y + card_h - 25, "EL", size=13, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, card_x + 78, card_y + card_h - 19, "FAHRERKARTE", size=17, bold=True, color=green_dark)
+    pdf_stream_text(stream, card_x + 250, card_y + card_h - 16, "EifelLog Fahrerkartenverwaltung", size=9, bold=True, color=green_dark)
+    pdf_stream_text(stream, card_x + 389, card_y + card_h - 31, "MUSTER / NICHT AMTLICH", size=8, bold=True, color=warning)
 
     # Avatar des Users
     avatar_x, avatar_y, avatar_w, avatar_h = card_x + 24, card_y + 69, 108, 126
-    pdf_stream_rect(stream, avatar_x - 2, avatar_y - 2, avatar_w + 4, avatar_h + 4, fill_rgb=(0.920, 0.955, 0.980), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.8)
+    pdf_stream_rect(stream, avatar_x - 2, avatar_y - 2, avatar_w + 4, avatar_h + 4, fill_rgb=green_pale, stroke_rgb=line_green, line_width=0.8)
     if avatar_image:
         pdf_stream_image(stream, "Avatar1", avatar_x, avatar_y + 9, avatar_w, avatar_w)
     else:
-        pdf_stream_rect(stream, avatar_x, avatar_y + 9, avatar_w, avatar_w, fill_rgb=(0.730, 0.820, 0.880), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+        pdf_stream_rect(stream, avatar_x, avatar_y + 9, avatar_w, avatar_w, fill_rgb=(0.860, 0.930, 0.880), stroke_rgb=line_green, line_width=0.5)
         initials = "".join([part[:1] for part in name.split()[:2]]).upper() or "EL"
-        pdf_stream_text(stream, avatar_x + 31, avatar_y + 65, initials[:3], size=24, bold=True, color=(0.120, 0.250, 0.460))
-    pdf_stream_text(stream, avatar_x + 14, avatar_y + 7, "USER AVATAR", size=7, bold=True, color=(0.190, 0.300, 0.430))
+        pdf_stream_text(stream, avatar_x + 31, avatar_y + 65, initials[:3], size=24, bold=True, color=green_dark)
+    pdf_stream_text(stream, avatar_x + 14, avatar_y + 7, "USER AVATAR", size=7, bold=True, color=muted)
 
-    # Datenfelder im Stil der Referenz, aber mit internen Feldern.
+    # Fahrerkartendaten
     data_x = card_x + 154
     line_y = card_y + 184
-    pdf_stream_text(stream, data_x, line_y, f"1. {name[:46]}", size=15, bold=True, color=(0.050, 0.080, 0.120), max_chars=58)
-    pdf_stream_text(stream, data_x, line_y - 26, f"2. {role[:50]}", size=11, bold=True, color=(0.050, 0.080, 0.120), max_chars=62)
-    pdf_stream_text(stream, data_x, line_y - 49, f"3. {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x + 138, line_y - 49, f"4a {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x + 272, line_y - 49, f"4b {valid_until.strftime('%d.%m.%Y')}", size=10, bold=False, color=(0.050, 0.080, 0.120))
-    pdf_stream_text(stream, data_x, line_y - 72, "4c EifelLog ServiceCenter", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=60)
-    pdf_stream_text(stream, data_x, line_y - 95, f"5a {system_id}", size=10, bold=False, color=(0.050, 0.080, 0.120), max_chars=64)
-    pdf_stream_text(stream, data_x, line_y - 118, f"5b {card_id}", size=10, bold=True, color=(0.050, 0.080, 0.120), max_chars=64)
-    pdf_stream_text(stream, data_x, line_y - 141, f"User: {username}  |  Fahrer-Nr.: {driver_number}", size=8, bold=False, color=(0.220, 0.310, 0.420), max_chars=76)
+    pdf_stream_text(stream, data_x, line_y, f"1. {name[:46]}", size=15, bold=True, color=ink, max_chars=58)
+    pdf_stream_text(stream, data_x, line_y - 26, f"2. {role[:50]}", size=11, bold=True, color=ink, max_chars=62)
+    pdf_stream_text(stream, data_x, line_y - 49, f"3. {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x + 138, line_y - 49, f"4a {issued_at.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x + 272, line_y - 49, f"4b {valid_until.strftime('%d.%m.%Y')}", size=10, bold=False, color=ink)
+    pdf_stream_text(stream, data_x, line_y - 72, "4c EifelLog Fahrerkartenverwaltung", size=10, bold=False, color=ink, max_chars=60)
+    pdf_stream_text(stream, data_x, line_y - 95, f"5a {system_id}", size=10, bold=False, color=ink, max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 118, f"5b {card_id}", size=10, bold=True, color=ink, max_chars=64)
+    pdf_stream_text(stream, data_x, line_y - 141, f"User: {username}  |  Fahrer-Nr.: {driver_number}", size=8, bold=False, color=muted, max_chars=76)
 
     # Interner Checkcode
     qr_x, qr_y, cell = card_x + card_w - 90, card_y + 55, 4
-    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, 68, 68, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.5)
+    pdf_stream_rect(stream, qr_x - 6, qr_y - 6, 68, 68, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=0.5)
     digest = hashlib.sha256(f"{card_id}|{request_id}".encode("utf-8")).digest()
     for row in range(14):
         for col in range(14):
             byte = digest[(row * 14 + col) % len(digest)]
             should_fill = ((byte >> (col % 8)) & 1) or row in {0, 13} or col in {0, 13}
             if should_fill:
-                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=(0.040, 0.080, 0.150))
-    pdf_stream_text(stream, qr_x - 1, qr_y - 20, "CHECKCODE", size=7, bold=True, color=(0.090, 0.180, 0.330))
+                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=green_dark)
+    pdf_stream_text(stream, qr_x - 1, qr_y - 20, "CHECKCODE", size=7, bold=True, color=green_dark)
 
     # Signaturzeile auf Karte
-    pdf_stream_line(stream, card_x + 155, card_y + 23, card_x + 375, card_y + 23, stroke_rgb=(0.090, 0.180, 0.330), line_width=0.6)
-    pdf_stream_text(stream, card_x + 155, card_y + 9, f"Signiert: {signature_name[:36]}", size=8, bold=False, color=(0.050, 0.080, 0.120), max_chars=54)
-    pdf_stream_text(stream, card_x + 405, card_y + 9, "INTERN / WEB", size=8, bold=True, color=(0.580, 0.060, 0.060))
+    pdf_stream_line(stream, card_x + 155, card_y + 23, card_x + 375, card_y + 23, stroke_rgb=green_dark, line_width=0.6)
+    pdf_stream_text(stream, card_x + 155, card_y + 9, f"Signiert: {signature_name[:36]}", size=8, bold=False, color=ink, max_chars=54)
+    pdf_stream_text(stream, card_x + 391, card_y + 9, "INTERN / MUSTER", size=8, bold=True, color=warning)
 
     # Detailbereiche unterhalb der Karte
     box_y = 250
-    pdf_stream_rect(stream, 48, box_y, 499, 188, fill_rgb=(1, 1, 1), stroke_rgb=(0.260, 0.410, 0.620), line_width=1)
-    pdf_stream_text(stream, 66, box_y + 158, "Postfach & Download", size=13, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, 66, box_y + 133, f"Antrags-ID: {request_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 116, f"Karten-ID: {card_id}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 99, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 82, "Bereitstellung: Postfach im ServiceCenter + PDF-Download", size=9, bold=True, color=(0.090, 0.180, 0.330), max_chars=82)
-    pdf_stream_text(stream, 66, box_y + 58, f"Hinweis: {note}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=62)
+    pdf_stream_rect(stream, 48, box_y, 499, 188, fill_rgb=(1, 1, 1), stroke_rgb=line_green, line_width=1)
+    pdf_stream_rect(stream, 48, box_y + 172, 499, 16, fill_rgb=green_soft)
+    pdf_stream_text(stream, 66, box_y + 158, "Fahrerkartendaten", size=13, bold=True, color=green_dark)
+    pdf_stream_text(stream, 66, box_y + 133, f"Vorgangs-ID: {request_id}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 116, f"Karten-ID: {card_id}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 99, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=ink, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 82, "Bereitstellung: internes Fahrerportal + PDF-Download", size=9, bold=True, color=green_dark, max_chars=82)
+    pdf_stream_text(stream, 66, box_y + 58, f"Hinweis: {note}", size=9, bold=False, color=ink, max_chars=62)
 
-    pdf_stream_text(stream, 315, box_y + 158, "Digitale Signatur", size=13, bold=True, color=(0.090, 0.180, 0.330))
-    pdf_stream_text(stream, 315, box_y + 133, f"Sachbearbeiter: {handler}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 116, f"Signatur: {signature_name}", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 99, f"Zeitpunkt: {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 82, f"Hash: {short_signature_hash}", size=8, bold=False, color=(0.050, 0.070, 0.090), max_chars=42)
-    pdf_stream_text(stream, 315, box_y + 58, "Verifikation: Web-ServiceCenter / MongoDB-Antrag", size=8, bold=True, color=(0.090, 0.180, 0.330), max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 158, "Digitale Signatur", size=13, bold=True, color=green_dark)
+    pdf_stream_text(stream, 315, box_y + 133, f"Sachbearbeiter: {handler}", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 116, f"Signatur: {signature_name}", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 99, f"Zeitpunkt: {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=9, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 82, f"Hash: {short_signature_hash}", size=8, bold=False, color=ink, max_chars=42)
+    pdf_stream_text(stream, 315, box_y + 58, "Verifikation: internes Fahrerportal", size=8, bold=True, color=green_dark, max_chars=42)
 
-    pdf_stream_rect(stream, 48, 116, 499, 88, fill_rgb=(0.120, 0.250, 0.460), stroke_rgb=(0.260, 0.410, 0.620), line_width=0.9)
-    pdf_stream_text(stream, 66, 175, "Interne Fahrerkarte", size=12, bold=True, color=(1, 1, 1))
-    pdf_stream_text(stream, 66, 154, "Dieses Dokument ist eine interne EifelLog-ServiceCenter-Karte und ersetzt keine amtliche Fahrerkarte.", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=92)
+    # Deutlicher Schutz gegen Verwechslung mit amtlichen Nachweisen.
+    pdf_stream_rect(stream, 48, 116, 499, 88, fill_rgb=green_dark, stroke_rgb=line_green, line_width=0.9)
+    pdf_stream_text(stream, 66, 175, "MUSTER - INTERNE FAHRERKARTE", size=12, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 66, 154, "Kein amtliches Dokument. Kein Nachweis gegenueber Behoerden oder Kontrollstellen.", size=8, bold=True, color=(0.950, 1.000, 0.960), max_chars=92)
     verify_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}".encode("utf-8")).hexdigest()[:24].upper()
-    pdf_stream_text(stream, 66, 136, f"Pruefhash: {verify_hash}", size=8, bold=False, color=(0.890, 0.940, 1.000), max_chars=80)
-    pdf_stream_text(stream, 66, 120, "Download: ServiceCenter / Postfach / Fahrerkarte", size=8, bold=True, color=(1, 1, 1), max_chars=80)
+    pdf_stream_text(stream, 66, 136, f"Pruefhash: {verify_hash}", size=8, bold=False, color=(0.900, 1.000, 0.930), max_chars=80)
+    pdf_stream_text(stream, 66, 120, "Ablage: internes Fahrerportal / Fahrerkarte", size=8, bold=True, color=(1, 1, 1), max_chars=80)
 
-    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - webbasierte Fahrerkarte-Ausstellung", size=8, bold=False, color=(0.220, 0.310, 0.420))
-    pdf_stream_text(stream, 42, 48, "Bei falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=(0.220, 0.310, 0.420))
+    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - interne Fahrerkartenverwaltung", size=8, bold=False, color=muted)
+    pdf_stream_text(stream, 42, 48, "Bei falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=muted)
     stream.extend(b"Q\n")
     return build_pdf_single_page(stream, images=pdf_images)
 
@@ -4445,7 +4532,7 @@ def build_fahrerkarte_pdf_sections(request_doc, user_doc=None, actor=None):
 
     sections.append(("Personalabteilung", [
         ("Sachbearbeiter", handler),
-        ("Ausstellungsvermerk", request_doc.get("issue_note") or request_doc.get("approval_note") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt."),
+        ("Ausstellungsvermerk", request_doc.get("issue_note") or request_doc.get("approval_note") or "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt."),
         ("Tracker Upload", "Dieses PDF ist für den späteren Upload im Tracker vorgesehen."),
     ]))
     return sections
@@ -4474,7 +4561,7 @@ def save_fahrerkarte_pdf(request_doc, user_doc=None, actor=None, force=False):
     driver_name = request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or "fahrer"
     safe_driver = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(driver_name, "fahrer"))[:60].strip("_") or "fahrer"
     safe_card_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", card_id)[:80]
-    filename = f"EifelLog_ServiceCenter_Fahrerkarte_{safe_card_id}_{safe_driver}_{request_id[:8]}.pdf"
+    filename = f"EifelLog_Fahrerkarte_{safe_card_id}_{safe_driver}_{request_id[:8]}.pdf"
     file_path = os.path.join(target_folder, filename)
 
     pdf_doc = dict(request_doc)
@@ -4506,7 +4593,7 @@ def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
     username = request_doc.get("username") or request_doc.get("discord_username") or "-"
     role = request_doc.get("role") or request_doc.get("role_name") or "Fahrer"
     issued_at = format_datetime_for_template(request_doc.get("issued_at")) or now_utc().strftime("%d.%m.%Y %H:%M")
-    description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im EifelLog ServiceCenter bereitgestellt.")
+    description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im internen Fahrerportal bereitgestellt.")
     return f"""
         <p><strong>Personalisierte Fahrerkarte ausgestellt</strong></p>
         <p class="mt-4">{description}</p>
@@ -4532,7 +4619,7 @@ def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
             </div>
 
             <p class="mt-5 text-xs text-gray-400">
-                Das PDF wurde automatisch generiert und ist als Download für Dashboard, ServiceCenter und späteren Tracker-Upload bereit.
+                Das PDF wurde automatisch generiert und ist als Download für Dashboard, Fahrerportal und späteren Tracker-Upload bereit.
             </p>
 
             <a href="{download_url}" class="inline-flex items-center justify-center mt-5 px-5 py-3 rounded-xl bg-[var(--brand-green)] text-black font-orbitron font-bold uppercase tracking-widest hover:opacity-90" download>
@@ -4548,7 +4635,7 @@ def create_fahrerkarte_pdf_dashboard_document(request_doc, actor=None, descripti
         return None
 
     actor = actor or current_staff_identity()
-    handler_name = actor.get("display_name") or actor.get("username") or "EifelLog ServiceCenter"
+    handler_name = actor.get("display_name") or actor.get("username") or "EifelLog Fahrerkartenverwaltung"
     download_url = servicecenter_fahrerkarte_download_url(request_id)
     pdf_filename = request_doc.get("pdf_filename") or request_doc.get("file_name") or "EifelLog_Fahrerkarte.pdf"
     document_description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF ausgestellt und ist bereit für den Tracker-Upload.")
@@ -7267,16 +7354,20 @@ def tracker_profile_payload(user_doc):
         }
     }
 
+def tracker_request_has_valid_api_key():
+    if not TRACKER_API_KEY:
+        return False
+    provided_key = request.headers.get("X-Tracker-Api-Key") or request.args.get("api_key")
+    return secure_compare(provided_key, TRACKER_API_KEY)
+
+
 def tracker_api_key_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not TRACKER_API_KEY:
             return jsonify({"success": False, "error": "TRACKER_API_KEY ist serverseitig nicht konfiguriert."}), 500
-
-        provided_key = request.headers.get("X-Tracker-Api-Key") or request.args.get("api_key")
-        if not secure_compare(provided_key, TRACKER_API_KEY):
+        if not tracker_request_has_valid_api_key():
             return jsonify({"success": False, "error": "Ungültiger API-Key."}), 401
-
         return func(*args, **kwargs)
     return wrapper
 
@@ -8161,14 +8252,6 @@ def find_ets2_city_coordinate(city_name):
     return None
 
 
-def first_present_value(source, *keys, fallback=""):
-    source = source or {}
-    for key in keys:
-        if key in source and source.get(key) is not None and str(source.get(key)).strip():
-            return source.get(key)
-    return fallback
-
-
 def normalize_ets2_route_point(point, index=0, default_name="", default_kind="stop", default_time=""):
     if not isinstance(point, dict):
         city_name = safe_str(point or default_name)
@@ -8658,7 +8741,7 @@ def build_company_stats_payload():
         "allTimeKilometers",
         fallback=0.0
     )
-    company_income = company_stat_number(
+    company_income = company_stat_money(
         persistent_stats,
         "all_time_income",
         "companyIncome",
@@ -8747,7 +8830,7 @@ def build_tracker_driver_stats_payload(user_doc):
     """Liefert Fahrer-All-Time-Werte mit stabilen Aliasen fuer Desktop und WebView."""
     stats = get_profile_stats(user_doc or {})
     km = round(positive_number(stats.get("km") or stats.get("all_time_km"), 0), 1)
-    income = round(positive_number(stats.get("income") or stats.get("revenue"), 0), 2)
+    income = round(parse_number(first_present_value(stats, "income", "revenue", fallback=0), 0), 2)
     deliveries = parse_int(stats.get("deliveries") or stats.get("tours"), 0)
     jobs = parse_int(stats.get("jobs"), deliveries)
 
@@ -11948,44 +12031,35 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta") or active_job.get("eta"), "-")
     driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
 
-    planned_distance = parse_number(
-        payload.get("plannedDistanceKm")
-        or payload.get("planned_distance_km")
-        or payload.get("routeDistanceKm")
-        or payload.get("route_distance_km")
-        or payload.get("completedDistanceKm")
-        or payload.get("completed_distance_km")
-        or payload.get("distanceKm")
-        or telemetry.get("plannedDistanceKm")
-        or active_job.get("distanceKm")
-        or live_state.get("plannedDistanceKm"),
-        0
+    planned_distance = first_present_number(
+        payload,
+        "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km",
+        "completedDistanceKm", "completed_distance_km", "distanceKm",
+        fallback=first_present_number(
+            telemetry,
+            "plannedDistanceKm", "planned_distance_km", "routeDistanceKm", "route_distance_km",
+            fallback=first_present_number(active_job, "distanceKm", fallback=first_present_number(live_state, "plannedDistanceKm", fallback=0)),
+        ),
     )
-    driven_distance = parse_number(
-        payload.get("completedDistanceKm")
-        or payload.get("completed_distance_km")
-        or payload.get("drivenDistanceKm")
-        or payload.get("driven_distance_km")
-        or payload.get("distanceKm")
-        or payload.get("distance")
-        or payload.get("routeDistanceKm")
-        or payload.get("route_distance_km")
-        or payload.get("tripDistanceKm")
-        or telemetry.get("completedDistanceKm")
-        or telemetry.get("drivenDistanceKm")
-        or telemetry.get("distanceKm")
-        or telemetry.get("tripDistanceKm")
-        or live_state.get("completedDistanceKm")
-        or live_state.get("drivenDistanceKm")
-        or live_state.get("tripDistanceKm"),
-        0
+    driven_distance = first_present_number(
+        payload,
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "tripDistanceKm",
+        fallback=first_present_number(
+            telemetry,
+            "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+            "distanceKm", "tripDistanceKm",
+            fallback=first_present_number(live_state, "completedDistanceKm", "drivenDistanceKm", "tripDistanceKm", fallback=0),
+        ),
     )
-    remaining_distance = parse_number(
-        payload.get("remainingDistanceKm")
-        or telemetry.get("remainingDistanceKm")
-        or active_job.get("remainingDistanceKm")
-        or live_state.get("remainingDistanceKm"),
-        0
+    remaining_distance = first_present_number(
+        payload,
+        "remainingDistanceKm", "remaining_distance_km",
+        fallback=first_present_number(
+            telemetry,
+            "remainingDistanceKm", "remaining_distance_km",
+            fallback=first_present_number(active_job, "remainingDistanceKm", fallback=first_present_number(live_state, "remainingDistanceKm", fallback=0)),
+        ),
     )
 
     if driven_distance <= 0 and planned_distance > 0:
@@ -12001,15 +12075,29 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     planned_distance = round(max(planned_distance, driven_distance, 0.0), 1)
     remaining_distance = round(max(0.0, remaining_distance), 1)
 
-    rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
-    base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
-    if base_amount <= 0:
+    rate_per_km = first_present_number(payload, "ratePerKm", "rate_per_km", fallback=TOUR_RECEIPT_RATE_PER_KM)
+    bonus = first_present_number(payload, "bonus", fallback=0)
+    penalty = abs(first_present_number(payload, "penalty", "deduction", fallback=0))
+
+    # `income` ist im Tracker ein Netto-/Gesamtwert. `baseAmount` ist der Wert vor Bonus/Abzug.
+    # Wenn beides geliefert wird, muss totalAmount unverändert bleiben; sonst würden Bonus
+    # und Abzug beim Backend ein zweites Mal verrechnet.
+    explicit_base_amount = first_present_value(payload, "baseAmount", "base_amount", fallback=None)
+    explicit_total_amount = first_present_value(payload, "totalAmount", "total_amount", "income", "revenue", "money", fallback=None)
+
+    if explicit_base_amount is not None:
+        base_amount = round(parse_number(explicit_base_amount, 0), 2)
+    elif explicit_total_amount is not None:
+        base_amount = round(parse_number(explicit_total_amount, 0) - bonus + penalty, 2)
+    else:
         base_amount = round(driven_distance * rate_per_km, 2)
 
-    bonus = parse_number(payload.get("bonus"), 0)
-    penalty = abs(parse_number(payload.get("penalty") or payload.get("deduction"), 0))
-    total_amount = round(base_amount + bonus - penalty, 2)
-    currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
+    if explicit_total_amount is not None:
+        total_amount = round(parse_number(explicit_total_amount, base_amount + bonus - penalty), 2)
+    else:
+        total_amount = round(base_amount + bonus - penalty, 2)
+
+    currency = safe_str(first_present_value(payload, "currency", fallback=TOUR_RECEIPT_CURRENCY), TOUR_RECEIPT_CURRENCY).upper()
 
     receipt_number = safe_str(payload.get("receiptNumber") or payload.get("receipt_number"))
     if not receipt_number:
@@ -12043,6 +12131,14 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "completedDistanceKm": driven_distance,
         "completed_distance_km": driven_distance,
         "income": total_amount,
+        "revenue": total_amount,
+        "totalAmount": total_amount,
+        "total_amount": total_amount,
+        "baseAmount": base_amount,
+        "base_amount": base_amount,
+        "bonus": bonus,
+        "penalty": penalty,
+        "currency": currency,
         "submitted_at": submitted_at,
         "created_at": submitted_at,
         "driver": {
@@ -12066,12 +12162,12 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "planned_distance_km": planned_distance,
             "driven_distance_km": driven_distance,
             "remaining_distance_km": remaining_distance,
-            "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
-            "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
-            "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
-            "fuel_liters": parse_number(payload.get("fuelLiters") or payload.get("fuel_liters") or telemetry.get("fuelLiters"), -1),
-            "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
-            "rpm": parse_number(payload.get("rpm") or payload.get("engineRpm") or telemetry.get("rpm"), 0)
+            "route_progress_percent": first_present_number(payload, "routeProgressPercent", fallback=first_present_number(telemetry, "routeProgressPercent", fallback=100)),
+            "damage_percent": first_present_number(payload, "damagePercent", fallback=first_present_number(telemetry, "damagePercent", fallback=0)),
+            "fuel_percent": first_present_number(payload, "fuelPercent", fallback=first_present_number(telemetry, "fuelPercent", fallback=0)),
+            "fuel_liters": first_present_number(payload, "fuelLiters", "fuel_liters", fallback=first_present_number(telemetry, "fuelLiters", fallback=-1)),
+            "speed_kmh": first_present_number(payload, "speedKmh", fallback=first_present_number(telemetry, "speedKmh", fallback=0)),
+            "rpm": first_present_number(payload, "rpm", "engineRpm", fallback=first_present_number(telemetry, "rpm", fallback=0))
         },
         "billing": {
             "rate_per_km": rate_per_km,
@@ -12346,14 +12442,16 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
     )
 
     try:
-        persist_receipt_to_driver_logbook(user_doc, receipt_doc)
+        logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
     except Exception as error:
         app.logger.exception("Tourabschluss konnte nicht vollständig ins Fahrer-Logbook gespiegelt werden: %s", error)
+        logbook_result = {"stored": False, "error": str(error)}
 
     # Eigener Company-All-Time-Datenbankeintrag: company_stats/company_all_time
     # wird nur um den frisch gespeicherten Beleg erhoeht. Alte Belege werden nicht
     # automatisch neu aggregiert, damit ein Reset im Company-Tab stabil bleibt.
     add_receipt_to_company_all_time_stats(receipt_doc)
+    return logbook_result
 
 
 
@@ -12377,6 +12475,14 @@ def complete_tracker_tour_from_request():
     # Restdistanz-/Fortschrittsdaten vor, werden diese weiterhin serverseitig geprüft;
     # fehlt ein Distanzsignal vollständig, zählt die authentifizierte Abgabe als Zielsignal.
     if not client_token:
+        # Service-zu-Service-Abgaben ohne Fahrer-Token sind nur mit TRACKER_API_KEY erlaubt.
+        # Damit kann niemand von außen fremde offene Touren über den Complete-Endpunkt abschließen.
+        if not tracker_request_has_valid_api_key():
+            return jsonify({
+                "success": False,
+                "error": "Tracker-Token oder gültiger X-Tracker-Api-Key fehlt.",
+            }), 401
+
         payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
         payload.setdefault("event", "tour_completed")
         payload.setdefault("type", "tour_completed")
@@ -12418,7 +12524,11 @@ def complete_tracker_tour_from_request():
             "database": database_result,
             "discord": discord_result,
             "companyStats": company_stats_payload,
+            "company_stats": company_stats_payload,
             "company": company_stats_payload,
+            "companyAllTimeIncome": company_stats_payload.get("companyIncome", 0),
+            "jobsAllTime": company_stats_payload.get("jobsAllTime", 0),
+            "deliveriesAllTime": company_stats_payload.get("deliveriesAllTime", 0),
             "dashboardRefresh": True,
             "receipt": {
                 "receiptId": database_result.get("receiptId"),
@@ -12427,6 +12537,9 @@ def complete_tracker_tour_from_request():
                 "jobStartKey": database_result.get("jobStartKey"),
                 "driverName": database_result.get("driverName"),
                 "distanceKm": database_result.get("distanceKm"),
+                "income": database_result.get("income"),
+                "totalAmount": database_result.get("totalAmount"),
+                "currency": database_result.get("currency") or TOUR_RECEIPT_CURRENCY,
                 "pdf": database_result.get("pdf"),
                 "discord": discord_result,
             }
@@ -12498,9 +12611,14 @@ def complete_tracker_tour_from_request():
         "allTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
         "companyAllTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
+        "driverAllTimeIncome": round(get_user_all_time_income(fresh_user), 2),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "companyStats": company_stats_payload,
+        "company_stats": company_stats_payload,
         "company": company_stats_payload,
+        "companyAllTimeIncome": company_stats_payload.get("companyIncome", 0),
+        "jobsAllTime": company_stats_payload.get("jobsAllTime", 0),
+        "deliveriesAllTime": company_stats_payload.get("deliveriesAllTime", 0),
         "dashboardRefresh": True,
         "receipt": {
             "receiptId": database_result.get("receiptId"),
@@ -12509,6 +12627,9 @@ def complete_tracker_tour_from_request():
             "jobStartKey": database_result.get("jobStartKey"),
             "driverName": database_result.get("driverName"),
             "distanceKm": database_result.get("distanceKm"),
+            "income": database_result.get("income"),
+            "totalAmount": database_result.get("totalAmount"),
+            "currency": database_result.get("currency") or TOUR_RECEIPT_CURRENCY,
             "destinationConfirmed": database_result.get("destinationConfirmed"),
             "destinationConfirmationReason": database_result.get("destinationConfirmationReason"),
             "pdf": database_result.get("pdf"),
@@ -13890,10 +14011,16 @@ def store_tracker_webhook_completed_job(payload):
             "jobStartKey": existing.get("job_start_key"),
             "receiptId": existing.get("receipt_id"),
             "receiptNumber": existing.get("receipt_number"),
+            "driverName": (existing.get("driver") or {}).get("name"),
+            "currency": safe_str((existing.get("billing") or {}).get("currency"), TOUR_RECEIPT_CURRENCY).upper(),
             "pdf": existing.get("pdf"),
             "discord": existing.get("discord") or {},
+            "distanceKm": round(get_receipt_distance_km(existing), 1),
+            "income": round(get_receipt_income(existing), 2),
+            "totalAmount": round(get_receipt_income(existing), 2),
             "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
             "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+            "companyAllTimeIncome": round(company_stat_money(company_stats, "all_time_income", "companyIncome", fallback=0), 2),
             "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
             "companyStats": company_stats_payload,
             "company": company_stats_payload,
@@ -13917,12 +14044,7 @@ def store_tracker_webhook_completed_job(payload):
     # write_receipt_into_user_stats ruft dieselbe Funktion aus Kompatibilitätsgründen
     # ebenfalls auf; processed_receipt_keys verhindert dabei jede Doppelzählung.
     add_receipt_to_company_all_time_stats(receipt_doc)
-    write_receipt_into_user_stats(user_doc, receipt_doc)
-    try:
-        logbook_result = persist_receipt_to_driver_logbook(user_doc, receipt_doc)
-    except Exception as error:
-        app.logger.exception("Tourabschluss konnte nach Receipt-Speicherung nicht ins Logbook gespiegelt werden: %s", error)
-        logbook_result = {"stored": False, "error": str(error)}
+    logbook_result = write_receipt_into_user_stats(user_doc, receipt_doc)
     mark_tracker_job_start_completed(user_doc, payload_for_db, receipt_doc)
     reset_active_tour_start_embed_state(user_doc, reason="tour_completed", completed_job_key=current_job_key)
 
@@ -13941,8 +14063,13 @@ def store_tracker_webhook_completed_job(payload):
         "destinationConfirmed": True,
         "destinationConfirmationReason": allowed_reason,
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
+        "driverAllTimeIncome": round(get_user_all_time_income(fresh_user), 2),
+        "income": round(get_receipt_income(receipt_doc), 2),
+        "totalAmount": round(get_receipt_income(receipt_doc), 2),
+        "currency": safe_str((receipt_doc.get("billing") or {}).get("currency"), TOUR_RECEIPT_CURRENCY).upper(),
         "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
         "companyAllTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+        "companyAllTimeIncome": round(company_stat_money(company_stats, "all_time_income", "companyIncome", fallback=0), 2),
         "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "companyStats": company_stats_payload,
         "company": company_stats_payload,
@@ -13981,12 +14108,17 @@ def tracker_local_webhook():
 
         success = bool(database_result.get("stored")) or bool(database_result.get("alreadyStored")) or bool(discord_result.get("sent"))
         status_code = 200 if success else (409 if database_result.get("notAtDestination") else 502)
+        company_stats_payload = build_company_stats_payload()
         return jsonify({
             "success": success,
             "message": "Tour abgeschlossen: PDF-Beleg wurde verarbeitet." if success else safe_str(database_result.get("reason"), "Tour-Abschluss erkannt, aber Verarbeitung fehlgeschlagen."),
             "event": "tour_completed" if success else "tour_completion_blocked",
             "database": database_result,
-            "discord": discord_result
+            "discord": discord_result,
+            "companyStats": company_stats_payload,
+            "company_stats": company_stats_payload,
+            "company": company_stats_payload,
+            "dashboardRefresh": True,
         }), status_code
 
     # Startmeldungen niemals roh weiterleiten, sondern dedupliziert über die Backend-Logik senden.
@@ -22336,7 +22468,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ServiceCenter Fahrerkarte</title>
+  <title>EifelLog Fahrerkarte</title>
   <style>
     :root {
       --blue:#17345f;
@@ -22466,7 +22598,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
       font-family:Arial, Inter, system-ui, sans-serif;
     }
     .driver-card::before {
-      content:"EIFELLOG EIFELLOG EIFELLOG EIFELLOG";
+      content:"MUSTER NICHT AMTLICH MUSTER NICHT AMTLICH";
       position:absolute;
       inset:0;
       z-index:-1;
@@ -22672,7 +22804,7 @@ FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 <body>
 <header>
   <div>
-    <h1>ServiceCenter Fahrerkarte</h1>
+    <h1>EifelLog Fahrerkarte</h1>
     <p>Web-only: claimen, genehmigen, signieren, ausstellen und PDF im User-Postfach bereitstellen.</p>
   </div>
   <a href="{{ personal_url }}">Zur Personalabteilung</a>
@@ -22725,7 +22857,7 @@ function renderDriverCard(item, id){
   const cardId = esc(item.card_id || 'Wird bei Ausstellung erzeugt');
   const issuedAt = esc(item.issued_at || item.created_at || '-');
   const expiry = esc(item.expiry_at || '5 Jahre nach Ausstellung');
-  const authority = esc(item.authority || 'EifelLog ServiceCenter');
+  const authority = esc(item.authority || 'EifelLog Fahrerkartenverwaltung');
   const licenseNumber = esc(item.license_number || ('EL-FS-' + (item.system_id || id)));
   const name = esc(item.display_name || item.name || 'Unbekannter User');
   const role = esc(item.role || item.role_name || 'Fahrer');
@@ -22739,7 +22871,7 @@ function renderDriverCard(item, id){
           <div class="eu">EU</div>
           <div class="driver-title">
             <strong>Fahrerkarte</strong>
-            <span>Driver Card · Bundesrepublik EifelLog</span>
+            <span>Interne Ausgabe · Muster / nicht amtlich</span>
           </div>
           <div class="chip" aria-hidden="true"></div>
         </div>
@@ -22776,13 +22908,13 @@ function renderServiceCard(item, id){
   const serviceCardId = esc(item.service_card_id || item.fahrerkarte_service_card_id || ('SC-' + (item.system_id || id)));
   return `
     <div id="service-card-${cleanId(id)}" class="service-card-panel" aria-hidden="true">
-      <div class="preview-title"><span>ServiceCenter Karte</span><span>Intern aktiv</span></div>
+      <div class="preview-title"><span>Interne Fahrerkarte</span><span>Muster / nicht amtlich</span></div>
       <div class="service-card">
         <div class="service-head">
           <div class="service-logo">EL</div>
           <div>
             <strong>Servicekarte</strong>
-            <span>EifelLog ServiceCenter</span>
+            <span>EifelLog Fahrerkartenverwaltung</span>
           </div>
           <div class="service-badge">Intern</div>
         </div>
@@ -22793,14 +22925,14 @@ function renderServiceCard(item, id){
             <p><b>1.</b> ${role}</p>
             <p><b>2.</b> ${esc(item.system_id || '-')}</p>
             <p><b>3.</b> ${esc(item.issued_at || item.created_at || '-')}</p>
-            <p><b>4a.</b> Web-ServiceCenter</p>
+            <p><b>4a.</b> Internes Fahrerportal</p>
             <p><b>4b.</b> Aktiv</p>
             <p><b>5a.</b> ${serviceCardId}</p>
             <p><b>5b.</b> Interne digitale Ausgabe</p>
           </div>
         </div>
         <div class="service-foot">
-          <span>Interne Servicekarte</span>
+          <span>Interne Fahrerkarte</span>
           <span>Verknüpft mit Fahrerkarte</span>
         </div>
       </div>
@@ -22814,7 +22946,7 @@ function renderCase(item){
   const canIssue = ['claimed','approved'].includes(item.status);
   const twoCardsAvailable = item.status === 'issued' && item.has_servicecenter_card !== false;
   const download = item.download_url ? `<a href="${esc(item.download_url)}" download><button class="success" type="button">PDF herunterladen</button></a>` : '';
-  const serviceButton = twoCardsAvailable ? `<div class="service-toggle-row"><button class="ghost" type="button" onclick="toggleServiceCard('${safeId}', this)">ServiceCenter Karte ansehen</button></div>` : '';
+  const serviceButton = twoCardsAvailable ? `<div class="service-toggle-row"><button class="ghost" type="button" onclick="toggleServiceCard('${safeId}', this)">Interne Fahrerkarte ansehen</button></div>` : '';
   return `
   <article class="case" id="case-${safeId}">
     <div class="preview-shell">
@@ -22838,7 +22970,7 @@ function renderCase(item){
       <div class="signature">
         <label>Digitale Signatur des Sachbearbeiters</label>
         <input id="sig-${safeId}" value="${esc(staffName)}" placeholder="${esc(staffName)}">
-        <textarea id="note-${safeId}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde im EifelLog Web-ServiceCenter ausgestellt.</textarea>
+        <textarea id="note-${safeId}" rows="2" placeholder="Ausstellungsvermerk">Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt.</textarea>
         <label class="small"><input id="confirm-${safeId}" type="checkbox"> Ich bestätige die korrekte Web-Signatur und Ausstellung.</label>
         <button class="success" ${canIssue?'':'disabled'} onclick="issueCase('${id}', '${safeId}')">Signieren & ausstellen</button>
       </div>
@@ -22854,7 +22986,7 @@ function toggleServiceCard(safeId, button){
   if(!panel) return;
   const open = panel.classList.toggle('is-open');
   panel.setAttribute('aria-hidden', open ? 'false' : 'true');
-  button.textContent = open ? 'ServiceCenter Karte ausblenden' : 'ServiceCenter Karte ansehen';
+  button.textContent = open ? 'Interne Fahrerkarte ausblenden' : 'Interne Fahrerkarte ansehen';
 }
 async function claimCase(id){ try{ const d=await api(actions.claim,{requestId:id}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
 async function approveCase(id){ try{ const note=prompt('Genehmigungsvermerk','Fahrerkarte geprüft und genehmigt.')||''; const d=await api(actions.approve,{requestId:id,note}); setMsg(d.message); await loadCases(); }catch(e){ setMsg(e.message,true); } }
@@ -24257,7 +24389,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
 
     data = request.get_json(silent=True) or {}
     request_id = safe_str(data.get("requestId") or data.get("id"))
-    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("description"), "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")[:1000]
+    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("description"), "Fahrerkarte wurde in der internen EifelLog-Fahrerkartenverwaltung ausgestellt.")[:1000]
     force_pdf = bool_from_payload(data.get("force"), fallback=False)
     if not request_id:
         return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
