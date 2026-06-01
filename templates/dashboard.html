@@ -12,6 +12,8 @@
     - NEU: Servicecenter-Schnellzugriff über /servicecenter statt Mein-Profil-Kachel.
     - NEU: System-Postfach-Hinweis für alle User: Fahrerkarten jetzt verfügbar / beantragbar.
     - NEU: System-Postfach mit Aktiv-/Archiv-Ansicht, manueller Archivierung und automatischer Archivierung alter Dokumente.
+    - NEU: Temporäre Pflichtunterweisung "Update & Wipe Info" vom 01.06.2026, 12:45 Uhr.
+    - NEU: Pflichtunterweisung ist 7 Tage sichtbar, nicht archivierbar und öffnet sich einmalig nach dem nächsten Login.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -1444,6 +1446,92 @@
         }
     }
 
+
+    /* ---------------------------------------------------------
+       Temporäre Pflichtunterweisung: Update & Wipe Info
+       - Gültig vom 01.06.2026, 12:45 Uhr bis 08.06.2026, 12:45 Uhr.
+       - Öffnet sich einmalig nach dem Login und kann nicht weggeklickt werden.
+       - Erst nach vollständigem Lesen wird die Bestätigung freigeschaltet.
+       - Das zugehörige Postfach-Dokument bleibt während der Laufzeit fixiert.
+    --------------------------------------------------------- */
+    #temporary-instruction-wrapper {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 190 !important;
+        width: 100vw !important;
+        height: calc(var(--dashboard-vh, 1vh) * 100) !important;
+        min-height: calc(var(--dashboard-vh, 1vh) * 100) !important;
+        padding: clamp(0.75rem, 2vw, 1.5rem) !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        overscroll-behavior: contain;
+        box-sizing: border-box !important;
+    }
+
+    #temporary-instruction-wrapper.hidden {
+        display: none !important;
+    }
+
+    #temporary-instruction-wrapper:not(.hidden) {
+        display: flex !important;
+    }
+
+    #temporary-instruction-panel {
+        position: relative !important;
+        width: min(calc(100vw - 1.5rem), 46rem) !important;
+        max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1.5rem) !important;
+        margin: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    #temporary-instruction-content {
+        min-height: 0 !important;
+        max-height: min(56vh, 31rem);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+    }
+
+    #temporary-instruction-confirm:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        filter: saturate(0.55);
+        transform: none !important;
+    }
+
+    @supports (height: 100dvh) {
+        #temporary-instruction-wrapper {
+            height: 100dvh !important;
+            min-height: 100dvh !important;
+        }
+
+        #temporary-instruction-panel {
+            max-height: calc(100dvh - 1.5rem) !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        #temporary-instruction-wrapper {
+            padding: 0.5rem !important;
+        }
+
+        #temporary-instruction-panel {
+            width: calc(100vw - 1rem) !important;
+            max-width: calc(100vw - 1rem) !important;
+            max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
+            border-radius: 1.25rem !important;
+        }
+
+        #temporary-instruction-content {
+            max-height: 53vh;
+        }
+    }
+
 </style>
 
 <div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
@@ -2404,6 +2492,81 @@
     </div>
 </div>
 
+<!-- Temporäre Pflichtunterweisung: Update & Wipe Info -->
+<div id="temporary-instruction-wrapper" aria-hidden="true" class="fixed inset-0 z-[190] hidden items-center justify-center bg-black/85 backdrop-blur-2xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="temporary-instruction-panel" class="relative z-10 w-full max-w-3xl mx-auto overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/35 bg-[#0d0f0c]/98 shadow-[0_0_85px_rgba(220,226,38,0.16)] transform transition-all duration-300">
+        <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0 bg-[var(--brand-yellow)]/[0.035]">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/35 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 shadow-[0_0_28px_rgba(220,226,38,0.12)]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
+                    </svg>
+                </div>
+
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Verpflichtende Unterweisung</span>
+                        <span class="inline-flex rounded-full border border-[var(--brand-yellow)]/25 bg-[var(--brand-yellow)]/10 px-2 py-1 text-[9px] font-orbitron font-bold uppercase tracking-widest text-[var(--brand-yellow)]">7 Tage verfügbar</span>
+                    </div>
+                    <h2 class="font-orbitron font-bold text-xl md:text-2xl text-white tracking-wide mt-2">Update &amp; Wipe Info</h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                        System • 01.06.2026, 12:45 Uhr • gültig bis 08.06.2026, 12:45 Uhr
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="temporary-instruction-content" class="custom-scrollbar p-6 md:p-8 space-y-5 text-sm text-gray-300 font-inter leading-relaxed">
+            <div class="rounded-2xl border border-red-400/20 bg-red-400/[0.055] p-4">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-red-300">Datenbank-Wipe</p>
+                <p class="mt-3">
+                    Die Datenbankstruktur wurde vollständig zurückgesetzt. Dadurch wurden sämtliche Benutzerkonten sowie alle bestehenden Fahrerkarten-Registrierungen entfernt.
+                </p>
+            </div>
+
+            <div class="rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.045] p-4">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-yellow)]">Erforderliche Schritte</p>
+                <ul class="mt-3 space-y-2 list-disc pl-5">
+                    <li>Fahrerkarte erneut im <strong class="text-white">ServiceCenter</strong> beantragen.</li>
+                    <li><strong class="text-white">Fahrer-Registrierung</strong> erneut durchführen.</li>
+                </ul>
+                <p class="mt-4">
+                    Der vollständige Datenbank-Reset wurde bewusst durchgeführt, um eine saubere Grundlage für die weitere Entwicklung zu schaffen.
+                </p>
+            </div>
+
+            <div class="rounded-2xl border border-[var(--brand-green)]/20 bg-[var(--brand-green)]/[0.045] p-4">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)]">Direkte Neuerungen</p>
+                <ul class="mt-3 space-y-2 list-disc pl-5">
+                    <li>Das <strong class="text-white">ServiceCenter</strong> wurde vollständig überarbeitet.</li>
+                    <li>Im ServiceCenter stehen jetzt <strong class="text-white">Weiterbildungen</strong> zur Verfügung.</li>
+                    <li>Beim Herunterladen einer Fahrerkarten-PDF ist ein <strong class="text-white">QR-Code</strong> abgebildet. Scanne diesen bei Bedarf mit der Kamera-App deines Handys oder einer sonstigen QR-Scanner-App.</li>
+                </ul>
+            </div>
+
+            <div class="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <p>
+                    Diese Unterweisung ist während ihrer Laufzeit zusätzlich im System-Postfach nachlesbar. Sie ist fixiert und kann nicht archiviert werden.
+                </p>
+                <p class="mt-3 text-xs text-[var(--muted)]">
+                    Scrolle bis zum Ende dieser Unterweisung. Anschließend wird die verpflichtende Bestätigung freigeschaltet.
+                </p>
+            </div>
+        </div>
+
+        <div class="p-6 md:p-8 pt-5 border-t border-white/10 bg-black/25 shrink-0">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p id="temporary-instruction-read-status" class="text-xs text-[var(--brand-yellow)] font-inter leading-relaxed">
+                    Bitte lies die Unterweisung vollständig durch.
+                </p>
+                <button id="temporary-instruction-confirm" type="button" disabled class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-[var(--brand-yellow)]/15 border border-[var(--brand-yellow)]/45 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/25 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.14em] whitespace-nowrap">
+                    Gelesen &amp; verstanden
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Blaues Tutorial-Alert-Modal -->
 <div id="tutorial-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
     <div id="tutorial-alert-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[#5865F2]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(88,101,242,0.15)] transform transition-all duration-300">
@@ -2448,9 +2611,9 @@
 
                 <div class="min-w-0">
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">System Alert</span>
-                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Fahrerkarten verfügbar</h2>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Neue System-Dokumente</h2>
                     <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
-                        Fahrerkarten sind jetzt verfügbar und im Servicecenter beantragbar. Öffne dein Postfach für die Details.
+                        In deinem System-Postfach liegen neue oder noch ungelesene Dokumente bereit. Öffne das Postfach für die Details.
                     </p>
                 </div>
             </div>
@@ -2518,6 +2681,64 @@
         </div>
 
         <div id="postfach-container" data-view="active" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
+            <button id="update-wipe-info-doc" class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-yellow)]/[0.07] border border-[var(--brand-yellow)]/35 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/[0.11] hover:-translate-y-0.5 transition-all duration-300 group relative"
+                    data-title="Update &amp; Wipe Info"
+                    data-sender="System"
+                    data-date="01.06.2026, 12:45"
+                    data-needs-signature="false"
+                    data-fixed-doc="true"
+                    data-archiveable="false"
+                    data-temporary-until="2026-06-08T12:45:00+02:00"
+                    data-doc-id="system-update-wipe-info-2026-06-01-1245-v1">
+                <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
+
+                <div class="flex items-center gap-4 pr-5">
+                    <div class="p-3 rounded-xl bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)] border border-[var(--brand-yellow)]/25 group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h4 class="text-sm font-bold font-orbitron text-white truncate">Update &amp; Wipe Info</h4>
+                            <span class="rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 px-2 py-1 text-[9px] font-orbitron font-bold uppercase tracking-widest text-[var(--brand-yellow)]">Fixiert</span>
+                        </div>
+                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">System • 01.06.2026, 12:45 Uhr</p>
+                        <p class="text-[10px] text-[var(--brand-yellow)] font-orbitron uppercase tracking-widest mt-2">Pflichtunterweisung • 7 Tage • Nicht archivierbar</p>
+                    </div>
+                </div>
+
+                <div class="hidden doc-data-content">
+                    <p><strong>Update &amp; Wipe Info</strong></p>
+                    <p class="mt-2 text-xs text-gray-400">System • 01.06.2026, 12:45 Uhr • gültig bis 08.06.2026, 12:45 Uhr</p>
+
+                    <div class="mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.055] p-4">
+                        <p class="text-[10px] font-orbitron text-red-300 uppercase tracking-widest mb-2">Datenbank-Wipe</p>
+                        <p>Die Datenbankstruktur wurde vollständig zurückgesetzt. Dadurch wurden sämtliche Benutzerkonten sowie alle bestehenden Fahrerkarten-Registrierungen entfernt.</p>
+                    </div>
+
+                    <div class="mt-4 rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.045] p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest mb-2">Erforderliche Schritte</p>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li>Fahrerkarte erneut im <strong>ServiceCenter</strong> beantragen.</li>
+                            <li><strong>Fahrer-Registrierung</strong> erneut durchführen.</li>
+                        </ul>
+                        <p class="mt-4">Der vollständige Datenbank-Reset wurde bewusst durchgeführt, um eine saubere Grundlage für die weitere Entwicklung zu schaffen.</p>
+                    </div>
+
+                    <div class="mt-4 rounded-2xl border border-[var(--brand-green)]/20 bg-[var(--brand-green)]/[0.045] p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Direkte Neuerungen</p>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li>Das <strong>ServiceCenter</strong> wurde vollständig überarbeitet.</li>
+                            <li>Im ServiceCenter stehen jetzt <strong>Weiterbildungen</strong> zur Verfügung.</li>
+                            <li>Beim Herunterladen einer Fahrerkarten-PDF ist ein <strong>QR-Code</strong> abgebildet. Scanne diesen bei Bedarf mit der Kamera-App deines Handys oder einer sonstigen QR-Scanner-App.</li>
+                        </ul>
+                    </div>
+
+                    <p class="mt-4 text-xs text-gray-400">Dieses temporäre Dokument ist während seiner 7-tägigen Laufzeit fixiert und kann nicht archiviert werden.</p>
+                </div>
+            </button>
+
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="Fahrerkarten jetzt verfügbar"
                     data-sender="Servicecenter"
@@ -2993,6 +3214,15 @@
         const btnDismissTutorial = document.getElementById('btn-dismiss-tutorial');
         const tutorialStorageKey = `eifellog.tutorial.seen.${currentUserKey || 'user'}`;
 
+        const temporaryInstructionWrapper = document.getElementById('temporary-instruction-wrapper');
+        const temporaryInstructionPanel = document.getElementById('temporary-instruction-panel');
+        const temporaryInstructionContent = document.getElementById('temporary-instruction-content');
+        const temporaryInstructionConfirm = document.getElementById('temporary-instruction-confirm');
+        const temporaryInstructionReadStatus = document.getElementById('temporary-instruction-read-status');
+        const temporaryInstructionDocId = 'system-update-wipe-info-2026-06-01-1245-v1';
+        const temporaryInstructionExpiresAt = new Date('2026-06-08T12:45:00+02:00').getTime();
+        const temporaryInstructionSeenStorageKey = `eifellog.notice.updateWipeInfo20260601.seen.${currentUserKey || 'user'}`;
+
         const alertBell = document.getElementById('alert-bell');
         const alertBadge = document.getElementById('alert-badge');
         const alertsWrapper = document.getElementById('general-alerts-wrapper');
@@ -3157,6 +3387,7 @@
          * Modals immer als direktes Kind von <body> anhängen
          */
         [
+            temporaryInstructionWrapper,
             tutorialAlertWrapper,
             newDocAlertWrapper,
             alertsWrapper,
@@ -3215,11 +3446,12 @@
             const alertsHidden = !alertsWrapper || alertsWrapper.classList.contains('hidden');
             const newDocAlertHidden = !newDocAlertWrapper || newDocAlertWrapper.classList.contains('hidden');
             const docHidden = !univModal || univModal.classList.contains('hidden');
+            const temporaryInstructionHidden = !temporaryInstructionWrapper || temporaryInstructionWrapper.classList.contains('hidden');
             const tutorialHidden = !tutorialAlertWrapper || tutorialAlertWrapper.classList.contains('hidden');
             const loaDetailModal = document.getElementById('loa-detail-modal');
             const loaHidden = !loaDetailModal || loaDetailModal.classList.contains('hidden');
 
-            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && tutorialHidden && loaHidden) {
+            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && temporaryInstructionHidden && tutorialHidden && loaHidden) {
                 document.documentElement.classList.remove('modal-scroll-locked');
                 document.body.classList.remove('modal-scroll-locked', 'overflow-hidden');
                 document.body.style.top = '';
@@ -3258,16 +3490,111 @@
             }, 300);
         }
 
-        // ====== TUTORIAL LOGIK ======
+        // ====== TEMPORÄRE PFLICHTUNTERWEISUNG + TUTORIAL LOGIK ======
+        let isTemporaryInstructionShowing = false;
         let isTutorialShowing = false;
-        
-        setTimeout(() => {
-            const hasSeenTutorial = window.localStorage.getItem(tutorialStorageKey);
-            if (!hasSeenTutorial) {
-                isTutorialShowing = true;
-                openAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel);
+        let startupInstructionCheckPending = true;
+
+        function isTemporaryInstructionActive() {
+            return Date.now() < temporaryInstructionExpiresAt;
+        }
+
+        function removeExpiredTemporaryInstructionDocument() {
+            if (isTemporaryInstructionActive()) return;
+
+            const temporaryDocument = document.getElementById('update-wipe-info-doc');
+            if (temporaryDocument) temporaryDocument.remove();
+        }
+
+        function updateTemporaryInstructionConfirmState() {
+            if (!temporaryInstructionContent || !temporaryInstructionConfirm) return;
+
+            const reachedBottom = temporaryInstructionContent.scrollHeight - temporaryInstructionContent.scrollTop <= temporaryInstructionContent.clientHeight + 10;
+            temporaryInstructionConfirm.disabled = !reachedBottom;
+
+            if (temporaryInstructionReadStatus) {
+                temporaryInstructionReadStatus.textContent = reachedBottom
+                    ? 'Unterweisung vollständig gelesen. Bitte bestätige die Kenntnisnahme.'
+                    : 'Bitte lies die Unterweisung vollständig durch und scrolle bis zum Ende.';
+                temporaryInstructionReadStatus.classList.toggle('text-[var(--brand-green)]', reachedBottom);
+                temporaryInstructionReadStatus.classList.toggle('text-[var(--brand-yellow)]', !reachedBottom);
             }
-        }, 800); // Leicht verzögert, wirkt natürlicher
+        }
+
+        function openTemporaryInstructionIfNeeded() {
+            removeExpiredTemporaryInstructionDocument();
+
+            if (!isTemporaryInstructionActive()) return false;
+
+            let alreadySeen = false;
+            try {
+                alreadySeen = window.localStorage.getItem(temporaryInstructionSeenStorageKey) === 'true';
+            } catch (error) {
+                console.warn('Pflichtunterweisungs-Status konnte nicht gelesen werden:', error);
+            }
+
+            if (alreadySeen) return false;
+
+            isTemporaryInstructionShowing = true;
+            openAnimatedModal(temporaryInstructionWrapper, temporaryInstructionPanel);
+
+            setTimeout(() => {
+                if (temporaryInstructionContent) temporaryInstructionContent.scrollTop = 0;
+                updateTemporaryInstructionConfirmState();
+            }, 25);
+
+            return true;
+        }
+
+        function openTutorialAlertIfNeeded() {
+            if (isTemporaryInstructionShowing) return false;
+
+            const hasSeenTutorial = window.localStorage.getItem(tutorialStorageKey);
+            if (hasSeenTutorial) return false;
+
+            isTutorialShowing = true;
+            openAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel);
+            return true;
+        }
+
+        removeExpiredTemporaryInstructionDocument();
+
+        setTimeout(() => {
+            startupInstructionCheckPending = false;
+
+            if (openTemporaryInstructionIfNeeded()) return;
+            if (openTutorialAlertIfNeeded()) return;
+
+            initializeInboxNotifications(true);
+        }, 550);
+
+        if (temporaryInstructionContent) {
+            temporaryInstructionContent.addEventListener('scroll', updateTemporaryInstructionConfirmState, { passive: true });
+        }
+
+        if (temporaryInstructionConfirm) {
+            temporaryInstructionConfirm.addEventListener('click', () => {
+                if (temporaryInstructionConfirm.disabled) return;
+
+                try {
+                    window.localStorage.setItem(temporaryInstructionSeenStorageKey, 'true');
+                } catch (error) {
+                    console.warn('Pflichtunterweisungs-Status konnte nicht gespeichert werden:', error);
+                }
+
+                readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
+                const temporaryDocument = document.getElementById('update-wipe-info-doc');
+                if (temporaryDocument) markDocumentAsRead(temporaryDocument);
+
+                closeAnimatedModal(temporaryInstructionWrapper, temporaryInstructionPanel, () => {
+                    isTemporaryInstructionShowing = false;
+
+                    if (!openTutorialAlertIfNeeded()) {
+                        initializeInboxNotifications(true);
+                    }
+                });
+            });
+        }
 
         if (btnStartTutorial) {
             btnStartTutorial.addEventListener('click', () => {
@@ -3606,7 +3933,8 @@
         }
 
         function initializeInboxNotifications(force = false) {
-            if (isTutorialShowing && !force) return; // Wenn Tutorial-Alert da ist, warte mit den Dokumenten
+            if (isTemporaryInstructionShowing) return; // Pflichtunterweisung hat immer Vorrang.
+            if ((startupInstructionCheckPending || isTutorialShowing) && !force) return; // Erst Startup-Unterweisung/Tutorial abschließen.
 
             readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
             archivedDocumentIds = new Set(readJsonArrayFromStorage(archivedDocumentsStorageKey));
@@ -3814,6 +4142,10 @@
 
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
+
+            if (temporaryInstructionWrapper && !temporaryInstructionWrapper.classList.contains('hidden')) {
+                return; // Pflichtunterweisung kann nicht per Escape geschlossen werden.
+            }
 
             if (tutorialAlertWrapper && !tutorialAlertWrapper.classList.contains('hidden')) {
                 window.localStorage.setItem(tutorialStorageKey, 'true');
