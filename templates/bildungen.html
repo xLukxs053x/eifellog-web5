@@ -310,6 +310,65 @@
             flex-direction: column;
         }
 
+        /* === SERVICECENTER-BEREICHSWECHSEL === */
+        .service-switcher {
+            margin-bottom: 1rem;
+            padding: 0.55rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-top-color: rgba(var(--brand-green-rgb), 0.20);
+            border-radius: 1.2rem;
+            background: linear-gradient(145deg, rgba(9, 20, 13, 0.80), rgba(3, 8, 5, 0.90));
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, 0.24);
+        }
+
+        .service-switcher-link {
+            min-height: 42px;
+            padding: 0.72rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 0.85rem;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.025);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.13em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: 0.25s ease;
+        }
+
+        .service-switcher-link:hover {
+            color: var(--text);
+            border-color: rgba(var(--brand-green-rgb), 0.42);
+            background: rgba(var(--brand-green-rgb), 0.08);
+            transform: translateY(-1px);
+        }
+
+        .service-switcher-link.active {
+            color: #08140c;
+            border-color: rgba(var(--brand-green-rgb), 0.82);
+            background: linear-gradient(135deg, var(--brand-green), var(--brand-yellow));
+            box-shadow: 0 0 20px rgba(var(--brand-green-rgb), 0.20);
+        }
+
+        .service-switcher-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 11px rgba(var(--brand-green-rgb), 0.55);
+        }
+
         /* === SEITENSPEZIFISCH: BILDUNGEN === */
         .page-hero {
             position: relative;
@@ -695,6 +754,73 @@
             white-space: nowrap;
         }
 
+        .history-status.submitted,
+        .history-status.in_review,
+        .history-status.appointment_scheduled {
+            color: var(--warning);
+            border-color: rgba(255, 212, 121, 0.38);
+            background: rgba(255, 212, 121, 0.08);
+        }
+
+        .history-status.rejected {
+            color: var(--danger);
+            border-color: rgba(255, 159, 159, 0.38);
+            background: rgba(255, 159, 159, 0.08);
+        }
+
+        .history-main { min-width: 0; }
+
+        .history-updated {
+            margin-top: 0.42rem;
+            color: rgba(147, 164, 200, 0.78);
+            font-size: 0.7rem;
+            line-height: 1.45;
+        }
+
+        .history-details {
+            margin-top: 0.8rem;
+            padding-top: 0.7rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .history-details summary {
+            cursor: pointer;
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.58rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .history-detail-grid {
+            margin-top: 0.72rem;
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .history-detail {
+            padding: 0.7rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 0.75rem;
+            color: var(--muted);
+            background: rgba(0, 0, 0, 0.15);
+            font-size: 0.75rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .history-detail strong {
+            display: block;
+            margin-bottom: 0.22rem;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.57rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+        }
+
         .empty-state {
             padding: 2rem 1rem;
             color: var(--muted);
@@ -799,6 +925,8 @@
 
             .offer-grid { grid-template-columns: 1fr; }
             .btn-primary, .btn-secondary, .btn-danger { width: 100%; }
+            .service-switcher { display: grid; grid-template-columns: 1fr 1fr; }
+            .service-switcher-link { width: 100%; padding-right: 0.7rem; padding-left: 0.7rem; font-size: 0.58rem; letter-spacing: 0.09em; }
             .history-item { grid-template-columns: 1fr; }
             .history-status { justify-self: start; }
             .flash-item { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
@@ -1601,6 +1729,17 @@
                 {% endif %}
             {% endwith %}
 
+            <nav class="service-switcher" aria-label="ServiceCenter Bereiche">
+                <a class="service-switcher-link" href="{{ url_for('servicecenter_fahrerkarte') }}">
+                    <span class="service-switcher-dot"></span>
+                    Fahrerkarte
+                </a>
+                <a class="service-switcher-link active no-fade" href="{{ url_for('bildungen') }}" aria-current="page">
+                    <span class="service-switcher-dot"></span>
+                    Weiterbildungen
+                </a>
+            </nav>
+
             <section class="page-grid">
                 <div class="page-hero glass-card">
                     <div class="relative z-10">
@@ -1636,7 +1775,7 @@
 
                 <aside class="identity-card glass-card">
                     <div class="identity-label">Angemeldeter Fahrer</div>
-                    <div class="identity-name">{{ user.display_name or user.username or current_user.username or 'Fahrer' }}</div>
+                    <div class="identity-name">{{ user.display_name or user.username or current_user.discord_username or current_user.username or 'Fahrer' }}</div>
                     <div class="identity-role">{{ primary_role_name or 'Fahrer' }}</div>
                     <p class="identity-note">
                         Deine Einreichung wird deinem internen ServiceCenter-Profil zugeordnet und zur Bearbeitung gespeichert.
@@ -1783,11 +1922,32 @@
                         <div class="history-list">
                             {% for item in bildungen_requests %}
                                 <article class="history-item">
-                                    <div>
+                                    <div class="history-main">
                                         <div class="history-title">{{ item.offer_title }}</div>
-                                        <div class="history-meta">{{ item.category_label }} · {{ item.created_at_display }}</div>
+                                        <div class="history-meta">{{ item.category_label }} · Eingereicht am {{ item.created_at_display }}</div>
+                                        <div class="history-updated">Letzte Aktualisierung: {{ item.updated_at_display }}</div>
+
+                                        {% if item.appointment_at_display or item.appointment_note %}
+                                            <details class="history-details" {% if item.appointment_at_display %}open{% endif %}>
+                                                <summary>Termin-Informationen</summary>
+                                                <div class="history-detail-grid">
+                                                    {% if item.appointment_at_display %}
+                                                        <div class="history-detail">
+                                                            <strong>Vorgesehener Termin</strong>
+                                                            {{ item.appointment_at_display }}
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if item.appointment_note %}
+                                                        <div class="history-detail">
+                                                            <strong>Hinweis der Personalabteilung</strong>
+                                                            {{ item.appointment_note }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </details>
+                                        {% endif %}
                                     </div>
-                                    <div class="history-status">{{ item.status_label }}</div>
+                                    <div class="history-status {{ item.status }}">{{ item.status_label }}</div>
                                 </article>
                             {% endfor %}
                         </div>
