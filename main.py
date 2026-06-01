@@ -215,6 +215,10 @@ TRACKER_PDF_DOWNLOAD_SIGNING_KEY = env_first(
     default="",
 )
 
+# Version des serverseitigen Fahrerkarten-Auszug-Layouts.
+# Bei einer Aenderung werden bereits gespeicherte Alt-PDFs beim naechsten Abruf neu erzeugt.
+TRACKER_SHIFT_PDF_LAYOUT_VERSION = "tachograph-v2"
+
 TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
     "TOUR_START_DUPLICATE_WINDOW_MINUTES",
     "JOB_START_WEBHOOK_DUPLICATE_WINDOW_MINUTES",
@@ -9742,7 +9746,7 @@ def build_driver_activity_period_report(user_doc, date_from="", date_to=""):
     }
 
 
-def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_filename="", shift_id=""):
+def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_filename="", shift_id="", pdf_layout_version=""):
     user_doc = user_doc or {}
     discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
     if not discord_id:
@@ -9798,6 +9802,10 @@ def persist_tracker_shift_log_snapshot(user_doc, date_value, pdf_path="", pdf_fi
         document["pdf_filename"] = pdf_filename
     elif existing and existing.get("pdf_filename"):
         document["pdf_filename"] = existing.get("pdf_filename")
+    if pdf_path:
+        document["pdf_layout_version"] = safe_str(pdf_layout_version, TRACKER_SHIFT_PDF_LAYOUT_VERSION)
+    elif existing and existing.get("pdf_layout_version"):
+        document["pdf_layout_version"] = existing.get("pdf_layout_version")
     document["pdf_url"] = f"/api/hr/download_shift_pdf/{document['shift_id']}"
     document["tracker_pdf_url"] = tracker_shift_pdf_route_url(document["shift_id"])
 
@@ -10065,10 +10073,14 @@ def generate_shift_log_pdf(shift_doc):
     if entry_rows:
         sections.append(("Zeitsegmente", entry_rows))
 
+    signature_state = "Signatur geprueft" if bool((card_doc or {}).get("signature_verified")) else "Signatur ungeprueft"
     pdf_bytes = build_simple_pdf(
         "Auszug Fahrerkarte / Schichtprotokoll",
         sections,
         footer_text="EifelLog Fahrerkarte / digitaler PDF-Auszug",
+        document_reference=safe_str(shift_doc.get("shift_id") or f"EL-SHIFT-{date_str}"),
+        document_category="FAHRERKARTE / SCHICHTPROTOKOLL",
+        signature_state=signature_state,
     )
 
     with open(file_path, "wb") as file:
@@ -10077,9 +10089,8 @@ def generate_shift_log_pdf(shift_doc):
     return file_path, filename
 
 
-def build_simple_pdf(title, sections, footer_text="Eifel LOG Tour-Beleg / Abrechnung"):
-    # Minimaler PDF-Generator ohne externe Bibliothek.
-    # Nutzt Standard-Schrift Helvetica und erstellt bei Bedarf mehrere Seiten.
+def _build_simple_pdf_minimal(title, sections, footer_text="Eifel LOG Tour-Beleg / Abrechnung"):
+    """Robuster Minimal-Fallback, falls ReportLab auf dem Server nicht installiert ist."""
     page_width = 595
     page_height = 842
     margin_left = 42
@@ -10104,7 +10115,7 @@ def build_simple_pdf(title, sections, footer_text="Eifel LOG Tour-Beleg / Abrech
             "text": safe_str(text),
             "size": size,
             "bold": bool(bold),
-            "gap_after": gap_after
+            "gap_after": gap_after,
         })
 
     add_line(title, size=18, bold=True, gap_after=10)
@@ -10197,6 +10208,432 @@ def build_simple_pdf(title, sections, footer_text="Eifel LOG Tour-Beleg / Abrech
         f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
     )
     return bytes(pdf)
+
+
+def build_simple_pdf(
+    title,
+    sections,
+    footer_text="Eifel LOG Tour-Beleg / Abrechnung",
+    document_reference="",
+    document_category="DIGITALER PDF-AUSZUG",
+    signature_state="",
+):
+    """Erstellt einen realistisch gestalteten EifelLog-PDF-Auszug.
+
+    Der ReportLab-Pfad liefert ein technisches Tachographen-Layout mit
+    wiederkehrendem Kopfbereich, klaren Datenkarten, Zeitwert-Kacheln,
+    Prüfvermerk und Mehrseiten-Footer. Auf Servern ohne ReportLab bleibt der
+    bisherige Minimal-PDF-Generator als sicherer Fallback aktiv.
+    """
+    try:
+        from html import escape
+        from reportlab.lib import colors
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            KeepTogether,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+
+        generated_at = now_utc()
+        raw_reference = safe_str(document_reference)
+        if not raw_reference:
+            digest = hashlib.sha256(
+                f"{safe_str(title)}|{generated_at.isoformat()}|{safe_str(footer_text)}".encode("utf-8")
+            ).hexdigest()[:12].upper()
+            raw_reference = f"EL-PDF-{generated_at.strftime('%Y%m%d')}-{digest}"
+
+        category = safe_str(document_category, "DIGITALER PDF-AUSZUG").upper()
+        signature_label = safe_str(signature_state)
+
+        COLOR_INK = HexColor("#172326")
+        COLOR_INK_SOFT = HexColor("#435255")
+        COLOR_MUTED = HexColor("#68777A")
+        COLOR_PAPER = HexColor("#F4F2EA")
+        COLOR_PAPER_LIGHT = HexColor("#FBFAF6")
+        COLOR_PANEL = HexColor("#FFFFFF")
+        COLOR_BORDER = HexColor("#D7D9D2")
+        COLOR_BORDER_STRONG = HexColor("#B9C0BB")
+        COLOR_HEADER = HexColor("#16272B")
+        COLOR_HEADER_DEEP = HexColor("#0E191C")
+        COLOR_GREEN = HexColor("#2E7950")
+        COLOR_GREEN_DARK = HexColor("#1F5C3A")
+        COLOR_GREEN_SOFT = HexColor("#E6F1EA")
+        COLOR_BLUE_SOFT = HexColor("#E8EFF1")
+        COLOR_AMBER = HexColor("#A16A22")
+        COLOR_AMBER_SOFT = HexColor("#F7EDD9")
+        COLOR_DANGER = HexColor("#9C3D3D")
+        COLOR_DANGER_SOFT = HexColor("#F7E5E3")
+
+        def clean(value, fallback="-"):
+            value = safe_str(value, fallback)
+            if not value:
+                value = fallback
+            return escape(value).replace("\n", "<br/>")
+
+        def is_positive_signature(value):
+            normalized = safe_str(value).lower()
+            return any(token in normalized for token in (
+                "geprueft", "geprüft", "signiert", "verified", "aktiv", "gueltig", "gültig", "ok"
+            )) and not any(token in normalized for token in (
+                "ungeprueft", "ungeprüft", "nicht", "ungueltig", "ungültig", "fehler"
+            ))
+
+        def status_colors(value):
+            normalized = safe_str(value).lower()
+            if any(token in normalized for token in ("fehler", "verstoß", "verstoss", "ungueltig", "ungültig", "abgelaufen")):
+                return COLOR_DANGER_SOFT, COLOR_DANGER
+            if any(token in normalized for token in ("ungeprueft", "ungeprüft", "nicht", "offen", "warn", "kein feierabend")):
+                return COLOR_AMBER_SOFT, COLOR_AMBER
+            return COLOR_GREEN_SOFT, COLOR_GREEN_DARK
+
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="ELBody",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=9.3,
+            leading=12.1,
+            textColor=COLOR_INK,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELValue",
+            parent=styles["BodyText"],
+            fontName="Courier-Bold",
+            fontSize=8.9,
+            leading=11.5,
+            textColor=COLOR_INK,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELLabel",
+            parent=styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=8.2,
+            leading=10.2,
+            textColor=COLOR_MUTED,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELSection",
+            parent=styles["Heading2"],
+            fontName="Courier-Bold",
+            fontSize=9.7,
+            leading=12,
+            textColor=COLOR_HEADER,
+            spaceAfter=0,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELMicro",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=7.2,
+            leading=9,
+            textColor=COLOR_MUTED,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELMicroRight",
+            parent=styles["ELMicro"],
+            alignment=TA_RIGHT,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELMetricLabel",
+            parent=styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            leading=8.8,
+            textColor=COLOR_MUTED,
+            uppercase=True,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELMetricValue",
+            parent=styles["BodyText"],
+            fontName="Courier-Bold",
+            fontSize=15,
+            leading=17,
+            textColor=COLOR_HEADER,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELStatus",
+            parent=styles["BodyText"],
+            fontName="Courier-Bold",
+            fontSize=9,
+            leading=11,
+            textColor=COLOR_GREEN_DARK,
+        ))
+        styles.add(ParagraphStyle(
+            name="ELStatusSmall",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=8.2,
+            leading=10.5,
+            textColor=COLOR_INK_SOFT,
+        ))
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=15 * mm,
+            rightMargin=15 * mm,
+            topMargin=39 * mm,
+            bottomMargin=18 * mm,
+            title=safe_str(title),
+            author="EifelLog",
+            subject=category,
+        )
+        page_width, page_height = A4
+
+        def draw_barcode(canvas_obj, seed, x, y, width, height):
+            digest = hashlib.sha256(seed.encode("utf-8")).digest()
+            bits = "".join(f"{byte:08b}" for byte in digest[:14])
+            unit = width / max(1, len(bits))
+            canvas_obj.saveState()
+            canvas_obj.setFillColor(colors.white)
+            for index, bit in enumerate(bits):
+                if bit == "1":
+                    canvas_obj.rect(x + index * unit, y, max(0.48, unit * 0.82), height, fill=1, stroke=0)
+            canvas_obj.restoreState()
+
+        def draw_page(canvas_obj, pdf_doc):
+            canvas_obj.saveState()
+            canvas_obj.setFillColor(COLOR_PAPER)
+            canvas_obj.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+
+            canvas_obj.setStrokeColor(HexColor("#E6E2D8"))
+            canvas_obj.setLineWidth(0.25)
+            grid_step = 12 * mm
+            grid_x = 15 * mm
+            while grid_x < page_width - 15 * mm:
+                canvas_obj.line(grid_x, 18 * mm, grid_x, page_height - 31 * mm)
+                grid_x += grid_step
+            grid_y = 20 * mm
+            while grid_y < page_height - 31 * mm:
+                canvas_obj.line(15 * mm, grid_y, page_width - 15 * mm, grid_y)
+                grid_y += grid_step
+
+            canvas_obj.saveState()
+            canvas_obj.translate(page_width * 0.51, page_height * 0.47)
+            canvas_obj.rotate(28)
+            canvas_obj.setFillColor(HexColor("#ECE9DF"))
+            canvas_obj.setFont("Helvetica-Bold", 54)
+            canvas_obj.drawCentredString(0, 0, "EIFELLOG")
+            canvas_obj.restoreState()
+
+            canvas_obj.setFillColor(COLOR_HEADER_DEEP)
+            canvas_obj.rect(0, page_height - 31 * mm, page_width, 31 * mm, fill=1, stroke=0)
+            canvas_obj.setFillColor(COLOR_HEADER)
+            canvas_obj.rect(0, page_height - 27 * mm, page_width, 27 * mm, fill=1, stroke=0)
+            canvas_obj.setFillColor(COLOR_GREEN)
+            canvas_obj.rect(0, page_height - 31 * mm, page_width, 1.5 * mm, fill=1, stroke=0)
+
+            canvas_obj.setFillColor(colors.white)
+            canvas_obj.setFont("Courier-Bold", 15)
+            canvas_obj.drawString(15 * mm, page_height - 12.2 * mm, "EIFELLOG  ·  AUSDRUCK")
+            canvas_obj.setFont("Helvetica", 8.7)
+            canvas_obj.drawString(15 * mm, page_height - 17.3 * mm, "Digitaler Fahrtenschreiber / serverseitiger Nachweis")
+            canvas_obj.setFont("Courier-Bold", 8.1)
+            canvas_obj.drawString(15 * mm, page_height - 24.5 * mm, category[:74])
+
+            canvas_obj.setFont("Courier", 7.2)
+            canvas_obj.drawRightString(page_width - 15 * mm, page_height - 10.4 * mm, generated_at.strftime("%d.%m.%Y, %H:%M:%S UTC"))
+            canvas_obj.drawRightString(page_width - 15 * mm, page_height - 15.2 * mm, f"REF: {raw_reference[:52]}")
+            canvas_obj.drawRightString(page_width - 15 * mm, page_height - 20 * mm, f"SEITE {canvas_obj.getPageNumber():02d}")
+            draw_barcode(canvas_obj, raw_reference, page_width - 62 * mm, page_height - 27.4 * mm, 47 * mm, 3.5 * mm)
+
+            canvas_obj.setStrokeColor(COLOR_BORDER_STRONG)
+            canvas_obj.setLineWidth(0.65)
+            canvas_obj.line(15 * mm, 14 * mm, page_width - 15 * mm, 14 * mm)
+            canvas_obj.setFillColor(COLOR_MUTED)
+            canvas_obj.setFont("Helvetica", 7)
+            canvas_obj.drawString(15 * mm, 9.5 * mm, safe_str(footer_text)[:96])
+            canvas_obj.drawRightString(page_width - 15 * mm, 9.5 * mm, "EifelLog · intern erzeugter PDF-Auszug")
+            canvas_obj.restoreState()
+
+        def p(value, style_name="ELBody"):
+            return Paragraph(clean(value), styles[style_name])
+
+        def section_header(index, section_title):
+            heading = Table(
+                [[Paragraph(f"{index:02d}  ·  {clean(section_title).upper()}", styles["ELSection"]) ]],
+                colWidths=[180 * mm],
+            )
+            heading.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), COLOR_BLUE_SOFT),
+                ("BOX", (0, 0), (-1, -1), 0.65, COLOR_BORDER_STRONG),
+                ("LINEBEFORE", (0, 0), (0, -1), 3, COLOR_GREEN),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ]))
+            return heading
+
+        def key_value_table(rows, tinted=False):
+            data = []
+            for label, value in rows:
+                data.append([p(label, "ELLabel"), p(value, "ELValue")])
+            table = Table(data, colWidths=[48 * mm, 132 * mm], repeatRows=0)
+            commands = [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("BOX", (0, 0), (-1, -1), 0.55, COLOR_BORDER),
+                ("INNERGRID", (0, 0), (-1, -1), 0.28, COLOR_BORDER),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 4.7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4.7),
+            ]
+            for row_index in range(len(data)):
+                commands.append((
+                    "BACKGROUND",
+                    (0, row_index),
+                    (-1, row_index),
+                    COLOR_PAPER_LIGHT if row_index % 2 == 0 else COLOR_PANEL,
+                ))
+            if tinted:
+                commands.append(("LINEBEFORE", (0, 0), (0, -1), 2.2, COLOR_GREEN))
+            table.setStyle(TableStyle(commands))
+            return table
+
+        def metric_cards(rows):
+            cells = []
+            for label, value in rows:
+                card = Table(
+                    [[p(label.upper(), "ELMetricLabel")], [p(value, "ELMetricValue")]],
+                    colWidths=[86 * mm],
+                )
+                card.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, -1), COLOR_PANEL),
+                    ("BOX", (0, 0), (-1, -1), 0.65, COLOR_BORDER_STRONG),
+                    ("LINEABOVE", (0, 0), (-1, 0), 2.2, COLOR_GREEN),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]))
+                cells.append(card)
+            grid_rows = []
+            for index in range(0, len(cells), 2):
+                row = cells[index:index + 2]
+                if len(row) == 1:
+                    row.append("")
+                grid_rows.append(row)
+            grid = Table(grid_rows, colWidths=[90 * mm, 90 * mm], hAlign="LEFT")
+            grid.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            return grid
+
+        def status_panel(rows, signature=False):
+            row_map = {safe_str(label).lower(): safe_str(value) for label, value in rows}
+            status_value = row_map.get("status") or row_map.get("signatur") or signature_label or "Nachweis erzeugt"
+            bg, accent = status_colors(status_value)
+            if signature and is_positive_signature(status_value or signature_label):
+                bg, accent = COLOR_GREEN_SOFT, COLOR_GREEN_DARK
+
+            content = []
+            for label, value in rows:
+                content.append([p(label, "ELLabel"), p(value, "ELValue")])
+            table = Table(content, colWidths=[48 * mm, 132 * mm])
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), bg),
+                ("BOX", (0, 0), (-1, -1), 0.8, accent),
+                ("LINEBEFORE", (0, 0), (0, -1), 3.2, accent),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 5.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5.5),
+            ]))
+            return table
+
+        story = []
+        intro = Table(
+            [[
+                Paragraph(clean(title), ParagraphStyle(
+                    "ELIntroTitle",
+                    parent=styles["ELBody"],
+                    fontName="Helvetica-Bold",
+                    fontSize=13,
+                    leading=15,
+                    textColor=COLOR_HEADER,
+                )),
+                Paragraph(
+                    f"<b>REFERENZ</b><br/><font name='Courier'>{clean(raw_reference)}</font><br/>"
+                    f"<b>ERZEUGT UTC</b><br/><font name='Courier'>{generated_at.strftime('%d.%m.%Y %H:%M:%S')}</font>",
+                    styles["ELMicroRight"],
+                ),
+            ]],
+            colWidths=[113 * mm, 67 * mm],
+        )
+        intro.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_PAPER_LIGHT),
+            ("BOX", (0, 0), (-1, -1), 0.8, COLOR_BORDER_STRONG),
+            ("LINEBEFORE", (0, 0), (0, -1), 4, COLOR_GREEN),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        story.append(intro)
+        story.append(Spacer(1, 5 * mm))
+
+        for section_index, raw_section in enumerate(sections or [], start=1):
+            section_title, raw_rows = raw_section
+            rows = [(safe_str(label), safe_str(value, "-")) for label, value in (raw_rows or [])]
+            normalized_title = safe_str(section_title).lower()
+
+            block = [section_header(section_index, section_title), Spacer(1, 2.2 * mm)]
+            if "summen" in normalized_title or "abrechnung" in normalized_title:
+                block.append(metric_cards(rows))
+            elif "signatur" in normalized_title or "pruefvermerk" in normalized_title or "prüfvermerk" in normalized_title:
+                block.append(status_panel(rows, signature=True))
+            elif "ruhezeit" in normalized_title or "auffaellig" in normalized_title or "auffällig" in normalized_title:
+                block.append(status_panel(rows, signature=False))
+            else:
+                block.append(key_value_table(rows, tinted=(section_index == 1)))
+            block.append(Spacer(1, 4.2 * mm))
+            story.append(KeepTogether(block))
+
+        story.append(Spacer(1, 1.5 * mm))
+        disclaimer = Table(
+            [[Paragraph(
+                "Dieser Auszug wurde serverseitig aus den gespeicherten EifelLog-Daten erzeugt. "
+                "Er dient als interner digitaler Nachweis. Ein sichtbarer Pruefvermerk ersetzt keine "
+                "qualifizierte Zertifikats-Signatur und kein amtliches Kontrollgeraet.",
+                styles["ELMicro"],
+            )]],
+            colWidths=[180 * mm],
+        )
+        disclaimer.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_BLUE_SOFT),
+            ("BOX", (0, 0), (-1, -1), 0.55, COLOR_BORDER_STRONG),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(disclaimer)
+
+        doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
+        return buffer.getvalue()
+
+    except Exception:
+        try:
+            app.logger.exception("Gestalteter EifelLog-PDF-Auszug konnte nicht erzeugt werden, nutze Minimal-Fallback.")
+        except Exception:
+            pass
+        return _build_simple_pdf_minimal(title, sections, footer_text=footer_text)
 
 
 def generate_receipt_number(job_id, discord_id="", submitted_at=None):
@@ -13085,6 +13522,7 @@ def tracker_feierabend():
         pdf_path=file_path,
         pdf_filename=filename,
         shift_id=shift_doc.get("shift_id"),
+        pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
     ) or shift_doc
 
     new_session = tracker_default_work_session()
@@ -14142,7 +14580,8 @@ def tracker_driver_card_extract_pdf_download(selector=""):
     file_path = safe_str(shift_doc.get("pdf_path"))
     file_name = safe_str(shift_doc.get("pdf_filename"))
     regenerate = safe_str(request.args.get("refresh") or payload.get("refresh")).lower() in {"1", "true", "yes", "ja", "on"}
-    if regenerate or not file_path or not os.path.exists(file_path):
+    outdated_layout = safe_str(shift_doc.get("pdf_layout_version")) != TRACKER_SHIFT_PDF_LAYOUT_VERSION
+    if regenerate or outdated_layout or not file_path or not os.path.exists(file_path):
         file_path, file_name = generate_shift_log_pdf(shift_doc)
         fresh_shift_doc = persist_tracker_shift_log_snapshot(
             user_doc,
@@ -14150,6 +14589,7 @@ def tracker_driver_card_extract_pdf_download(selector=""):
             pdf_path=file_path,
             pdf_filename=file_name,
             shift_id=shift_doc.get("shift_id"),
+            pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
         )
         if fresh_shift_doc:
             shift_doc = fresh_shift_doc
@@ -18906,6 +19346,7 @@ def generate_driver_card_pdf(user_id, date_str):
         pdf_path=file_path,
         pdf_filename=filename,
         shift_id=shift_doc.get("shift_id"),
+        pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
     ) or shift_doc
 
     return send_file(
@@ -19372,7 +19813,8 @@ def hr_download_shift_pdf(shift_id):
         abort(403)
 
     file_path = shift_log.get("pdf_path")
-    if not file_path or not os.path.exists(file_path):
+    outdated_layout = safe_str(shift_log.get("pdf_layout_version")) != TRACKER_SHIFT_PDF_LAYOUT_VERSION
+    if outdated_layout or not file_path or not os.path.exists(file_path):
         target_user = users_collection.find_one({"discord_id": safe_str(shift_log.get("discord_id"))}) or {}
         file_path, filename = generate_shift_log_pdf(shift_log)
         shift_log = persist_tracker_shift_log_snapshot(
@@ -19381,6 +19823,7 @@ def hr_download_shift_pdf(shift_id):
             pdf_path=file_path,
             pdf_filename=filename,
             shift_id=shift_log.get("shift_id"),
+            pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
         ) or shift_log
 
     if not file_path or not os.path.exists(file_path):
@@ -19948,6 +20391,7 @@ def update_driver_state():
             pdf_path=file_path,
             pdf_filename=filename,
             shift_id=shift_doc.get("shift_id"),
+            pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
         ) or shift_doc
         result["shiftLog"] = driver_shift_log_for_api(shift_doc)
 
