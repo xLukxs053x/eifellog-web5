@@ -1,0 +1,1 @@
+("app.blueprints.tracker.routes", "tracker_bp"),
