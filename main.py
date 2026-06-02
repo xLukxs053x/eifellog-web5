@@ -272,7 +272,7 @@ def add_tracker_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     response.headers["Access-Control-Max-Age"] = "86400"
     response.headers["Access-Control-Allow-Private-Network"] = "true"
-    response.headers["Access-Control-Expose-Headers"] = "Content-Type, Content-Disposition, Content-Length, ETag, Last-Modified, X-EifelLog-Pdf-Type, X-EifelLog-Shift-Id"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Type, Content-Disposition, Content-Length, ETag, Last-Modified, X-EifelLog-Pdf-Type, X-EifelLog-Shift-Id, X-EifelLog-Driver-Card-Id"
     return response
 
 
@@ -4350,11 +4350,18 @@ def fahrerkarte_status_label(status):
     }.get(safe_str(status).lower(), safe_str(status, "Unbekannt"))
 
 
-def servicecenter_fahrerkarte_download_url(request_id):
+def servicecenter_fahrerkarte_download_url(request_id, inline=False):
+    """Liefert Download- oder Browser-Vorschau-URL für eine ServiceCenter-Fahrerkarte.
+
+    Die Vorschau verwendet bewusst ``inline=1``. Damit rendert der Browser die PDF
+    direkt im PDF-Viewer, während normale Download-Links weiterhin als Datei-Download
+    ausgeliefert werden.
+    """
     request_id = safe_str(request_id)
     if not request_id:
         return ""
-    return f"/servicecenter/fahrerkarte/download/{request_id}"
+    url = f"/servicecenter/fahrerkarte/download/{request_id}"
+    return f"{url}?inline=1" if inline else url
 
 
 def resolve_servicecenter_fahrerkarte_folder():
@@ -5468,6 +5475,9 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["pdf_filename"] = item.get("pdf_filename") or item.get("file_name") or ""
     item["pdf_relative_path"] = item.get("pdf_relative_path") or item.get("pdf_path") or ""
     item["download_url"] = servicecenter_fahrerkarte_download_url(item["request_id"]) if item["pdf_relative_path"] else ""
+    item["preview_url"] = servicecenter_fahrerkarte_download_url(item["request_id"], inline=True) if item["pdf_relative_path"] else ""
+    item["pdf_preview_url"] = item["preview_url"]
+    item["pdfPreviewUrl"] = item["preview_url"]
     item["tracker_upload_ready"] = bool(item.get("tracker_upload_ready") or item.get("status") == "issued")
     if not item.get("avatar_url") or "eifellog.jpg" in safe_str(item.get("avatar_url")).lower():
         preview_user = find_user_for_request_doc(item)
@@ -6601,6 +6611,129 @@ def tracker_validate_shift_pdf_download_ticket(ticket, expected_shift_id=""):
     }, ""
 
 
+def tracker_create_driver_card_pdf_download_ticket(discord_id, card_id, lifetime_seconds=None):
+    """Erstellt ein kurzlebiges Ticket für die eigentliche Fahrerkarte-PDF.
+
+    Ein eingebetteter Browser-PDF-Viewer kann keine benutzerdefinierten Tracker-Header
+    mitsenden. Das signierte Ticket erlaubt deshalb eine zeitlich begrenzte Vorschau,
+    ohne den langlebigen Tracker-Token in eine URL zu schreiben.
+    """
+    discord_id = safe_str(discord_id)
+    card_id = normalize_fahrerkarte_card_id(card_id)
+    if not discord_id or not card_id:
+        return ""
+
+    lifetime = parse_int(lifetime_seconds, TRACKER_PDF_DOWNLOAD_TICKET_LIFETIME_SECONDS)
+    lifetime = max(60, min(3600, lifetime))
+    ticket_payload = {
+        "v": 1,
+        "kind": "driver-card",
+        "sub": discord_id,
+        "card": card_id,
+        "exp": int(time.time()) + lifetime,
+    }
+    serialized = json.dumps(ticket_payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    encoded_payload = base64.urlsafe_b64encode(serialized).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        tracker_pdf_download_ticket_key(),
+        encoded_payload.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded_payload}.{signature}"
+
+
+def tracker_validate_driver_card_pdf_download_ticket(ticket, expected_card_id=""):
+    """Prüft ein kurzlebiges, an Fahrer und Karten-ID gebundenes Vorschau-Ticket."""
+    ticket = safe_str(ticket)
+    expected_card_id = normalize_fahrerkarte_card_id(expected_card_id)
+    if not ticket or "." not in ticket:
+        return None, "Fahrerkarte-PDF-Ticket fehlt oder ist ungültig."
+
+    try:
+        encoded_payload, signature = ticket.rsplit(".", 1)
+        expected_signature = hmac.new(
+            tracker_pdf_download_ticket_key(),
+            encoded_payload.encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected_signature):
+            return None, "Fahrerkarte-PDF-Ticket ist ungültig."
+
+        padded_payload = encoded_payload + ("=" * (-len(encoded_payload) % 4))
+        payload = json.loads(base64.urlsafe_b64decode(padded_payload.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return None, "Fahrerkarte-PDF-Ticket ist ungültig."
+
+    discord_id = safe_str(payload.get("sub"))
+    card_id = normalize_fahrerkarte_card_id(payload.get("card"))
+    expires_at = parse_int(payload.get("exp"), 0)
+    if safe_str(payload.get("kind")) != "driver-card" or not discord_id or not card_id or expires_at <= int(time.time()):
+        return None, "Fahrerkarte-PDF-Ticket ist abgelaufen oder unvollständig."
+    if expected_card_id and expected_card_id != card_id:
+        return None, "Fahrerkarte-PDF-Ticket gehört nicht zu dieser Karte."
+
+    return {
+        "discord_id": discord_id,
+        "card_id": card_id,
+        "expires_at": expires_at,
+    }, ""
+
+
+def tracker_driver_card_pdf_route_url(card_id=""):
+    card_id = normalize_fahrerkarte_card_id(card_id)
+    if not card_id:
+        return "/api/tracker/driver-card/pdf"
+    return f"/api/tracker/driver-card/pdf/{quote(card_id, safe='')}"
+
+
+def tracker_driver_card_pdf_links(card_doc=None, user_doc=None, absolute=False):
+    """Erzeugt getrennte URLs für PDF-Vorschau, Download und Header-authentifizierte API.
+
+    ``preview_url`` ist für iframe/WebView-PDF-Viewer gedacht und liefert ``inline``.
+    ``download_url`` bleibt ein echter Dateidownload. Beide Links sind kurzlebig und
+    benötigen im PDF-Viewer keine zusätzlichen Request-Header.
+    """
+    card_doc = card_doc or {}
+    user_doc = user_doc or {}
+    card_id = normalize_fahrerkarte_card_id(
+        card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("card_number")
+    )
+    discord_id = safe_str(
+        card_doc.get("discord_id")
+        or card_doc.get("user_id")
+        or user_doc.get("discord_id")
+        or user_doc.get("user_id")
+        or user_doc.get("id")
+    )
+    api_url = tracker_driver_card_pdf_route_url(card_id)
+    ticket = tracker_create_driver_card_pdf_download_ticket(discord_id, card_id) if discord_id and card_id else ""
+    if ticket:
+        ticket_query = quote(ticket, safe="")
+        preview_url = f"{api_url}?ticket={ticket_query}&inline=1"
+        download_url = f"{api_url}?ticket={ticket_query}&download=1"
+    else:
+        preview_url = api_url
+        download_url = api_url
+
+    if absolute:
+        try:
+            api_url = make_external_url(api_url)
+            preview_url = make_external_url(preview_url)
+            download_url = make_external_url(download_url)
+        except Exception:
+            pass
+
+    return {
+        "api_url": api_url,
+        "preview_url": preview_url,
+        "download_url": download_url,
+        "pdfPreviewUrl": preview_url,
+        "pdf_preview_url": preview_url,
+        "pdfDownloadUrl": download_url,
+        "pdf_download_url": download_url,
+    }
+
+
 def tracker_shift_pdf_route_url(shift_id):
     shift_id = safe_str(shift_id)
     if not shift_id:
@@ -6609,38 +6742,62 @@ def tracker_shift_pdf_route_url(shift_id):
 
 
 def tracker_shift_pdf_links(shift_doc, absolute=False):
-    """Ergaenzt HR-Download, Token-API und direkt anklickbaren signierten WebView-Link."""
+    """Ergänzt HR-Link, Token-API sowie signierte Vorschau- und Download-URLs.
+
+    Der native Browser-PDF-Viewer lädt seine Ressource selbst und übernimmt keine
+    Tracker-Header. Die kurzlebigen Ticket-URLs verhindern deshalb, dass eine
+    Vorschau irrtümlich die Login-Seite oder eine JSON-Fehlermeldung rendert.
+    """
     shift_doc = shift_doc or {}
     shift_id = safe_str(shift_doc.get("shift_id"))
     discord_id = safe_str(shift_doc.get("discord_id") or shift_doc.get("user_id"))
     if not shift_id:
         return {
             "pdf_url": "",
+            "browser_pdf_url": "",
+            "hr_pdf_url": "",
             "tracker_pdf_url": "",
+            "tracker_pdf_preview_url": "",
             "tracker_pdf_download_url": "",
+            "extract_pdf_preview_url": "",
             "extract_pdf_download_url": "",
+            "pdfPreviewUrl": "",
+            "extractPdfPreviewUrl": "",
+            "pdfDownloadUrl": "",
+            "extractPdfDownloadUrl": "",
         }
 
     browser_url = safe_str(shift_doc.get("pdf_url")) or f"/api/hr/download_shift_pdf/{quote(shift_id, safe='')}"
     tracker_url = tracker_shift_pdf_route_url(shift_id)
     ticket = tracker_create_shift_pdf_download_ticket(discord_id, shift_id) if discord_id else ""
-    signed_url = f"{tracker_url}?ticket={quote(ticket, safe='')}" if tracker_url and ticket else tracker_url
+    signed_base_url = f"{tracker_url}?ticket={quote(ticket, safe='')}" if tracker_url and ticket else tracker_url
+    joiner = "&" if "?" in signed_base_url else "?"
+    signed_preview_url = f"{signed_base_url}{joiner}inline=1"
+    signed_download_url = f"{signed_base_url}{joiner}download=1"
 
     if absolute:
         try:
             browser_url = make_external_url(browser_url)
             tracker_url = make_external_url(tracker_url)
-            signed_url = make_external_url(signed_url)
+            signed_preview_url = make_external_url(signed_preview_url)
+            signed_download_url = make_external_url(signed_download_url)
         except Exception:
             pass
 
     return {
-        "pdf_url": browser_url,
+        # Rückwärtskompatibel: pdf_url zeigt nun auf eine tatsächlich einbettbare PDF.
+        "pdf_url": signed_preview_url,
+        "browser_pdf_url": browser_url,
+        "hr_pdf_url": browser_url,
         "tracker_pdf_url": tracker_url,
-        "tracker_pdf_download_url": signed_url,
-        "extract_pdf_download_url": signed_url,
-        "pdfDownloadUrl": signed_url,
-        "extractPdfDownloadUrl": signed_url,
+        "tracker_pdf_preview_url": signed_preview_url,
+        "tracker_pdf_download_url": signed_download_url,
+        "extract_pdf_preview_url": signed_preview_url,
+        "extract_pdf_download_url": signed_download_url,
+        "pdfPreviewUrl": signed_preview_url,
+        "extractPdfPreviewUrl": signed_preview_url,
+        "pdfDownloadUrl": signed_download_url,
+        "extractPdfDownloadUrl": signed_download_url,
     }
 
 
@@ -7325,10 +7482,22 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     card_id = normalize_fahrerkarte_card_id(card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("card_number"))
     driver_name = safe_str(card_doc.get("driver_name") or card_doc.get("display_name") or card_doc.get("name"), "EifelLog Fahrer")
     file_relative_path = safe_str(card_doc.get("file_relative_path") or card_doc.get("pdf_relative_path") or card_doc.get("pdf_path"))
-    download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
-    if download_url:
-        download_url = make_external_url(download_url)
-    api_download_url = make_external_url(f"/api/tracker/driver-card/pdf/{card_id}") if card_id else make_external_url("/api/tracker/driver-card/pdf")
+
+    # Der historische ServiceCenter-Link bleibt für Web-Dashboards erhalten. Für
+    # Tracker/WebView werden jedoch ausschließlich kurzlebige, signierte Links
+    # verwendet, damit die Vorschau nicht versehentlich die Login-Seite lädt.
+    legacy_download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
+    servicecenter_download_url = safe_str(card_doc.get("servicecenter_download_url")) or legacy_download_url
+    if legacy_download_url:
+        legacy_download_url = make_external_url(legacy_download_url)
+    if servicecenter_download_url:
+        servicecenter_download_url = make_external_url(servicecenter_download_url)
+
+    pdf_links = tracker_driver_card_pdf_links(card_doc=card_doc, user_doc=user_doc, absolute=True)
+    api_download_url = pdf_links.get("api_url") or make_external_url(tracker_driver_card_pdf_route_url(card_id))
+    signed_preview_url = pdf_links.get("preview_url") or legacy_download_url or api_download_url
+    signed_download_url = pdf_links.get("download_url") or legacy_download_url or api_download_url
+
     avatar_url = (
         safe_str(card_doc.get("avatar_url") or card_doc.get("avatarUrl") or card_doc.get("discord_avatar_url"))
         or get_fahrerkarte_avatar_url(user_doc=user_doc or {}, request_doc=card_doc, size=256)
@@ -7384,10 +7553,16 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "tag": safe_str(card_doc.get("tag"), "INTERN"),
         "fileName": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
         "filename": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
-        "downloadUrl": download_url,
-        "download_url": download_url,
-        "pdfUrl": download_url,
-        "pdf_url": download_url,
+        "downloadUrl": signed_download_url,
+        "download_url": signed_download_url,
+        "pdfDownloadUrl": signed_download_url,
+        "pdf_download_url": signed_download_url,
+        "pdfUrl": signed_preview_url,
+        "pdf_url": signed_preview_url,
+        "previewUrl": signed_preview_url,
+        "preview_url": signed_preview_url,
+        "pdfPreviewUrl": signed_preview_url,
+        "pdf_preview_url": signed_preview_url,
         "apiDownloadUrl": api_download_url,
         "downloadApiUrl": api_download_url,
         "pdfDownloadApiUrl": api_download_url,
@@ -7397,9 +7572,10 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
         "driverCardExtractPdfApiUrl": extract_pdf_api_url,
         "fileRelativePath": file_relative_path,
         "pdfRelativePath": file_relative_path,
-        "hasPdf": bool(download_url or file_relative_path),
-        "has_pdf": bool(download_url or file_relative_path),
-        "servicecenterDownloadUrl": safe_str(card_doc.get("servicecenter_download_url")) or download_url,
+        "hasPdf": bool(signed_preview_url or signed_download_url or file_relative_path),
+        "has_pdf": bool(signed_preview_url or signed_download_url or file_relative_path),
+        "servicecenterDownloadUrl": servicecenter_download_url or legacy_download_url,
+        "legacyDownloadUrl": legacy_download_url,
         "sourceRequestId": safe_str(card_doc.get("source_request_id") or card_doc.get("servicecenter_request_id")),
         "manualUploadRequired": bool(card_doc.get("manual_upload_required", False)),
         "requiresManualUpload": bool(card_doc.get("requiresManualUpload", False)),
@@ -15825,17 +16001,43 @@ def tracker_driver_card_upload():
 @app.route("/api/tracker/fahrerkarte/pdf", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/fahrerkarte/pdf/<card_id>", methods=["GET", "POST", "OPTIONS"])
 def tracker_driver_card_pdf_download(card_id=""):
+    """Liefert die Fahrerkarte als Download oder direkt einbettbare PDF-Vorschau.
+
+    Header-authentifizierte Tracker-Requests funktionieren weiterhin. Zusätzlich
+    akzeptiert die Route kurzlebige HMAC-Tickets, weil ein nativer Browser-PDF-Viewer
+    keine benutzerdefinierten Tracker-Header an seinen eigenen PDF-Request anhängt.
+    """
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
     payload = tracker_request_payload()
-    user_doc, client_token, error_response = tracker_auth_user_from_payload(payload)
-    if error_response:
-        return error_response
+    card_id = normalize_fahrerkarte_card_id(
+        card_id
+        or payload.get("cardId")
+        or payload.get("card_id")
+        or payload.get("driverCardId")
+    )
+    ticket = safe_str(
+        request.args.get("ticket")
+        or payload.get("ticket")
+        or request.headers.get("X-Tracker-Pdf-Ticket")
+    )
+
+    user_doc = None
+    if ticket:
+        ticket_payload, ticket_error = tracker_validate_driver_card_pdf_download_ticket(ticket, expected_card_id=card_id)
+        if ticket_error:
+            return jsonify({"success": False, "error": ticket_error}), 403
+        card_id = ticket_payload["card_id"]
+        user_doc = users_collection.find_one({"discord_id": ticket_payload["discord_id"]})
+        if not user_doc or not user_has_tracker_access(user_doc):
+            return jsonify({"success": False, "error": "Tracker-Zugriff für diese Fahrerkarte ist nicht mehr freigegeben."}), 403
+    else:
+        user_doc, _client_token, error_response = tracker_auth_user_from_payload(payload)
+        if error_response:
+            return error_response
 
     discord_id = safe_str(user_doc.get("discord_id"))
-    card_id = safe_str(card_id or payload.get("cardId") or payload.get("card_id") or payload.get("driverCardId"))
-
     if card_id:
         card_doc = tracker_driver_cards_collection.find_one(
             {"discord_id": discord_id, "card_id": card_id, "archived": {"$ne": True}},
@@ -15843,6 +16045,7 @@ def tracker_driver_card_pdf_download(card_id=""):
         )
     else:
         card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+        card_id = normalize_fahrerkarte_card_id((card_doc or {}).get("card_id"))
 
     if not card_doc:
         return jsonify({"success": False, "error": "Keine Fahrerkarte für diesen User gefunden."}), 404
@@ -15873,8 +16076,32 @@ def tracker_driver_card_pdf_download(card_id=""):
     if not resolved_path or not os.path.exists(resolved_path):
         return jsonify({"success": False, "error": "Fahrerkarte-PDF wurde in der Datenbank gefunden, aber die Datei existiert nicht auf dem Server."}), 404
 
-    download_name = safe_str(card_doc.get("file_name") or card_doc.get("original_filename") or f"fahrerkarte_{discord_id}.pdf")
-    return send_file(resolved_path, mimetype="application/pdf", as_attachment=True, download_name=download_name)
+    download_name = secure_filename(safe_str(card_doc.get("file_name") or card_doc.get("original_filename") or f"fahrerkarte_{discord_id}.pdf"))
+    if not download_name.lower().endswith(".pdf"):
+        download_name += ".pdf"
+    inline = safe_str(
+        request.args.get("inline")
+        or request.args.get("preview")
+        or payload.get("inline")
+        or payload.get("preview")
+    ).lower() in {"1", "true", "yes", "ja", "on"}
+
+    response = send_file(
+        resolved_path,
+        mimetype="application/pdf",
+        as_attachment=not inline,
+        download_name=download_name,
+        conditional=True,
+        etag=True,
+        last_modified=os.path.getmtime(resolved_path),
+    )
+    response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-EifelLog-Pdf-Type"] = "driver-card"
+    response.headers["X-EifelLog-Driver-Card-Id"] = card_id
+    return response
 
 
 def tracker_extract_pdf_shift_for_user(user_doc, payload=None, selector=""):
@@ -16010,7 +16237,12 @@ def tracker_driver_card_extract_pdf_download(selector=""):
     if not file_name.lower().endswith(".pdf"):
         file_name += ".pdf"
 
-    inline = safe_str(request.args.get("inline") or payload.get("inline")).lower() in {"1", "true", "yes", "ja", "on"}
+    inline = safe_str(
+        request.args.get("inline")
+        or request.args.get("preview")
+        or payload.get("inline")
+        or payload.get("preview")
+    ).lower() in {"1", "true", "yes", "ja", "on"}
     response = send_file(
         file_path,
         mimetype="application/pdf",
@@ -21500,12 +21732,21 @@ def generate_driver_card_pdf(user_id, date_str):
         pdf_layout_version=TRACKER_SHIFT_PDF_LAYOUT_VERSION,
     ) or shift_doc
 
-    return send_file(
+    inline = safe_str(request.args.get("inline") or request.args.get("preview")).lower() in {"1", "true", "yes", "ja", "on"}
+    response = send_file(
         file_path,
         mimetype="application/pdf",
-        as_attachment=True,
+        as_attachment=not inline,
         download_name=filename,
+        conditional=True,
+        etag=True,
+        last_modified=os.path.getmtime(file_path),
     )
+    response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-EifelLog-Pdf-Type"] = "driver-card-extract"
+    response.headers["X-EifelLog-Shift-Id"] = safe_str(shift_doc.get("shift_id"))
+    return response
 
 def prepare_driver_card_fields_for_personalabteilung(user_doc):
     """Felder, die Personalabteilung.html im Fahrerkarten-Tab direkt aus driver liest."""
@@ -21980,12 +22221,21 @@ def hr_download_shift_pdf(shift_id):
     if not file_path or not os.path.exists(file_path):
         abort(404)
 
-    return send_file(
+    inline = safe_str(request.args.get("inline") or request.args.get("preview")).lower() in {"1", "true", "yes", "ja", "on"}
+    response = send_file(
         file_path,
-        as_attachment=True,
+        as_attachment=not inline,
         download_name=shift_log.get("pdf_filename", os.path.basename(file_path)),
-        mimetype="application/pdf"
+        mimetype="application/pdf",
+        conditional=True,
+        etag=True,
+        last_modified=os.path.getmtime(file_path),
     )
+    response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-EifelLog-Pdf-Type"] = "driver-card-extract"
+    response.headers["X-EifelLog-Shift-Id"] = safe_str(shift_log.get("shift_id"))
+    return response
 
 @app.route("/api/hr-controlling/system/status", methods=["GET", "OPTIONS"])
 def api_hr_controlling_system_status():
@@ -26386,6 +26636,8 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
         "handlerName": handler_name,
         "cardId": card_id,
         "downloadUrl": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
+        "previewUrl": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id"), inline=True),
+        "pdfPreviewUrl": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id"), inline=True),
         "pdfPath": relative_path,
         "pdfFilename": filename,
         "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
@@ -26653,8 +26905,26 @@ def servicecenter_fahrerkarte_download(request_id):
         else:
             abort(404)
 
-    download_name = request_doc.get("pdf_filename") or os.path.basename(resolved_path)
-    return send_file(resolved_path, mimetype="application/pdf", as_attachment=True, download_name=download_name)
+    download_name = secure_filename(request_doc.get("pdf_filename") or os.path.basename(resolved_path) or "EifelLog_Fahrerkarte.pdf")
+    if not download_name.lower().endswith(".pdf"):
+        download_name += ".pdf"
+    inline = safe_str(request.args.get("inline") or request.args.get("preview")).lower() in {"1", "true", "yes", "ja", "on"}
+    response = send_file(
+        resolved_path,
+        mimetype="application/pdf",
+        as_attachment=not inline,
+        download_name=download_name,
+        conditional=True,
+        etag=True,
+        last_modified=os.path.getmtime(resolved_path),
+    )
+    response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-EifelLog-Pdf-Type"] = "servicecenter-driver-card"
+    response.headers["X-EifelLog-Driver-Card-Id"] = safe_str(request_doc.get("card_id"))
+    return response
 
 @app.route("/api/personalabteilung/fahrer_registration/claim", methods=["POST"])
 def api_personalabteilung_claim_registration():
