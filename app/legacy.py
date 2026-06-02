@@ -1,3 +1,12 @@
+"""Legacy-Kompatibilitätsschicht für EifelLog.
+
+Alle fachlichen HTTP-Routen werden inzwischen über Flask-Blueprints
+registriert. Dieses Modul enthält vorübergehend weiterhin gemeinsam genutzte
+Business-Logik und bestehende View-Implementierungen. Die Implementierungen
+werden in den nächsten Migrationsschritten schrittweise in feature-spezifische
+services.py-Dateien verschoben.
+"""
+
 import os
 import base64
 import re
@@ -54,6 +63,10 @@ except Exception:
 from app.config import *
 from app.db.collections import *
 from app.db.indexes import ensure_indexes
+from app.core.http import register_http_handlers
+from app.core.permissions import *
+from app.core.template_helpers import register_template_helpers
+from app.core.utils import *
 
 
 # Flask bleibt während der schrittweisen Migration zentral in diesem Modul.
@@ -68,112 +81,13 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 
-@app.context_processor
-def inject_template_helpers():
-    """Stellt Template-Helfer bereit, damit reine Flask-Templates mit csrf_token() sauber rendern."""
-    def csrf_token():
-        token = session.get("_csrf_token")
-        if not token:
-            token = secrets.token_hex(16)
-            session["_csrf_token"] = token
-        return token
-
-    return {"csrf_token": csrf_token}
+register_template_helpers(app)
 
 
 # Indizes werden wie bisher beim App-Import sichergestellt.
 ensure_indexes()
 
-# ==========================================
-# LOCAL TRACKER / WEBVIEW2 CORS
-# ==========================================
-
-@app.after_request
-def add_tracker_headers(response):
-    # WebView2 / lokale Tracker-Apps senden je nach Version unterschiedliche
-    # Header. Diese Antworten bleiben deshalb bewusst breit CORS-freundlich,
-    # damit die Oberfläche nicht mit browserseitigem "Failed to fetch" endet.
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Accept, Origin, Authorization, X-Tracker-Token, X-Tracker-Code, "
-        "X-Tracker-Client-Token, X-Client-Token, X-Tracker-Api-Key, X-Tracker-Pdf-Ticket, X-Requested-With"
-    )
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    response.headers["Access-Control-Max-Age"] = "86400"
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
-    response.headers["Access-Control-Expose-Headers"] = "Content-Type, Content-Disposition, Content-Length, ETag, Last-Modified, X-EifelLog-Pdf-Type, X-EifelLog-Shift-Id, X-EifelLog-Driver-Card-Id"
-    return response
-
-
-@app.route("/api/<path:any_path>", methods=["OPTIONS"])
-def api_options(any_path):
-    return jsonify({"success": True})
-
-
-def is_api_like_request_path():
-    path = safe_str(request.path)
-    return path.startswith("/api/") or path in {"/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"}
-
-
-@app.errorhandler(HTTPException)
-def handle_http_exception_json(error):
-    if is_api_like_request_path():
-        return jsonify({
-            "success": False,
-            "error": safe_str(getattr(error, "description", ""), "HTTP-Fehler"),
-            "statusCode": int(getattr(error, "code", 500) or 500),
-            "path": request.path,
-        }), int(getattr(error, "code", 500) or 500)
-    return error
-
-
-@app.errorhandler(Exception)
-def handle_unexpected_api_exception(error):
-    if is_api_like_request_path():
-        app.logger.exception("Unerwarteter API-/Tracker-Fehler")
-        return jsonify({
-            "success": False,
-            "error": "Interner Serverfehler im Tracker-Backend.",
-            "details": safe_str(error),
-            "path": request.path,
-        }), 500
-    raise error
-
-
-# ==========================================
-# EIFEL LOG ROLLEN IDS
-# ==========================================
-
-ROLE_FAHRER = os.getenv("ROLE_FAHRER")
-ROLE_GESCHAEFTSLEITUNG = os.getenv("ROLE_GESCHAEFTSLEITUNG")
-ROLE_PROJEKTLEITUNG = os.getenv("ROLE_PROJEKTLEITUNG")
-ROLE_STELLVERTRETENDE_PROJEKTLEITUNG = os.getenv("ROLE_STELLVERTRETENDE_PROJEKTLEITUNG")
-ROLE_FUHRPARKMANAGEMENT = os.getenv("ROLE_FUHRPARKMANAGEMENT")
-ROLE_BUCHHALTUNG = os.getenv("ROLE_BUCHHALTUNG")
-ROLE_HR_CONTROLLING = env_first("ROLE_HR_CONTROLLING", "HR_CONTROLLING_ROLE_ID", default="1473726292963885188")
-ROLE_DISPOSITION = os.getenv("ROLE_DISPOSITION")
-ROLE_PERSONALMANAGEMENT = os.getenv("ROLE_PERSONALMANAGEMENT")
-ROLE_PROBEFAHRER = os.getenv("ROLE_PROBEFAHRER")
-
-# Hardcoded Rollen IDs basierend auf Vorgaben
-ROLE_PERSONALABTEILUNG_ID = "1473725287505072174"
-ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
-ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
-ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
-ROLE_BUCHHALTUNG_ID = "1473730533593845951"
-ROLE_FAHRER_ID = env_first("ROLE_FAHRER_ID", "FAHRER_ROLE_ID", default=ROLE_FAHRER or "1473721587101339681")
-ROLE_PROBEFAHRER_ID = env_first("ROLE_PROBEFAHRER_ID", "PROBEFAHRER_ROLE_ID", default=ROLE_PROBEFAHRER or "1508193258214265003")
-ROLE_FUHRPARKMANAGEMENT_ID = env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMANAGEMENT_ROLE_ID", "FUHRPARK_ROLE_ID", default=ROLE_FUHRPARKMANAGEMENT or "")
-ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
-ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
-
-# Admin-Area: Zugriff ausschließlich fuer die von dir vorgegebenen Discord-Rollen.
-ADMIN_AREA_PERSONALABTEILUNG_ROLE_ID = "1473721587122438321"
-ADMIN_AREA_GESCHAEFTSLEITUNG_ROLE_ID = "1473721587122438322"
-ADMIN_AREA_ALLOWED_ROLE_IDS = {
-    ADMIN_AREA_PERSONALABTEILUNG_ROLE_ID,
-    ADMIN_AREA_GESCHAEFTSLEITUNG_ROLE_ID,
-}
+register_http_handlers(app)
 
 # ==========================================
 # SERVICECENTER / WEB-ONLY FAHRERKARTE
@@ -276,300 +190,9 @@ TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID = env_bool(
     default=True,
 )
 
-ALLOWED_HUB_ROLES = [
-    ROLE_FAHRER,
-    ROLE_FAHRER_ID,
-    ROLE_PROBEFAHRER,
-    ROLE_PROBEFAHRER_ID,
-    ROLE_GESCHAEFTSLEITUNG,
-    ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG,
-    ROLE_PROJEKTLEITUNG_ID,
-    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
-    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID,
-    ROLE_FUHRPARKMANAGEMENT,
-    ROLE_FUHRPARKMANAGEMENT_ID,
-    ROLE_BUCHHALTUNG,
-    ROLE_BUCHHALTUNG_ID,
-    ROLE_HR_CONTROLLING,
-    ROLE_HR_CONTROLLING_ID,
-    ROLE_DISPOSITION,
-    ROLE_DISPOSITION_ID,
-    ROLE_PERSONALMANAGEMENT,
-    ROLE_PERSONALABTEILUNG_ID
-]
-
-PERSONALABTEILUNG_ALLOWED_ROLES = {
-    ROLE_PERSONALABTEILUNG_ID,
-    ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG_ID,
-    ROLE_HR_CONTROLLING,
-    ROLE_HR_CONTROLLING_ID,
-    "1473726292963885188",
-    "HR-Controlling",
-    "HR Controlling",
-    "hr-controlling",
-    "hr controlling"
-}
-
-DISPOSITION_ALLOWED_ROLES = {
-    ROLE_DISPOSITION,
-    ROLE_DISPOSITION_ID,
-    ROLE_GESCHAEFTSLEITUNG,
-    ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG,
-    ROLE_PROJEKTLEITUNG_ID,
-    "Disposition",
-    "Disponent",
-    "disposition",
-    "disponent",
-    "dispo",
-    "Geschäftsleitung",
-    "Geschaeftsleitung",
-    "Geschäftsführung",
-    "Geschaeftsfuehrung",
-    "Projektleitung",
-    "projektleitung"
-}
-
-GESCHAEFTSLEITUNG_ALLOWED_ROLES = {
-    ROLE_GESCHAEFTSLEITUNG,
-    ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG,
-    ROLE_PROJEKTLEITUNG_ID,
-    "Geschäftsleitung",
-    "Geschaeftsleitung",
-    "Geschäftsführung",
-    "Geschaeftsfuehrung",
-    "geschäftsleitung",
-    "geschaeftsleitung",
-    "geschäftsführung",
-    "geschaeftsfuehrung",
-    "Projektleitung",
-    "projektleitung"
-}
-
-# Rollen, die die Dispo-Formularseite öffnen und Belege einreichen dürfen.
-# Der Zugriff auf /dispo/form ist bewusst breit, die Einsicht in eingereichte Dokumente bleibt getrennt.
-DISPO_FORM_ACCESS_ROLES = {
-    ROLE_FAHRER,
-    ROLE_FAHRER_ID,
-    ROLE_BUCHHALTUNG,
-    ROLE_BUCHHALTUNG_ID,
-    ROLE_HR_CONTROLLING,
-    ROLE_HR_CONTROLLING_ID,
-    ROLE_FUHRPARKMANAGEMENT,
-    ROLE_FUHRPARKMANAGEMENT_ID,
-    ROLE_PERSONALMANAGEMENT,
-    ROLE_PERSONALABTEILUNG_ID,
-    ROLE_DISPOSITION,
-    ROLE_DISPOSITION_ID,
-    ROLE_GESCHAEFTSLEITUNG,
-    ROLE_GESCHAEFTSFUEHRUNG_ID,
-    ROLE_PROJEKTLEITUNG,
-    ROLE_PROJEKTLEITUNG_ID,
-    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
-    ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID,
-    "Fahrer",
-    "fahrer",
-    "Buchhaltung",
-    "buchhaltung",
-    "HR-Controlling",
-    "HR Controlling",
-    "hr-controlling",
-    "hr controlling",
-    "Fuhrparkmanagement",
-    "fuhrparkmanagement",
-    "Personalmanagement",
-    "Personalabteilung",
-    "personalmanagement",
-    "personalabteilung",
-    "Disposition",
-    "Disponent",
-    "disposition",
-    "disponent",
-    "dispo",
-    "Geschäftsleitung",
-    "Geschaeftsleitung",
-    "Geschäftsführung",
-    "Geschaeftsfuehrung",
-    "Projektleitung",
-    "projektleitung",
-    "Stellvertretende Projektleitung",
-    "stellvertretende projektleitung"
-}
-
-# Nur diese Rolle sieht auf /dispo/form die Disponenten-Ansicht / Sektion „Eingereichte Dokumente“.
-DISPO_SUBMITTED_DOCUMENTS_ALLOWED_ROLES = {
-    ROLE_DISPOSITION,
-    ROLE_DISPOSITION_ID,
-    "Disposition",
-    "Disponent",
-    "disposition",
-    "disponent",
-    "dispo"
-}
-
-# Diese Rollen sollen die Sektion „Eingereichte Dokumente“ ausdrücklich nicht sehen.
-DISPO_SUBMITTED_DOCUMENTS_BLOCKED_ROLES = {
-    ROLE_HR_CONTROLLING,
-    ROLE_HR_CONTROLLING_ID,
-    ROLE_FAHRER,
-    ROLE_FAHRER_ID,
-    ROLE_BUCHHALTUNG,
-    ROLE_BUCHHALTUNG_ID,
-    ROLE_PERSONALMANAGEMENT,
-    ROLE_PERSONALABTEILUNG_ID,
-    ROLE_FUHRPARKMANAGEMENT,
-    ROLE_FUHRPARKMANAGEMENT_ID,
-    "HR-Controlling",
-    "HR Controlling",
-    "hr-controlling",
-    "hr controlling",
-    "Fahrer",
-    "fahrer",
-    "Buchhaltung",
-    "buchhaltung",
-    "Personalmanagement",
-    "Personalabteilung",
-    "personalmanagement",
-    "personalabteilung",
-    "Fuhrparkmanagement",
-    "fuhrparkmanagement"
-}
-
-
 # ==========================================
 # ALLGEMEINE HILFSFUNKTIONEN
 # ==========================================
-
-def now_utc():
-    return datetime.utcnow()
-
-
-
-def mongo_upsert_set_preserve_created_at(document):
-    """
-    Baut ein sicheres MongoDB-Upsert-Update.
-
-    Hintergrund:
-    MongoDB verbietet denselben Feldpfad gleichzeitig in $set und $setOnInsert.
-    Wenn ein Dokument also created_at enthält, darf created_at nicht zusätzlich
-    in $setOnInsert stehen, solange das komplette Dokument per $set gesetzt wird.
-
-    Diese Funktion entfernt created_at aus $set und setzt es nur beim Insert.
-    Dadurch bleibt created_at bei bestehenden Datensätzen stabil und bei neuen
-    Datensätzen trotzdem vorhanden.
-    """
-    set_fields = dict(document or {})
-    created_at_value = set_fields.pop("created_at", None)
-
-    update_doc = {"$set": set_fields}
-    if created_at_value is not None:
-        update_doc["$setOnInsert"] = {"created_at": created_at_value}
-
-    return update_doc
-
-
-def safe_str(value, fallback=""):
-    if value is None:
-        return fallback
-    return str(value).strip()
-
-
-def clean_roles(roles):
-    return [str(role).strip() for role in (roles or []) if role]
-
-
-def has_dashboard_permission(user_roles):
-    clean_user_roles = clean_roles(user_roles)
-    clean_allowed_roles = clean_roles(ALLOWED_HUB_ROLES)
-    return any(role in clean_user_roles for role in clean_allowed_roles)
-
-
-def has_disposition_permission(user_roles):
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_allowed_roles = set(clean_roles(DISPOSITION_ALLOWED_ROLES))
-    if clean_user_roles.intersection(clean_allowed_roles):
-        return True
-
-    primary_role_name = get_primary_role_name(user_roles)
-    return primary_role_name in {"Disposition", "Projektleitung", "Geschäftsleitung"}
-
-
-def has_geschaeftsleitung_permission(user_roles):
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_allowed_roles = set(clean_roles(GESCHAEFTSLEITUNG_ALLOWED_ROLES))
-    if clean_user_roles.intersection(clean_allowed_roles):
-        return True
-
-    primary_role_name = get_primary_role_name(user_roles)
-    return primary_role_name in {"Geschäftsleitung", "Geschäftsführung", "Projektleitung"}
-
-
-def has_admin_area_permission(user_roles):
-    """Admin-Area nur fuer die explizit erlaubten Discord-Rollen-IDs freigeben."""
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_allowed_roles = set(clean_roles(ADMIN_AREA_ALLOWED_ROLE_IDS))
-    return bool(clean_user_roles.intersection(clean_allowed_roles))
-
-
-def has_dispo_form_access(user_roles):
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_allowed_roles = set(clean_roles(DISPO_FORM_ACCESS_ROLES))
-    if clean_user_roles.intersection(clean_allowed_roles):
-        return True
-
-    # Fallback: Jeder eingeloggte Discord-Nutzer aus der App darf das Formular betreten.
-    return True
-
-
-def has_dispo_submitted_documents_permission(user_roles):
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_allowed_roles = set(clean_roles(DISPO_SUBMITTED_DOCUMENTS_ALLOWED_ROLES))
-
-    # Disposition überschreibt Basisrollen wie Fahrer, falls ein Disponent mehrere Discord-Rollen besitzt.
-    if clean_user_roles.intersection(clean_allowed_roles):
-        return True
-
-    primary_role_name = get_primary_role_name(user_roles)
-    return primary_role_name in {"Disposition"}
-
-
-def has_dispo_blocked_documents_role(user_roles):
-    clean_user_roles = set(clean_roles(user_roles))
-    clean_blocked_roles = set(clean_roles(DISPO_SUBMITTED_DOCUMENTS_BLOCKED_ROLES))
-    return bool(clean_user_roles.intersection(clean_blocked_roles))
-
-
-def get_primary_role_name(user_roles):
-    clean_user_roles = clean_roles(user_roles)
-
-    if str(ROLE_GESCHAEFTSLEITUNG).strip() in clean_user_roles or str(ROLE_GESCHAEFTSFUEHRUNG_ID).strip() in clean_user_roles: return "Geschäftsleitung"
-    if str(ROLE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Projektleitung"
-    if str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG).strip() in clean_user_roles or str(ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID).strip() in clean_user_roles: return "Stellvertretende Projektleitung"
-    if str(ROLE_DISPOSITION).strip() in clean_user_roles or str(ROLE_DISPOSITION_ID).strip() in clean_user_roles or "Disposition" in clean_user_roles or "Disponent" in clean_user_roles: return "Disposition"
-    if str(ROLE_PERSONALMANAGEMENT).strip() in clean_user_roles or str(ROLE_PERSONALABTEILUNG_ID).strip() in clean_user_roles: return "Personalmanagement"
-    if str(ROLE_HR_CONTROLLING).strip() in clean_user_roles or str(ROLE_HR_CONTROLLING_ID).strip() in clean_user_roles: return "HR-Controlling"
-    if "HR-Controlling" in clean_user_roles or "HR Controlling" in clean_user_roles: return "HR-Controlling"
-    if str(ROLE_BUCHHALTUNG).strip() in clean_user_roles or str(ROLE_BUCHHALTUNG_ID).strip() in clean_user_roles: return "Buchhaltung"
-    if str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles or str(ROLE_FUHRPARKMANAGEMENT_ID).strip() in clean_user_roles: return "Fuhrparkmanagement"
-    if str(ROLE_PROBEFAHRER).strip() in clean_user_roles or str(ROLE_PROBEFAHRER_ID).strip() in clean_user_roles or "Probefahrer" in clean_user_roles or "probefahrer" in clean_user_roles: return "Probefahrer"
-    if str(ROLE_FAHRER).strip() in clean_user_roles or str(ROLE_FAHRER_ID).strip() in clean_user_roles: return "Fahrer"
-
-    return "Fahrer"
-
-
-def normalize_username(username, fallback="driver"):
-    username = str(username or "").strip()
-    username = username.replace(" ", "-")
-    username = re.sub(r"[^A-Za-z0-9_.-]", "", username)
-    username = username[:32].strip(".-_")
-
-    if not username:
-        username = fallback
-    return username
-
 
 def username_exists(username, exclude_discord_id=None):
     username_lc = username.lower()
@@ -864,90 +487,6 @@ def build_qr_pdf_image(payload, image_name="QrCode1", size_px=420):
         "bits_per_component": 8,
         "payload": payload,
     }
-
-
-def format_datetime_for_template(value):
-    if isinstance(value, datetime):
-        return value.strftime("%d.%m.%Y %H:%M")
-    if value:
-        return str(value)
-    return ""
-
-
-def datetime_to_iso(value):
-    if isinstance(value, datetime):
-        return value.isoformat() + "Z"
-    if value:
-        return str(value)
-    return ""
-
-
-def parse_number(value, fallback=0.0):
-    """Parst JSON-, MongoDB- und deutsch formatierte Zahlen ohne Dezimalstellen zu verlieren.
-
-    Beispiele: 123.45, "123.45", "123,45" und "1.234,56 €".
-    """
-    if value is None:
-        return fallback
-    if isinstance(value, bool):
-        return 1.0 if value else 0.0
-    if isinstance(value, (int, float)):
-        number = float(value)
-        return number if math.isfinite(number) else fallback
-
-    text = str(value).strip()
-    if not text:
-        return fallback
-
-    text = text.replace("\u00a0", " ").replace("€", "").replace("%", "")
-    text = re.sub(r"(?i)km", "", text)
-    text = text.replace(" ", "").replace("'", "")
-    text = re.sub(r"[^0-9,.+\-]", "", text)
-
-    if text in {"", "+", "-", ".", ",", "+.", "-.", "+,", "-,"}:
-        return fallback
-
-    if "," in text and "." in text:
-        # Das zuletzt vorkommende Trennzeichen ist die Dezimalstelle.
-        if text.rfind(",") > text.rfind("."):
-            text = text.replace(".", "").replace(",", ".")
-        else:
-            text = text.replace(",", "")
-    elif "," in text:
-        parts = text.split(",")
-        if len(parts) > 2:
-            text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
-        else:
-            text = text.replace(",", ".")
-    elif text.count(".") > 1:
-        parts = text.split(".")
-        text = "".join(parts[:-1]) + "." + parts[-1] if len(parts[-1]) in {1, 2} else "".join(parts)
-
-    try:
-        number = float(text)
-        return number if math.isfinite(number) else fallback
-    except Exception:
-        return fallback
-
-
-def first_present_value(source, *keys, fallback=None):
-    """Liest den ersten gesetzten Wert. Anders als `or` bleiben 0 und False erhalten."""
-    source = source or {}
-    for key in keys:
-        if key in source and source.get(key) not in [None, ""]:
-            return source.get(key)
-    return fallback
-
-
-def first_present_number(source, *keys, fallback=0.0):
-    return parse_number(first_present_value(source, *keys, fallback=fallback), fallback)
-
-
-def parse_int(value, fallback=0):
-    try:
-        return int(round(parse_number(value, fallback)))
-    except Exception:
-        return fallback
 
 
 # ==========================================
@@ -1665,16 +1204,6 @@ def get_profile_stats(user_doc):
     }
 
 
-def load_json_file(path):
-    if not os.path.exists(path): return []
-    try:
-        with open(path, "r", encoding="utf-8") as file:
-            return json.load(file)
-    except Exception as error:
-        print(f"Fehler beim Laden von {path}: {error}")
-        return []
-
-
 # ==========================================
 # WARTUNGSMODUS / GLOBALER LOGIN-SPERRSCHALTER
 # ==========================================
@@ -1948,7 +1477,7 @@ def inject_wartung_template_context():
 @app.before_request
 def enforce_global_wartungsmodus():
     path = request.path or ""
-    endpoint = request.endpoint or ""
+    endpoint = (request.endpoint or "").rsplit(".", 1)[-1]
 
     if request.method == "OPTIONS":
         return None
@@ -1975,8 +1504,6 @@ def enforce_global_wartungsmodus():
     return maintenance_block_response(config)
 
 
-@app.route("/api/wartungsarbeiten", methods=["GET", "POST"])
-@app.route("/api/wartungsarbeiten/<state>", methods=["GET", "POST"])
 def api_wartungsarbeiten(state=None):
     config = load_wartung_config()
 
@@ -14475,9 +14002,6 @@ def store_tracker_webhook_completed_job(payload):
     }
 
 
-@app.route("/webhook", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/webhook", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/discord/webhook", methods=["GET", "POST", "OPTIONS"])
 
 def tracker_local_webhook():
     if request.method == "OPTIONS":
@@ -14561,7 +14085,6 @@ def tracker_local_webhook():
         "discord": discord_result
     }), status_code
 
-@app.route("/api/tracker/feierabend", methods=["POST", "OPTIONS"])
 @tracker_api_key_required
 def tracker_feierabend():
     if request.method == "OPTIONS":
@@ -14622,8 +14145,6 @@ def tracker_feierabend():
 # ROUTES - ÖFFENTLICH
 # ==========================================
 
-@app.route("/")
-@app.route("/index.html")
 def home():
     title = "Eifel LOG - Virtuelle Spedition"
 
@@ -14639,15 +14160,11 @@ def home():
         description=description
     )
 
-@app.route("/about")
-@app.route("/about.html")
 def about():
     title = "Über Eifel LOG - Virtuelle Spedition"
     description = ("Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.")
     return render_template("about.html", title=title, description=description)
 
-@app.route("/changelog")
-@app.route("/changelog.html")
 def changelog():
     title = "Changelog - Eifel LOG"
 
@@ -14803,7 +14320,6 @@ def changelog():
     )
 
 
-@app.route("/login")
 def login():
     # Auch im Wartungsmodus muss /login erreichbar bleiben, damit Discord nach dem
     # OAuth-Callback die Rollen prüfen kann. Nicht freigegebene Rollen werden in
@@ -14813,7 +14329,6 @@ def login():
     )
     return redirect(auth_url)
 
-@app.route("/callback")
 def callback():
     code = request.args.get("code")
     if not code:
@@ -14947,7 +14462,6 @@ def callback():
         return redirect(post_login_redirect)
     return redirect(url_for("dashboard"))
 
-@app.route("/logout")
 def logout():
     session.pop("user", None)
     flash("Erfolgreich abgemeldet.", "success")
@@ -14960,7 +14474,6 @@ def logout():
 # TRACKER API
 # ==========================================
 
-@app.route("/api/tracker/login", methods=["GET", "POST", "OPTIONS"])
 def tracker_login():
     if request.method == "OPTIONS": return jsonify({"success": True})
     if request.method == "GET": return jsonify({"success": False, "message": "Method not allowed"}), 200
@@ -15014,7 +14527,6 @@ def tracker_login():
         "profile": tracker_profile_payload(fresh_user)
     })
 
-@app.route("/api/tracker/session", methods=["GET", "POST", "OPTIONS"])
 def tracker_session_login():
     if request.method == "OPTIONS": return jsonify({"success": True})
     if request.method == "GET": return jsonify({"success": False, "message": "Method not allowed"}), 200
@@ -15032,7 +14544,6 @@ def tracker_session_login():
 
     return jsonify({"success": True, "message": "Tracker-Sitzung gültig.", "profile": tracker_profile_payload(fresh_user)})
 
-@app.route("/api/tracker/profile", methods=["GET", "POST", "OPTIONS"])
 def tracker_profile():
     if request.method == "OPTIONS": return jsonify({"success": True})
     data = request.get_json(silent=True) or {}
@@ -15045,7 +14556,6 @@ def tracker_profile():
 
     return jsonify({"success": True, "profile": tracker_profile_payload(user_doc)})
 
-@app.route("/api/tracker/state", methods=["GET", "POST", "OPTIONS"])
 def tracker_state():
     if request.method == "OPTIONS": return jsonify({"success": True})
     data = request.get_json(silent=True) or {}
@@ -15062,8 +14572,6 @@ def tracker_state():
     return jsonify(tracker_state_payload(fresh_user))
 
 
-@app.route("/api/dashboard/state", methods=["GET", "OPTIONS"])
-@app.route("/api/dashboard/data", methods=["GET", "OPTIONS"])
 def dashboard_state_api():
     """Session-basierter JSON-Zustand fuer dashboard.html.
 
@@ -15116,10 +14624,6 @@ def dashboard_state_api():
     })
 
 
-@app.route("/api/tracker/company/stats", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/company/state", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/company/stats", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/dashboard/company/stats", methods=["GET", "POST", "OPTIONS"])
 def api_company_stats():
     """MongoDB-basierte Company-All-Time-Werte fuer Tracker- und Web-Dashboards."""
     if request.method == "OPTIONS":
@@ -15152,8 +14656,6 @@ def api_company_stats():
     })
 
 
-@app.route("/api/tracker/company/reset", methods=["POST", "OPTIONS"])
-@app.route("/api/company/reset", methods=["POST", "OPTIONS"])
 @tracker_api_key_required
 def api_reset_company_stats():
     if request.method == "OPTIONS":
@@ -15171,7 +14673,6 @@ def api_reset_company_stats():
         "updatedAt": datetime_to_iso(reset_doc.get("updated_at"))
     })
 
-@app.route("/api/tracker/telemetry/live", methods=["GET", "POST", "OPTIONS"])
 def tracker_telemetry_live():
     if request.method == "OPTIONS": return jsonify({"success": True})
     if request.method == "GET": return jsonify({"success": False, "message": "Method not allowed"}), 200
@@ -15243,7 +14744,6 @@ def tracker_telemetry_live():
 
     return jsonify(tracker_state_payload(fresh_user))
 
-@app.route("/api/tracker/driver-card", methods=["GET", "POST", "OPTIONS"])
 def tracker_driver_card():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -15253,7 +14753,7 @@ def tracker_driver_card():
     if error_response:
         return error_response
 
-    if request.method == "POST":
+    if request.method in {"POST", "PUT", "PATCH"}:
         incoming = data.get("driverCard") or data.get("driver_card") or data.get("card") or {}
         latest_request = tracker_latest_issued_fahrerkarte_request(user_doc)
         card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="tracker_manual_sync", extra=incoming)
@@ -15380,8 +14880,6 @@ def tracker_resolve_issued_fahrerkarte_request_for_pin(user_doc, card_id=""):
     return None, "Mehrere Fahrerkarte-Datensätze gefunden. Sende die Karten-ID für eine eindeutige PIN-Prüfung mit.", 409
 
 
-@app.route("/api/tracker/driver-card/pin/verify", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/pin/verify", methods=["POST", "OPTIONS"])
 def tracker_driver_card_pin_verify():
     """Prüft ausschließlich die persönliche PIN der übermittelten Fahrerkarte serverseitig."""
     if request.method == "OPTIONS":
@@ -15430,10 +14928,6 @@ def tracker_driver_card_pin_verify():
     }), status_code
 
 
-@app.route("/api/tracker/driver-card/upload", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/upload", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/pdf/upload", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/file", methods=["POST", "OPTIONS"])
 def tracker_driver_card_upload():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -15525,12 +15019,6 @@ def tracker_driver_card_upload():
     })
 
 
-@app.route("/api/tracker/driver-card/pdf", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/pdf/<card_id>", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/download", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/download/<card_id>", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/pdf", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/pdf/<card_id>", methods=["GET", "POST", "OPTIONS"])
 def tracker_driver_card_pdf_download(card_id=""):
     """Liefert die Fahrerkarte als Download oder direkt einbettbare PDF-Vorschau.
 
@@ -15707,12 +15195,6 @@ def tracker_extract_pdf_shift_for_user(user_doc, payload=None, selector=""):
     return shift_doc, ""
 
 
-@app.route("/api/tracker/driver-card/extract/pdf", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/driver-card/extract/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/auszug/pdf", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/auszug/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/shift/pdf", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/shift/pdf/<selector>", methods=["GET", "POST", "OPTIONS"])
 def tracker_driver_card_extract_pdf_download(selector=""):
     """Liefert den echten Fahrerkarten-PDF-Auszug fuer WebView2 als Dateidownload."""
     if request.method == "OPTIONS":
@@ -15791,9 +15273,6 @@ def tracker_driver_card_extract_pdf_download(selector=""):
     return response
 
 
-@app.route("/api/tracker/work-session", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/worksession", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/arbeitszeit", methods=["GET", "POST", "OPTIONS"])
 def tracker_work_session():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -15804,7 +15283,7 @@ def tracker_work_session():
         return error_response
 
     daily_history = None
-    if request.method == "POST":
+    if request.method in {"POST", "PUT", "PATCH"}:
         incoming_session = tracker_work_session_from_request_payload(data)
         driver_card_id = safe_str(data.get("driverCardId") or data.get("driver_card_id"))
         session_doc = tracker_save_work_session(user_doc, incoming_session, driver_card_id=driver_card_id)
@@ -15851,13 +15330,6 @@ def tracker_work_session():
     })
 
 
-@app.route("/api/tracker/jobs/start", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/job/start", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/jobs/started", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/job/started", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/start-job", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/tour/start", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/tour/started", methods=["GET", "POST", "OPTIONS"])
 def tracker_jobs_start():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -16054,25 +15526,14 @@ def tracker_jobs_start():
 
 
 
-@app.route("/api/tracker/tour/submit", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/tour/complete", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/tour/completed", methods=["GET", "POST", "OPTIONS"])
 def tracker_tour_submit():
     return complete_tracker_tour_from_request()
 
 
-@app.route("/api/tracker/job/complete", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/jobs/complete", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/job/finish", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/jobs/finish", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/job/completed", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/jobs/completed", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/tracker/complete-job", methods=["GET", "POST", "OPTIONS"])
 def tracker_job_complete():
     return complete_tracker_tour_from_request()
 
 
-@app.route("/api/tracker/logout", methods=["GET", "POST", "OPTIONS"])
 def tracker_logout():
     if request.method == "OPTIONS": return jsonify({"success": True})
     if request.method == "GET": return jsonify({"success": False, "message": "Method not allowed"}), 200
@@ -16088,7 +15549,6 @@ def tracker_logout():
 
     return jsonify({"success": True, "message": "Tracker lokal abgemeldet."})
 
-@app.route("/api/tracker/code/create", methods=["GET", "POST", "OPTIONS"])
 @tracker_api_key_required
 def tracker_create_code_admin():
     if request.method == "OPTIONS": return jsonify({"success": True})
@@ -16122,7 +15582,6 @@ def tracker_create_code_admin():
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
     return jsonify({"success": True, "message": "Tracker-Code erstellt.", "trackerCode": tracker_code, "driver": tracker_profile_payload(fresh_user)})
 
-@app.route("/api/tracker/code/my", methods=["GET", "POST", "OPTIONS"])
 def tracker_create_code_for_logged_in_user():
     if request.method == "OPTIONS": return jsonify({"success": True})
     return jsonify({"success": False, "message": "Tokens werden nicht automatisch erstellt. Bitte Personalabteilung kontaktieren."}), 403
@@ -16132,7 +15591,6 @@ def tracker_create_code_for_logged_in_user():
 # ÖFFENTLICHE PROFILE
 # ==========================================
 
-@app.route("/profile")
 def my_profile_redirect():
     current_user = get_current_user()
     if not current_user:
@@ -16146,7 +15604,6 @@ def my_profile_redirect():
 
     return redirect(url_for("profile", username=username))
 
-@app.route("/profile/<username>", methods=["GET", "POST"])
 def profile(username):
     profile_user = find_user_by_username(username)
     if not profile_user: abort(404)
@@ -17246,7 +16703,6 @@ DASHBOARD_DETAIL_TEMPLATE = '''{% extends "base.html" %}
 {% endblock %}
 '''
 
-@app.route("/hub")
 def hub():
     wartung_config = load_wartung_config()
 
@@ -17518,8 +16974,6 @@ def build_driver_leaderboard_entries(limit=250, include_zero_km=True):
     return entries[:limit]
 
 
-@app.route("/leaderboard", methods=["GET"])
-@app.route("/leaderboard.html", methods=["GET"])
 def leaderboard():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -17556,7 +17010,6 @@ def leaderboard():
     )
 
 
-@app.route("/dashboard")
 def dashboard():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -17619,7 +17072,6 @@ def dashboard():
     )
 
 
-@app.route("/api/dashboard/instructions/update-wipe-info", methods=["GET", "OPTIONS"])
 def api_dashboard_update_wipe_info_status():
     """Liefert den serverseitigen Status der temporären Pflichtunterweisung."""
     if request.method == "OPTIONS":
@@ -17648,7 +17100,6 @@ def api_dashboard_update_wipe_info_status():
     })
 
 
-@app.route("/api/dashboard/instructions/update-wipe-info/acknowledge", methods=["POST", "OPTIONS"])
 def api_dashboard_acknowledge_update_wipe_info():
     """Speichert die verpflichtende Kenntnisnahme des eingeloggten Nutzers."""
     if request.method == "OPTIONS":
@@ -17700,8 +17151,6 @@ def api_dashboard_acknowledge_update_wipe_info():
     })
 
 
-@app.route("/admin", methods=["GET"])
-@app.route("/admin.html", methods=["GET"])
 def admin():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -17730,7 +17179,6 @@ def admin():
     )
 
 
-@app.route("/api/dashboard/loa/upcoming")
 def api_dashboard_loa_upcoming():
     if "user" not in session:
         return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
@@ -17756,7 +17204,6 @@ def api_dashboard_loa_upcoming():
     })
 
 
-@app.route("/api/dashboard/loa/<record_id>")
 def api_dashboard_loa_detail(record_id):
     if "user" not in session:
         return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
@@ -17988,8 +17435,6 @@ def require_dashboard_detail_access(error_message="Zugriff verweigert! Du benöt
     return None
 
 
-@app.route("/dashboard/detail", methods=["GET"])
-@app.route("/dashboard/detail.html", methods=["GET"])
 def dashboard_detail():
     denied_response = require_dashboard_detail_access(
         "Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen."
@@ -18000,10 +17445,6 @@ def dashboard_detail():
     return render_template("dashboard_detail.html", **build_dashboard_detail_context(logbook_limit=50))
 
 
-@app.route("/dashboard/gefahrene-km", methods=["GET"])
-@app.route("/dashboard/gefahrene-km/details", methods=["GET"])
-@app.route("/dashboard/gefahrene-km-details", methods=["GET"])
-@app.route("/dashboard/gefahrene_km_details.html", methods=["GET"])
 def dashboard_gefahrene_km_details():
     denied_response = require_dashboard_detail_access()
     if denied_response:
@@ -18012,10 +17453,6 @@ def dashboard_gefahrene_km_details():
     return render_template("gefahrene_km_details.html", **build_dashboard_detail_context(logbook_limit=100))
 
 
-@app.route("/dashboard/kontostand", methods=["GET"])
-@app.route("/dashboard/kontostand/details", methods=["GET"])
-@app.route("/dashboard/kontostand-details", methods=["GET"])
-@app.route("/dashboard/kontostand_details.html", methods=["GET"])
 def dashboard_kontostand_details():
     denied_response = require_dashboard_detail_access()
     if denied_response:
@@ -18024,10 +17461,6 @@ def dashboard_kontostand_details():
     return render_template("kontostand_details.html", **build_dashboard_detail_context(logbook_limit=100))
 
 
-@app.route("/dashboard/fahrer-level", methods=["GET"])
-@app.route("/dashboard/fahrer-level/details", methods=["GET"])
-@app.route("/dashboard/fahrer-level-details", methods=["GET"])
-@app.route("/dashboard/fahrer_level_details.html", methods=["GET"])
 def dashboard_fahrer_level_details():
     denied_response = require_dashboard_detail_access()
     if denied_response:
@@ -18036,11 +17469,6 @@ def dashboard_fahrer_level_details():
     return render_template("fahrer_level_details.html", **build_dashboard_detail_context(logbook_limit=100))
 
 
-@app.route("/dashboard/abgeschlossen", methods=["GET"])
-@app.route("/dashboard/abgeschlossene-touren", methods=["GET"])
-@app.route("/dashboard/abgeschlossene-touren/details", methods=["GET"])
-@app.route("/dashboard/abgeschlossene-touren-details", methods=["GET"])
-@app.route("/dashboard/abgeschlossene_touren_details.html", methods=["GET"])
 def dashboard_abgeschlossene_touren_details():
     denied_response = require_dashboard_detail_access()
     if denied_response:
@@ -18462,9 +17890,6 @@ def servicecenter_bildungen_document_content(request_doc, response_text, actor):
     '''
 
 
-@app.route("/bildungen", methods=["GET"])
-@app.route("/bildungen.html", methods=["GET"])
-@app.route("/servicecenter/bildungen", methods=["GET"])
 def bildungen():
     if "user" not in session:
         session["post_login_redirect"] = request.path
@@ -18505,7 +17930,6 @@ def bildungen():
     )
 
 
-@app.route("/servicecenter/bildungen/anmelden", methods=["POST"])
 def bildungen_anmelden():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -18565,7 +17989,6 @@ def bildungen_anmelden():
     return redirect(url_for("bildungen"))
 
 
-@app.route("/api/servicecenter/bildungen/<request_id>", methods=["GET"])
 def api_servicecenter_bildungen_request_detail(request_id):
     if "user" not in session:
         return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
@@ -18577,7 +18000,6 @@ def api_servicecenter_bildungen_request_detail(request_id):
     return jsonify({"success": True, "request": prepare_bildungen_request_for_user_json(request_doc)})
 
 
-@app.route("/api/servicecenter/bildungen/<request_id>/chat", methods=["POST"])
 def api_servicecenter_bildungen_user_chat_send(request_id):
     if "user" not in session:
         return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
@@ -18612,7 +18034,6 @@ def api_servicecenter_bildungen_user_chat_send(request_id):
     return jsonify({"success": True, "message": "Nachricht wurde gesendet.", "request": prepare_bildungen_request_for_user_json(fresh_request)})
 
 
-@app.route("/api/servicecenter/bildungen/<request_id>/withdraw", methods=["POST"])
 def api_servicecenter_bildungen_withdraw(request_id):
     if "user" not in session:
         return jsonify({"success": False, "message": "Bitte logge dich zuerst ein."}), 401
@@ -18694,19 +18115,14 @@ def update_bildungen_appointment_from_user(request_id, decision):
     return jsonify({"success": True, "message": f"Der Termin wurde {decision_text}.", "request": prepare_bildungen_request_for_user_json(fresh_request)})
 
 
-@app.route("/api/servicecenter/bildungen/<request_id>/appointment/confirm", methods=["POST"])
 def api_servicecenter_bildungen_appointment_confirm(request_id):
     return update_bildungen_appointment_from_user(request_id, "confirmed")
 
 
-@app.route("/api/servicecenter/bildungen/<request_id>/appointment/decline", methods=["POST"])
 def api_servicecenter_bildungen_appointment_decline(request_id):
     return update_bildungen_appointment_from_user(request_id, "declined")
 
 
-@app.route("/servicecenter", methods=["GET"])
-@app.route("/EifellogServiceCenter", methods=["GET"])
-@app.route("/EifellogServiceCenter.html", methods=["GET"])
 def servicecenter():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -18748,12 +18164,10 @@ def servicecenter():
     )
 
 
-@app.route("/servicecenter/fahrerkarte", methods=["GET"])
 def servicecenter_fahrerkarte():
     return servicecenter()
 
 
-@app.route("/servicecenter/fahrerkarte/pin/<request_id>", methods=["GET"])
 def servicecenter_fahrerkarte_pin_reveal(request_id):
     """Liefert den PIN erst nach bewusster Aktion ausschließlich an den eingeloggten Karteninhaber."""
     if "user" not in session:
@@ -18879,7 +18293,6 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
     return response
 
 
-@app.route("/servicecenter/fahrerkarte/beantragen", methods=["POST"])
 def servicecenter_fahrerkarte_beantragen():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -19019,7 +18432,6 @@ def servicecenter_fahrerkarte_beantragen():
     return redirect(url_for("servicecenter"))
 
 
-@app.route("/api/fahrer_registration", methods=["POST"])
 def api_fahrer_registration():
     if "user" not in session: return jsonify({"success": False, "message": "Bitte zuerst einloggen."}), 401
 
@@ -19083,7 +18495,6 @@ def api_fahrer_registration():
 
     return jsonify({"success": True, "message": "Deine Fahrer-Registrierung wurde an die Personalabteilung gesendet.", "requestId": request_id, "status": "pending", "deadline": request_doc["deadline_display"]})
 
-@app.route("/api/new_token_request", methods=["POST"])
 def api_new_token_request():
     if "user" not in session: return jsonify({"success": False, "message": "Bitte zuerst einloggen."}), 401
     session_user = session.get("user") or {}
@@ -19147,7 +18558,6 @@ def api_new_token_request():
 # STANDARD ROUTEN
 # ==========================================
 
-@app.route("/tutorial")
 def tutorial():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -19180,7 +18590,6 @@ def tutorial():
     return render_template(template_name, current_user=user, primary_role_name=role_name)
 
 
-@app.route("/downloads")
 def downloads():
     title = "Downloads - Eifel LOG"
 
@@ -19198,8 +18607,6 @@ def downloads():
         description=description
     )
 
-@app.route("/fuhrpark")
-@app.route("/fuhrpark.html")
 def fuhrpark():
     title = "Fuhrpark - Eifel LOG"
 
@@ -19209,7 +18616,6 @@ def fuhrpark():
     )
     return render_template("fuhrpark.html", description=description)
 
-@app.route("/impressum")
 def impressum():
     title = "Impressum - Eifel LOG"
 
@@ -19226,8 +18632,6 @@ def impressum():
     )
 
  
-@app.route("/team")
-@app.route("/team.html")
 def team():
     title = "Team - Eifel LOG"
 
@@ -19464,10 +18868,6 @@ def get_dispo_available_drivers(limit=100):
     return drivers
 
 
-@app.route("/disposition.html", methods=["GET"])
-@app.route("/disposition", methods=["GET"])
-@app.route("/dispo.html", methods=["GET"])
-@app.route("/dispo", methods=["GET"])
 def dispo():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -19535,7 +18935,6 @@ def dispo():
     )
 
 
-@app.route("/dispo/tour/create", methods=["POST"])
 def dispo_create_tour():
     permission_response = require_disposition_permission()
     if permission_response:
@@ -19593,7 +18992,6 @@ def dispo_create_tour():
     return redirect(url_for("dispo"))
 
 
-@app.route("/dispo/note/create", methods=["POST"])
 def dispo_create_note():
     permission_response = require_disposition_permission()
     if permission_response:
@@ -19623,8 +19021,6 @@ def dispo_create_note():
     return redirect(url_for("dispo"))
 
 
-@app.route("/dispo/tour/assign", methods=["POST"])
-@app.route("/dispo/tour/<tour_id>/assign", methods=["POST"])
 def dispo_assign_tour(tour_id=None):
     permission_response = require_disposition_permission()
     if permission_response:
@@ -20188,8 +19584,6 @@ def load_active_dispo_form_entry(document_id):
     })
 
 
-@app.route("/dispo/form", methods=["GET"])
-@app.route("/dispo_form.html", methods=["GET"])
 def dispo_form():
     permission_response = require_dispo_form_access()
     if permission_response:
@@ -20269,7 +19663,6 @@ def dispo_form():
     )
 
 
-@app.route("/dispo/form/manual", methods=["POST"])
 def dispo_form_manual_submit():
     permission_response = require_dispo_form_access()
     if permission_response:
@@ -20334,7 +19727,6 @@ def dispo_form_manual_submit():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/documents/upload", methods=["POST"])
 def dispo_form_documents_upload():
     permission_response = require_dispo_form_access()
     if permission_response:
@@ -20419,7 +19811,6 @@ def dispo_form_documents_upload():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/file/<entry_id>/<filename>", methods=["GET"])
 def dispo_form_file_download(entry_id, filename):
     permission_response = require_dispo_form_access()
     if permission_response:
@@ -20465,7 +19856,6 @@ def dispo_form_file_download(entry_id, filename):
     )
 
 
-@app.route("/dispo/form/<entry_id>/status", methods=["POST"])
 def dispo_form_update_status(entry_id):
     permission_response = require_dispo_form_access()
     if permission_response:
@@ -20507,7 +19897,6 @@ def dispo_form_update_status(entry_id):
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/users", methods=["GET"])
 def dispo_form_users_api():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20522,7 +19911,6 @@ def dispo_form_users_api():
     })
 
 
-@app.route("/dispo/form/documents/edit", methods=["POST"])
 def dispo_form_document_edit():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20587,7 +19975,6 @@ def dispo_form_document_edit():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/documents/assign-user", methods=["POST"])
 def dispo_form_document_assign_user():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20652,7 +20039,6 @@ def dispo_form_document_assign_user():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/documents/review", methods=["POST"])
 def dispo_form_document_review():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20708,7 +20094,6 @@ def dispo_form_document_review():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/documents/sign", methods=["POST"])
 def dispo_form_document_sign():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20767,7 +20152,6 @@ def dispo_form_document_sign():
     return redirect(url_for("dispo_form"))
 
 
-@app.route("/dispo/form/documents/forward-management", methods=["POST"])
 def dispo_form_document_forward_management():
     permission_response = require_dispo_document_management_permission()
     if permission_response:
@@ -20828,12 +20212,6 @@ def dispo_form_document_forward_management():
 # GESCHÄFTSLEITUNG / DOKUMENTPRÜFUNG
 # ==========================================
 
-@app.route("/management", methods=["GET"])
-@app.route("/geschaeftsfuehrung.html", methods=["GET"])
-@app.route("/geschaeftsfuehrung", methods=["GET"])
-@app.route("/geschaeftsleitung.html", methods=["GET"])
-@app.route("/geschaeftsleitung/dokumente", methods=["GET"])
-@app.route("/geschaeftsleitung", methods=["GET"])
 def geschaeftsleitung():
     permission_response = require_geschaeftsleitung_permission()
     if permission_response:
@@ -20874,7 +20252,6 @@ def geschaeftsleitung():
     )
 
 
-@app.route("/geschaeftsleitung/dispo-documents/approve", methods=["POST"])
 def geschaeftsleitung_approve_dispo_document():
     permission_response = require_geschaeftsleitung_permission()
     if permission_response:
@@ -20924,7 +20301,6 @@ def geschaeftsleitung_approve_dispo_document():
     return redirect(url_for("geschaeftsleitung"))
 
 
-@app.route("/geschaeftsleitung/dispo-documents/return", methods=["POST"])
 def geschaeftsleitung_return_dispo_document():
     permission_response = require_geschaeftsleitung_permission()
     if permission_response:
@@ -21237,7 +20613,6 @@ def refresh_driver_card_snapshot_for_personalabteilung(user_doc, card_doc=None, 
 
     return card_doc
 
-@app.route("/api/hr/driver-card/pdf/<user_id>/<date_str>")
 def generate_driver_card_pdf(user_id, date_str):
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -21697,7 +21072,6 @@ def hr_last_sync_timestamp():
 
     return hr_datetime_for_api(max(latest_candidates))
 
-@app.route("/api/hr/driver_card_log/<discord_id>/<date_str>", methods=["GET"])
 def hr_get_driver_card_log(discord_id, date_str):
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -21720,7 +21094,6 @@ def hr_get_driver_card_log(discord_id, date_str):
         "data": driver_shift_log_for_api(shift_log)
     })
 
-@app.route("/api/hr/download_shift_pdf/<shift_id>", methods=["GET"])
 def hr_download_shift_pdf(shift_id):
     user_doc = get_current_user()
     if not user_doc:
@@ -21768,7 +21141,6 @@ def hr_download_shift_pdf(shift_id):
     response.headers["X-EifelLog-Shift-Id"] = safe_str(shift_log.get("shift_id"))
     return response
 
-@app.route("/api/hr-controlling/system/status", methods=["GET", "OPTIONS"])
 def api_hr_controlling_system_status():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -21800,7 +21172,6 @@ def api_hr_controlling_system_status():
     }), 200 if connected else 503
 
 
-@app.route("/api/hr-controlling/personalakten", methods=["GET", "POST", "OPTIONS"])
 def api_hr_controlling_personalakten():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -21863,7 +21234,6 @@ def api_hr_controlling_personalakten():
     }), 201 if not existing else 200
 
 
-@app.route("/api/hr-controlling/personalakten/<employee_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
 def api_hr_controlling_personalakte_detail(employee_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -21925,7 +21295,6 @@ def api_hr_controlling_personalakte_detail(employee_id):
     })
 
 
-@app.route("/api/hr-controlling/checkliste", methods=["GET", "POST", "OPTIONS"])
 def api_hr_controlling_checkliste():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -22016,7 +21385,6 @@ def api_hr_controlling_checkliste():
     }), 201 if not existing else 200
 
 
-@app.route("/api/hr-controlling/checkliste/<item_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
 def api_hr_controlling_checkliste_detail(item_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -22074,7 +21442,6 @@ def api_hr_controlling_checkliste_detail(item_id):
     })
 
 
-@app.route("/api/hr-controlling/prozessplan", methods=["GET", "POST", "OPTIONS"])
 def api_hr_controlling_prozessplan():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -22126,7 +21493,6 @@ def api_hr_controlling_prozessplan():
     }), 201 if not existing else 200
 
 
-@app.route("/controlling", methods=["GET"])
 def hr_controlling():
     permission_response = require_personalabteilung_permission()
     if permission_response:
@@ -22135,7 +21501,6 @@ def hr_controlling():
     return render_template("HR-Controlling.html")
 
 
-@app.route("/personalabteilung", methods=["GET"])
 def personalabteilung():
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -22275,10 +21640,6 @@ FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
     default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
 )
 
-@app.route("/api/tracker/activity-state", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/driver-activity", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/fahrerkarte/state", methods=["POST", "OPTIONS"])
-@app.route("/api/tracker/state/update", methods=["POST", "OPTIONS"])
 def update_driver_state():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -23421,7 +22782,6 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
     return report_doc
 
 
-@app.route("/api/personalabteilung/fahrerkarte/data/query", methods=["POST", "OPTIONS"])
 def api_personalabteilung_fahrerkarte_data_query():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -23479,9 +22839,6 @@ def api_personalabteilung_fahrerkarte_data_query():
         return personalabteilung_json_error(f"Fahrerkarten-Daten konnten nicht abgefragt werden: {error}", 500)
 
 
-@app.route("/api/personalabteilung/fahrerkarte/daily-times", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/personalabteilung/fahrerkarte/times", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/personalabteilung/fahrerkarte/day", methods=["GET", "POST", "OPTIONS"])
 def api_personalabteilung_fahrerkarte_daily_times():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -23544,7 +22901,6 @@ def api_personalabteilung_fahrerkarte_daily_times():
         return personalabteilung_json_error(f"Fahrerkarten-Zeiten konnten nicht geladen werden: {error}", 500)
 
 
-@app.route("/api/personalabteilung/fahrerkarte/pdf/create", methods=["POST", "OPTIONS"])
 def api_personalabteilung_fahrerkarte_pdf_create():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -23587,7 +22943,6 @@ def api_personalabteilung_fahrerkarte_pdf_create():
         return personalabteilung_json_error(f"PDF-Beleg konnte nicht erstellt werden: {error}", 500)
 
 
-@app.route("/api/personalabteilung/fahrerkarte/pdf/send", methods=["POST", "OPTIONS"])
 def api_personalabteilung_fahrerkarte_pdf_send():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -23645,7 +23000,6 @@ def api_personalabteilung_fahrerkarte_pdf_send():
         return personalabteilung_json_error(f"PDF-Beleg konnte nicht gesendet werden: {error}", 500)
 
 
-@app.route("/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf", methods=["POST", "OPTIONS"])
 def api_personalabteilung_fahrerkarte_lenk_ruhe_pdf():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -24281,8 +23635,6 @@ loadCases();
 """
 
 
-@app.route("/personalabteilung/servicecenter/fahrerkarte", methods=["GET"])
-@app.route("/servicecenter/admin/fahrerkarte", methods=["GET"])
 def personalabteilung_servicecenter_fahrerkarte_web():
     permission_response = require_personalabteilung_permission()
     if permission_response:
@@ -24360,8 +23712,6 @@ document.getElementById('filter-search').addEventListener('keydown',event=>{if(e
 """
 
 
-@app.route("/personalabteilung/servicecenter/fahrerkarte/weiterbildungen", methods=["GET"])
-@app.route("/servicecenter/admin/fahrerkarte/weiterbildungen", methods=["GET"])
 def personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web():
     permission_response = require_personalabteilung_permission()
     if permission_response:
@@ -24386,7 +23736,6 @@ def personalabteilung_servicecenter_fahrerkarte_weiterbildungen_web():
     )
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen", methods=["GET"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list():
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -24425,7 +23774,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_list():
     return jsonify({"success": True, "requests": items, "items": items, "stats": stats})
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/claim", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_claim():
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -24463,7 +23811,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_claim():
     return jsonify({"success": True, "message": "Weiterbildungs-Antrag wurde geclaimt.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/update", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update():
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -24552,7 +23899,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_update():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/appointment-proposal", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_appointment_proposal():
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -24631,7 +23977,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_appointment_
     return jsonify({"success": True, "message": "Terminvorschlag wurde gespeichert und direkt an den User gesendet.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/<request_id>/chat", methods=["GET", "POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_chat(request_id):
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -24681,7 +24026,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_chat(request
     return jsonify({"success": True, "message": "Chat-Nachricht wurde gesendet.", "request": prepare_bildungen_request_for_personalabteilung(fresh_request)})
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/weiterbildungen/archive", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_weiterbildungen_archive():
     permission_response = require_personalabteilung_api_permission()
     if permission_response:
@@ -25299,7 +24643,6 @@ def get_all_drivers_for_select():
     return drivers
 
 
-@app.route("/buchhaltung", methods=["GET"])
 def buchhaltung():
     permission_response = require_buchhaltung_permission()
     if permission_response:
@@ -25341,7 +24684,6 @@ def buchhaltung():
     )
 
 
-@app.route("/api/buchhaltung/entries", methods=["GET", "POST", "OPTIONS"])
 def api_buchhaltung_entries():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -25418,7 +24760,6 @@ def api_buchhaltung_entries():
     }), 201
 
 
-@app.route("/api/buchhaltung/entries/<entry_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
 def api_buchhaltung_entry_detail(entry_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -25543,7 +24884,6 @@ def api_buchhaltung_entry_detail(entry_id):
     })
 
 
-@app.route("/api/buchhaltung/entries/<entry_id>/pdf", methods=["GET", "OPTIONS"])
 def api_buchhaltung_entry_pdf(entry_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -25605,7 +24945,6 @@ def api_buchhaltung_entry_pdf(entry_id):
     )
 
 
-@app.route("/api/buchhaltung/request", methods=["GET", "POST", "OPTIONS"])
 def api_buchhaltung_request():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -25681,7 +25020,6 @@ def api_buchhaltung_request():
     })
 
 
-@app.route("/personalabteilung/dokumente", methods=["GET", "POST"])
 def personalabteilung_dokumente():
     permission_response = require_personalabteilung_permission()
     if permission_response:
@@ -25762,7 +25100,6 @@ def personalabteilung_dokumente():
     )
 
 
-@app.route("/api/personalabteilung/driver/document/send", methods=["POST"])
 def api_personalabteilung_send_document():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -25857,8 +25194,6 @@ def api_personalabteilung_send_document():
     })
 
 
-@app.route("/api/personalabteilung/driver/document/issue-fahrerkarte", methods=["POST"])
-@app.route("/api/personalabteilung/driver/fahrerkarte/ausstellen", methods=["POST"])
 def api_personalabteilung_issue_driver_fahrerkarte():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -25916,7 +25251,6 @@ def api_personalabteilung_issue_driver_fahrerkarte():
 # PERSONALABTEILUNG - SERVICECENTER FAHRERKARTE
 # ==========================================
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte", methods=["GET"])
 def api_personalabteilung_servicecenter_fahrerkarte_list():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -25933,7 +25267,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_list():
     return jsonify({"success": True, "requests": items, "items": items})
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/claim", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_claim():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -25987,7 +25320,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_claim():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/approve", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_approve():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26057,7 +25389,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_approve():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/issue", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_issue():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26175,7 +25506,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/pin/reissue", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_pin_reissue():
     """Erstellt bei Verlust eine neue PIN. Der alte PIN wird unmittelbar ungültig."""
     permission_response = require_personalabteilung_api_permission()
@@ -26232,7 +25562,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_pin_reissue():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/reject", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_reject():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26291,7 +25620,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_reject():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/postpone", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_postpone():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26375,7 +25703,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_postpone():
     })
 
 
-@app.route("/api/personalabteilung/servicecenter/fahrerkarte/discord-sync", methods=["POST"])
 def api_personalabteilung_servicecenter_fahrerkarte_discord_sync():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26399,7 +25726,6 @@ def api_personalabteilung_servicecenter_fahrerkarte_discord_sync():
     })
 
 
-@app.route("/servicecenter/fahrerkarte/download/<request_id>", methods=["GET"])
 def servicecenter_fahrerkarte_download(request_id):
     if "user" not in session:
         flash("Bitte logge dich zuerst ein.", "error")
@@ -26457,7 +25783,6 @@ def servicecenter_fahrerkarte_download(request_id):
     response.headers["X-EifelLog-Driver-Card-Id"] = safe_str(request_doc.get("card_id"))
     return response
 
-@app.route("/api/personalabteilung/fahrer_registration/claim", methods=["POST"])
 def api_personalabteilung_claim_registration():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26487,7 +25812,6 @@ def api_personalabteilung_claim_registration():
     users_collection.update_one({"discord_id": str(request_doc.get("discord_id"))}, {"$set": {"fahrer_registration_status": "claimed", "fahrer_registration_handler": actor.get("display_name"), "fahrer_registration_claimed_at": now}})
     return jsonify({"success": True, "message": "Antrag wurde geclaimt. Du kannst ihn jetzt annehmen oder ablehnen.", "handlerName": actor.get("display_name"), "status": "claimed"})
 
-@app.route("/api/personalabteilung/fahrer_registration/approve", methods=["POST"])
 def api_personalabteilung_approve_registration():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26552,7 +25876,6 @@ def api_personalabteilung_approve_registration():
 
     return jsonify({"success": True, "message": "Fahrer wurde genehmigt. Token und Aktenzeichen ins System-Postfach gesendet.", "status": "approved", "handlerName": handler_name, "trackerCode": tracker_code})
 
-@app.route("/api/personalabteilung/fahrer_registration/reject", methods=["POST"])
 def api_personalabteilung_reject_registration():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26580,7 +25903,6 @@ def api_personalabteilung_reject_registration():
 
     return jsonify({"success": True, "message": "Fahrer-Registrierung wurde abgelehnt.", "status": "rejected", "handlerName": handler_name})
 
-@app.route("/api/personalabteilung/token_request/approve", methods=["POST"])
 def api_personalabteilung_approve_token_request():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26613,7 +25935,6 @@ def api_personalabteilung_approve_token_request():
 
     return jsonify({"success": True, "message": "Neuer Token wurde erstellt und ins System-Postfach gesendet.", "status": "approved", "handlerName": handler_name, "trackerCode": tracker_code})
 
-@app.route("/api/personalabteilung/token_request/reject", methods=["POST"])
 def api_personalabteilung_reject_token_request():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -26636,7 +25957,6 @@ def api_personalabteilung_reject_token_request():
 
     return jsonify({"success": True, "message": "Token-Anfrage wurde abgelehnt.", "status": "rejected", "handlerName": handler_name})
 
-@app.route("/personalabteilung/tracker-code/create", methods=["POST"])
 def personalabteilung_create_tracker_code():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
@@ -27105,7 +26425,6 @@ def workspace_parse_since(value):
         return None
 
 
-@app.route("/api/workspace/system/status", methods=["GET", "OPTIONS"])
 def api_workspace_system_status():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27132,7 +26451,6 @@ def api_workspace_system_status():
     }), 200 if connected else 503
 
 
-@app.route("/api/workspace/auth/register", methods=["POST", "OPTIONS"])
 def api_workspace_auth_register():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27180,7 +26498,6 @@ def api_workspace_auth_register():
     return jsonify(workspace_bootstrap_payload(saved)), 201
 
 
-@app.route("/api/workspace/auth/login", methods=["POST", "OPTIONS"])
 def api_workspace_auth_login():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27198,7 +26515,6 @@ def api_workspace_auth_login():
     return jsonify(workspace_bootstrap_payload(account_doc))
 
 
-@app.route("/api/workspace/auth/logout", methods=["POST", "OPTIONS"])
 def api_workspace_auth_logout():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27206,8 +26522,6 @@ def api_workspace_auth_logout():
     return jsonify({"success": True, "message": "Workspace-Account wurde abgemeldet."})
 
 
-@app.route("/api/workspace/me", methods=["GET", "OPTIONS"])
-@app.route("/api/workspace/bootstrap", methods=["GET", "OPTIONS"])
 def api_workspace_bootstrap():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27217,7 +26531,6 @@ def api_workspace_bootstrap():
     return jsonify(workspace_bootstrap_payload(account_doc))
 
 
-@app.route("/api/workspace/account", methods=["PATCH", "OPTIONS"])
 def api_workspace_account_update():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27241,7 +26554,6 @@ def api_workspace_account_update():
     return jsonify({"success": True, "profile": workspace_profile_for_api(account_doc)})
 
 
-@app.route("/api/workspace/workspaces", methods=["GET", "POST", "OPTIONS"])
 def api_workspace_workspaces():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27295,7 +26607,6 @@ def api_workspace_workspaces():
     return jsonify({"success": True, "workspace": workspace_public_doc(workspace_doc), "folder": workspace_public_doc(folder_doc)}), 201
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
 def api_workspace_workspace_detail(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27332,7 +26643,6 @@ def api_workspace_workspace_detail(workspace_id):
     return jsonify({"success": True, "workspace": workspace_public_doc(saved)})
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>/members", methods=["GET", "POST", "OPTIONS"])
 def api_workspace_members(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27365,7 +26675,6 @@ def api_workspace_members(workspace_id):
     return jsonify({"success": True, "message": "Mitglied wurde hinzugefügt."})
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>/folders", methods=["GET", "POST", "OPTIONS"])
 def api_workspace_folders(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27399,7 +26708,6 @@ def api_workspace_folders(workspace_id):
     return jsonify({"success": True, "folder": workspace_public_doc(folder_doc)}), 201
 
 
-@app.route("/api/workspace/folders/<folder_id>", methods=["PATCH", "DELETE", "OPTIONS"])
 def api_workspace_folder_detail(folder_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27428,7 +26736,6 @@ def api_workspace_folder_detail(folder_id):
     return jsonify({"success": True, "folder": workspace_public_doc(workspace_folders_collection.find_one({"id": folder_id}))})
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>/project-maps", methods=["GET", "POST", "OPTIONS"])
 def api_workspace_project_maps(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27464,7 +26771,6 @@ def api_workspace_project_maps(workspace_id):
     return jsonify({"success": True, "projectMap": workspace_public_doc(project_doc), "project": workspace_public_doc(project_doc), "sheet": workspace_public_doc(sheet_doc)}), 201
 
 
-@app.route("/api/workspace/project-maps/<project_id>", methods=["PATCH", "DELETE", "OPTIONS"])
 def api_workspace_project_map_detail(project_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27493,7 +26799,6 @@ def api_workspace_project_map_detail(project_id):
     return jsonify({"success": True, "projectMap": workspace_public_doc(workspace_project_maps_collection.find_one({"id": project_id}))})
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>/sheets", methods=["GET", "POST", "OPTIONS"])
 def api_workspace_sheets(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27541,7 +26846,6 @@ def workspace_update_sheet_doc(sheet_doc, sheet_payload, account_doc, reason="ma
     return workspace_sheets_collection.find_one({"id": sheet_doc["id"]})
 
 
-@app.route("/api/workspace/sheets/<sheet_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
 def api_workspace_sheet_detail(sheet_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27572,7 +26876,6 @@ def api_workspace_sheet_detail(sheet_id):
     return jsonify({"success": True, "sheet": workspace_public_doc(saved), "lastSync": workspace_iso(saved.get("updated_at"))})
 
 
-@app.route("/api/workspace/workspaces/<workspace_id>/share", methods=["POST", "OPTIONS"])
 def api_workspace_share(workspace_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27619,7 +26922,6 @@ def api_workspace_share(workspace_id):
     return jsonify({"success": True, "invite": workspace_public_doc(invite_doc), "code": code, "message": "Einladung wurde erstellt."}), 201
 
 
-@app.route("/api/workspace/share/accept", methods=["POST", "OPTIONS"])
 def api_workspace_share_accept():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27650,7 +26952,6 @@ def api_workspace_share_accept():
     return jsonify({"success": True, "workspace": workspace_public_doc(workspace_doc), "message": "Workspace wurde angenommen."})
 
 
-@app.route("/api/workspace/events", methods=["GET", "OPTIONS"])
 def api_workspace_events():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27669,7 +26970,6 @@ def api_workspace_events():
     return jsonify({"success": True, "events": [workspace_public_doc(item) for item in events], "lastSync": workspace_iso(workspace_db_timestamp())})
 
 
-@app.route("/api/workspace/live/<workspace_id>", methods=["GET"])
 def api_workspace_live_stream(workspace_id):
     account_doc, error_response = workspace_require_account()
     if error_response:
@@ -27712,7 +27012,6 @@ def api_workspace_live_stream(workspace_id):
     })
 
 
-@app.route("/api/hr-controlling/tabellen-builder", methods=["GET", "POST", "OPTIONS"])
 def api_hr_controlling_tabellen_builder():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -27807,7 +27106,6 @@ def api_hr_controlling_tabellen_builder():
     })
 
 
-@app.route("/api/hr-controlling/tabellen-builder/live", methods=["GET"])
 def api_hr_controlling_tabellen_builder_live():
     permission_response = hr_api_permission_response()
     if permission_response:
@@ -27832,45 +27130,39 @@ def api_hr_controlling_tabellen_builder_live():
         "X-Accel-Buffering": "no",
         "Connection": "keep-alive",
     })
-
-
 # ==========================================
-# API ROUTEN
+# TRACKER-BLUEPRINT-FALLBACK FÜR LEGACY-STARTS
 # ==========================================
+def register_tracker_blueprint_for_legacy_app():
+    """Registriert die Tracker-Routen auch bei einem direkten Start von legacy.app.
 
-@app.route("/api/sign_policy", methods=["POST"])
-def sign_policy():
-    if "user" not in session: return jsonify({"success": False, "error": "Not logged in"}), 401
-    data = request.get_json() or {}
-    signature = data.get("signature")
-    if not signature: return jsonify({"success": False, "error": "No signature provided"}), 400
+    Die eigentliche Routing-Schicht bleibt in ``app.routes.tracker``. Einige
+    Deployment-Setups importieren jedoch weiterhin unmittelbar ``app.legacy:app``.
+    Ohne diesen Fallback wäre dann nur die Business-Logik geladen, nicht aber der
+    Tracker-Blueprint. Das führt bei vorhandenen Alt-Routen typischerweise zu
+    ``405 Method Not Allowed`` für schreibende Tracker-Anfragen.
 
-    users_collection.update_one({"discord_id": str(session["user"]["id"])}, {"$set": {"policy_signed": True, "policy_signature": signature, "policy_signed_at": datetime.utcnow()}})
-    return jsonify({"success": True})
+    Der alternative Blueprint-Name verhindert Namenskollisionen, falls ein
+    moderner App-Entrypoint den regulären Tracker-Blueprint anschließend noch
+    einmal unter seinem Standardnamen registriert.
+    """
+    required_path = "/api/tracker/work-session"
+    required_method = "POST"
 
-@app.route("/api/health")
-def health_check():
-    return jsonify({
-        "success": True,
-        "service": "EifelLog",
-        "database": MONGO_DB_NAME,
-        "time": now_utc().isoformat() + "Z",
-        "trackerJobStartUrl": TRACKER_JOB_START_PUBLIC_URL,
-        "trackerRoutes": [
-            "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
-            "/api/tracker/state", "/api/tracker/telemetry/live",
-            "/api/tracker/activity-state", "/api/tracker/driver-activity",
-            "/api/tracker/fahrerkarte/state", "/api/tracker/state/update",
-            "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
-            "/api/tracker/driver-card/extract/pdf/<shift_id>",
-            "/api/tracker/fahrerkarte/auszug/pdf/<shift_id>",
-            "/api/tracker/work-session", "/api/tracker/jobs/start",
-            TRACKER_JOB_START_PUBLIC_URL,
-            "/api/tracker/tour/start", "/api/tracker/tour/submit", "/api/tracker/tour/complete", "/api/tracker/job/complete", "/api/tracker/jobs/completed", "/api/tracker/logout",
-            "/api/hr/driver_card_log/<discord_id>/<date_str>",
-            "/api/hr/driver-card/pdf/<user_id>/<date_str>",
-            "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
-        ]
-    })
+    for rule in app.url_map.iter_rules():
+        if rule.rule == required_path and required_method in (rule.methods or set()):
+            return
+
+    from app.routes.tracker import tracker_bp
+
+    compatibility_blueprint_name = "legacy_tracker_compat"
+    if compatibility_blueprint_name in app.blueprints:
+        return
+
+    app.register_blueprint(
+        tracker_bp,
+        name=compatibility_blueprint_name,
+    )
 
 
+register_tracker_blueprint_for_legacy_app()
