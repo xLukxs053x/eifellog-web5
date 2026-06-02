@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request, session
 
+from app import legacy as _legacy
 from app.config import MONGO_DB_NAME, TRACKER_JOB_START_PUBLIC_URL
 from app.core.utils import now_utc, safe_str
 from app.db.collections import users_collection
@@ -45,7 +46,6 @@ TRACKER_ROUTES = (
 
 def get_logged_in_discord_id() -> str:
     """Liest die Discord-ID robust aus der bestehenden Flask-Session."""
-
     user_session = session.get("user")
 
     if isinstance(user_session, dict):
@@ -54,19 +54,12 @@ def get_logged_in_discord_id() -> str:
             or user_session.get("discord_id")
         )
 
-    # Legacy-Kompatibilität:
-    # Ältere Sessions können nur einen Benutzernamen als String enthalten.
     if isinstance(user_session, str):
         username = safe_str(user_session).lower()
         if not username:
             return ""
 
-        user_doc = users_collection.find_one(
-            {
-                "username_lc": username,
-            }
-        )
-
+        user_doc = users_collection.find_one({"username_lc": username})
         return safe_str((user_doc or {}).get("discord_id"))
 
     return ""
@@ -75,31 +68,17 @@ def get_logged_in_discord_id() -> str:
 @api_bp.route("/api/sign_policy", methods=["POST"])
 def sign_policy():
     """Speichert die Richtlinien-Unterschrift eines eingeloggten Nutzers."""
-
     discord_id = get_logged_in_discord_id()
     if not discord_id:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Not logged in",
-            }
-        ), 401
+        return jsonify({"success": False, "error": "Not logged in"}), 401
 
     data = request.get_json(silent=True) or {}
     signature = safe_str(data.get("signature"))
-
     if not signature:
-        return jsonify(
-            {
-                "success": False,
-                "error": "No signature provided",
-            }
-        ), 400
+        return jsonify({"success": False, "error": "No signature provided"}), 400
 
     update_result = users_collection.update_one(
-        {
-            "discord_id": discord_id,
-        },
+        {"discord_id": discord_id},
         {
             "$set": {
                 "policy_signed": True,
@@ -110,34 +89,22 @@ def sign_policy():
     )
 
     if update_result.matched_count == 0:
-        return jsonify(
-            {
-                "success": False,
-                "error": "User not found",
-            }
-        ), 404
+        return jsonify({"success": False, "error": "User not found"}), 404
 
-    return jsonify(
-        {
-            "success": True,
-        }
-    )
+    return jsonify({"success": True})
 
 
 @api_bp.route("/api/health", methods=["GET"])
 def health_check():
     """Liefert einen Statuscheck für Server, Datenbank und Tracker-Routen."""
-
     tracker_routes = list(TRACKER_ROUTES)
 
     if (
         TRACKER_JOB_START_PUBLIC_URL
         and TRACKER_JOB_START_PUBLIC_URL not in tracker_routes
     ):
-        insert_index = tracker_routes.index("/api/tracker/tour/start")
-
         tracker_routes.insert(
-            insert_index,
+            tracker_routes.index("/api/tracker/tour/start"),
             TRACKER_JOB_START_PUBLIC_URL,
         )
 
@@ -151,3 +118,10 @@ def health_check():
             "trackerRoutes": tracker_routes,
         }
     )
+
+
+@api_bp.route('/api/wartungsarbeiten', methods=['GET', 'POST'])
+@api_bp.route('/api/wartungsarbeiten/<state>', methods=['GET', 'POST'])
+def api_wartungsarbeiten(*args, **kwargs):
+    """Delegiert kompatibel an app.legacy.api_wartungsarbeiten()."""
+    return _legacy.api_wartungsarbeiten(*args, **kwargs)

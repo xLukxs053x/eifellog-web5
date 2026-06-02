@@ -1,61 +1,93 @@
-"""Zentrale Flask-App-Fabrik für EifelLog.
-
-Während der kontrollierten Migration bleibt die bestehende Anwendung zunächst
-unter app.legacy aktiv. Neue Bereiche werden Schritt für Schritt als
-Blueprints ausgelagert und hier zentral registriert.
-"""
+"""Zentrale Flask-App-Fabrik und Blueprint-Registrierung für EifelLog."""
 
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Final
-
 from flask import Flask
+from werkzeug.routing import Rule
 
 
-BLUEPRINTS: Final[tuple[tuple[str, str], ...]] = (
-    ("app.blueprints.api.routes", "api_bp"),
-    ("app.blueprints.auth.routes", "auth_bp"),
-    ("app.blueprints.public.routes", "public_bp"),
-    ("app.blueprints.dashboard.routes", "dashboard_bp"),
-    ("app.blueprints.tracker.routes", "tracker_bp"),
-    ("app.blueprints.servicecenter.routes", "servicecenter_bp"),
-    ("app.blueprints.dispo.routes", "dispo_bp"),
-    ("app.blueprints.management.routes", "management_bp"),
-    ("app.blueprints.hr.routes", "hr_bp"),
-    ("app.blueprints.accounting.routes", "accounting_bp"),
-    ("app.blueprints.workspace.routes", "workspace_bp"),
-)
+def register_legacy_url_aliases(app: Flask) -> None:
+    """Erhält bestehende url_for("name")-Aufrufe während der Migration.
+
+    Blueprint-Endpunkte heißen intern zum Beispiel ``public.home``. Bestehende
+    Templates verwenden teilweise weiterhin ``url_for("home")``. Dafür werden
+    ausschließlich Build-Aliasse ergänzt; eingehende Requests laufen weiterhin
+    über die Blueprints.
+    """
+    if app.extensions.get("eifellog_legacy_url_aliases_registered"):
+        return
+
+    original_rules = list(app.url_map.iter_rules())
+    existing_endpoints = {rule.endpoint for rule in original_rules}
+
+    grouped_rules: dict[str, list] = {}
+
+    for rule in original_rules:
+        if "." not in rule.endpoint:
+            continue
+
+        legacy_endpoint = rule.endpoint.rsplit(".", 1)[-1]
+        grouped_rules.setdefault(legacy_endpoint, []).append(rule)
+
+    for legacy_endpoint, rules in grouped_rules.items():
+        if legacy_endpoint in existing_endpoints:
+            continue
+
+        for source_rule in rules:
+            app.url_map.add(
+                Rule(
+                    source_rule.rule,
+                    defaults=source_rule.defaults,
+                    subdomain=source_rule.subdomain,
+                    methods=source_rule.methods,
+                    build_only=True,
+                    endpoint=legacy_endpoint,
+                )
+            )
+
+    app.extensions["eifellog_legacy_url_aliases_registered"] = True
 
 
 def register_blueprints(app: Flask) -> None:
-    """Registriert vorhandene EifelLog-Blueprints genau einmal."""
+    """Registriert sämtliche fachlichen EifelLog-Blueprints genau einmal."""
     if app.extensions.get("eifellog_blueprints_registered"):
         return
 
-    for module_path, blueprint_name in BLUEPRINTS:
-        try:
-            module = import_module(module_path)
-        except ModuleNotFoundError as error:
-            # Noch nicht angelegte Blueprints werden während der Migration
-            # übersprungen. Interne Importfehler vorhandener Module bleiben
-            # dagegen sichtbar.
-            if error.name == module_path or module_path.startswith(f"{error.name}."):
-                continue
-            raise
+    from app.blueprints.api.routes import api_bp
+    from app.blueprints.auth.routes import auth_bp
+    from app.blueprints.public.routes import public_bp
+    from app.blueprints.dashboard.routes import dashboard_bp
+    from app.blueprints.tracker.routes import tracker_bp
+    from app.blueprints.servicecenter.routes import servicecenter_bp
+    from app.blueprints.dispo.routes import dispo_bp
+    from app.blueprints.management.routes import management_bp
+    from app.blueprints.hr.routes import hr_bp
+    from app.blueprints.accounting.routes import accounting_bp
+    from app.blueprints.workspace.routes import workspace_bp
 
-        blueprint = getattr(module, blueprint_name, None)
-        if blueprint is None:
-            raise RuntimeError(
-                f"Blueprint '{blueprint_name}' fehlt in '{module_path}'."
-            )
+    blueprints = (
+        api_bp,
+        auth_bp,
+        public_bp,
+        dashboard_bp,
+        tracker_bp,
+        servicecenter_bp,
+        dispo_bp,
+        management_bp,
+        hr_bp,
+        accounting_bp,
+        workspace_bp,
+    )
 
+    for blueprint in blueprints:
         app.register_blueprint(blueprint)
 
+    register_legacy_url_aliases(app)
     app.extensions["eifellog_blueprints_registered"] = True
 
 
 def create_app() -> Flask:
+    """Lädt die bestehende App und registriert sämtliche Blueprints."""
     from app.legacy import app
 
     register_blueprints(app)
