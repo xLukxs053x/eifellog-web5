@@ -27130,21 +27130,17 @@ def api_hr_controlling_tabellen_builder_live():
         "X-Accel-Buffering": "no",
         "Connection": "keep-alive",
     })
+
 # ==========================================
 # TRACKER-BLUEPRINT-FALLBACK FÜR LEGACY-STARTS
 # ==========================================
 def register_tracker_blueprint_for_legacy_app():
-    """Registriert die Tracker-Routen auch bei einem direkten Start von legacy.app.
+    """Registriert optionale Tracker-Blueprints, wenn sie im Projekt vorhanden sind.
 
-    Die eigentliche Routing-Schicht bleibt in ``app.routes.tracker``. Einige
-    Deployment-Setups importieren jedoch weiterhin unmittelbar ``app.legacy:app``.
-    Ohne diesen Fallback wäre dann nur die Business-Logik geladen, nicht aber der
-    Tracker-Blueprint. Das führt bei vorhandenen Alt-Routen typischerweise zu
-    ``405 Method Not Allowed`` für schreibende Tracker-Anfragen.
-
-    Der alternative Blueprint-Name verhindert Namenskollisionen, falls ein
-    moderner App-Entrypoint den regulären Tracker-Blueprint anschließend noch
-    einmal unter seinem Standardnamen registriert.
+    Dieses Projekt kann je nach Migrationsstand unterschiedliche Paketpfade haben.
+    Deshalb darf ein fehlendes Blueprint-Modul den Serverstart nicht abbrechen.
+    Die eigentlichen Legacy-Funktionen bleiben weiterhin direkt in dieser Datei
+    verfügbar und werden von app.create_app() registriert.
     """
     required_path = "/api/tracker/work-session"
     required_method = "POST"
@@ -27153,7 +27149,32 @@ def register_tracker_blueprint_for_legacy_app():
         if rule.rule == required_path and required_method in (rule.methods or set()):
             return
 
-    from app.routes.tracker import tracker_bp
+    tracker_bp = None
+    last_import_error = None
+
+    for import_path in (
+        "app.routes.tracker",
+        "app.blueprints.tracker",
+        "app.tracker",
+        "routes.tracker",
+    ):
+        try:
+            module = __import__(import_path, fromlist=["tracker_bp"])
+            tracker_bp = getattr(module, "tracker_bp", None)
+            if tracker_bp is not None:
+                break
+        except ModuleNotFoundError as exc:
+            last_import_error = exc
+        except ImportError as exc:
+            last_import_error = exc
+
+    if tracker_bp is None:
+        print(
+            "WARNUNG: Kein separater Tracker-Blueprint gefunden. "
+            "Legacy-Routen bleiben aktiv. "
+            f"Letzter Importfehler: {last_import_error}"
+        )
+        return
 
     compatibility_blueprint_name = "legacy_tracker_compat"
     if compatibility_blueprint_name in app.blueprints:
