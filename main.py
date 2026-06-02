@@ -3346,6 +3346,42 @@ def generate_fahrerkarte_card_id(discord_id, request_id=""):
     return f"EL-FK-{now_utc().strftime('%Y%m%d')}-{digest}"
 
 
+def normalize_fahrerkarte_card_id(card_id):
+    """Normalisiert Karten-IDs aus WebView2, Tracker-Cache und Legacy-Datensätzen.
+
+    Die PIN bleibt weiterhin streng an die konkrete Fahrerkarte und an die Discord-ID
+    des angemeldeten Fahrers gebunden. Die Normalisierung beseitigt ausschließlich
+    Darstellungsunterschiede wie Groß-/Kleinschreibung, Leerzeichen, Unicode-Bindestriche
+    oder eine versehentlich übermittelte PDF-Dateibezeichnung.
+    """
+    value = safe_str(card_id)
+    if not value:
+        return ""
+
+    for source, target in {
+        "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-",
+    }.items():
+        value = value.replace(source, target)
+
+    value = value.upper().strip()
+    value = re.sub(r"\s+", "", value)
+
+    # Der Tracker kann aus alten Caches statt der Karten-ID versehentlich einen
+    # Dateinamen oder eine URL senden. In diesem Fall wird ausschließlich das
+    # darin enthaltene, reguläre EifelLog-Karten-ID-Format extrahiert.
+    match = re.search(r"EL-FK-\d{8}-[A-Z0-9]{8}", value)
+    if match:
+        return match.group(0)
+
+    return value
+
+
+def fahrerkarte_card_ids_equal(card_id_a, card_id_b):
+    normalized_a = normalize_fahrerkarte_card_id(card_id_a)
+    normalized_b = normalize_fahrerkarte_card_id(card_id_b)
+    return bool(normalized_a and normalized_b and normalized_a == normalized_b)
+
+
 def normalize_fahrerkarte_pin(pin):
     """Akzeptiert ausschließlich die konfigurierte Anzahl numerischer PIN-Ziffern."""
     normalized = safe_str(pin)
@@ -3716,6 +3752,32 @@ def normalize_fahrerkarte_status(status):
 FAHRERKARTE_ACTIVE_STATUSES = {"pending", "claimed", "approved", "issued", "rejected", "postponed"}
 
 
+def fahrerkarte_request_is_effectively_issued(request_doc):
+    """Erkennt ausgestellte Karten auch dann, wenn ein Legacy-Sync den Status veraltet hat.
+
+    Ein bloßer Tracker-PDF-Upload reicht bewusst nicht aus. Für den sicheren Legacy-
+    Fallback müssen Karten-ID und Ausstellungszeitpunkt vorliegen; zusätzlich muss ein
+    serverseitiges ServiceCenter-/PDF-Merkmal vorhanden sein.
+    """
+    request_doc = request_doc or {}
+    if normalize_fahrerkarte_status(request_doc.get("status")) == "issued":
+        return True
+
+    card_id = normalize_fahrerkarte_card_id(
+        request_doc.get("card_id") or request_doc.get("fahrerkarte_card_id")
+    )
+    issued_at = coerce_fahrerkarte_datetime(request_doc.get("issued_at"))
+    has_server_artifact = bool(
+        request_doc.get("pdf_relative_path")
+        or request_doc.get("pdf_path")
+        or request_doc.get("download_url")
+        or request_doc.get("has_driver_card") is True
+        or request_doc.get("has_servicecenter_card") is True
+        or request_doc.get("tracker_upload_ready") is True
+    )
+    return bool(card_id and issued_at and has_server_artifact)
+
+
 def coerce_fahrerkarte_datetime(value, fallback=None):
     if isinstance(value, datetime):
         return value
@@ -3817,7 +3879,12 @@ def build_fahrerkarte_request_from_user_doc(user_doc):
         "source_user_mongo_id": user_mongo_id,
         "user_mongo_id": user_mongo_id,
         "verified_user_mongo_id": user_mongo_id,
-        "card_id": safe_str(user_doc.get("fahrerkarte_card_id") or user_doc.get("card_id")),
+        "card_id": normalize_fahrerkarte_card_id(
+            user_doc.get("fahrerkarte_card_id")
+            or user_doc.get("personalisierte_fahrerkarte_card_id")
+            or user_doc.get("driver_card_id")
+            or user_doc.get("card_id")
+        ),
         "handler_name": safe_str(user_doc.get("fahrerkarte_handler"), "Noch nicht zugewiesen"),
         "tracker_upload_ready": bool(user_doc.get("tracker_upload_ready") or status == "issued"),
         "fahrerkarte_pin_configured": bool(user_doc.get("fahrerkarte_pin_configured")),
@@ -3982,9 +4049,29 @@ def sync_fahrerkarte_request_from_user_doc(user_doc, force=False):
             "fahrerkarte_pin_version", "fahrerkarte_pin_configured", "fahrerkarte_pin_issued_at",
             "fahrerkarte_pin_issued_by", "fahrerkarte_pin_failed_attempts", "fahrerkarte_pin_locked_until",
             "fahrerkarte_pin_last_verified_at", "fahrerkarte_pin_last_revealed_at", "fahrerkarte_pin_reveal_count",
+            "fahrerkarte_pin_rotation_pending_reveal", "fahrerkarte_pin_key_id",
+            "fahrerkarte_pin_crypto_migrated_at", "fahrerkarte_pin_crypto_migration_reason",
         ]:
             if existing.get(key) not in (None, "") and set_fields.get(key) in (None, ""):
                 set_fields[key] = existing.get(key)
+
+        # Ein veralteter users-Datensatz darf eine bereits ausgestellte ServiceCenter-
+        # Karte nicht wieder auf approved/pending zurückstufen. Genau dieser Drift konnte
+        # dazu führen, dass der Tracker die sichtbare aktive Karte geladen hat, während
+        # die strengere PIN-Prüfung dieselbe Karten-ID als nicht ausgestellt abgelehnt hat.
+        if fahrerkarte_request_is_effectively_issued(existing):
+            set_fields["status"] = "issued"
+            canonical_card_id = normalize_fahrerkarte_card_id(
+                existing.get("card_id") or set_fields.get("card_id")
+            )
+            if canonical_card_id:
+                set_fields["card_id"] = canonical_card_id
+            for key in [
+                "issued_at", "pdf_path", "pdf_relative_path", "pdf_filename", "download_url",
+                "has_driver_card", "has_servicecenter_card", "tracker_upload_ready",
+            ]:
+                if existing.get(key) not in (None, ""):
+                    set_fields[key] = existing.get(key)
 
     if existing:
         fahrerkarte_requests_collection.update_one(
@@ -5500,8 +5587,11 @@ def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, ext
         "fahrerkarte_discord_avatar_url": make_external_url(discord_cdn_avatar_url(user_doc, size=256) or get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256)),
         "fahrerkarte_updated_at": now,
     }
-    if request_doc.get("card_id"):
-        update_fields["fahrerkarte_card_id"] = request_doc.get("card_id")
+    canonical_card_id = normalize_fahrerkarte_card_id(request_doc.get("card_id"))
+    if canonical_card_id:
+        update_fields["fahrerkarte_card_id"] = canonical_card_id
+        update_fields["personalisierte_fahrerkarte_card_id"] = canonical_card_id
+        update_fields["driver_card_id"] = canonical_card_id
     if request_doc.get("issued_at"):
         update_fields["fahrerkarte_issued_at"] = request_doc.get("issued_at")
     if request_doc.get("pdf_relative_path"):
@@ -6971,22 +7061,110 @@ def tracker_first_user_value(user_doc, *keys, fallback=""):
     return fallback
 
 
+def tracker_repair_issued_fahrerkarte_request(request_doc, user_doc=None, reason="tracker_issued_binding_repair"):
+    """Repariert ausschließlich eindeutig ausgestellte Karten-Metadaten.
+
+    Sicherheitsgrenze: Diese Funktion stellt keine neue Karte aus. Sie synchronisiert
+    nur eine bereits serverseitig ausgestellte Karte, wenn Status oder Schreibweise der
+    Karten-ID durch einen Legacy-/Cache-Sync auseinanderliefen.
+    """
+    request_doc = request_doc or {}
+    if not request_doc.get("_id") or not fahrerkarte_request_is_effectively_issued(request_doc):
+        return request_doc
+
+    now = now_utc()
+    canonical_card_id = normalize_fahrerkarte_card_id(
+        request_doc.get("card_id") or request_doc.get("fahrerkarte_card_id")
+    )
+    update_fields = {}
+    if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
+        update_fields["status"] = "issued"
+    if canonical_card_id and safe_str(request_doc.get("card_id")) != canonical_card_id:
+        update_fields["card_id"] = canonical_card_id
+
+    if update_fields:
+        update_fields.update({
+            "tracker_binding_repaired_at": now,
+            "tracker_binding_repair_reason": safe_str(reason, "tracker_issued_binding_repair"),
+            "updated_at": now,
+        })
+        fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": update_fields})
+        request_doc.update(update_fields)
+
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    user_doc = user_doc or (users_collection.find_one({"discord_id": discord_id}) if discord_id else None)
+    if user_doc and user_doc.get("_id"):
+        user_fields = {
+            "personalisierte_fahrerkarte_status": "issued",
+            "fahrerkarte_status": "issued",
+            "fahrerkarte_request_id": safe_str(request_doc.get("request_id") or request_doc.get("_id")),
+            "fahrerkarte_updated_at": now,
+        }
+        if canonical_card_id:
+            user_fields.update({
+                "fahrerkarte_card_id": canonical_card_id,
+                "personalisierte_fahrerkarte_card_id": canonical_card_id,
+                "driver_card_id": canonical_card_id,
+            })
+        if request_doc.get("issued_at"):
+            user_fields["fahrerkarte_issued_at"] = request_doc.get("issued_at")
+        users_collection.update_one({"_id": user_doc["_id"]}, {"$set": user_fields})
+
+    return request_doc
+
+
+def tracker_card_id_from_payload(payload):
+    """Liest Karten-ID-Aliase aus Desktop-Tracker, WebView2 und Ingame-Tacho robust aus."""
+    payload = payload or {}
+    if not isinstance(payload, dict):
+        return normalize_fahrerkarte_card_id(payload)
+
+    sources = [payload]
+    for container_key in ["payload", "driverCard", "driver_card", "card", "fahrerkarte", "digitalDriverCard"]:
+        nested = payload.get(container_key)
+        if isinstance(nested, dict):
+            sources.append(nested)
+
+    keys = [
+        "cardId", "card_id", "driverCardId", "driver_card_id", "fahrerkarteCardId",
+        "fahrerkarte_card_id", "cardNumber", "driverCardNumber", "licenseNumber",
+        "fileName", "filename", "pdfFilename",
+    ]
+    for source in sources:
+        for key in keys:
+            value = source.get(key)
+            if isinstance(value, (str, int)):
+                normalized = normalize_fahrerkarte_card_id(value)
+                if normalized:
+                    return normalized
+    return ""
+
+
 def tracker_latest_issued_fahrerkarte_request(user_doc):
     user_doc = user_doc or {}
     discord_id = safe_str(user_doc.get("discord_id"))
     if not discord_id:
         return None
 
-    request_doc = get_latest_fahrerkarte_request_for_user(discord_id)
-    if not request_doc:
-        return None
+    # Importiert Legacy-Metadaten, ohne eine bereits ausgestellte Karte zurückzustufen.
+    sync_fahrerkarte_request_from_user_doc(user_doc)
 
-    status = normalize_fahrerkarte_status(request_doc.get("status"))
-    has_generated_pdf = bool(request_doc.get("pdf_relative_path") or request_doc.get("pdf_path") or request_doc.get("download_url"))
-    if status != "issued" and not has_generated_pdf:
-        return None
-
-    return request_doc
+    candidates = list(
+        fahrerkarte_requests_collection.find({
+            "discord_id": discord_id,
+            "archived": {"$ne": True},
+        })
+        .sort([("issued_at", DESCENDING), ("updated_at", DESCENDING), ("created_at", DESCENDING)])
+        .limit(100)
+    )
+    for request_doc in candidates:
+        if fahrerkarte_request_is_effectively_issued(request_doc):
+            return tracker_repair_issued_fahrerkarte_request(
+                request_doc,
+                user_doc=user_doc,
+                reason="tracker_latest_issued_lookup",
+            )
+    return None
 
 
 def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker_upload", extra=None):
@@ -7021,10 +7199,14 @@ def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker
         created_at = user_doc.get("created_at")
         birth_date = created_at.strftime("%d.%m.%Y") if isinstance(created_at, datetime) else now.strftime("%d.%m.%Y")
 
+    # Bei einer ServiceCenter-Karte ist die serverseitige Request-ID maßgeblich.
+    # Client- oder Cache-Werte dürfen sie nicht überschreiben.
     card_id = (
-        safe_str(extra.get("cardId") or extra.get("card_id"))
-        or safe_str(source_request.get("card_id") or source_request.get("fahrerkarte_card_id"))
-        or tracker_first_user_value(user_doc, "fahrerkarte_card_id", "personalisierte_fahrerkarte_card_id", "driver_card_id", "card_id", fallback="")
+        normalize_fahrerkarte_card_id(source_request.get("card_id") or source_request.get("fahrerkarte_card_id"))
+        or normalize_fahrerkarte_card_id(extra.get("cardId") or extra.get("card_id"))
+        or normalize_fahrerkarte_card_id(
+            tracker_first_user_value(user_doc, "fahrerkarte_card_id", "personalisierte_fahrerkarte_card_id", "driver_card_id", "card_id", fallback="")
+        )
     )
     if not card_id:
         card_id = generate_fahrerkarte_card_id(discord_id, safe_str(source_request.get("request_id")))
@@ -7140,7 +7322,7 @@ def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
     if not card_doc:
         return None
 
-    card_id = safe_str(card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("card_number"))
+    card_id = normalize_fahrerkarte_card_id(card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("card_number"))
     driver_name = safe_str(card_doc.get("driver_name") or card_doc.get("display_name") or card_doc.get("name"), "EifelLog Fahrer")
     file_relative_path = safe_str(card_doc.get("file_relative_path") or card_doc.get("pdf_relative_path") or card_doc.get("pdf_path"))
     download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
@@ -7243,7 +7425,29 @@ def sync_tracker_driver_card_from_fahrerkarte(user_doc, request_doc, source="ser
     if not user_doc:
         user_doc = users_collection.find_one({"discord_id": discord_id}) or {}
 
+    request_doc = tracker_repair_issued_fahrerkarte_request(
+        request_doc,
+        user_doc=user_doc,
+        reason=f"{safe_str(source, 'servicecenter_sync')}_metadata_repair",
+    )
     request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    canonical_card_id = normalize_fahrerkarte_card_id(request_doc.get("card_id"))
+    if not canonical_card_id:
+        canonical_card_id = generate_fahrerkarte_card_id(discord_id, request_id)
+        if request_doc.get("_id"):
+            fahrerkarte_requests_collection.update_one(
+                {"_id": request_doc["_id"]},
+                {"$set": {"card_id": canonical_card_id, "updated_at": now_utc()}},
+            )
+        request_doc["card_id"] = canonical_card_id
+    elif safe_str(request_doc.get("card_id")) != canonical_card_id:
+        if request_doc.get("_id"):
+            fahrerkarte_requests_collection.update_one(
+                {"_id": request_doc["_id"]},
+                {"$set": {"card_id": canonical_card_id, "updated_at": now_utc()}},
+            )
+        request_doc["card_id"] = canonical_card_id
+
     extra = {
         "status": "Aktiv",
         "avatarUrl": get_fahrerkarte_avatar_url(user_doc=user_doc, request_doc=request_doc, size=256),
@@ -7300,8 +7504,44 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     if not discord_id:
         return None
 
-    # Zuerst immer die aktive, direkt dem User zugeordnete Tracker-Fahrerkarte laden.
-    # Dadurch bekommt jeder Fahrer exakt seine eigene PDF aus tracker_driver_cards.
+    # Eine ausgestellte ServiceCenter-Karte ist maßgeblich. Damit kann kein älterer
+    # Tracker-Cache eine sichtbare Karte mit einer abweichenden PIN-Bindung liefern.
+    source_request = tracker_latest_issued_fahrerkarte_request(user_doc) if create_from_servicecenter else None
+    if source_request:
+        authoritative_card_id = normalize_fahrerkarte_card_id(source_request.get("card_id"))
+        exact_card = None
+        if authoritative_card_id:
+            exact_card = tracker_driver_cards_collection.find_one(
+                {
+                    "discord_id": discord_id,
+                    "archived": {"$ne": True},
+                    "card_id": {"$regex": f"^{re.escape(authoritative_card_id)}$", "$options": "i"},
+                },
+                sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)],
+            )
+
+        needs_sync = not exact_card
+        if exact_card:
+            needs_sync = bool(
+                safe_str(exact_card.get("source_request_id") or exact_card.get("servicecenter_request_id"))
+                != safe_str(source_request.get("request_id") or source_request.get("_id"))
+                or bool(exact_card.get("pin_configured") or exact_card.get("fahrerkarte_pin_configured"))
+                != bool(source_request.get("fahrerkarte_pin_configured") or source_request.get("fahrerkarte_pin_ciphertext"))
+                or safe_str(exact_card.get("pdf_relative_path") or exact_card.get("file_relative_path"))
+                != safe_str(source_request.get("pdf_relative_path") or source_request.get("pdf_path"))
+            )
+
+        if needs_sync:
+            exact_card = sync_tracker_driver_card_from_fahrerkarte(
+                user_doc,
+                source_request,
+                source="servicecenter_db_fetch",
+                archive_existing=True,
+            )
+        if exact_card:
+            return exact_card
+
+    # Legacy-Fallback: aktive Tracker-Karte direkt aus MongoDB laden.
     card_doc = tracker_driver_cards_collection.find_one(
         {"discord_id": discord_id, "archived": {"$ne": True}, "active": {"$ne": False}},
         sort=[("updated_at", DESCENDING), ("uploaded_at", DESCENDING), ("created_at", DESCENDING)]
@@ -7317,11 +7557,14 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     if card_doc:
         return card_doc
 
-    # Fallback aus dem User-Dokument, falls die PDF dort schon gespeichert ist,
-    # aber die Tracker-Collection noch keinen synchronisierten Datensatz besitzt.
+    # Fallback aus dem User-Dokument für Altbestände ohne synchronisierten Tracker-Datensatz.
     user_pdf_path = safe_str(user_doc.get("fahrerkarte_pdf_relative_path") or user_doc.get("driver_card_pdf_relative_path"))
     user_download_url = safe_str(user_doc.get("fahrerkarte_download_url") or user_doc.get("driver_card_download_url"))
-    user_card_id = safe_str(user_doc.get("fahrerkarte_card_id") or user_doc.get("personalisierte_fahrerkarte_card_id") or user_doc.get("driver_card_id"))
+    user_card_id = normalize_fahrerkarte_card_id(
+        user_doc.get("fahrerkarte_card_id")
+        or user_doc.get("personalisierte_fahrerkarte_card_id")
+        or user_doc.get("driver_card_id")
+    )
     if user_pdf_path or user_download_url or user_card_id:
         extra = {
             "cardId": user_card_id or generate_fahrerkarte_card_id(discord_id, "user-doc"),
@@ -7341,18 +7584,6 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
             {"discord_id": discord_id, "card_id": card_doc["card_id"], "archived": {"$ne": True}},
             sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
         )
-
-    # Letzter Fallback: ausgestellte Fahrerkarte aus dem ServiceCenter synchronisieren.
-    source_request = tracker_latest_issued_fahrerkarte_request(user_doc) if create_from_servicecenter else None
-    if source_request:
-        servicecenter_card = sync_tracker_driver_card_from_fahrerkarte(
-            user_doc,
-            source_request,
-            source="servicecenter_db_fetch",
-            archive_existing=False
-        )
-        if servicecenter_card:
-            return servicecenter_card
 
     return None
 
@@ -15354,55 +15585,90 @@ def tracker_driver_card():
 
 
 def tracker_resolve_issued_fahrerkarte_request_for_pin(user_doc, card_id=""):
-    """Bindet eine PIN-Prüfung eindeutig an den angemeldeten Fahrer und seine konkrete Karte."""
+    """Bindet PIN-Prüfung strikt an Fahrer und konkrete Karte, toleriert aber Legacy-Drift."""
     user_doc = user_doc or {}
     discord_id = safe_str(user_doc.get("discord_id"))
-    normalized_card_id = safe_str(card_id)
+    normalized_card_id = normalize_fahrerkarte_card_id(card_id)
     if not discord_id:
         return None, "Der angemeldete Fahrer konnte nicht ermittelt werden.", 401
+
+    # Importiert Legacy-Metadaten; ausgestellte Karten werden dabei nicht zurückgestuft.
+    sync_fahrerkarte_request_from_user_doc(user_doc)
 
     base_query = {
         "discord_id": discord_id,
         "archived": {"$ne": True},
-        "status": "issued",
     }
+    candidates = list(
+        fahrerkarte_requests_collection.find(base_query)
+        .sort([("issued_at", DESCENDING), ("updated_at", DESCENDING), ("created_at", DESCENDING)])
+        .limit(100)
+    )
 
     if normalized_card_id:
-        exact_query = dict(base_query)
-        exact_query["card_id"] = normalized_card_id
-        request_doc = fahrerkarte_requests_collection.find_one(
-            exact_query,
-            sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)],
+        for request_doc in candidates:
+            if not fahrerkarte_card_ids_equal(request_doc.get("card_id"), normalized_card_id):
+                continue
+            if not fahrerkarte_request_is_effectively_issued(request_doc):
+                continue
+            return tracker_repair_issued_fahrerkarte_request(
+                request_doc,
+                user_doc=user_doc,
+                reason="tracker_pin_exact_card_binding",
+            ), "", 200
+
+        # Fallback für Altbestände: Die aktive Tracker-Karte darf nur auf ihren eigenen
+        # ServiceCenter-Antrag verweisen. Fahrer-ID und Karten-ID bleiben zwingend gleich.
+        tracker_cards = list(
+            tracker_driver_cards_collection.find({
+                "discord_id": discord_id,
+                "archived": {"$ne": True},
+            })
+            .sort([("updated_at", DESCENDING), ("created_at", DESCENDING)])
+            .limit(50)
         )
-        if not request_doc:
-            # Karten-IDs sind technisch nicht case-sensitiv. Der Fallback bleibt
-            # trotzdem streng auf genau diese ID und genau diesen Fahrer begrenzt.
-            case_insensitive_query = dict(base_query)
-            case_insensitive_query["card_id"] = {
-                "$regex": f"^{re.escape(normalized_card_id)}$",
-                "$options": "i",
-            }
-            request_doc = fahrerkarte_requests_collection.find_one(
-                case_insensitive_query,
-                sort=[("issued_at", DESCENDING), ("created_at", DESCENDING)],
+        for tracker_card in tracker_cards:
+            if not fahrerkarte_card_ids_equal(tracker_card.get("card_id"), normalized_card_id):
+                continue
+            source_request_id = safe_str(
+                tracker_card.get("source_request_id") or tracker_card.get("servicecenter_request_id")
             )
-        if not request_doc:
-            return None, "Die angegebene Fahrerkarte gehört nicht zum angemeldeten Fahrer oder ist nicht aktiv ausgestellt.", 404
-        return request_doc, "", 200
+            if not source_request_id:
+                continue
+            source_request = find_fahrerkarte_request(source_request_id)
+            if not source_request:
+                continue
+            if safe_str(source_request.get("discord_id") or source_request.get("user_id")) != discord_id:
+                continue
+            if not fahrerkarte_request_is_effectively_issued(source_request):
+                continue
+            repaired = tracker_repair_issued_fahrerkarte_request(
+                source_request,
+                user_doc=user_doc,
+                reason="tracker_pin_tracker_card_source_binding",
+            )
+            if fahrerkarte_card_ids_equal(repaired.get("card_id"), normalized_card_id):
+                return repaired, "", 200
+
+        return None, "Die angegebene Fahrerkarte gehört nicht zum angemeldeten Fahrer oder ist nicht aktiv ausgestellt.", 404
 
     if TRACKER_DRIVER_CARD_PIN_REQUIRE_CARD_ID:
         return None, "Karten-ID fehlt. Die PIN-Prüfung muss immer für die konkrete Fahrerkarte gesendet werden.", 400
 
-    # Optionaler Legacy-Modus über .env: ohne Karten-ID nur dann fortfahren,
-    # wenn exakt eine ausgestellte Karte für den Fahrer existiert.
-    candidates = list(
-        fahrerkarte_requests_collection.find(base_query)
-        .sort([("issued_at", DESCENDING), ("created_at", DESCENDING)])
-        .limit(2)
-    )
-    if len(candidates) == 1:
-        return candidates[0], "", 200
-    if not candidates:
+    # Optionaler Legacy-Modus: ohne Karten-ID nur bei exakt einer serverseitig
+    # ausgestellten Karte fortfahren.
+    issued_candidates = [
+        tracker_repair_issued_fahrerkarte_request(
+            candidate,
+            user_doc=user_doc,
+            reason="tracker_pin_legacy_single_card_binding",
+        )
+        for candidate in candidates
+        if fahrerkarte_request_is_effectively_issued(candidate)
+    ]
+    if len(issued_candidates) == 1:
+        return issued_candidates[0], "", 200
+    if not issued_candidates:
         return None, "Keine ausgestellte Fahrerkarte gefunden.", 404
     return None, "Mehrere Fahrerkarte-Datensätze gefunden. Sende die Karten-ID für eine eindeutige PIN-Prüfung mit.", 409
 
@@ -15423,7 +15689,7 @@ def tracker_driver_card_pin_verify():
     if not submitted_pin:
         return jsonify({"success": False, "verified": False, "pinVerified": False, "error": "Fahrerkarte-PIN fehlt."}), 400
 
-    card_id = safe_str(payload.get("cardId") or payload.get("card_id") or payload.get("driverCardId"))
+    card_id = tracker_card_id_from_payload(payload)
     request_doc, lookup_error, lookup_status = tracker_resolve_issued_fahrerkarte_request_for_pin(user_doc, card_id=card_id)
     if not request_doc:
         return jsonify({
@@ -18740,8 +19006,12 @@ def servicecenter_fahrerkarte_pin_reveal(request_id):
     if not session_discord_id or session_discord_id != owner_discord_id:
         return jsonify({"success": False, "error": "Der PIN darf ausschließlich vom Karteninhaber abgerufen werden."}), 403
 
-    if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
+    if not fahrerkarte_request_is_effectively_issued(request_doc):
         return jsonify({"success": False, "error": "PIN-Ausstellung ist erst nach Ausstellung der Fahrerkarte verfügbar."}), 409
+    request_doc = tracker_repair_issued_fahrerkarte_request(
+        request_doc,
+        reason="servicecenter_pin_reveal_metadata_repair",
+    )
 
     pin_reissued_after_key_loss = False
     pin_reissued_after_policy_rotation = False
@@ -26049,7 +26319,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
 
     now = now_utc()
     handler_name = actor.get("display_name") or "Personalabteilung"
-    card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_doc.get("request_id"))
+    card_id = normalize_fahrerkarte_card_id(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_doc.get("request_id"))
     service_card_id = safe_str(request_doc.get("service_card_id") or request_doc.get("fahrerkarte_service_card_id") or f"SC-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
     license_number = safe_str(request_doc.get("license_number") or request_doc.get("fahrerkarte_license_number") or request_doc.get("driver_number") or f"EL-FS-{safe_str(request_doc.get('system_id') or request_doc.get('discord_id') or request_doc.get('user_id') or request_doc.get('request_id'))}")
 
@@ -26138,8 +26408,12 @@ def api_personalabteilung_servicecenter_fahrerkarte_pin_reissue():
     request_doc = find_fahrerkarte_request(request_id)
     if not request_doc:
         return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
-    if normalize_fahrerkarte_status(request_doc.get("status")) != "issued":
+    if not fahrerkarte_request_is_effectively_issued(request_doc):
         return jsonify({"success": False, "message": "Eine PIN kann erst für eine ausgestellte Fahrerkarte neu ausgestellt werden."}), 409
+    request_doc = tracker_repair_issued_fahrerkarte_request(
+        request_doc,
+        reason="servicecenter_pin_reissue_metadata_repair",
+    )
 
     actor = current_staff_identity()
     try:
