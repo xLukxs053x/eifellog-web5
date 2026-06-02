@@ -27131,6 +27131,33 @@ def api_hr_controlling_tabellen_builder_live():
         "Connection": "keep-alive",
     })
 
+
+# ==========================================
+# TRACKER KONTOR / DISPATCH KOMPATIBILITÄTSROUTEN
+# ==========================================
+@app.route(
+    "/api/tracker/kontor/state",
+    methods=["GET", "HEAD", "POST", "PUT", "PATCH", "OPTIONS"],
+)
+@app.route(
+    "/api/tracker/dispatch/state",
+    methods=["GET", "HEAD", "POST", "PUT", "PATCH", "OPTIONS"],
+)
+def tracker_kontor_state_compat():
+    """Kompatibilitätsendpunkt für den Desktop-Tracker.
+
+    Der WPF-Client fragt zusätzlich zu ``/api/tracker/state`` auch
+    ``/api/tracker/kontor/state`` ab. Im aktuellen Legacy-Backend gibt es dafür
+    keine eigene fachliche View; der benötigte Live-/Dashboard-Zustand liegt
+    bereits im bestehenden ``tracker_state()``-Payload. Deshalb delegiert dieser
+    Endpunkt bewusst dorthin und verhindert ``405 Method Not Allowed`` bei
+    GET-Refreshes.
+    """
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    return tracker_state()
+
 # ==========================================
 # TRACKER-BLUEPRINT-FALLBACK FÜR LEGACY-STARTS
 # ==========================================
