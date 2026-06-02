@@ -54,8 +54,8 @@ def get_logged_in_discord_id() -> str:
             or user_session.get("discord_id")
         )
 
-    # Legacy-Kompatibilität: Frühere Sessions konnten nur den Benutzernamen
-    # als String enthalten.
+    # Legacy-Kompatibilität:
+    # Ältere Sessions können nur einen Benutzernamen als String enthalten.
     if isinstance(user_session, str):
         username = safe_str(user_session).lower()
         if not username:
@@ -66,6 +66,7 @@ def get_logged_in_discord_id() -> str:
                 "username_lc": username,
             }
         )
+
         return safe_str((user_doc or {}).get("discord_id"))
 
     return ""
@@ -133,8 +134,10 @@ def health_check():
         TRACKER_JOB_START_PUBLIC_URL
         and TRACKER_JOB_START_PUBLIC_URL not in tracker_routes
     ):
+        insert_index = tracker_routes.index("/api/tracker/tour/start")
+
         tracker_routes.insert(
-            tracker_routes.index("/api/tracker/tour/start"),
+            insert_index,
             TRACKER_JOB_START_PUBLIC_URL,
         )
 
