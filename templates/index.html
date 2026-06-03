@@ -228,16 +228,18 @@
             <!--
                 Unterstützte Antworten von GET /api/birthdays:
                 [
-                        {
-                            "display_name": "Max",
-                            "date": "2026-06-03",
-                            "days_until": 0,
-                            "avatar_url": "https://..."
-                        }
+                    {
+                        "user_id": "499690831070887936",
+                        "user_name": "lukxsde",
+                        "day_month": "11.10.",
+                        "full_date": "11.10.2005",
+                        "year": 2005,
+                        "updated_at": "2026-05-04T15:55:08.732+00:00"
+                    }
                 ]
 
-                Alternativ akzeptiert das Frontend weiterhin die Legacy-Formate
-                {"birthdays": [...]} und {"upcoming_birthdays": [...]}.
+                Zusätzlich bleiben ältere Feldnamen und die Legacy-Wrapper
+                {"birthdays": [...]} sowie {"upcoming_birthdays": [...]} kompatibel.
             -->
             <div id="eifellog-birthdays"
                  data-endpoint="/api/birthdays"
@@ -656,7 +658,13 @@
         const birthdayStatus = document.getElementById('birthday-status');
 
         const getBirthdayDateValue = (birthday) => {
-            return birthday.date || birthday.birthday || birthday.birth_date || birthday.geburtstag || null;
+            return birthday.full_date
+                || birthday.day_month
+                || birthday.date
+                || birthday.birthday
+                || birthday.birth_date
+                || birthday.geburtstag
+                || null;
         };
 
         const parseBirthdayDate = (value) => {
@@ -716,7 +724,24 @@
         };
 
         const getDisplayName = (birthday) => {
-            return birthday.display_name || birthday.name || birthday.username || 'EifelLog-Mitglied';
+            return birthday.user_name
+                || birthday.display_name
+                || birthday.name
+                || birthday.username
+                || birthday.discord_name
+                || 'EifelLog-Mitglied';
+        };
+
+        const getBirthdayYear = (birthday) => {
+            const explicitYear = Number(birthday.year);
+
+            if (Number.isInteger(explicitYear) && explicitYear > 1900) {
+                return explicitYear;
+            }
+
+            const fullDate = parseBirthdayDate(birthday.full_date);
+
+            return fullDate ? fullDate.getFullYear() : null;
         };
 
         const getDaysUntil = (birthday) => {
@@ -729,17 +754,23 @@
             return calculateDaysUntil(getBirthdayDateValue(birthday));
         };
 
-        const formatBirthdayDate = (dateString) => {
-            const date = parseBirthdayDate(dateString);
+        const formatBirthdayDate = (birthday) => {
+            const dateValue = getBirthdayDateValue(birthday);
+            const date = parseBirthdayDate(dateValue);
 
             if (!date) {
-                return dateString || 'Datum nicht verfügbar';
+                return dateValue || 'Datum nicht verfügbar';
             }
 
-            return new Intl.DateTimeFormat('de-DE', {
+            const formattedDate = new Intl.DateTimeFormat('de-DE', {
                 day: '2-digit',
                 month: 'long'
             }).format(date);
+            const year = getBirthdayYear(birthday);
+
+            return year
+                ? `${formattedDate} · Jahrgang ${year}`
+                : formattedDate;
         };
 
         const getBirthdayHeadline = (birthday) => {
@@ -768,9 +799,11 @@
             const avatar = document.createElement('div');
             avatar.className = 'w-11 h-11 shrink-0 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 flex items-center justify-center overflow-hidden';
 
-            if (birthday.avatar_url) {
+            const avatarUrl = birthday.avatar_url || birthday.avatar || birthday.profile_image || null;
+
+            if (avatarUrl) {
                 const avatarImage = document.createElement('img');
-                avatarImage.src = birthday.avatar_url;
+                avatarImage.src = avatarUrl;
                 avatarImage.alt = `${getDisplayName(birthday)} Profilbild`;
                 avatarImage.className = 'w-full h-full object-cover';
                 avatar.appendChild(avatarImage);
@@ -790,7 +823,7 @@
 
             const meta = document.createElement('p');
             meta.className = 'text-xs text-[var(--muted)] font-inter mt-1';
-            meta.textContent = formatBirthdayDate(getBirthdayDateValue(birthday));
+            meta.textContent = formatBirthdayDate(birthday);
 
             content.append(headline, meta);
             card.append(avatar, content);
@@ -821,7 +854,6 @@
 
                     return aDays - bDays;
                 })
-                .slice(0, 4)
                 .forEach(birthday => birthdaysContainer.appendChild(createBirthdayCard(birthday)));
         };
 
