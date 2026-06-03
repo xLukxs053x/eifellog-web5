@@ -17,7 +17,7 @@ def dashboard_state_api(*args, **kwargs):
     return _legacy.dashboard_state_api(*args, **kwargs)
 
 
-@dashboard_bp.route('/profile')
+@dashboard_bp.route('/user')
 def my_profile_redirect(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.my_profile_redirect()."""
     return _legacy.my_profile_redirect(*args, **kwargs)
