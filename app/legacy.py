@@ -1445,6 +1445,9 @@ WARTUNG_AUTH_ENDPOINTS = {
     "api_wartungsarbeiten",
 }
 
+def events():
+    """Rendert die öffentliche Eventübersicht."""
+    return render_template("events.html")
 
 def maintenance_block_response(config=None, status_code=503):
     config = config or load_wartung_config()

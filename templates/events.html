@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Events{% endblock %}
+
+{% block content %}
+<!-- Events Hero -->
+<section class="mb-10 mt-10" aria-labelledby="events-page-title">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 pb-4 mb-4">
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase">Eifel LOG Community</span>
+            <h1 id="events-page-title" class="text-3xl md:text-4xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
+                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
+                Events &amp; Konvois
+            </h1>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <span id="api-status-badge" class="px-4 py-2 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2 shadow-[0_0_15px_rgba(137,190,50,0.2)]">
+                <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] animate-pulse"></span>
+                <span id="api-status-label">Event-Sync startet</span>
+            </span>
+
+            <a href="/" class="btn-secondary inline-flex items-center justify-center">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 mr-2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Zur Startseite
+            </a>
+        </div>
+    </div>
+
+    <div class="glass-card p-8 md:p-10 relative overflow-hidden">
+        <p class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-3">Gemeinsam unterwegs</p>
+        <h2 class="text-3xl md:text-5xl font-orbitron font-extrabold text-[var(--text)] tracking-tight leading-tight">
+            Die nächste Tour wartet.<br>
+            <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
+        </h2>
+        <p class="text-sm md:text-base text-[var(--muted)] mt-5 max-w-3xl leading-relaxed font-inter">
+            Hier findest du alle geplanten Eifel LOG Events, Community-Abende und Konvois. Die Übersicht wird automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
+        </p>
+    </div>
+</section>
+
+<!-- Event Kennzahlen -->
+<section class="mb-8" aria-label="Event-Übersicht">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <article class="info-card p-5">
+            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Anstehende Events</p>
+            <p id="stat-upcoming" class="text-3xl font-orbitron font-bold text-[var(--brand-green)] mt-3">–</p>
+        </article>
+
+        <article class="info-card p-5">
+            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Events insgesamt</p>
+            <p id="stat-total" class="text-3xl font-orbitron font-bold text-[var(--text)] mt-3">–</p>
+        </article>
+
+        <article class="info-card p-5">
+            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Nächster Termin</p>
+            <p id="stat-next-date" class="text-lg font-orbitron font-bold text-[var(--brand-yellow)] mt-3">Wird geladen</p>
+        </article>
+
+        <article class="info-card p-5">
+            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Letzte Synchronisierung</p>
+            <p id="stat-last-sync" class="text-sm font-orbitron font-bold text-[var(--text)] mt-3">Noch nicht geladen</p>
+        </article>
+    </div>
+</section>
+
+<!-- Filter -->
+<section class="mb-8" aria-labelledby="event-filter-title">
+    <article class="info-card p-5 md:p-6">
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+            <div>
+                <p class="font-orbitron text-[8px] font-bold text-[var(--brand-green)] tracking-[0.16em] uppercase mb-1">Event-Navigation</p>
+                <h2 id="event-filter-title" class="text-xl font-orbitron font-bold text-[var(--text)] tracking-wide">Events durchsuchen</h2>
+            </div>
+
+            <button id="refresh-events" type="button" class="btn-secondary inline-flex items-center justify-center shrink-0">
+                <svg id="refresh-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 mr-2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Neu laden
+            </button>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4 mt-5">
+            <label class="block">
+                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Suche</span>
+                <input id="event-search"
+                       type="search"
+                       autocomplete="off"
+                       placeholder="Titel, Beschreibung oder Ort"
+                       class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/70 outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
+            </label>
+
+            <label class="block">
+                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Kategorie</span>
+                <select id="event-category"
+                        class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
+                    <option value="all">Alle Kategorien</option>
+                </select>
+            </label>
+
+            <label class="block">
+                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Zeitraum</span>
+                <select id="event-period"
+                        class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
+                    <option value="upcoming">Nur anstehende Events</option>
+                    <option value="all">Alle Events</option>
+                    <option value="past">Vergangene Events</option>
+                </select>
+            </label>
+        </div>
+    </article>
+</section>
+
+<!-- Vollständige Event-Liste -->
+<section class="mb-16" aria-labelledby="event-list-title">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
+        <div>
+            <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase mb-2">EifelLog API</p>
+            <h2 id="event-list-title" class="text-2xl md:text-3xl font-orbitron font-bold text-[var(--text)] tracking-wide">Eventübersicht</h2>
+        </div>
+        <p id="event-result-count" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Events werden geladen</p>
+    </div>
+
+    <!--
+        Unterstützte Antworten von GET /api/events:
+        [
+            {
+                "title": "...",
+                "description": "...",
+                "start_at": "...",
+                "location": "...",
+                "category": "...",
+                "participants": 12
+            }
+        ]
+
+        Alternativ akzeptiert das Frontend weiterhin:
+        {"events": [...]} und {"upcoming_events": [...]}.
+    -->
+    <div id="events-page-list"
+         data-endpoint="/api/events"
+         class="grid lg:grid-cols-2 gap-5"
+         aria-live="polite"
+         aria-busy="true">
+        <div class="info-card p-6 lg:col-span-2">
+            <p class="text-sm text-[var(--muted)] font-inter">Events werden aus EifelLog geladen …</p>
+        </div>
+    </div>
+</section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const eventsContainer = document.getElementById('events-page-list');
+        const searchInput = document.getElementById('event-search');
+        const categorySelect = document.getElementById('event-category');
+        const periodSelect = document.getElementById('event-period');
+        const refreshButton = document.getElementById('refresh-events');
+        const refreshIcon = document.getElementById('refresh-icon');
+        const resultCount = document.getElementById('event-result-count');
+        const statusBadge = document.getElementById('api-status-badge');
+        const statusDot = document.getElementById('api-status-dot');
+        const statusLabel = document.getElementById('api-status-label');
+        const statUpcoming = document.getElementById('stat-upcoming');
+        const statTotal = document.getElementById('stat-total');
+        const statNextDate = document.getElementById('stat-next-date');
+        const statLastSync = document.getElementById('stat-last-sync');
+
+        let events = [];
+        let isLoading = false;
+
+        const normalizeText = (value) => String(value || '').trim();
+
+        const parseDate = (value) => {
+            if (!value) {
+                return null;
+            }
+
+            const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
+                ? `${value}T00:00:00`
+                : value;
+            const date = new Date(normalizedValue);
+
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
+        const getEventStartValue = (event) => {
+            return event.start_at
+                || event.starts_at
+                || event.start_time
+                || event.datetime
+                || event.date
+                || null;
+        };
+
+        const getEventDate = (event) => parseDate(getEventStartValue(event));
+        const getEventTitle = (event) => normalizeText(event.title || event.name || 'EifelLog Event');
+        const getEventDescription = (event) => normalizeText(event.description || event.summary || 'Weitere Informationen werden noch bekannt gegeben.');
+        const getEventCategory = (event) => normalizeText(event.category || event.type || 'EifelLog Event');
+        const getEventLocation = (event) => normalizeText(event.location || event.channel_name || 'Eifel LOG Community');
+
+        const isPastEvent = (event) => {
+            const date = getEventDate(event);
+
+            if (!date) {
+                return false;
+            }
+
+            return date.getTime() < Date.now();
+        };
+
+        const formatDate = (event, includeYear = true) => {
+            const date = getEventDate(event);
+
+            if (!date) {
+                return 'Termin folgt';
+            }
+
+            return new Intl.DateTimeFormat('de-DE', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                ...(includeYear ? { year: 'numeric' } : {})
+            }).format(date);
+        };
+
+        const formatTime = (event) => {
+            if (event.time) {
+                return normalizeText(event.time);
+            }
+
+            const value = getEventStartValue(event);
+            const date = getEventDate(event);
+
+            if (!date || !value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                return 'Uhrzeit folgt';
+            }
+
+            return new Intl.DateTimeFormat('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
+
+        const createElement = (tag, className, textContent) => {
+            const element = document.createElement(tag);
+
+            if (className) {
+                element.className = className;
+            }
+
+            if (textContent !== undefined) {
+                element.textContent = textContent;
+            }
+
+            return element;
+        };
+
+        const createStateCard = (title, message) => {
+            const card = createElement('article', 'info-card p-6 lg:col-span-2');
+            const heading = createElement('h3', 'text-base font-orbitron font-bold text-[var(--text)] tracking-wide', title);
+            const description = createElement('p', 'text-sm text-[var(--muted)] font-inter leading-relaxed mt-2', message);
+
+            card.append(heading, description);
+            return card;
+        };
+
+        const createMetaItem = (svgPath, label) => {
+            const wrapper = createElement('div', 'flex items-center gap-2 min-w-0');
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '15');
+            svg.setAttribute('height', '15');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('stroke-width', '2');
+            svg.setAttribute('aria-hidden', 'true');
+            svg.classList.add('shrink-0');
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('d', svgPath);
+            svg.appendChild(path);
+
+            const text = createElement('span', 'truncate', label);
+            wrapper.append(svg, text);
+            return wrapper;
+        };
+
+        const createEventCard = (event) => {
+            const card = createElement('article', 'info-card p-6 flex flex-col');
+            const topRow = createElement('div', 'flex items-start justify-between gap-4 border-b border-white/5 pb-4');
+            const topContent = createElement('div', 'min-w-0');
+            const category = createElement('p', 'text-[9px] font-orbitron font-bold uppercase tracking-[0.16em] text-[var(--brand-green)]', getEventCategory(event));
+            const title = createElement('h3', 'text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mt-2 break-words', getEventTitle(event));
+            topContent.append(category, title);
+
+            const dateBox = createElement('div', 'w-24 shrink-0 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 px-3 py-3 text-center');
+            const eventDate = getEventDate(event);
+            const day = createElement('p', 'text-xl font-orbitron font-bold text-[var(--text)]', eventDate ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(eventDate) : '–');
+            const month = createElement('p', 'text-[10px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)] mt-1', eventDate ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(eventDate) : 'Termin');
+            const year = createElement('p', 'text-[9px] font-orbitron font-bold text-[var(--muted)] mt-1', eventDate ? new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(eventDate) : 'folgt');
+            dateBox.append(day, month, year);
+            topRow.append(topContent, dateBox);
+
+            const description = createElement('p', 'text-sm text-[var(--muted)] font-inter leading-relaxed mt-5 flex-grow', getEventDescription(event));
+            const meta = createElement('div', 'grid sm:grid-cols-2 gap-x-4 gap-y-3 mt-5 pt-4 border-t border-white/5 text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]');
+
+            meta.append(
+                createMetaItem('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', formatDate(event)),
+                createMetaItem('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', formatTime(event)),
+                createMetaItem('M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', getEventLocation(event))
+            );
+
+            if (event.participants !== undefined && event.participants !== null && event.participants !== '') {
+                meta.append(createMetaItem('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', `${event.participants} Teilnehmer`));
+            }
+
+            const footer = createElement('div', 'mt-5 flex items-center justify-between gap-4');
+            const state = createElement(
+                'span',
+                isPastEvent(event)
+                    ? 'px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)]'
+                    : 'px-3 py-1.5 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-green)]',
+                isPastEvent(event) ? 'Vergangen' : 'Anstehend'
+            );
+            footer.appendChild(state);
+
+            card.append(topRow, description, meta, footer);
+            return card;
+        };
+
+        const sortEvents = (items) => {
+            return [...items].sort((a, b) => {
+                const aDate = getEventDate(a);
+                const bDate = getEventDate(b);
+                const aTime = aDate ? aDate.getTime() : Number.MAX_SAFE_INTEGER;
+                const bTime = bDate ? bDate.getTime() : Number.MAX_SAFE_INTEGER;
+
+                return aTime - bTime;
+            });
+        };
+
+        const getFilteredEvents = () => {
+            const query = normalizeText(searchInput?.value).toLocaleLowerCase('de-DE');
+            const category = categorySelect?.value || 'all';
+            const period = periodSelect?.value || 'upcoming';
+
+            return events.filter(event => {
+                const isPast = isPastEvent(event);
+                const matchesPeriod = period === 'all'
+                    || (period === 'past' && isPast)
+                    || (period === 'upcoming' && !isPast);
+                const matchesCategory = category === 'all' || getEventCategory(event) === category;
+                const haystack = [
+                    getEventTitle(event),
+                    getEventDescription(event),
+                    getEventCategory(event),
+                    getEventLocation(event)
+                ].join(' ').toLocaleLowerCase('de-DE');
+                const matchesQuery = !query || haystack.includes(query);
+
+                return matchesPeriod && matchesCategory && matchesQuery;
+            });
+        };
+
+        const populateCategories = () => {
+            if (!categorySelect) {
+                return;
+            }
+
+            const currentValue = categorySelect.value;
+            const categories = [...new Set(events.map(getEventCategory))]
+                .filter(Boolean)
+                .sort((a, b) => a.localeCompare(b, 'de-DE'));
+
+            categorySelect.replaceChildren();
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Alle Kategorien';
+            categorySelect.appendChild(allOption);
+
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categorySelect.appendChild(option);
+            });
+
+            categorySelect.value = categories.includes(currentValue) ? currentValue : 'all';
+        };
+
+        const updateStats = () => {
+            const upcomingEvents = sortEvents(events.filter(event => !isPastEvent(event)));
+            const nextEvent = upcomingEvents[0];
+
+            if (statUpcoming) {
+                statUpcoming.textContent = String(upcomingEvents.length);
+            }
+
+            if (statTotal) {
+                statTotal.textContent = String(events.length);
+            }
+
+            if (statNextDate) {
+                statNextDate.textContent = nextEvent ? formatDate(nextEvent, false) : 'Kein Termin';
+            }
+        };
+
+        const renderEvents = () => {
+            if (!eventsContainer) {
+                return;
+            }
+
+            const filteredEvents = getFilteredEvents();
+            eventsContainer.replaceChildren();
+
+            if (!filteredEvents.length) {
+                eventsContainer.appendChild(createStateCard(
+                    'Keine passenden Events gefunden',
+                    events.length
+                        ? 'Passe die Suche oder die Filter an, um weitere Termine anzuzeigen.'
+                        : 'Zurzeit sind keine Events im EifelLog-System eingetragen.'
+                ));
+            } else {
+                filteredEvents.forEach(event => eventsContainer.appendChild(createEventCard(event)));
+            }
+
+            if (resultCount) {
+                resultCount.textContent = filteredEvents.length === 1
+                    ? '1 Event wird angezeigt'
+                    : `${filteredEvents.length} Events werden angezeigt`;
+            }
+        };
+
+        const setLoadingState = (loading) => {
+            isLoading = loading;
+
+            if (eventsContainer) {
+                eventsContainer.setAttribute('aria-busy', loading ? 'true' : 'false');
+            }
+
+            if (refreshButton) {
+                refreshButton.disabled = loading;
+                refreshButton.classList.toggle('opacity-60', loading);
+                refreshButton.classList.toggle('cursor-not-allowed', loading);
+            }
+
+            if (refreshIcon) {
+                refreshIcon.classList.toggle('animate-spin', loading);
+            }
+        };
+
+        const setApiStatus = (type, label) => {
+            if (!statusBadge || !statusDot || !statusLabel) {
+                return;
+            }
+
+            statusLabel.textContent = label;
+            statusBadge.className = 'px-4 py-2 rounded-full text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2';
+            statusDot.className = 'w-1.5 h-1.5 rounded-full';
+
+            if (type === 'error') {
+                statusBadge.classList.add('bg-red-500/10', 'border', 'border-red-500/30', 'text-red-300');
+                statusDot.classList.add('bg-red-400');
+                return;
+            }
+
+            if (type === 'loading') {
+                statusBadge.classList.add('bg-[var(--brand-yellow)]/10', 'border', 'border-[var(--brand-yellow)]/30', 'text-[var(--brand-yellow)]');
+                statusDot.classList.add('bg-[var(--brand-yellow)]', 'animate-pulse');
+                return;
+            }
+
+            statusBadge.classList.add('bg-[var(--brand-green)]/10', 'border', 'border-[var(--brand-green)]/30', 'text-[var(--brand-green)]');
+            statusDot.classList.add('bg-[var(--brand-green)]', 'animate-pulse');
+        };
+
+        const loadEvents = async () => {
+            if (!eventsContainer || isLoading) {
+                return;
+            }
+
+            setLoadingState(true);
+            setApiStatus('loading', 'Event-Sync läuft');
+
+            try {
+                const response = await fetch(eventsContainer.dataset.endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Event API returned ${response.status}`);
+                }
+
+                const payload = await response.json();
+                const rawEvents = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload.events)
+                        ? payload.events
+                        : Array.isArray(payload.upcoming_events)
+                            ? payload.upcoming_events
+                            : [];
+
+                events = sortEvents(rawEvents.filter(event => event && typeof event === 'object'));
+                populateCategories();
+                updateStats();
+                renderEvents();
+
+                const syncTime = new Intl.DateTimeFormat('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(new Date());
+
+                if (statLastSync) {
+                    statLastSync.textContent = `${syncTime} Uhr`;
+                }
+
+                setApiStatus('success', 'Systems Online');
+            } catch (error) {
+                console.error('Events konnten nicht geladen werden:', error);
+                events = [];
+                populateCategories();
+                updateStats();
+                eventsContainer.replaceChildren(createStateCard(
+                    'Event-Sync nicht verfügbar',
+                    'Die Event-Daten konnten gerade nicht geladen werden. Bitte versuche es später erneut oder nutze den Button „Neu laden“.'
+                ));
+
+                if (resultCount) {
+                    resultCount.textContent = 'Keine Event-Daten verfügbar';
+                }
+
+                if (statLastSync) {
+                    statLastSync.textContent = 'Fehlgeschlagen';
+                }
+
+                setApiStatus('error', 'Sync nicht verfügbar');
+            } finally {
+                setLoadingState(false);
+            }
+        };
+
+        searchInput?.addEventListener('input', renderEvents);
+        categorySelect?.addEventListener('change', renderEvents);
+        periodSelect?.addEventListener('change', renderEvents);
+        refreshButton?.addEventListener('click', loadEvents);
+
+        loadEvents();
+        window.setInterval(loadEvents, 300000);
+    });
+</script>
+{% endblock %}

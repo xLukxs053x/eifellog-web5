@@ -47,6 +47,13 @@ def downloads(*args, **kwargs):
     return _legacy.downloads(*args, **kwargs)
 
 
+@public_bp.route("/events")
+@public_bp.route("/events.html")
+def events(*args, **kwargs):
+    """Delegiert kompatibel an app.legacy.events()."""
+    return _legacy.events(*args, **kwargs)
+
+
 @public_bp.route("/fuhrpark")
 @public_bp.route("/fuhrpark.html")
 def fuhrpark(*args, **kwargs):
@@ -65,7 +72,6 @@ def impressum(*args, **kwargs):
 def team(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.team()."""
     return _legacy.team(*args, **kwargs)
-
 
 # ==========================================
 # ÖFFENTLICHE DISCORD-PLUGIN-API
