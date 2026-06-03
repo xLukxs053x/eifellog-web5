@@ -637,7 +637,7 @@
                 activeEventIndex = 0;
                 renderActiveEvent();
                 restartEventRotation();
-                eventStatus.textContent = 'Mit EifelLog synchronisiert';
+                eventStatus.textContent = '';
             } catch (error) {
                 console.error('Events konnten nicht geladen werden:', error);
                 events = [];
@@ -732,18 +732,6 @@
                 || 'EifelLog-Mitglied';
         };
 
-        const getBirthdayYear = (birthday) => {
-            const explicitYear = Number(birthday.year);
-
-            if (Number.isInteger(explicitYear) && explicitYear > 1900) {
-                return explicitYear;
-            }
-
-            const fullDate = parseBirthdayDate(birthday.full_date);
-
-            return fullDate ? fullDate.getFullYear() : null;
-        };
-
         const getDaysUntil = (birthday) => {
             const suppliedDays = Number(birthday.days_until);
 
@@ -762,15 +750,10 @@
                 return dateValue || 'Datum nicht verfügbar';
             }
 
-            const formattedDate = new Intl.DateTimeFormat('de-DE', {
+            return new Intl.DateTimeFormat('de-DE', {
                 day: '2-digit',
                 month: 'long'
             }).format(date);
-            const year = getBirthdayYear(birthday);
-
-            return year
-                ? `${formattedDate} · Jahrgang ${year}`
-                : formattedDate;
         };
 
         const getBirthdayHeadline = (birthday) => {
@@ -888,7 +871,7 @@
                             : [];
 
                 renderBirthdays(birthdays);
-                birthdayStatus.textContent = 'Mit EifelLog synchronisiert';
+                birthdayStatus.textContent = '';
             } catch (error) {
                 console.error('Geburtstage konnten nicht geladen werden:', error);
                 birthdaysContainer.replaceChildren(createStateCard('Geburtstagsdaten sind derzeit nicht verfügbar.'));
