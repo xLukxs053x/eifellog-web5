@@ -4,18 +4,18 @@
 
 {% block content %}
 <!-- Hero Section -->
-<section class="mb-12 flex-grow flex flex-col justify-center mt-10">
-    
+<section class="mb-10 flex-grow flex flex-col justify-center mt-10">
+
     <!-- Top Bar: Titel und Status -->
     <div class="flex flex-col sm:flex-row sm:items-end justify-between pb-4 mb-4">
         <div>
             <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase">Virtuelle ETS2 Spedition</span>
             <h1 class="text-3xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
-                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
+                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
                 Eifel LOG Hub
             </h1>
         </div>
-        
+
         <div class="mt-4 sm:mt-0 flex items-center gap-4">
             <span class="px-4 py-2 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2 shadow-[0_0_15px_rgba(137,190,50,0.2)]">
                 <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] animate-pulse"></span>
@@ -26,16 +26,16 @@
 
     <!-- Main Glass Panel -->
     <div class="glass-card p-10 md:p-16 flex flex-col justify-center relative overflow-hidden">
-        
+
         <p class="font-orbitron text-[11px] font-bold text-[var(--brand-yellow)] tracking-[0.25em] uppercase mb-4 drop-shadow-md">
             Real Life geht vor.
         </p>
-        
+
         <h2 class="text-5xl md:text-6xl lg:text-7xl font-orbitron font-extrabold mb-6 glow-text leading-[1.05] text-[var(--text)] tracking-tight">
             Fahre mit Leidenschaft.<br>
             <span class="text-[var(--brand-green)]">Gemeinsam stark.</span>
         </h2>
-        
+
         <p class="text-base md:text-lg text-[var(--muted)] mb-10 max-w-2xl leading-relaxed font-inter">
             Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander.
         </p>
@@ -47,20 +47,167 @@
         </div>
 
         <div class="flex flex-col sm:flex-row gap-4 mt-auto">
-            <!-- Verlinke hier deine Routen, z.B. /hub oder /apply -->
             <a href="/hub" class="btn-primary">
                 Driver Hub Starten
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-1"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-1" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                </svg>
             </a>
             <a href="#info" class="btn-secondary">Mehr Erfahren</a>
         </div>
     </div>
 </section>
 
+<!-- Premium Section: Warum Eifel LOG? -->
+<section class="mb-12" aria-labelledby="why-eifellog-title">
+    <div class="mb-6">
+        <p class="font-orbitron text-[9px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase mb-2">Deine Spedition. Dein Tempo.</p>
+        <h2 id="why-eifellog-title" class="text-2xl md:text-3xl font-orbitron font-bold text-[var(--text)] tracking-wide">Warum Eifel LOG?</h2>
+        <p class="text-sm md:text-base text-[var(--muted)] mt-3 max-w-3xl leading-relaxed font-inter">
+            Eine moderne virtuelle Spedition für Fahrer, die Gemeinschaft suchen, ohne dass der Spielspaß zur Pflicht wird.
+        </p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% set benefits = [
+            ('Keine Mindestkilometer', 'Fahre freiwillig und ohne Leistungsdruck.'),
+            ('Real Life First', 'Das echte Leben hat bei uns immer Vorrang.'),
+            ('Eigener Driver Hub', 'Behalte Fahrten, Statistiken und Finanzen im Blick.'),
+            ('Familiäre Community', 'Respekt, Hilfsbereitschaft und ein starkes Miteinander.'),
+            ('Regelmäßige Konvois', 'Gemeinsame Touren mit der Community.'),
+            ('Aktive Entwicklung', 'Der Hub und unsere Systeme werden laufend erweitert.')
+        ] %}
+
+        {% for title, description in benefits %}
+        <article class="info-card p-5 flex items-start gap-4">
+            <div class="shrink-0 w-10 h-10 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center shadow-[0_0_15px_rgba(137,190,50,0.12)]">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--brand-green)" stroke-width="2.5" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-orbitron font-bold text-[var(--text)] tracking-wide">{{ title }}</h3>
+                <p class="text-xs text-[var(--muted)] leading-relaxed font-inter mt-2">{{ description }}</p>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Community Live Preview -->
+<section class="mb-12" aria-labelledby="community-preview-title">
+    <div class="mb-6">
+        <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase mb-2">Community Live</p>
+        <h2 id="community-preview-title" class="text-2xl md:text-3xl font-orbitron font-bold text-[var(--text)] tracking-wide">Was steht an?</h2>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+
+        <!-- Aktuelle Konvois -->
+        <article class="info-card p-7 md:p-8 flex flex-col">
+            <div class="flex items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
+                <div>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Event Vorschau</p>
+                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Aktuelle Konvois</h3>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="var(--brand-yellow)" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="space-y-3 flex-grow">
+                <div class="rounded-xl border border-white/5 bg-black/25 p-4 flex items-center gap-4">
+                    <div class="w-14 shrink-0 text-center rounded-lg bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 py-2">
+                        <p class="text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-green)]">Fr</p>
+                        <p class="text-xs font-orbitron font-bold text-[var(--text)] mt-1">20:00</p>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-orbitron font-bold text-[var(--text)] tracking-wide">Community Convoy</h4>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-1">Gemeinsame Tour mit der Eifel LOG Community.</p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-white/5 bg-black/25 p-4 flex items-center gap-4">
+                    <div class="w-14 shrink-0 text-center rounded-lg bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 py-2">
+                        <p class="text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)]">So</p>
+                        <p class="text-xs font-orbitron font-bold text-[var(--text)] mt-1">18:00</p>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-orbitron font-bold text-[var(--text)] tracking-wide">ETS2 Public Event</h4>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-1">Öffentlicher Konvoi für Fahrer und Gäste.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <a href="/events" class="btn-secondary inline-flex items-center">
+                    Alle Events anzeigen
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                </a>
+            </div>
+        </article>
+
+        <!-- Geburtstage: Daten werden serverseitig über das Discord-Plugin bereitgestellt -->
+        <article class="info-card p-7 md:p-8 flex flex-col">
+            <div class="flex items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
+                <div>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Discord Plugin</p>
+                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Geburtstage</h3>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="var(--brand-green)" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8a3 3 0 100-6 3 3 0 000 6zM19 21v-2a7 7 0 00-14 0v2M8 12h8m-4-4v8"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!--
+                Erwartete Antwort von GET /api/discord/birthdays:
+                {
+                    "birthdays": [
+                        {
+                            "display_name": "Max",
+                            "date": "2026-06-03",
+                            "days_until": 0,
+                            "avatar_url": "https://..."
+                        }
+                    ]
+                }
+
+                Wichtig: Discord-Bot-Token niemals im Browser hinterlegen.
+                Der Endpunkt muss die Daten serverseitig aus eurem Discord-Plugin abrufen.
+            -->
+            <div id="discord-birthdays"
+                 data-endpoint="/api/discord/birthdays"
+                 class="space-y-3 flex-grow"
+                 aria-live="polite"
+                 aria-busy="true">
+                <div class="rounded-xl border border-white/5 bg-black/25 p-4">
+                    <p class="text-sm text-[var(--muted)] font-inter">Geburtstage werden aus Discord geladen …</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-between gap-4">
+                <p id="birthday-status" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Discord Sync wird gestartet</p>
+                <a href="/discord" class="text-xs font-orbitron font-bold text-[var(--brand-green)] hover:underline">Zum Discord</a>
+            </div>
+        </article>
+    </div>
+</section>
+
 <!-- Info Cards Section -->
-<section id="info" class="mb-16">
+<section id="info" class="mb-16" aria-labelledby="info-title">
+    <div class="mb-6">
+        <p class="font-orbitron text-[9px] font-bold text-[var(--brand-green)] tracking-[0.2em] uppercase mb-2">Über Eifel LOG</p>
+        <h2 id="info-title" class="text-2xl md:text-3xl font-orbitron font-bold text-[var(--text)] tracking-wide">Gemeinsam auf Tour</h2>
+    </div>
+
     <div class="grid md:grid-cols-3 gap-6">
-        
+
         <!-- Card 1 -->
         <article class="info-card p-8 flex flex-col">
             <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
@@ -68,7 +215,7 @@
                     <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Philosophie</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Real Life First</h3>
                 </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </div>
@@ -84,8 +231,8 @@
                     <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Netzwerk</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Starke Community</h3>
                 </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-yellow)" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-yellow)" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                 </svg>
             </div>
             <div class="flex-grow">
@@ -100,7 +247,7 @@
                     <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Technik</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Moderne Systeme</h3>
                 </div>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
             </div>
@@ -108,24 +255,215 @@
                 <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Mit unserem eigenen, komplett neu entwickelten Driver Hub protokollierst du deine Fahrten, behältst Statistiken im Blick und steuerst deine Finanzen.</p>
             </div>
         </article>
-
     </div>
 </section>
 
-<!-- Smooth Scroll Script für den "Mehr Erfahren" Button -->
+<!-- Smooth Scroll + Discord Birthday Sync -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
+            anchor.addEventListener('click', function (event) {
+                event.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
+
                 if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth'
-                    });
+                    target.scrollIntoView({ behavior: 'smooth' });
                 }
             });
         });
+
+        const birthdaysContainer = document.getElementById('discord-birthdays');
+        const birthdayStatus = document.getElementById('birthday-status');
+
+        if (!birthdaysContainer || !birthdayStatus) {
+            return;
+        }
+
+        const endpoint = birthdaysContainer.dataset.endpoint;
+
+        const calculateDaysUntil = (dateString) => {
+            if (!dateString) {
+                return null;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const birthday = new Date(`${dateString}T00:00:00`);
+
+            if (Number.isNaN(birthday.getTime())) {
+                return null;
+            }
+
+            return Math.max(0, Math.ceil((birthday - today) / 86400000));
+        };
+
+        const getDisplayName = (birthday) => {
+            return birthday.display_name || birthday.name || birthday.username || 'Discord-Mitglied';
+        };
+
+        const getDaysUntil = (birthday) => {
+            const suppliedDays = Number(birthday.days_until);
+
+            if (Number.isFinite(suppliedDays)) {
+                return Math.max(0, suppliedDays);
+            }
+
+            return calculateDaysUntil(birthday.date);
+        };
+
+        const formatDate = (dateString) => {
+            if (!dateString) {
+                return 'Datum nicht verfügbar';
+            }
+
+            const date = new Date(`${dateString}T00:00:00`);
+
+            if (Number.isNaN(date.getTime())) {
+                return dateString;
+            }
+
+            return new Intl.DateTimeFormat('de-DE', {
+                day: '2-digit',
+                month: 'long'
+            }).format(date);
+        };
+
+        const getBirthdayHeadline = (birthday) => {
+            const name = getDisplayName(birthday);
+            const daysUntil = getDaysUntil(birthday);
+
+            if (daysUntil === 0) {
+                return `Heute hat ${name} Geburtstag`;
+            }
+
+            if (daysUntil === 1) {
+                return `${name} hat morgen Geburtstag`;
+            }
+
+            if (Number.isFinite(daysUntil)) {
+                return `${name} hat in ${daysUntil} Tagen Geburtstag`;
+            }
+
+            return `${name} hat bald Geburtstag`;
+        };
+
+        const createBirthdayCard = (birthday) => {
+            const card = document.createElement('div');
+            card.className = 'rounded-xl border border-white/5 bg-black/25 p-4 flex items-center gap-4';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'w-11 h-11 shrink-0 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 flex items-center justify-center overflow-hidden';
+
+            if (birthday.avatar_url) {
+                const avatarImage = document.createElement('img');
+                avatarImage.src = birthday.avatar_url;
+                avatarImage.alt = `${getDisplayName(birthday)} Discord Avatar`;
+                avatarImage.className = 'w-full h-full object-cover';
+                avatar.appendChild(avatarImage);
+            } else {
+                const avatarFallback = document.createElement('span');
+                avatarFallback.textContent = '🎂';
+                avatarFallback.setAttribute('aria-hidden', 'true');
+                avatar.appendChild(avatarFallback);
+            }
+
+            const content = document.createElement('div');
+            content.className = 'min-w-0';
+
+            const headline = document.createElement('h4');
+            headline.className = 'text-sm font-orbitron font-bold text-[var(--text)] tracking-wide';
+            headline.textContent = getBirthdayHeadline(birthday);
+
+            const meta = document.createElement('p');
+            meta.className = 'text-xs text-[var(--muted)] font-inter mt-1';
+            meta.textContent = formatDate(birthday.date);
+
+            content.append(headline, meta);
+            card.append(avatar, content);
+
+            return card;
+        };
+
+        const renderBirthdays = (birthdays) => {
+            birthdaysContainer.replaceChildren();
+
+            if (!birthdays.length) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'rounded-xl border border-white/5 bg-black/25 p-4';
+
+                const text = document.createElement('p');
+                text.className = 'text-sm text-[var(--muted)] font-inter';
+                text.textContent = 'Zurzeit sind keine anstehenden Geburtstage eingetragen.';
+
+                emptyState.appendChild(text);
+                birthdaysContainer.appendChild(emptyState);
+                return;
+            }
+
+            birthdays
+                .map(birthday => ({
+                    ...birthday,
+                    computed_days_until: getDaysUntil(birthday)
+                }))
+                .sort((a, b) => {
+                    const aDays = Number.isFinite(a.computed_days_until) ? a.computed_days_until : Number.MAX_SAFE_INTEGER;
+                    const bDays = Number.isFinite(b.computed_days_until) ? b.computed_days_until : Number.MAX_SAFE_INTEGER;
+
+                    return aDays - bDays;
+                })
+                .slice(0, 4)
+                .forEach(birthday => birthdaysContainer.appendChild(createBirthdayCard(birthday)));
+        };
+
+        const loadBirthdays = async () => {
+            birthdaysContainer.setAttribute('aria-busy', 'true');
+            birthdayStatus.textContent = 'Discord Sync läuft';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Discord birthday API returned ${response.status}`);
+                }
+
+                const payload = await response.json();
+                const birthdays = Array.isArray(payload.birthdays)
+                    ? payload.birthdays
+                    : Array.isArray(payload.upcoming_birthdays)
+                        ? payload.upcoming_birthdays
+                        : [];
+
+                renderBirthdays(birthdays);
+                birthdayStatus.textContent = 'Mit Discord synchronisiert';
+            } catch (error) {
+                console.error('Geburtstage konnten nicht geladen werden:', error);
+
+                birthdaysContainer.replaceChildren();
+
+                const errorState = document.createElement('div');
+                errorState.className = 'rounded-xl border border-white/5 bg-black/25 p-4';
+
+                const text = document.createElement('p');
+                text.className = 'text-sm text-[var(--muted)] font-inter';
+                text.textContent = 'Geburtstagsdaten sind derzeit nicht verfügbar.';
+
+                errorState.appendChild(text);
+                birthdaysContainer.appendChild(errorState);
+                birthdayStatus.textContent = 'Discord Sync nicht verfügbar';
+            } finally {
+                birthdaysContainer.setAttribute('aria-busy', 'false');
+            }
+        };
+
+        loadBirthdays();
+        window.setInterval(loadBirthdays, 300000);
     });
 </script>
 {% endblock %}
