@@ -131,11 +131,11 @@
 
     <div class="grid lg:grid-cols-2 gap-6">
 
-        <!-- Events: ausschließlich serverseitig aus event.py / Discord-Plugin -->
+        <!-- Events: serverseitig aus MongoDB über die öffentliche Flask-API -->
         <article class="info-card p-7 md:p-8 flex flex-col">
             <div class="flex items-center justify-between gap-4 mb-5 border-b border-white/5 pb-4">
                 <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Discord Plugin</p>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">EifelLog API</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Events</h3>
                 </div>
                 <div class="w-11 h-11 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center">
@@ -146,9 +146,8 @@
             </div>
 
             <!--
-                Erwartete Antwort von GET /api/discord/events:
-                {
-                    "events": [
+                Unterstützte Antworten von GET /api/events:
+                [
                         {
                             "title": "...",
                             "description": "...",
@@ -156,15 +155,13 @@
                             "location": "...",
                             "category": "..."
                         }
-                    ]
-                }
+                ]
 
-                Alternativ akzeptiert das Frontend auch "upcoming_events".
-                Bot-Token niemals im Browser hinterlegen. event.py stellt nur die
-                serverseitig gefilterten Daten über den Flask-Endpunkt bereit.
+                Alternativ akzeptiert das Frontend weiterhin die Legacy-Formate
+                {"events": [...]} und {"upcoming_events": [...]}.
             -->
-            <div id="discord-events"
-                 data-endpoint="/api/discord/events"
+            <div id="eifellog-events"
+                 data-endpoint="/api/events"
                  class="flex-grow"
                  aria-busy="true">
                 <div class="event-slideshow-stage relative overflow-hidden rounded-2xl border border-white/5 bg-black/15">
@@ -172,13 +169,13 @@
                          class="event-slideshow-fit min-h-[230px] flex items-center justify-center p-3"
                          aria-live="polite">
                         <div class="w-full rounded-xl border border-white/5 bg-black/25 p-5">
-                            <p class="text-sm text-[var(--muted)] font-inter">Events werden aus Discord geladen …</p>
+                            <p class="text-sm text-[var(--muted)] font-inter">Events werden aus EifelLog geladen …</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="mt-3 flex items-center justify-between gap-3">
-                    <p id="event-slide-counter" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Discord Sync wird gestartet</p>
+                    <p id="event-slide-counter" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">EifelLog Sync wird gestartet</p>
 
                     <div class="flex items-center gap-2" aria-label="Event-Slideshow steuern">
                         <button id="event-prev"
@@ -214,11 +211,11 @@
             </div>
         </article>
 
-        <!-- Geburtstage: Daten werden serverseitig über das Discord-Plugin bereitgestellt -->
+        <!-- Geburtstage: serverseitig aus MongoDB über die öffentliche Flask-API -->
         <article class="info-card p-7 md:p-8 flex flex-col">
             <div class="flex items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
                 <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Discord Plugin</p>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">EifelLog API</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Geburtstage</h3>
                 </div>
                 <div class="w-11 h-11 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center">
@@ -229,33 +226,31 @@
             </div>
 
             <!--
-                Erwartete Antwort von GET /api/discord/birthdays:
-                {
-                    "birthdays": [
+                Unterstützte Antworten von GET /api/birthdays:
+                [
                         {
                             "display_name": "Max",
                             "date": "2026-06-03",
                             "days_until": 0,
                             "avatar_url": "https://..."
                         }
-                    ]
-                }
+                ]
 
-                Wichtig: Discord-Bot-Token niemals im Browser hinterlegen.
-                Der Endpunkt muss die Daten serverseitig aus eurem Discord-Plugin abrufen.
+                Alternativ akzeptiert das Frontend weiterhin die Legacy-Formate
+                {"birthdays": [...]} und {"upcoming_birthdays": [...]}.
             -->
-            <div id="discord-birthdays"
-                 data-endpoint="/api/discord/birthdays"
+            <div id="eifellog-birthdays"
+                 data-endpoint="/api/birthdays"
                  class="space-y-3 flex-grow"
                  aria-live="polite"
                  aria-busy="true">
                 <div class="rounded-xl border border-white/5 bg-black/25 p-4">
-                    <p class="text-sm text-[var(--muted)] font-inter">Geburtstage werden aus Discord geladen …</p>
+                    <p class="text-sm text-[var(--muted)] font-inter">Geburtstage werden aus EifelLog geladen …</p>
                 </div>
             </div>
 
             <div class="mt-6 flex items-center justify-between gap-4">
-                <p id="birthday-status" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Discord Sync wird gestartet</p>
+                <p id="birthday-status" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">EifelLog Sync wird gestartet</p>
                 <a href="/discord" class="text-xs font-orbitron font-bold text-[var(--brand-green)] hover:underline">Zum Discord</a>
             </div>
         </article>
@@ -321,7 +316,7 @@
     </div>
 </section>
 
-<!-- Smooth Scroll + Discord Event- und Geburtstag-Sync -->
+<!-- Smooth Scroll + Event- und Geburtstag-Sync -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -361,9 +356,9 @@
         };
 
         /* --------------------------------------------------------------
-           Events aus event.py / Discord-Plugin
+           Events aus der öffentlichen EifelLog-API
         -------------------------------------------------------------- */
-        const eventsContainer = document.getElementById('discord-events');
+        const eventsContainer = document.getElementById('eifellog-events');
         const eventViewport = document.getElementById('event-slideshow-viewport');
         const eventStatus = document.getElementById('event-status');
         const eventCounter = document.getElementById('event-slide-counter');
@@ -380,7 +375,7 @@
         };
 
         const getEventTitle = (event) => {
-            return event.title || event.name || 'Discord Event';
+            return event.title || event.name || 'EifelLog Event';
         };
 
         const getEventDescription = (event) => {
@@ -459,7 +454,7 @@
 
             const category = document.createElement('p');
             category.className = 'text-[9px] font-orbitron font-bold uppercase tracking-[0.16em] text-[var(--brand-green)]';
-            category.textContent = event.category || event.type || 'Discord Event';
+            category.textContent = event.category || event.type || 'EifelLog Event';
 
             const title = document.createElement('h4');
             title.className = 'text-base sm:text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mt-2 break-words';
@@ -601,7 +596,7 @@
             }
 
             eventsContainer.setAttribute('aria-busy', 'true');
-            eventStatus.textContent = 'Discord Event-Sync läuft';
+            eventStatus.textContent = 'EifelLog Event-Sync läuft';
 
             try {
                 const response = await fetch(eventsContainer.dataset.endpoint, {
@@ -613,15 +608,17 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Discord event API returned ${response.status}`);
+                    throw new Error(`Event API returned ${response.status}`);
                 }
 
                 const payload = await response.json();
-                const rawEvents = Array.isArray(payload.events)
-                    ? payload.events
-                    : Array.isArray(payload.upcoming_events)
-                        ? payload.upcoming_events
-                        : [];
+                const rawEvents = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload.events)
+                        ? payload.events
+                        : Array.isArray(payload.upcoming_events)
+                            ? payload.upcoming_events
+                            : [];
 
                 events = rawEvents
                     .filter(event => event && typeof event === 'object')
@@ -638,7 +635,7 @@
                 activeEventIndex = 0;
                 renderActiveEvent();
                 restartEventRotation();
-                eventStatus.textContent = 'Mit Discord synchronisiert';
+                eventStatus.textContent = 'Mit EifelLog synchronisiert';
             } catch (error) {
                 console.error('Events konnten nicht geladen werden:', error);
                 events = [];
@@ -646,34 +643,80 @@
                 restartEventRotation();
                 eventViewport.replaceChildren(createStateCard('Event-Daten sind derzeit nicht verfügbar.'));
                 updateEventControls();
-                eventStatus.textContent = 'Discord Event-Sync nicht verfügbar';
+                eventStatus.textContent = 'Event-Sync nicht verfügbar';
             } finally {
                 eventsContainer.setAttribute('aria-busy', 'false');
             }
         };
 
         /* --------------------------------------------------------------
-           Geburtstage aus event.py / Discord-Plugin
+           Geburtstage aus der öffentlichen EifelLog-API
         -------------------------------------------------------------- */
-        const birthdaysContainer = document.getElementById('discord-birthdays');
+        const birthdaysContainer = document.getElementById('eifellog-birthdays');
         const birthdayStatus = document.getElementById('birthday-status');
 
-        const calculateDaysUntil = (dateString) => {
-            const birthday = parseDate(dateString);
+        const getBirthdayDateValue = (birthday) => {
+            return birthday.date || birthday.birthday || birthday.birth_date || birthday.geburtstag || null;
+        };
 
-            if (!birthday) {
+        const parseBirthdayDate = (value) => {
+            if (!value) {
+                return null;
+            }
+
+            const normalizedValue = String(value).trim();
+            const germanDateMatch = normalizedValue.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?\.?$/);
+            const shortIsoMatch = normalizedValue.match(/^(\d{1,2})-(\d{1,2})$/);
+
+            if (germanDateMatch) {
+                const year = germanDateMatch[3]
+                    ? Number(germanDateMatch[3])
+                    : new Date().getFullYear();
+
+                return new Date(
+                    year,
+                    Number(germanDateMatch[2]) - 1,
+                    Number(germanDateMatch[1])
+                );
+            }
+
+            if (shortIsoMatch) {
+                return new Date(
+                    new Date().getFullYear(),
+                    Number(shortIsoMatch[1]) - 1,
+                    Number(shortIsoMatch[2])
+                );
+            }
+
+            return parseDate(normalizedValue);
+        };
+
+        const calculateDaysUntil = (dateString) => {
+            const sourceDate = parseBirthdayDate(dateString);
+
+            if (!sourceDate) {
                 return null;
             }
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            birthday.setHours(0, 0, 0, 0);
 
-            return Math.max(0, Math.ceil((birthday - today) / 86400000));
+            const nextBirthday = new Date(
+                today.getFullYear(),
+                sourceDate.getMonth(),
+                sourceDate.getDate()
+            );
+            nextBirthday.setHours(0, 0, 0, 0);
+
+            if (nextBirthday < today) {
+                nextBirthday.setFullYear(today.getFullYear() + 1);
+            }
+
+            return Math.ceil((nextBirthday - today) / 86400000);
         };
 
         const getDisplayName = (birthday) => {
-            return birthday.display_name || birthday.name || birthday.username || 'Discord-Mitglied';
+            return birthday.display_name || birthday.name || birthday.username || 'EifelLog-Mitglied';
         };
 
         const getDaysUntil = (birthday) => {
@@ -683,11 +726,11 @@
                 return Math.max(0, suppliedDays);
             }
 
-            return calculateDaysUntil(birthday.date);
+            return calculateDaysUntil(getBirthdayDateValue(birthday));
         };
 
         const formatBirthdayDate = (dateString) => {
-            const date = parseDate(dateString);
+            const date = parseBirthdayDate(dateString);
 
             if (!date) {
                 return dateString || 'Datum nicht verfügbar';
@@ -728,7 +771,7 @@
             if (birthday.avatar_url) {
                 const avatarImage = document.createElement('img');
                 avatarImage.src = birthday.avatar_url;
-                avatarImage.alt = `${getDisplayName(birthday)} Discord Avatar`;
+                avatarImage.alt = `${getDisplayName(birthday)} Profilbild`;
                 avatarImage.className = 'w-full h-full object-cover';
                 avatar.appendChild(avatarImage);
             } else {
@@ -747,7 +790,7 @@
 
             const meta = document.createElement('p');
             meta.className = 'text-xs text-[var(--muted)] font-inter mt-1';
-            meta.textContent = formatBirthdayDate(birthday.date);
+            meta.textContent = formatBirthdayDate(getBirthdayDateValue(birthday));
 
             content.append(headline, meta);
             card.append(avatar, content);
@@ -788,7 +831,7 @@
             }
 
             birthdaysContainer.setAttribute('aria-busy', 'true');
-            birthdayStatus.textContent = 'Discord Sync läuft';
+            birthdayStatus.textContent = 'EifelLog Sync läuft';
 
             try {
                 const response = await fetch(birthdaysContainer.dataset.endpoint, {
@@ -800,22 +843,24 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Discord birthday API returned ${response.status}`);
+                    throw new Error(`Birthday API returned ${response.status}`);
                 }
 
                 const payload = await response.json();
-                const birthdays = Array.isArray(payload.birthdays)
-                    ? payload.birthdays
-                    : Array.isArray(payload.upcoming_birthdays)
-                        ? payload.upcoming_birthdays
-                        : [];
+                const birthdays = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload.birthdays)
+                        ? payload.birthdays
+                        : Array.isArray(payload.upcoming_birthdays)
+                            ? payload.upcoming_birthdays
+                            : [];
 
                 renderBirthdays(birthdays);
-                birthdayStatus.textContent = 'Mit Discord synchronisiert';
+                birthdayStatus.textContent = 'Mit EifelLog synchronisiert';
             } catch (error) {
                 console.error('Geburtstage konnten nicht geladen werden:', error);
                 birthdaysContainer.replaceChildren(createStateCard('Geburtstagsdaten sind derzeit nicht verfügbar.'));
-                birthdayStatus.textContent = 'Discord Sync nicht verfügbar';
+                birthdayStatus.textContent = 'Birthday-Sync nicht verfügbar';
             } finally {
                 birthdaysContainer.setAttribute('aria-busy', 'false');
             }
