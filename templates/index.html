@@ -94,15 +94,20 @@
     </div>
 </section>
 
-<!-- Kompakte Skalierung der Discord-Event-Slideshow -->
+<!-- Kompakte Skalierung der Event-Slideshow wie in der Referenzansicht -->
 <style>
     .event-slideshow-stage {
-        min-height: 230px;
+        height: 230px;
     }
 
-    /* 92 % Zoom mit mathematisch kompensierter Breite: visuell exakt 100 %. */
+    /*
+        Desktop: Die Slideshow wird auf 92 % verkleinert.
+        Breite und Mindesthöhe werden mathematisch kompensiert, damit der
+        sichtbare Bereich sauber und vollständig in der Stage sitzt.
+    */
     .event-slideshow-fit {
         width: 108.695652%;
+        min-height: 250px;
         margin-left: -4.347826%;
         transform: scale(0.92);
         transform-origin: center center;
@@ -110,12 +115,13 @@
 
     @media (max-width: 640px) {
         .event-slideshow-stage {
-            min-height: 244px;
+            height: 244px;
         }
 
-        /* Auf kleinen Displays nur leicht herauszoomen, damit Text lesbar bleibt. */
+        /* Mobil nur leicht verkleinern, damit der Text gut lesbar bleibt. */
         .event-slideshow-fit {
             width: 104.166667%;
+            min-height: 254.166667px;
             margin-left: -2.083333%;
             transform: scale(0.96);
         }
@@ -166,7 +172,7 @@
                  aria-busy="true">
                 <div class="event-slideshow-stage relative overflow-hidden rounded-2xl border border-white/5 bg-black/15">
                     <div id="event-slideshow-viewport"
-                         class="event-slideshow-fit min-h-[230px] flex items-center justify-center p-3"
+                         class="event-slideshow-fit flex items-center justify-center p-3"
                          aria-live="polite">
                         <div class="w-full rounded-xl border border-white/5 bg-black/25 p-5">
                             <p class="text-sm text-[var(--muted)] font-inter">Events werden aus EifelLog geladen …</p>
@@ -837,6 +843,7 @@
 
                     return aDays - bDays;
                 })
+                .slice(0, 3)
                 .forEach(birthday => birthdaysContainer.appendChild(createBirthdayCard(birthday)));
         };
 
