@@ -21,7 +21,7 @@ import secrets
 from html import escape as html_escape
 import requests
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import quote
 
@@ -1413,6 +1413,8 @@ def wartung_api_token_matches(config=None):
 # Die eigentlichen Hub-/Dashboard-/API-Bereiche bleiben weiterhin gesperrt, sofern die
 # eingeloggte Person keine freigegebene Wartungs-Rolle besitzt.
 WARTUNG_PUBLIC_ENDPOINTS = {
+    "api_discord_events",
+    "api_discord_birthdays",
     "home",
     "about",
     "team",
@@ -1421,6 +1423,8 @@ WARTUNG_PUBLIC_ENDPOINTS = {
 }
 
 WARTUNG_PUBLIC_PATHS = {
+    "/api/discord/events",
+    "/api/discord/birthdays",
     "/",
     "/index.html",
     "/about",
@@ -14140,6 +14144,501 @@ def tracker_feierabend():
         "activity": activity_result.get("activity"),
         "summary": shift_doc.get("summary"),
     })
+
+# ==========================================
+# ÖFFENTLICHE EVENT- UND GEBURTSTAGS-API
+# ==========================================
+# Die Daten werden serverseitig aus MongoDB gelesen. Zugangsdaten gehören
+# ausschließlich in die Server-Umgebung (.env / Hosting-Environment) und
+# niemals in Templates oder Browser-JavaScript.
+#
+# Erwartete Umgebungsvariablen:
+# MONGOURI=<MongoDB-Verbindungsstring>
+# EVENT_DB_NAME=eifellog_db
+# EVENT_COLLECTION_NAME=events
+# BIRTHDAY_DB_NAME=EifelLog
+# BIRTHDAY_COLLECTION_NAME=Birthdays
+load_dotenv()
+
+PUBLIC_PLUGIN_MONGO_URI = safe_str(
+    os.getenv("MONGOURI")
+    or os.getenv("MONGO_URI")
+    or os.getenv("MONGODB_URI")
+)
+EVENT_DB_NAME = safe_str(os.getenv("EVENT_DB_NAME"), "eifellog_db") or "eifellog_db"
+EVENT_COLLECTION_NAME = safe_str(os.getenv("EVENT_COLLECTION_NAME"), "events") or "events"
+BIRTHDAY_DB_NAME = safe_str(os.getenv("BIRTHDAY_DB_NAME"), "EifelLog") or "EifelLog"
+BIRTHDAY_COLLECTION_NAME = safe_str(os.getenv("BIRTHDAY_COLLECTION_NAME"), "Birthdays") or "Birthdays"
+PUBLIC_PLUGIN_MONGO_TIMEOUT_MS = max(1000, min(30000, parse_int(os.getenv("PUBLIC_PLUGIN_MONGO_TIMEOUT_MS"), 5000)))
+
+_public_plugin_mongo_client = None
+
+
+def _public_plugin_mongo_client():
+    """Liefert einen wiederverwendbaren MongoDB-Client für die Discord-Plugin-Daten."""
+    global _public_plugin_mongo_client
+
+    if not PUBLIC_PLUGIN_MONGO_URI:
+        raise RuntimeError("MONGOURI fehlt in der Server-Umgebung.")
+
+    if _public_plugin_mongo_client is None:
+        _public_plugin_mongo_client = MongoClient(
+            PUBLIC_PLUGIN_MONGO_URI,
+            serverSelectionTimeoutMS=PUBLIC_PLUGIN_MONGO_TIMEOUT_MS,
+            connectTimeoutMS=PUBLIC_PLUGIN_MONGO_TIMEOUT_MS,
+            socketTimeoutMS=PUBLIC_PLUGIN_MONGO_TIMEOUT_MS,
+            appname="EifelLog-Public-Discord-Plugin-API",
+        )
+
+    return _public_plugin_mongo_client
+
+
+def _public_events_collection():
+    return _public_plugin_mongo_client()[EVENT_DB_NAME][EVENT_COLLECTION_NAME]
+
+
+def _public_birthdays_collection():
+    return _public_plugin_mongo_client()[BIRTHDAY_DB_NAME][BIRTHDAY_COLLECTION_NAME]
+
+
+def _public_first_value(source, *keys, fallback=None):
+    source = source or {}
+    for key in keys:
+        value = source.get(key)
+        if value not in (None, ""):
+            return value
+    return fallback
+
+
+def _public_nested_value(source, *paths, fallback=None):
+    source = source or {}
+    for path in paths:
+        current = source
+        for key in path.split("."):
+            if not isinstance(current, dict):
+                current = None
+                break
+            current = current.get(key)
+        if current not in (None, ""):
+            return current
+    return fallback
+
+
+def _public_parse_datetime(value):
+    """Parst ISO-, Discord- und MongoDB-Datumswerte robust für die Vorschau."""
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        timestamp = float(value)
+        if abs(timestamp) > 100000000000:
+            timestamp /= 1000.0
+        try:
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except Exception:
+            return None
+
+    value = safe_str(value)
+    if not value:
+        return None
+
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+
+    for candidate in (normalized, normalized.replace(" ", "T", 1)):
+        try:
+            return datetime.fromisoformat(candidate)
+        except Exception:
+            pass
+
+    for date_format in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y",
+    ):
+        try:
+            return datetime.strptime(value, date_format)
+        except Exception:
+            pass
+
+    return None
+
+
+def _public_datetime_sort_value(value, fallback=None):
+    parsed = _public_parse_datetime(value)
+    if parsed is None:
+        return fallback
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _public_datetime_iso(value):
+    parsed = _public_parse_datetime(value)
+    if parsed is None:
+        return safe_str(value)
+    if parsed.tzinfo is not None:
+        return parsed.isoformat()
+    return parsed.isoformat(timespec="minutes")
+
+
+def _public_event_start_value(event_doc):
+    event_doc = event_doc or {}
+    start_value = _public_first_value(
+        event_doc,
+        "start_at",
+        "starts_at",
+        "scheduled_start_time",
+        "scheduledStartTime",
+        "start_datetime",
+        "startDateTime",
+        "datetime",
+        "start",
+        "event_date",
+        "eventDate",
+        "date",
+    )
+
+    date_value = _public_first_value(event_doc, "date", "event_date", "eventDate")
+    time_value = _public_first_value(event_doc, "time", "start_time", "startTime")
+    if date_value and time_value:
+        date_text = safe_str(date_value)
+        time_text = safe_str(time_value)
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_text) and re.fullmatch(r"\d{1,2}:\d{2}(?::\d{2})?", time_text):
+            return f"{date_text}T{time_text}"
+
+    if start_value not in (None, ""):
+        return start_value
+
+    nested_start = _public_nested_value(
+        event_doc,
+        "schedule.start_at",
+        "schedule.starts_at",
+        "schedule.start_time",
+        "schedule.datetime",
+        "event.start_at",
+        "event.start_time",
+        "event.datetime",
+    )
+    return nested_start
+
+
+def _public_event_end_value(event_doc):
+    return _public_first_value(
+        event_doc,
+        "end_at",
+        "ends_at",
+        "scheduled_end_time",
+        "scheduledEndTime",
+        "end_datetime",
+        "endDateTime",
+        "end_time",
+        "endTime",
+        "end",
+        fallback=_public_nested_value(
+            event_doc,
+            "schedule.end_at",
+            "schedule.ends_at",
+            "schedule.end_time",
+            "event.end_at",
+            "event.end_time",
+        ),
+    )
+
+
+def _public_event_is_visible(event_doc):
+    event_doc = event_doc or {}
+    if event_doc.get("archived") is True or event_doc.get("deleted") is True:
+        return False
+
+    status = safe_str(_public_first_value(event_doc, "status", "state", "event_status")).lower()
+    return status not in {
+        "archived",
+        "cancelled",
+        "canceled",
+        "deleted",
+        "disabled",
+        "inactive",
+        "ended",
+        "finished",
+        "abgesagt",
+        "beendet",
+    }
+
+
+def _public_event_participants(event_doc):
+    value = _public_first_value(
+        event_doc,
+        "participants",
+        "participant_count",
+        "participantCount",
+        "members_count",
+        "membersCount",
+        "attendee_count",
+        "attendeeCount",
+    )
+    if isinstance(value, (list, tuple, set)):
+        return len(value)
+    if isinstance(value, dict):
+        return len(value)
+    if value in (None, ""):
+        return None
+    try:
+        return max(0, int(value))
+    except Exception:
+        return None
+
+
+def _public_event_payload(event_doc):
+    event_doc = event_doc or {}
+    start_value = _public_event_start_value(event_doc)
+    start_sort = _public_datetime_sort_value(start_value)
+    end_value = _public_event_end_value(event_doc)
+    end_sort = _public_datetime_sort_value(end_value)
+
+    title = safe_str(_public_first_value(event_doc, "title", "name", "event_name", "eventName"), "Discord Event")
+    description = safe_str(_public_first_value(event_doc, "description", "summary", "details", "content"))
+    category = safe_str(_public_first_value(event_doc, "category", "type", "event_type", "eventType"), "Discord Event")
+    location = safe_str(_public_first_value(event_doc, "location", "channel_name", "channelName", "channel", "place"), "Eifel LOG Community")
+    participants = _public_event_participants(event_doc)
+    event_id = safe_str(_public_first_value(event_doc, "event_id", "eventId", "discord_event_id", "discordEventId", "id", fallback=event_doc.get("_id")))
+    details_url = safe_str(_public_first_value(event_doc, "details_url", "detailsUrl", "url", "event_url", "eventUrl"))
+
+    payload = {
+        "id": event_id,
+        "title": title,
+        "description": description,
+        "start_at": _public_datetime_iso(start_value),
+        "category": category,
+        "location": location,
+    }
+    if end_value not in (None, ""):
+        payload["end_at"] = _public_datetime_iso(end_value)
+    if participants is not None:
+        payload["participants"] = participants
+    if details_url:
+        payload["details_url"] = details_url
+
+    return payload, start_sort, end_sort
+
+
+def _public_birthday_parts(value, source=None):
+    """Extrahiert Tag und Monat aus typischen Birthday-Plugin-Schemata."""
+    source = source or {}
+
+    if isinstance(value, datetime):
+        return value.day, value.month
+
+    if isinstance(value, dict):
+        day = value.get("day") or value.get("birthday_day") or value.get("birth_day")
+        month = value.get("month") or value.get("birthday_month") or value.get("birth_month")
+        try:
+            return int(day), int(month)
+        except Exception:
+            pass
+
+    parsed = _public_parse_datetime(value)
+    if parsed is not None:
+        return parsed.day, parsed.month
+
+    text = safe_str(value)
+    if text:
+        for pattern in (
+            r"^(\d{1,2})\.(\d{1,2})(?:\.\d{2,4})?\.?$",
+            r"^(\d{1,2})/(\d{1,2})(?:/\d{2,4})?$",
+            r"^(\d{1,2})-(\d{1,2})(?:-\d{2,4})?$",
+        ):
+            match = re.fullmatch(pattern, text.strip())
+            if match:
+                try:
+                    return int(match.group(1)), int(match.group(2))
+                except Exception:
+                    pass
+
+    day = _public_first_value(source, "day", "birthday_day", "birthdayDay", "birth_day", "birthDay")
+    month = _public_first_value(source, "month", "birthday_month", "birthdayMonth", "birth_month", "birthMonth")
+    try:
+        return int(day), int(month)
+    except Exception:
+        return None, None
+
+
+def _public_next_birthday(day, month, today=None):
+    today = today or datetime.now().date()
+    year = today.year
+
+    def candidate_for_year(candidate_year):
+        try:
+            return datetime(candidate_year, month, day).date()
+        except ValueError:
+            # 29. Februar: In Nicht-Schaltjahren wird der 28. Februar angezeigt.
+            if day == 29 and month == 2:
+                return datetime(candidate_year, 2, 28).date()
+            return None
+
+    candidate = candidate_for_year(year)
+    if candidate is None:
+        return None
+    if candidate < today:
+        candidate = candidate_for_year(year + 1)
+    return candidate
+
+
+def _public_birthday_avatar_url(birthday_doc):
+    birthday_doc = birthday_doc or {}
+    avatar_url = safe_str(_public_first_value(birthday_doc, "avatar_url", "avatarUrl", "discord_avatar_url", "discordAvatarUrl"))
+    if avatar_url:
+        return avatar_url
+
+    discord_id = safe_str(_public_first_value(birthday_doc, "discord_id", "discordId", "user_id", "userId", "member_id", "memberId"))
+    avatar_hash = safe_str(_public_first_value(birthday_doc, "avatar", "avatar_hash", "avatarHash", "discord_avatar", "discordAvatar"))
+    if not discord_id or not avatar_hash:
+        return ""
+
+    extension = "gif" if avatar_hash.startswith("a_") else "png"
+    return f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.{extension}?size=128"
+
+
+def _public_birthday_payload(birthday_doc, today=None):
+    birthday_doc = birthday_doc or {}
+    birthday_value = _public_first_value(
+        birthday_doc,
+        "birthday",
+        "birthdate",
+        "birth_date",
+        "birthday_date",
+        "birthdayDate",
+        "date",
+    )
+    day, month = _public_birthday_parts(birthday_value, source=birthday_doc)
+    if not day or not month:
+        return None, None
+
+    next_birthday = _public_next_birthday(day, month, today=today)
+    if next_birthday is None:
+        return None, None
+
+    today = today or datetime.now().date()
+    days_until = max(0, (next_birthday - today).days)
+    discord_id = safe_str(_public_first_value(birthday_doc, "discord_id", "discordId", "user_id", "userId", "member_id", "memberId"))
+    display_name = safe_str(
+        _public_first_value(
+            birthday_doc,
+            "display_name",
+            "displayName",
+            "name",
+            "username",
+            "member_name",
+            "memberName",
+        ),
+        "Discord-Mitglied",
+    )
+
+    payload = {
+        "display_name": display_name,
+        "date": next_birthday.isoformat(),
+        "days_until": days_until,
+    }
+    if discord_id:
+        payload["discord_id"] = discord_id
+
+    avatar_url = _public_birthday_avatar_url(birthday_doc)
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
+
+    return payload, days_until
+
+
+def _public_api_limit(default=32, maximum=250):
+    return max(1, min(maximum, parse_int(request.args.get("limit"), default)))
+
+
+def _public_safe_mongo_error(error):
+    message = safe_str(error)
+    if PUBLIC_PLUGIN_MONGO_URI:
+        message = message.replace(PUBLIC_PLUGIN_MONGO_URI, "[MONGOURI ausgeblendet]")
+    message = re.sub(r"(mongodb(?:\+srv)?://[^:@/\s]+:)[^@/\s]+(@)", r"\1***\2", message)
+    return f"{type(error).__name__}: {message}"
+
+
+@app.route("/api/discord/events", methods=["GET"])
+def api_discord_events():
+    """Öffentliche, minimierte Event-Vorschau aus eifellog_db.events."""
+    try:
+        limit = _public_api_limit(default=32, maximum=100)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        grace_period = now - timedelta(hours=6)
+        documents = _public_events_collection().find({}).limit(500)
+        normalized_events = []
+
+        for event_doc in documents:
+            if not _public_event_is_visible(event_doc):
+                continue
+
+            payload, start_sort, end_sort = _public_event_payload(event_doc)
+            if end_sort is not None and end_sort < grace_period:
+                continue
+            if end_sort is None and start_sort is not None and start_sort < grace_period:
+                continue
+
+            normalized_events.append((start_sort or datetime.max, payload))
+
+        normalized_events.sort(key=lambda item: item[0])
+        events = [payload for _, payload in normalized_events[:limit]]
+        return jsonify({
+            "success": True,
+            "source": f"{EVENT_DB_NAME}.{EVENT_COLLECTION_NAME}",
+            "events": events,
+            "count": len(events),
+        })
+    except Exception as error:
+        print(f"Öffentliche Event-API nicht verfügbar: {_public_safe_mongo_error(error)}")
+        return jsonify({
+            "success": False,
+            "events": [],
+            "message": "Event-Daten sind derzeit nicht verfügbar.",
+        }), 503
+
+
+@app.route("/api/discord/birthdays", methods=["GET"])
+def api_discord_birthdays():
+    """Öffentliche, minimierte Geburtstagsvorschau aus EifelLog.Birthdays."""
+    try:
+        limit = _public_api_limit(default=32, maximum=100)
+        today = datetime.now().date()
+        documents = _public_birthdays_collection().find({}).limit(1000)
+        normalized_birthdays = []
+
+        for birthday_doc in documents:
+            if birthday_doc.get("archived") is True or birthday_doc.get("deleted") is True:
+                continue
+
+            payload, days_until = _public_birthday_payload(birthday_doc, today=today)
+            if payload is None:
+                continue
+            normalized_birthdays.append((days_until, payload.get("display_name", ""), payload))
+
+        normalized_birthdays.sort(key=lambda item: (item[0], item[1].lower()))
+        birthdays = [payload for _, _, payload in normalized_birthdays[:limit]]
+        return jsonify({
+            "success": True,
+            "source": f"{BIRTHDAY_DB_NAME}.{BIRTHDAY_COLLECTION_NAME}",
+            "birthdays": birthdays,
+            "count": len(birthdays),
+        })
+    except Exception as error:
+        print(f"Öffentliche Birthday-API nicht verfügbar: {_public_safe_mongo_error(error)}")
+        return jsonify({
+            "success": False,
+            "birthdays": [],
+            "message": "Geburtstagsdaten sind derzeit nicht verfügbar.",
+        }), 503
+
+
 
 # ==========================================
 # ROUTES - ÖFFENTLICH
