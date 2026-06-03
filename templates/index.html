@@ -3,41 +3,6 @@
 {% block title %}EifelLog - Central Hub{% endblock %}
 
 {% block content %}
-<!-- Desktop-Zoom fuer die kompakte Index-Ansicht wie auf der Events-Seite -->
-<style>
-    /*
-        Auf grossen Bildschirmen wird der sichtbare Index-Inhalt etwas
-        herausgezoomt. Die Breite wird jeweils kompensiert, damit die
-        Karten weiterhin die komplette verfuegbare Content-Breite nutzen.
-    */
-    .index-content-zoom {
-        width: 121.95122%;
-        zoom: 0.82;
-    }
-
-    @media (max-width: 1599px) {
-        .index-content-zoom {
-            width: 113.636364%;
-            zoom: 0.88;
-        }
-    }
-
-    @media (max-width: 1279px) {
-        .index-content-zoom {
-            width: 106.382979%;
-            zoom: 0.94;
-        }
-    }
-
-    @media (max-width: 1023px) {
-        .index-content-zoom {
-            width: 100%;
-            zoom: 1;
-        }
-    }
-</style>
-
-<div class="index-content-zoom">
 <!-- Hero Section -->
 <section class="mb-10 flex-grow flex flex-col justify-center mt-10">
 
@@ -358,8 +323,6 @@
         </article>
     </div>
 </section>
-
-</div>
 
 <!-- Smooth Scroll + Event- und Geburtstag-Sync -->
 <script>
