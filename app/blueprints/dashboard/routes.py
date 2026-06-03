@@ -23,7 +23,7 @@ def my_profile_redirect(*args, **kwargs):
     return _legacy.my_profile_redirect(*args, **kwargs)
 
 
-@dashboard_bp.route('/profile/<username>', methods=['GET', 'POST'])
+@dashboard_bp.route('/user/<username>', methods=['GET', 'POST'])
 def profile(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.profile()."""
     return _legacy.profile(*args, **kwargs)
