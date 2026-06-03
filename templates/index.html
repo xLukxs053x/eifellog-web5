@@ -94,6 +94,34 @@
     </div>
 </section>
 
+<!-- Kompakte Skalierung der Discord-Event-Slideshow -->
+<style>
+    .event-slideshow-stage {
+        min-height: 230px;
+    }
+
+    /* 92 % Zoom mit mathematisch kompensierter Breite: visuell exakt 100 %. */
+    .event-slideshow-fit {
+        width: 108.695652%;
+        margin-left: -4.347826%;
+        transform: scale(0.92);
+        transform-origin: center center;
+    }
+
+    @media (max-width: 640px) {
+        .event-slideshow-stage {
+            min-height: 244px;
+        }
+
+        /* Auf kleinen Displays nur leicht herauszoomen, damit Text lesbar bleibt. */
+        .event-slideshow-fit {
+            width: 104.166667%;
+            margin-left: -2.083333%;
+            transform: scale(0.96);
+        }
+    }
+</style>
+
 <!-- Community Live Preview -->
 <section class="mb-12" aria-labelledby="community-preview-title">
     <div class="mb-6">
@@ -103,12 +131,12 @@
 
     <div class="grid lg:grid-cols-2 gap-6">
 
-        <!-- Aktuelle Konvois -->
+        <!-- Events: ausschließlich serverseitig aus event.py / Discord-Plugin -->
         <article class="info-card p-7 md:p-8 flex flex-col">
-            <div class="flex items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
+            <div class="flex items-center justify-between gap-4 mb-5 border-b border-white/5 pb-4">
                 <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Event Vorschau</p>
-                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Aktuelle Konvois</h3>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Discord Plugin</p>
+                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Events</h3>
                 </div>
                 <div class="w-11 h-11 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="var(--brand-yellow)" stroke-width="2" aria-hidden="true">
@@ -117,32 +145,67 @@
                 </div>
             </div>
 
-            <div class="space-y-3 flex-grow">
-                <div class="rounded-xl border border-white/5 bg-black/25 p-4 flex items-center gap-4">
-                    <div class="w-14 shrink-0 text-center rounded-lg bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 py-2">
-                        <p class="text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-green)]">Fr</p>
-                        <p class="text-xs font-orbitron font-bold text-[var(--text)] mt-1">20:00</p>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-orbitron font-bold text-[var(--text)] tracking-wide">Community Convoy</h4>
-                        <p class="text-xs text-[var(--muted)] font-inter mt-1">Gemeinsame Tour mit der Eifel LOG Community.</p>
+            <!--
+                Erwartete Antwort von GET /api/discord/events:
+                {
+                    "events": [
+                        {
+                            "title": "...",
+                            "description": "...",
+                            "start_at": "...",
+                            "location": "...",
+                            "category": "..."
+                        }
+                    ]
+                }
+
+                Alternativ akzeptiert das Frontend auch "upcoming_events".
+                Bot-Token niemals im Browser hinterlegen. event.py stellt nur die
+                serverseitig gefilterten Daten über den Flask-Endpunkt bereit.
+            -->
+            <div id="discord-events"
+                 data-endpoint="/api/discord/events"
+                 class="flex-grow"
+                 aria-busy="true">
+                <div class="event-slideshow-stage relative overflow-hidden rounded-2xl border border-white/5 bg-black/15">
+                    <div id="event-slideshow-viewport"
+                         class="event-slideshow-fit min-h-[230px] flex items-center justify-center p-3"
+                         aria-live="polite">
+                        <div class="w-full rounded-xl border border-white/5 bg-black/25 p-5">
+                            <p class="text-sm text-[var(--muted)] font-inter">Events werden aus Discord geladen …</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="rounded-xl border border-white/5 bg-black/25 p-4 flex items-center gap-4">
-                    <div class="w-14 shrink-0 text-center rounded-lg bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 py-2">
-                        <p class="text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)]">So</p>
-                        <p class="text-xs font-orbitron font-bold text-[var(--text)] mt-1">18:00</p>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-orbitron font-bold text-[var(--text)] tracking-wide">ETS2 Public Event</h4>
-                        <p class="text-xs text-[var(--muted)] font-inter mt-1">Öffentlicher Konvoi für Fahrer und Gäste.</p>
+                <div class="mt-3 flex items-center justify-between gap-3">
+                    <p id="event-slide-counter" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Discord Sync wird gestartet</p>
+
+                    <div class="flex items-center gap-2" aria-label="Event-Slideshow steuern">
+                        <button id="event-prev"
+                                type="button"
+                                class="w-8 h-8 rounded-lg border border-white/10 bg-black/20 text-[var(--muted)] hover:text-[var(--brand-yellow)] hover:border-[var(--brand-yellow)]/30 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                                aria-label="Vorheriges Event">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <button id="event-next"
+                                type="button"
+                                class="w-8 h-8 rounded-lg border border-white/10 bg-black/20 text-[var(--muted)] hover:text-[var(--brand-yellow)] hover:border-[var(--brand-yellow)]/30 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                                aria-label="Nächstes Event">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
+
+                <div id="event-dots" class="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Event-Auswahl"></div>
             </div>
 
-            <div class="mt-6">
-                <a href="/events" class="btn-secondary inline-flex items-center">
+            <div class="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <p id="event-status" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Event-Daten werden geladen</p>
+                <a href="/events" class="btn-secondary inline-flex items-center justify-center shrink-0">
                     Alle Events anzeigen
                     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -258,7 +321,7 @@
     </div>
 </section>
 
-<!-- Smooth Scroll + Discord Birthday Sync -->
+<!-- Smooth Scroll + Discord Event- und Geburtstag-Sync -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -272,28 +335,339 @@
             });
         });
 
+        const createStateCard = (message) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'w-full rounded-xl border border-white/5 bg-black/25 p-5';
+
+            const text = document.createElement('p');
+            text.className = 'text-sm text-[var(--muted)] font-inter';
+            text.textContent = message;
+
+            wrapper.appendChild(text);
+            return wrapper;
+        };
+
+        const parseDate = (value) => {
+            if (!value) {
+                return null;
+            }
+
+            const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
+                ? `${value}T00:00:00`
+                : value;
+            const date = new Date(normalizedValue);
+
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
+        /* --------------------------------------------------------------
+           Events aus event.py / Discord-Plugin
+        -------------------------------------------------------------- */
+        const eventsContainer = document.getElementById('discord-events');
+        const eventViewport = document.getElementById('event-slideshow-viewport');
+        const eventStatus = document.getElementById('event-status');
+        const eventCounter = document.getElementById('event-slide-counter');
+        const eventDots = document.getElementById('event-dots');
+        const eventPrev = document.getElementById('event-prev');
+        const eventNext = document.getElementById('event-next');
+
+        let events = [];
+        let activeEventIndex = 0;
+        let eventRotationTimer = null;
+
+        const getEventStartValue = (event) => {
+            return event.start_at || event.starts_at || event.start_time || event.datetime || event.date || null;
+        };
+
+        const getEventTitle = (event) => {
+            return event.title || event.name || 'Discord Event';
+        };
+
+        const getEventDescription = (event) => {
+            return event.description || event.summary || 'Weitere Informationen findest du in der vollständigen Eventübersicht.';
+        };
+
+        const formatEventWeekday = (event) => {
+            const date = parseDate(getEventStartValue(event));
+
+            if (!date) {
+                return 'Event';
+            }
+
+            return new Intl.DateTimeFormat('de-DE', { weekday: 'short' })
+                .format(date)
+                .replace('.', '');
+        };
+
+        const formatEventDate = (event) => {
+            const date = parseDate(getEventStartValue(event));
+
+            if (!date) {
+                return 'Termin folgt';
+            }
+
+            return new Intl.DateTimeFormat('de-DE', {
+                day: '2-digit',
+                month: 'short'
+            }).format(date);
+        };
+
+        const formatEventTime = (event) => {
+            if (event.time) {
+                return event.time;
+            }
+
+            const value = getEventStartValue(event);
+            const date = parseDate(value);
+
+            if (!date || !value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                return 'Uhrzeit folgt';
+            }
+
+            return new Intl.DateTimeFormat('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
+
+        const createEventSlide = (event) => {
+            const card = document.createElement('article');
+            card.className = 'w-full rounded-2xl border border-white/5 bg-black/30 p-4 sm:p-5 shadow-inner';
+
+            const topRow = document.createElement('div');
+            topRow.className = 'flex items-start gap-4';
+
+            const dateBox = document.createElement('div');
+            dateBox.className = 'w-20 shrink-0 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 px-2 py-3 text-center';
+
+            const weekday = document.createElement('p');
+            weekday.className = 'text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)]';
+            weekday.textContent = formatEventWeekday(event);
+
+            const date = document.createElement('p');
+            date.className = 'text-sm font-orbitron font-bold text-[var(--text)] mt-1';
+            date.textContent = formatEventDate(event);
+
+            const time = document.createElement('p');
+            time.className = 'text-[10px] font-orbitron font-bold text-[var(--muted)] mt-1';
+            time.textContent = formatEventTime(event);
+
+            dateBox.append(weekday, date, time);
+
+            const content = document.createElement('div');
+            content.className = 'min-w-0 flex-grow';
+
+            const category = document.createElement('p');
+            category.className = 'text-[9px] font-orbitron font-bold uppercase tracking-[0.16em] text-[var(--brand-green)]';
+            category.textContent = event.category || event.type || 'Discord Event';
+
+            const title = document.createElement('h4');
+            title.className = 'text-base sm:text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mt-2 break-words';
+            title.textContent = getEventTitle(event);
+
+            const description = document.createElement('p');
+            description.className = 'text-xs sm:text-sm text-[var(--muted)] font-inter leading-relaxed mt-2 line-clamp-3';
+            description.textContent = getEventDescription(event);
+
+            content.append(category, title, description);
+            topRow.append(dateBox, content);
+
+            const metaRow = document.createElement('div');
+            metaRow.className = 'mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-4 gap-y-2';
+
+            const location = document.createElement('p');
+            location.className = 'text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]';
+            location.textContent = event.location || event.channel_name || 'Eifel LOG Community';
+            metaRow.appendChild(location);
+
+            if (event.participants !== undefined && event.participants !== null) {
+                const participants = document.createElement('p');
+                participants.className = 'text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]';
+                participants.textContent = `${event.participants} Teilnehmer`;
+                metaRow.appendChild(participants);
+            }
+
+            card.append(topRow, metaRow);
+            return card;
+        };
+
+        const updateEventControls = () => {
+            const hasMultipleEvents = events.length > 1;
+
+            if (eventPrev) {
+                eventPrev.disabled = !hasMultipleEvents;
+            }
+
+            if (eventNext) {
+                eventNext.disabled = !hasMultipleEvents;
+            }
+
+            if (eventCounter) {
+                eventCounter.textContent = events.length
+                    ? `Event ${activeEventIndex + 1} von ${events.length}`
+                    : 'Keine Event-Vorschau verfügbar';
+            }
+
+            if (!eventDots) {
+                return;
+            }
+
+            eventDots.replaceChildren();
+
+            events.forEach((event, index) => {
+                const dot = document.createElement('button');
+                dot.type = 'button';
+                dot.className = index === activeEventIndex
+                    ? 'w-5 h-1.5 rounded-full bg-[var(--brand-yellow)] transition-all'
+                    : 'w-1.5 h-1.5 rounded-full bg-white/20 hover:bg-white/40 transition-all';
+                dot.setAttribute('aria-label', `Event ${index + 1} anzeigen`);
+                dot.setAttribute('aria-current', index === activeEventIndex ? 'true' : 'false');
+                dot.addEventListener('click', () => {
+                    activeEventIndex = index;
+                    renderActiveEvent();
+                    restartEventRotation();
+                });
+                eventDots.appendChild(dot);
+            });
+        };
+
+        const renderActiveEvent = () => {
+            if (!eventViewport) {
+                return;
+            }
+
+            eventViewport.replaceChildren();
+
+            if (!events.length) {
+                eventViewport.appendChild(createStateCard('Zurzeit sind keine anstehenden Events eingetragen.'));
+                updateEventControls();
+                return;
+            }
+
+            if (activeEventIndex >= events.length) {
+                activeEventIndex = 0;
+            }
+
+            eventViewport.appendChild(createEventSlide(events[activeEventIndex]));
+            updateEventControls();
+        };
+
+        const showNextEvent = () => {
+            if (events.length <= 1) {
+                return;
+            }
+
+            activeEventIndex = (activeEventIndex + 1) % events.length;
+            renderActiveEvent();
+        };
+
+        const showPreviousEvent = () => {
+            if (events.length <= 1) {
+                return;
+            }
+
+            activeEventIndex = (activeEventIndex - 1 + events.length) % events.length;
+            renderActiveEvent();
+        };
+
+        const restartEventRotation = () => {
+            if (eventRotationTimer) {
+                window.clearInterval(eventRotationTimer);
+                eventRotationTimer = null;
+            }
+
+            if (events.length > 1) {
+                eventRotationTimer = window.setInterval(showNextEvent, 7000);
+            }
+        };
+
+        if (eventPrev) {
+            eventPrev.addEventListener('click', () => {
+                showPreviousEvent();
+                restartEventRotation();
+            });
+        }
+
+        if (eventNext) {
+            eventNext.addEventListener('click', () => {
+                showNextEvent();
+                restartEventRotation();
+            });
+        }
+
+        const loadEvents = async () => {
+            if (!eventsContainer || !eventViewport || !eventStatus) {
+                return;
+            }
+
+            eventsContainer.setAttribute('aria-busy', 'true');
+            eventStatus.textContent = 'Discord Event-Sync läuft';
+
+            try {
+                const response = await fetch(eventsContainer.dataset.endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Discord event API returned ${response.status}`);
+                }
+
+                const payload = await response.json();
+                const rawEvents = Array.isArray(payload.events)
+                    ? payload.events
+                    : Array.isArray(payload.upcoming_events)
+                        ? payload.upcoming_events
+                        : [];
+
+                events = rawEvents
+                    .filter(event => event && typeof event === 'object')
+                    .sort((a, b) => {
+                        const aDate = parseDate(getEventStartValue(a));
+                        const bDate = parseDate(getEventStartValue(b));
+                        const aTime = aDate ? aDate.getTime() : Number.MAX_SAFE_INTEGER;
+                        const bTime = bDate ? bDate.getTime() : Number.MAX_SAFE_INTEGER;
+
+                        return aTime - bTime;
+                    })
+                    .slice(0, 8);
+
+                activeEventIndex = 0;
+                renderActiveEvent();
+                restartEventRotation();
+                eventStatus.textContent = 'Mit Discord synchronisiert';
+            } catch (error) {
+                console.error('Events konnten nicht geladen werden:', error);
+                events = [];
+                activeEventIndex = 0;
+                restartEventRotation();
+                eventViewport.replaceChildren(createStateCard('Event-Daten sind derzeit nicht verfügbar.'));
+                updateEventControls();
+                eventStatus.textContent = 'Discord Event-Sync nicht verfügbar';
+            } finally {
+                eventsContainer.setAttribute('aria-busy', 'false');
+            }
+        };
+
+        /* --------------------------------------------------------------
+           Geburtstage aus event.py / Discord-Plugin
+        -------------------------------------------------------------- */
         const birthdaysContainer = document.getElementById('discord-birthdays');
         const birthdayStatus = document.getElementById('birthday-status');
 
-        if (!birthdaysContainer || !birthdayStatus) {
-            return;
-        }
-
-        const endpoint = birthdaysContainer.dataset.endpoint;
-
         const calculateDaysUntil = (dateString) => {
-            if (!dateString) {
+            const birthday = parseDate(dateString);
+
+            if (!birthday) {
                 return null;
             }
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-
-            const birthday = new Date(`${dateString}T00:00:00`);
-
-            if (Number.isNaN(birthday.getTime())) {
-                return null;
-            }
+            birthday.setHours(0, 0, 0, 0);
 
             return Math.max(0, Math.ceil((birthday - today) / 86400000));
         };
@@ -312,15 +686,11 @@
             return calculateDaysUntil(birthday.date);
         };
 
-        const formatDate = (dateString) => {
-            if (!dateString) {
-                return 'Datum nicht verfügbar';
-            }
+        const formatBirthdayDate = (dateString) => {
+            const date = parseDate(dateString);
 
-            const date = new Date(`${dateString}T00:00:00`);
-
-            if (Number.isNaN(date.getTime())) {
-                return dateString;
+            if (!date) {
+                return dateString || 'Datum nicht verfügbar';
             }
 
             return new Intl.DateTimeFormat('de-DE', {
@@ -377,7 +747,7 @@
 
             const meta = document.createElement('p');
             meta.className = 'text-xs text-[var(--muted)] font-inter mt-1';
-            meta.textContent = formatDate(birthday.date);
+            meta.textContent = formatBirthdayDate(birthday.date);
 
             content.append(headline, meta);
             card.append(avatar, content);
@@ -386,18 +756,14 @@
         };
 
         const renderBirthdays = (birthdays) => {
+            if (!birthdaysContainer) {
+                return;
+            }
+
             birthdaysContainer.replaceChildren();
 
             if (!birthdays.length) {
-                const emptyState = document.createElement('div');
-                emptyState.className = 'rounded-xl border border-white/5 bg-black/25 p-4';
-
-                const text = document.createElement('p');
-                text.className = 'text-sm text-[var(--muted)] font-inter';
-                text.textContent = 'Zurzeit sind keine anstehenden Geburtstage eingetragen.';
-
-                emptyState.appendChild(text);
-                birthdaysContainer.appendChild(emptyState);
+                birthdaysContainer.appendChild(createStateCard('Zurzeit sind keine anstehenden Geburtstage eingetragen.'));
                 return;
             }
 
@@ -417,11 +783,15 @@
         };
 
         const loadBirthdays = async () => {
+            if (!birthdaysContainer || !birthdayStatus) {
+                return;
+            }
+
             birthdaysContainer.setAttribute('aria-busy', 'true');
             birthdayStatus.textContent = 'Discord Sync läuft';
 
             try {
-                const response = await fetch(endpoint, {
+                const response = await fetch(birthdaysContainer.dataset.endpoint, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json'
@@ -444,25 +814,16 @@
                 birthdayStatus.textContent = 'Mit Discord synchronisiert';
             } catch (error) {
                 console.error('Geburtstage konnten nicht geladen werden:', error);
-
-                birthdaysContainer.replaceChildren();
-
-                const errorState = document.createElement('div');
-                errorState.className = 'rounded-xl border border-white/5 bg-black/25 p-4';
-
-                const text = document.createElement('p');
-                text.className = 'text-sm text-[var(--muted)] font-inter';
-                text.textContent = 'Geburtstagsdaten sind derzeit nicht verfügbar.';
-
-                errorState.appendChild(text);
-                birthdaysContainer.appendChild(errorState);
+                birthdaysContainer.replaceChildren(createStateCard('Geburtstagsdaten sind derzeit nicht verfügbar.'));
                 birthdayStatus.textContent = 'Discord Sync nicht verfügbar';
             } finally {
                 birthdaysContainer.setAttribute('aria-busy', 'false');
             }
         };
 
+        loadEvents();
         loadBirthdays();
+        window.setInterval(loadEvents, 300000);
         window.setInterval(loadBirthdays, 300000);
     });
 </script>
