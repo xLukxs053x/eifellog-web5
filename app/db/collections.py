@@ -36,7 +36,9 @@ fahrer_registration_collection = db["fahrer_registration_requests"]
 token_request_collection = db["token_requests"]
 
 system_documents_collection = db["system_documents"]
-instruction_acknowledgements_collection = db["instruction_acknowledgements"]
+instruction_acknowledgements_collection = db[
+    "instruction_acknowledgements"
+]
 
 tasks_collection = db["tasks"]
 
@@ -103,8 +105,10 @@ workspace_events_collection = db["workspace_events"]
 
 # ---------------------------------------------------------------------------
 # Öffentliche Event-API
-# Datenbank: eifellog_db
-# Collection: events
+#
+# Standardwerte:
+#   EVENT_DB_NAME=eifellog_db
+#   EVENT_COLLECTION_NAME=events
 # ---------------------------------------------------------------------------
 
 EVENT_DB_NAME = env_first(
@@ -120,14 +124,18 @@ EVENT_COLLECTION_NAME = env_first(
 event_db = mongo_client[EVENT_DB_NAME]
 events_collection = event_db[EVENT_COLLECTION_NAME]
 
-# Kompatibilitäts-Alias für bestehende Singular-Imports
+# Kompatibilitäts-Aliase für bestehende Imports
 event_collection = events_collection
+public_events_collection = events_collection
+public_event_collection = events_collection
 
 
 # ---------------------------------------------------------------------------
 # Öffentliche Birthday-API
-# Datenbank: EifelLog
-# Collection: Birthdays
+#
+# Standardwerte:
+#   BIRTHDAY_DB_NAME=EifelLog
+#   BIRTHDAY_COLLECTION_NAME=Birthdays
 # ---------------------------------------------------------------------------
 
 BIRTHDAY_DB_NAME = env_first(
@@ -143,8 +151,41 @@ BIRTHDAY_COLLECTION_NAME = env_first(
 birthday_db = mongo_client[BIRTHDAY_DB_NAME]
 birthdays_collection = birthday_db[BIRTHDAY_COLLECTION_NAME]
 
-# Kompatibilitäts-Alias für bestehende Singular-Imports
+# Kompatibilitäts-Aliase für bestehende Imports
 birthday_collection = birthdays_collection
+public_birthdays_collection = birthdays_collection
+public_birthday_collection = birthdays_collection
+
+
+# ---------------------------------------------------------------------------
+# Optionale Getter für bestehende Module
+#
+# Wichtig:
+#   Getter immer mit Klammern aufrufen:
+#       get_events_collection()
+#
+#   Nicht korrekt:
+#       get_events_collection["events"]
+# ---------------------------------------------------------------------------
+
+def get_events_collection():
+    """Liefert die MongoDB-Collection der öffentlichen Events."""
+    return events_collection
+
+
+def get_event_collection():
+    """Kompatibilitäts-Getter für die öffentliche Event-Collection."""
+    return events_collection
+
+
+def get_birthdays_collection():
+    """Liefert die MongoDB-Collection der öffentlichen Geburtstage."""
+    return birthdays_collection
+
+
+def get_birthday_collection():
+    """Kompatibilitäts-Getter für die öffentliche Birthday-Collection."""
+    return birthdays_collection
 
 
 # ---------------------------------------------------------------------------
