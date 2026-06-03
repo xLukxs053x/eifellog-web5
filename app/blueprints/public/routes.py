@@ -11,24 +11,6 @@ public_bp = Blueprint("public", __name__)
 
 
 # ==========================================
-# ÖFFENTLICHE DISCORD-PLUGIN-API
-# ==========================================
-# Die Business-Logik und der MongoDB-Zugriff bleiben vollständig serverseitig
-# in app.legacy. Der Browser erhält ausschließlich minimierte JSON-Daten.
-
-@public_bp.route("/api/discord/events", methods=["GET"])
-def api_discord_events(*args, **kwargs):
-    """Liefert die öffentliche Event-Vorschau aus eifellog_db.events."""
-    return _legacy.api_discord_events(*args, **kwargs)
-
-
-@public_bp.route("/api/discord/birthdays", methods=["GET"])
-def api_discord_birthdays(*args, **kwargs):
-    """Liefert die öffentliche Geburtstagsvorschau aus EifelLog.Birthdays."""
-    return _legacy.api_discord_birthdays(*args, **kwargs)
-
-
-# ==========================================
 # ÖFFENTLICHE SEITEN
 # ==========================================
 
@@ -83,3 +65,19 @@ def impressum(*args, **kwargs):
 def team(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.team()."""
     return _legacy.team(*args, **kwargs)
+
+
+# ==========================================
+# ÖFFENTLICHE DISCORD-PLUGIN-API
+# ==========================================
+
+@public_bp.route("/api/discord/events", methods=["GET"])
+def api_discord_events(*args, **kwargs):
+    """Liefert die öffentliche Event-Vorschau aus eifellog_db.events."""
+    return _legacy.api_discord_events(*args, **kwargs)
+
+
+@public_bp.route("/api/discord/birthdays", methods=["GET"])
+def api_discord_birthdays(*args, **kwargs):
+    """Liefert die öffentliche Geburtstagsvorschau aus EifelLog.Birthdays."""
+    return _legacy.api_discord_birthdays(*args, **kwargs)
