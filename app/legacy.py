@@ -14565,7 +14565,6 @@ def _public_safe_mongo_error(error):
     return f"{type(error).__name__}: {message}"
 
 
-@app.route("/api/discord/events", methods=["GET"])
 def api_discord_events():
     """Öffentliche, minimierte Event-Vorschau aus eifellog_db.events."""
     try:
@@ -14604,7 +14603,6 @@ def api_discord_events():
         }), 503
 
 
-@app.route("/api/discord/birthdays", methods=["GET"])
 def api_discord_birthdays():
     """Öffentliche, minimierte Geburtstagsvorschau aus EifelLog.Birthdays."""
     try:
