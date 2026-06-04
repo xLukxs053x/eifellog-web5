@@ -151,7 +151,13 @@
     }
 
     .events-event-card {
-        padding: 1rem;
+        padding: 0.85rem;
+    }
+
+    @media (min-width: 768px) {
+        .events-event-card {
+            padding: 1rem;
+        }
     }
 
     .events-event-card::before {
@@ -161,7 +167,7 @@
     .events-event-cover {
         display: block;
         width: 100%;
-        aspect-ratio: 16 / 9;
+        aspect-ratio: 16 / 8;
         border-radius: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.08);
         object-fit: cover;
@@ -177,7 +183,7 @@
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.035);
-        padding: 0.5rem 0.7rem;
+        padding: 0.42rem 0.62rem;
     }
 
     .events-line-clamp-3 {
@@ -350,7 +356,7 @@
                     </span>
                 </div>
                 <p id="stat-total" class="mt-4 font-orbitron text-3xl font-extrabold text-[var(--text)]">–</p>
-                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Alle gespeicherten Event-Termine.</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Alle gespeicherten Events und Konvois.</p>
             </article>
 
             <article class="events-stat-card rounded-2xl p-5">
@@ -420,8 +426,8 @@
                 <label class="block">
                     <span class="mb-2 block font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">Zeitraum</span>
                     <select id="event-period" class="events-input px-4 py-3 font-inter text-sm">
+                        <option value="all">Alle Events &amp; Konvois</option>
                         <option value="upcoming">Nur anstehende Events</option>
-                        <option value="all">Alle Events</option>
                         <option value="past">Vergangene Events</option>
                     </select>
                 </label>
@@ -440,18 +446,29 @@
         </div>
 
         <!--
-            Die Übersicht ruft GET /api/events mit include=all und expand=... auf.
-            Unterstützt werden Arrays sowie verschachtelte Plugin-Antworten, zum Beispiel:
-            [ ... ], {"events": [...]}, {"upcoming_events": [...]},
-            {"data": {"events": [...]}}, {"plugin": {"scheduled_events": [...]}}.
+            Die Übersicht lädt alle verfügbaren Events und Konvois. Standardmäßig werden
+            GET /api/events und optional GET /api/convoys mit include=all und expand=...
+            aufgerufen. Existiert /api/convoys in deinem Backend nicht, wird die Seite
+            weiterhin vollständig über /api/events befüllt.
 
-            Für anstehende Events wird zusätzlich GET /api/events/{id} mit include=all
-            abgefragt, sofern eine Event-ID vorhanden ist. Falls dein Backend eine andere
-            Detailroute nutzt, passe data-detail-endpoint am Container an. Wenn es keine
-            Detailroute gibt, setze data-detail-endpoint="". Die Listen-Antwort bleibt
-            trotzdem vollständig nutzbar.
+            Unterstützt werden Arrays, verschachtelte Plugin-Antworten und kombinierte
+            Antworten, zum Beispiel: [ ... ], {"events": [...]}, {"convoys": [...]},
+            {"created_events": [...]}, {"data": {"events": [...], "convoys": [...]}},
+            {"plugin": {"scheduled_events": [...], "created_convoys": [...]}}.
+
+            Detaildaten werden nur intern über die ID nachgeladen. Technische IDs werden
+            niemals in der Oberfläche ausgegeben. Falls dein Backend andere Routen nutzt,
+            passe data-endpoints, data-detail-endpoint und data-convoy-detail-endpoint an.
         -->
-        <div id="events-page-list" data-endpoint="/api/events" data-detail-endpoint="/api/events/{id}" class="grid gap-4" aria-live="polite" aria-busy="true">
+        <div
+            id="events-page-list"
+            data-endpoints="/api/events,/api/convoys"
+            data-detail-endpoint="/api/events/{id}"
+            data-convoy-detail-endpoint="/api/convoys/{id}"
+            class="grid gap-3 lg:grid-cols-2"
+            aria-live="polite"
+            aria-busy="true"
+        >
             <article class="events-glass rounded-2xl p-6 lg:col-span-2">
                 <p class="font-inter text-sm text-[var(--muted)]">Events werden aus EifelLog geladen …</p>
             </article>
@@ -476,9 +493,13 @@
         const statNextDate = document.getElementById('stat-next-date');
         const statLastSync = document.getElementById('stat-last-sync');
 
-        const COLLECTION_ENDPOINT = eventsContainer?.dataset.endpoint || '/api/events';
+        const COLLECTION_ENDPOINTS = (eventsContainer?.dataset.endpoints || eventsContainer?.dataset.endpoint || '/api/events')
+            .split(',')
+            .map((endpoint) => endpoint.trim())
+            .filter(Boolean);
         const DETAIL_ENDPOINT_TEMPLATE = eventsContainer?.dataset.detailEndpoint || '';
-        const EXPAND_FIELDS = 'details,participants,organizer,location,links,metadata';
+        const CONVOY_DETAIL_ENDPOINT_TEMPLATE = eventsContainer?.dataset.convoyDetailEndpoint || '';
+        const EXPAND_FIELDS = 'details,participants,organizer,location,links,metadata,events,convoys';
         const DETAIL_FETCH_CONCURRENCY = 4;
 
         let events = [];
@@ -555,24 +576,36 @@
             return parsedUrl.href;
         };
 
+        const isLikelyTechnicalIdentifier = (value) => {
+            const normalizedValue = normalizeText(value);
+
+            if (!normalizedValue) {
+                return false;
+            }
+
+            return /^\d{12,25}$/.test(normalizedValue)
+                || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizedValue)
+                || /^<@!?&?\d+>$/.test(normalizedValue);
+        };
+
         const getEntityLabel = (value) => {
             if (Array.isArray(value)) {
                 return value.map(getEntityLabel).filter(Boolean).join(', ');
             }
 
             if (isPlainObject(value)) {
-                return normalizeText(firstDefined(
+                return getEntityLabel(firstDefined(
                     value.display_name,
                     value.displayName,
                     value.name,
                     value.title,
                     value.username,
-                    value.label,
-                    value.id
+                    value.label
                 ));
             }
 
-            return normalizeText(value);
+            const normalizedValue = normalizeText(value);
+            return isLikelyTechnicalIdentifier(normalizedValue) ? '' : normalizedValue;
         };
 
         const getParticipantCount = (value) => {
@@ -631,19 +664,44 @@
             }
 
             const eventId = normalizeText(firstDefined(event.id, event.event_id, event.eventId, event.uuid));
+            const eventKind = normalizeText(firstDefined(
+                event.entity_type,
+                event.entityType,
+                event.kind,
+                event.category,
+                event.type,
+                event._collectionEndpoint
+            )).toLocaleLowerCase('de-DE');
+            const isConvoy = eventKind.includes('convoy') || eventKind.includes('konvoi');
+            const fallbackTemplate = isConvoy
+                ? (CONVOY_DETAIL_ENDPOINT_TEMPLATE || DETAIL_ENDPOINT_TEMPLATE)
+                : DETAIL_ENDPOINT_TEMPLATE;
 
-            if (!DETAIL_ENDPOINT_TEMPLATE || !eventId) {
+            if (!fallbackTemplate || !eventId) {
                 return null;
             }
 
             return toAllowedUrl(
-                DETAIL_ENDPOINT_TEMPLATE.replace('{id}', encodeURIComponent(eventId)),
+                fallbackTemplate.replace('{id}', encodeURIComponent(eventId)),
                 { sameOriginOnly: true }
             );
         };
 
         const SENSITIVE_FIELD_PATTERN = /(token|secret|password|authorization|cookie|webhook|api[_-]?key|access[_-]?key|refresh[_-]?key|private[_-]?key)/i;
         const PERSONAL_LIST_PATTERN = /(participants?|attendees?|members?|users?|registrations?)/i;
+        const INTERNAL_ID_FIELD_PATTERN = /(?:^|[_-])(?:id|ids)$|(?:Id|IDs?)$/;
+        const HIDDEN_INTERNAL_FIELD_NAMES = new Set([
+            'id', 'uuid', 'event_id', 'eventId', 'last_channel_id', 'lastChannelId',
+            'role_id', 'roleId', 'guild_id', 'guildId', 'created_by_id', 'createdById',
+            'channel_id', 'channelId', 'voice_channel_id', 'voiceChannelId', 'server_id',
+            'serverId', 'creator_id', 'creatorId', 'owner_id', 'ownerId', 'user_id', 'userId'
+        ]);
+
+        const isInternalIdPath = (path) => {
+            return String(path)
+                .split('.')
+                .some((fieldName) => HIDDEN_INTERNAL_FIELD_NAMES.has(fieldName) || INTERNAL_ID_FIELD_PATTERN.test(fieldName));
+        };
         const ALREADY_RENDERED_FIELDS = new Set([
             'title', 'name', 'description', 'summary', 'content', 'start_at', 'starts_at', 'start_time',
             'startAt', 'startsAt', 'startTime', 'scheduled_start_time', 'scheduledStartTime', 'datetime', 'date',
@@ -653,7 +711,7 @@
             'end_location', 'endLocation', 'destination', 'to', 'details_markdown', 'detailsMarkdown', 'markdown',
             'long_description', 'longDescription', 'short_description', 'shortDescription', 'excerpt',
             'participants', 'participant_count', 'participantCount', 'participants_count', 'member_count', 'user_count',
-            'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'organizer', 'host', 'creator', 'owner',
+            'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'organizer', 'host', 'creator', 'owner', 'created_by', 'createdBy',
             'status', 'state', 'server', 'guild', 'channel', 'voice_channel', 'voiceChannel', 'platform', 'game',
             'route', 'departure', 'destination', 'meeting_point', 'meetingPoint', 'url', 'link', 'details_url',
             'detailsUrl', 'discord_url', 'discordUrl', 'registration_url', 'registrationUrl', 'external_url', 'externalUrl',
@@ -663,10 +721,6 @@
         ]);
 
         const FIELD_LABELS = {
-            id: 'Event-ID',
-            event_id: 'Event-ID',
-            eventId: 'Event-ID',
-            uuid: 'UUID',
             created_at: 'Erstellt am',
             createdAt: 'Erstellt am',
             updated_at: 'Aktualisiert am',
@@ -711,20 +765,58 @@
             }
         };
 
-        const formatPluginValue = (value) => {
-            if (typeof value === 'boolean') {
-                return value ? 'Ja' : 'Nein';
+        const sanitizeDisplayValue = (value, prefix = '', depth = 0) => {
+            if (depth > 4) {
+                return null;
             }
 
             if (Array.isArray(value)) {
-                return value.map((item) => isPlainObject(item) ? safeStringify(item) : normalizeText(item)).join(', ');
+                if (PERSONAL_LIST_PATTERN.test(prefix)) {
+                    return [];
+                }
+
+                return value
+                    .map((item) => sanitizeDisplayValue(item, prefix, depth + 1))
+                    .filter((item) => item !== null && item !== undefined && item !== '');
             }
 
             if (isPlainObject(value)) {
-                return safeStringify(value);
+                return Object.fromEntries(
+                    Object.entries(value)
+                        .filter(([key]) => {
+                            const path = prefix ? `${prefix}.${key}` : key;
+                            return !SENSITIVE_FIELD_PATTERN.test(path) && !isInternalIdPath(path);
+                        })
+                        .map(([key, childValue]) => {
+                            const path = prefix ? `${prefix}.${key}` : key;
+                            return [key, sanitizeDisplayValue(childValue, path, depth + 1)];
+                        })
+                        .filter(([, childValue]) => childValue !== null && childValue !== undefined && childValue !== '')
+                );
             }
 
-            return normalizeText(value);
+            return isLikelyTechnicalIdentifier(value) ? '' : value;
+        };
+
+        const formatPluginValue = (value, path = '') => {
+            const sanitizedValue = sanitizeDisplayValue(value, path);
+
+            if (typeof sanitizedValue === 'boolean') {
+                return sanitizedValue ? 'Ja' : 'Nein';
+            }
+
+            if (Array.isArray(sanitizedValue)) {
+                return sanitizedValue
+                    .map((item) => isPlainObject(item) ? safeStringify(item) : normalizeText(item))
+                    .filter(Boolean)
+                    .join(', ');
+            }
+
+            if (isPlainObject(sanitizedValue)) {
+                return Object.keys(sanitizedValue).length ? safeStringify(sanitizedValue) : '';
+            }
+
+            return normalizeText(sanitizedValue);
         };
 
         const flattenPluginData = (object, prefix = '', depth = 0, target = []) => {
@@ -735,7 +827,7 @@
             Object.entries(object).forEach(([key, value]) => {
                 const path = prefix ? `${prefix}.${key}` : key;
 
-                if (SENSITIVE_FIELD_PATTERN.test(path) || ALREADY_RENDERED_FIELDS.has(key)) {
+                if (SENSITIVE_FIELD_PATTERN.test(path) || isInternalIdPath(path) || ALREADY_RENDERED_FIELDS.has(key)) {
                     return;
                 }
 
@@ -752,7 +844,7 @@
                     return;
                 }
 
-                const formattedValue = formatPluginValue(value);
+                const formattedValue = formatPluginValue(value, path);
 
                 if (formattedValue) {
                     target.push({ label: prettifyFieldName(path), value: formattedValue });
@@ -895,10 +987,10 @@
                 destination,
                 participants: getParticipantCount(participantsSource),
                 maxParticipants: toNumberOrNull(pick(merged, 'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'attendance.capacity')),
-                organizer: getEntityLabel(pick(merged, 'organizer', 'host', 'creator', 'owner', 'created_by', 'createdBy')),
+                organizer: getEntityLabel(pick(merged, 'organizer_name', 'organizerName', 'created_by_name', 'createdByName', 'organizer', 'host', 'creator', 'owner', 'created_by', 'createdBy')),
                 status: getEntityLabel(pick(merged, 'status', 'state')),
-                server: getEntityLabel(pick(merged, 'server', 'guild', 'guild_name', 'guildName')),
-                channel: getEntityLabel(pick(merged, 'voice_channel', 'voiceChannel', 'channel')),
+                server: getEntityLabel(pick(merged, 'server_name', 'serverName', 'guild_name', 'guildName', 'server', 'guild')),
+                channel: getEntityLabel(pick(merged, 'channel_name', 'channelName', 'voice_channel_name', 'voiceChannelName', 'voice_channel', 'voiceChannel', 'channel')),
                 platform: getEntityLabel(pick(merged, 'platform')),
                 game: getEntityLabel(pick(merged, 'game')),
                 meetingPoint,
@@ -1241,7 +1333,7 @@
 
         const createEventCard = (event) => {
             const card = createElement('article', 'events-event-card rounded-[1.35rem] md:p-5');
-            const layout = createElement('div', event.imageUrl ? 'grid gap-5 md:grid-cols-[minmax(0,1fr)_15rem] md:items-start' : '');
+            const layout = createElement('div', event.imageUrl ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_11rem] xl:items-start' : '');
             const content = createElement('div', 'min-w-0');
             const topRow = createElement('div', 'flex items-start justify-between gap-4');
             const topContent = createElement('div', 'min-w-0');
@@ -1335,7 +1427,7 @@
         const getFilteredEvents = () => {
             const query = normalizeText(searchInput?.value).toLocaleLowerCase('de-DE');
             const category = categorySelect?.value || 'all';
-            const period = periodSelect?.value || 'upcoming';
+            const period = periodSelect?.value || 'all';
 
             return events.filter((event) => {
                 const isPast = isPastEvent(event);
@@ -1492,42 +1584,105 @@
             return response.json();
         };
 
-        const extractEvents = (payload) => {
-            if (Array.isArray(payload)) {
-                return payload;
-            }
+        const EVENT_COLLECTION_KEY_PATTERN = /^(?:events?|convoys?|konvois?|created|scheduled|upcoming|items?|results?|entries?|records?|data|list)$/i;
 
-            const possiblePaths = [
-                'events',
-                'upcoming_events',
-                'upcomingEvents',
-                'scheduled_events',
-                'scheduledEvents',
-                'items',
-                'results',
-                'data.events',
-                'data.upcoming_events',
-                'data.upcomingEvents',
-                'data.scheduled_events',
-                'data.scheduledEvents',
-                'data.items',
-                'plugin.events',
-                'plugin.upcoming_events',
-                'plugin.upcomingEvents',
-                'plugin.scheduled_events',
-                'plugin.scheduledEvents'
-            ];
+        const normalizeFieldKey = (value) => String(value)
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[-\s]+/g, '_');
 
-            for (const path of possiblePaths) {
-                const value = readPath(payload, path);
-
-                if (Array.isArray(value)) {
-                    return value;
-                }
-            }
-
-            return [];
+        const isEventCollectionPath = (path) => {
+            const lastPathPart = String(path).split('.').pop() || '';
+            return EVENT_COLLECTION_KEY_PATTERN.test(normalizeFieldKey(lastPathPart));
         };
+
+        const looksLikeEventObject = (value) => {
+            if (!isPlainObject(value)) {
+                return false;
+            }
+
+            const explicitTitle = pick(value, 'title', 'event_name', 'eventName');
+            const name = pick(value, 'name');
+            const eventData = firstDefined(
+                pick(value, 'start_at', 'starts_at', 'start_time', 'startAt', 'startsAt', 'startTime', 'datetime', 'date'),
+                pick(value, 'route', 'start_location', 'startLocation', 'destination'),
+                pick(value, 'description', 'summary', 'details'),
+                pick(value, 'category', 'type', 'event_type', 'eventType'),
+                pick(value, 'location', 'venue')
+            );
+
+            return Boolean(explicitTitle || (name && eventData !== undefined));
+        };
+
+        const collectEventRecords = (value, path = '', depth = 0, target = []) => {
+            if (depth > 6) {
+                return target;
+            }
+
+            if (Array.isArray(value)) {
+                if (!path || isEventCollectionPath(path)) {
+                    value.filter(looksLikeEventObject).forEach((event) => target.push(event));
+                }
+
+                value.forEach((item, index) => {
+                    if (isPlainObject(item) || Array.isArray(item)) {
+                        collectEventRecords(item, `${path}.${index}`, depth + 1, target);
+                    }
+                });
+
+                return target;
+            }
+
+            if (!isPlainObject(value)) {
+                return target;
+            }
+
+            if (!path && looksLikeEventObject(value)) {
+                target.push(value);
+            }
+
+            Object.entries(value).forEach(([key, childValue]) => {
+                const childPath = path ? `${path}.${key}` : key;
+
+                if (isPlainObject(childValue) && isEventCollectionPath(childPath)) {
+                    Object.values(childValue)
+                        .filter(looksLikeEventObject)
+                        .forEach((event) => target.push(event));
+                }
+
+                if (isPlainObject(childValue) || Array.isArray(childValue)) {
+                    collectEventRecords(childValue, childPath, depth + 1, target);
+                }
+            });
+
+            return target;
+        };
+
+        const getRawEventIdentity = (event) => {
+            const id = normalizeText(firstDefined(event.id, event.event_id, event.eventId, event.uuid));
+
+            if (id) {
+                return `id:${id}`;
+            }
+
+            const title = normalizeText(firstDefined(event.title, event.name, event.event_name, event.eventName));
+            const start = normalizeText(firstDefined(event.start_at, event.starts_at, event.start_time, event.startAt, event.startsAt, event.startTime, event.datetime, event.date));
+            const route = normalizeText(firstDefined(event.route, event.start_location, event.startLocation, event.destination));
+            return `fallback:${title}|${start}|${route}`;
+        };
+
+        const deduplicateRawEvents = (items) => {
+            const uniqueEvents = new Map();
+
+            items.filter(isPlainObject).forEach((event) => {
+                const identity = getRawEventIdentity(event);
+                const existingEvent = uniqueEvents.get(identity);
+                uniqueEvents.set(identity, existingEvent ? mergeObjects(existingEvent, event) : event);
+            });
+
+            return [...uniqueEvents.values()];
+        };
+
+        const extractEvents = (payload) => deduplicateRawEvents(collectEventRecords(payload));
 
         const extractSingleEvent = (payload) => {
             if (!isPlainObject(payload)) {
@@ -1617,17 +1772,37 @@
             setApiStatus('loading', 'Event-Sync läuft');
 
             try {
-                const collectionUrl = appendQueryParams(COLLECTION_ENDPOINT, {
-                    include: 'all',
-                    expand: EXPAND_FIELDS
-                });
-                const payload = await fetchJson(collectionUrl);
-                const rawEvents = extractEvents(payload)
-                    .filter((event) => event && typeof event === 'object');
+                const collectionResults = await Promise.allSettled(
+                    COLLECTION_ENDPOINTS.map(async (endpoint) => {
+                        const collectionUrl = appendQueryParams(endpoint, {
+                            include: 'all',
+                            expand: EXPAND_FIELDS
+                        });
+                        const payload = await fetchJson(collectionUrl);
+                        return { endpoint, payload };
+                    })
+                );
+                const successfulCollections = collectionResults
+                    .filter((result) => result.status === 'fulfilled')
+                    .map((result) => result.value);
+
+                if (!successfulCollections.length) {
+                    const firstFailure = collectionResults.find((result) => result.status === 'rejected');
+                    throw firstFailure?.reason || new Error('Keine Event-API erreichbar');
+                }
+
+                const rawEvents = deduplicateRawEvents(
+                    successfulCollections.flatMap(({ endpoint, payload }) => {
+                        return extractEvents(payload).map((event) => mergeObjects(event, { _collectionEndpoint: endpoint }));
+                    })
+                );
                 const enrichedEvents = await enrichUpcomingEvents(rawEvents);
 
                 events = sortEvents(enrichedEvents.map(normalizeEvent));
-                collectionStats = extractCollectionStats(payload);
+                collectionStats = {
+                    total: events.length,
+                    upcoming: events.filter((event) => !isPastEvent(event)).length
+                };
                 populateCategories();
                 updateStats();
                 renderEvents();
