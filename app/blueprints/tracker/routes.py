@@ -8,6 +8,11 @@ Die Methodensets sind bewusst zentral definiert:
 - Lese-Endpunkte akzeptieren GET, HEAD und OPTIONS.
 - Tracker-Kompatibilitätsendpunkte akzeptieren zusätzlich POST, PUT und PATCH.
 - Schreibende Aktionen bleiben auf POST, PUT, PATCH und OPTIONS beschränkt.
+- Tourstart und Tourabschluss werden vor der Legacy-Delegation zentral
+  normalisiert. Der Discord-Zielchannel ist für beide Ereignisse verbindlich
+  auf 1473756766478270517 festgelegt.
+- Beim Tourabschluss werden zusätzlich die Python-seitige PDF-Erzeugung und
+  der Discord-Anhang des Belegs ausdrücklich angefordert.
 """
 
 from __future__ import annotations
@@ -28,6 +33,30 @@ READ_METHODS = ["GET", "HEAD", "OPTIONS"]
 READ_WRITE_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "OPTIONS"]
 WRITE_METHODS = ["POST", "PUT", "PATCH", "OPTIONS"]
 DOWNLOAD_METHODS = ["GET", "HEAD", "POST", "OPTIONS"]
+
+
+# Tourstart-Embed und Abschlussbeleg landen verbindlich in diesem Channel.
+# C# übermittelt nur die Tracker-Daten. Die Python-Seite erzeugt Embeds,
+# PDF-Beleg und Discord-Nachricht über die Legacy-Businesslogik.
+TOUR_DISCORD_CHANNEL_ID = "1473756766478270517"
+
+_MUTATING_HTTP_METHODS = {"POST", "PUT", "PATCH"}
+_TOUR_CHANNEL_HEADERS = {
+    "HTTP_X_DISCORD_CHANNEL_ID": TOUR_DISCORD_CHANNEL_ID,
+    "HTTP_X_TOUR_DISCORD_CHANNEL_ID": TOUR_DISCORD_CHANNEL_ID,
+    "HTTP_X_TOUR_RECEIPT_DISCORD_CHANNEL_ID": TOUR_DISCORD_CHANNEL_ID,
+    "HTTP_X_EIFELLOG_DISCORD_CHANNEL_ID": TOUR_DISCORD_CHANNEL_ID,
+}
+_TOUR_CHANNEL_FIELDS = {
+    "discordChannelId": TOUR_DISCORD_CHANNEL_ID,
+    "discord_channel_id": TOUR_DISCORD_CHANNEL_ID,
+    "tourDiscordChannelId": TOUR_DISCORD_CHANNEL_ID,
+    "tour_discord_channel_id": TOUR_DISCORD_CHANNEL_ID,
+    "receiptDiscordChannelId": TOUR_DISCORD_CHANNEL_ID,
+    "receipt_discord_channel_id": TOUR_DISCORD_CHANNEL_ID,
+    "channelId": TOUR_DISCORD_CHANNEL_ID,
+    "channel_id": TOUR_DISCORD_CHANNEL_ID,
+}
 
 
 # Die Fahrerkarte läuft ohne PIN. Alte Desktop-Versionen und ältere WebAssets
@@ -99,6 +128,175 @@ _DRIVER_CARD_BRANCH_KEYS = {
     "profile",
     "identity",
 }
+
+
+def _force_tour_channel_headers() -> None:
+    """Stellt den verbindlichen Discord-Zielchannel als Request-Header bereit."""
+    for environ_key, channel_id in _TOUR_CHANNEL_HEADERS.items():
+        request.environ[environ_key] = channel_id
+
+
+def _merge_forced_channel_fields(value: Any) -> dict[str, Any]:
+    """Übernimmt vorhandene Daten und überschreibt sämtliche Channel-Aliase."""
+    merged = dict(value) if isinstance(value, dict) else {}
+    merged.update(_TOUR_CHANNEL_FIELDS)
+    merged["forced"] = True
+    return merged
+
+
+def _cache_json_request_payload(payload: dict[str, Any]) -> None:
+    """Ersetzt den gecachten Flask-JSON-Body für die nachfolgende Legacy-Route.
+
+    Die Desktop-Tracker senden JSON. Flask hält den dekodierten Body intern im
+    Request-Cache. Durch die Aktualisierung sehen bestehende Legacy-Handler die
+    normalisierte Nutzlast weiterhin über ``request.get_json()`` und
+    ``request.get_data()``. Dadurch muss die Business-Logik nicht dupliziert
+    werden.
+    """
+    encoded_payload = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    # Flask/Werkzeug verwendet diese Request-Caches nach dem ersten JSON-Zugriff.
+    # Beide Varianten werden gesetzt, damit silent=True und silent=False dieselbe
+    # normalisierte Nutzlast erhalten.
+    request._cached_json = (payload, payload)  # type: ignore[attr-defined]
+    request._cached_data = encoded_payload  # type: ignore[attr-defined]
+    request.environ["CONTENT_LENGTH"] = str(len(encoded_payload))
+    request.environ["CONTENT_TYPE"] = "application/json; charset=utf-8"
+
+
+def _normalize_tour_event_request(event_name: str) -> None:
+    """Erzwingt Python-seitige Discord-Verarbeitung für Start oder Abschluss."""
+    _force_tour_channel_headers()
+
+    if request.method.upper() not in _MUTATING_HTTP_METHODS:
+        return
+
+    original_payload = request.get_json(silent=True)
+    payload: dict[str, Any] = (
+        dict(original_payload) if isinstance(original_payload, dict) else {}
+    )
+
+    payload.update(_TOUR_CHANNEL_FIELDS)
+    payload["discord"] = _merge_forced_channel_fields(payload.get("discord"))
+    payload["routing"] = _merge_forced_channel_fields(payload.get("routing"))
+
+    # Die Route bestimmt das Ereignis verbindlich. Dadurch können alte Clients
+    # keine veralteten Event-Namen oder falschen Statuswerte durchreichen.
+    payload["event"] = event_name
+    payload["type"] = event_name
+    payload["discordEvent"] = event_name
+    payload["discord_event"] = event_name
+    payload["sourceSystem"] = payload.get("sourceSystem") or "app.routes.tracker"
+    payload["source_system"] = payload.get("source_system") or "app.routes.tracker"
+    payload["pythonProcessing"] = True
+    payload["python_processing"] = True
+    payload["sendDiscord"] = True
+    payload["send_discord"] = True
+
+    if event_name == "tour_started":
+        payload["status"] = "started"
+        payload["jobStatus"] = "started"
+        payload["job_status"] = "started"
+        payload["jobStarted"] = True
+        payload["job_started"] = True
+        payload["jobActive"] = True
+        payload["job_active"] = True
+        payload["hasJob"] = True
+        payload["has_job"] = True
+        payload["sendTourStartEmbed"] = True
+        payload["send_tour_start_embed"] = True
+
+    elif event_name == "tour_completed":
+        payload["status"] = "completed"
+        payload["jobStatus"] = "completed"
+        payload["job_status"] = "completed"
+        payload["jobFinished"] = True
+        payload["job_finished"] = True
+        payload["jobDelivered"] = True
+        payload["job_delivered"] = True
+        payload["jobCompleted"] = True
+        payload["job_completed"] = True
+        payload["completed"] = True
+        payload["delivered"] = True
+        payload["submitted"] = True
+        payload["billingRelevant"] = True
+        payload["billing_relevant"] = True
+        payload["jobActive"] = False
+        payload["job_active"] = False
+        payload["hasJob"] = False
+        payload["has_job"] = False
+        payload["sendTourCompletionEmbed"] = True
+        payload["send_tour_completion_embed"] = True
+        payload["createPdfReceipt"] = True
+        payload["create_pdf_receipt"] = True
+        payload["sendPdfReceipt"] = True
+        payload["send_pdf_receipt"] = True
+        payload["attachPdfReceipt"] = True
+        payload["attach_pdf_receipt"] = True
+
+        receipt = _merge_forced_channel_fields(payload.get("receipt"))
+        receipt["createPdf"] = True
+        receipt["create_pdf"] = True
+        receipt["sendPdf"] = True
+        receipt["send_pdf"] = True
+        receipt["attachPdf"] = True
+        receipt["attach_pdf"] = True
+        payload["receipt"] = receipt
+
+    _cache_json_request_payload(payload)
+
+
+def _normalize_tour_event_response(raw_response: Any):
+    """Ergänzt die erzwungene Routing-Information in JSON-Antworten.
+
+    Erfolgsstatus, Fehlertexte und Versandstatus kommen weiterhin ausschließlich
+    aus der Legacy-Businesslogik. Es wird lediglich transparent gemacht, welcher
+    Zielchannel auf Routing-Ebene erzwungen wurde.
+    """
+    response = make_response(raw_response)
+    payload = response.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        return response
+
+    payload.update(_TOUR_CHANNEL_FIELDS)
+    payload["routing"] = _merge_forced_channel_fields(payload.get("routing"))
+
+    discord = _merge_forced_channel_fields(payload.get("discord"))
+    payload["discord"] = discord
+
+    receipt = payload.get("receipt")
+    if isinstance(receipt, dict):
+        normalized_receipt = dict(receipt)
+        normalized_receipt.update(_TOUR_CHANNEL_FIELDS)
+        payload["receipt"] = normalized_receipt
+
+    response.set_data(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+    )
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    response.headers["Content-Length"] = str(len(response.get_data()))
+    return response
+
+
+def _delegate_tour_event(
+    handler: Callable[..., Any],
+    event_name: str,
+    *args: Any,
+    **kwargs: Any,
+):
+    """Normalisiert eine Tour-Anfrage und delegiert an die vorhandene Logik."""
+    _normalize_tour_event_request(event_name)
+    raw_response = handler(*args, **kwargs)
+    return _normalize_tour_event_response(raw_response)
 
 
 def _compact_key(value: Any) -> str:
@@ -460,16 +658,26 @@ def tracker_work_session(*args, **kwargs):
 @tracker_bp.route("/api/tracker/tour/start", methods=READ_WRITE_METHODS)
 @tracker_bp.route("/api/tracker/tour/started", methods=READ_WRITE_METHODS)
 def tracker_jobs_start(*args, **kwargs):
-    """Delegiert kompatibel an app.legacy.tracker_jobs_start()."""
-    return _legacy.tracker_jobs_start(*args, **kwargs)
+    """Erzwingt den Tourstart-Channel und delegiert das Start-Embed an Python."""
+    return _delegate_tour_event(
+        _legacy.tracker_jobs_start,
+        "tour_started",
+        *args,
+        **kwargs,
+    )
 
 
 @tracker_bp.route("/api/tracker/tour/submit", methods=READ_WRITE_METHODS)
 @tracker_bp.route("/api/tracker/tour/complete", methods=READ_WRITE_METHODS)
 @tracker_bp.route("/api/tracker/tour/completed", methods=READ_WRITE_METHODS)
 def tracker_tour_submit(*args, **kwargs):
-    """Delegiert kompatibel an app.legacy.tracker_tour_submit()."""
-    return _legacy.tracker_tour_submit(*args, **kwargs)
+    """Erzwingt Channel und PDF-Beleg für kompatible Tourabschluss-Aufrufe."""
+    return _delegate_tour_event(
+        _legacy.tracker_tour_submit,
+        "tour_completed",
+        *args,
+        **kwargs,
+    )
 
 
 @tracker_bp.route("/api/tracker/job/complete", methods=READ_WRITE_METHODS)
@@ -480,8 +688,13 @@ def tracker_tour_submit(*args, **kwargs):
 @tracker_bp.route("/api/tracker/jobs/completed", methods=READ_WRITE_METHODS)
 @tracker_bp.route("/api/tracker/complete-job", methods=READ_WRITE_METHODS)
 def tracker_job_complete(*args, **kwargs):
-    """Delegiert kompatibel an app.legacy.tracker_job_complete()."""
-    return _legacy.tracker_job_complete(*args, **kwargs)
+    """Erzwingt Channel und PDF-Beleg und delegiert den Abschluss an Python."""
+    return _delegate_tour_event(
+        _legacy.tracker_job_complete,
+        "tour_completed",
+        *args,
+        **kwargs,
+    )
 
 
 @tracker_bp.route("/api/tracker/logout", methods=READ_WRITE_METHODS)

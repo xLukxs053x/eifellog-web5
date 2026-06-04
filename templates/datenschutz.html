@@ -1,0 +1,657 @@
+{% extends "base.html" %}
+
+{% block title %}Datenschutz | Eifel LOG{% endblock %}
+
+{% block content %}
+<style>
+    /* Datenschutzseite: Ergänzungen zum bestehenden Eifel-LOG-Design */
+    .privacy-kicker,
+    .privacy-section-number,
+    .privacy-toc-link,
+    .privacy-chip,
+    .privacy-label {
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .privacy-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.30fr) minmax(0, 0.70fr);
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .privacy-sidebar {
+        position: sticky;
+        top: 7.5rem;
+    }
+
+    .privacy-toc-link {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.72rem 0.8rem;
+        border-radius: 0.85rem;
+        color: var(--muted);
+        font-size: 0.67rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        line-height: 1.45;
+        text-transform: uppercase;
+        text-decoration: none;
+        transition: 0.25s ease;
+    }
+
+    .privacy-toc-link:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateX(0.2rem);
+    }
+
+    .privacy-toc-dot {
+        width: 0.42rem;
+        height: 0.42rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 12px rgba(var(--brand-green-rgb), 0.55);
+    }
+
+    .privacy-card {
+        scroll-margin-top: 7rem;
+    }
+
+    .privacy-card p,
+    .privacy-card li,
+    .privacy-card td,
+    .privacy-card th {
+        line-height: 1.8;
+    }
+
+    .privacy-card a:not(.btn-primary):not(.btn-secondary) {
+        color: var(--brand-green);
+        text-decoration: underline;
+        text-decoration-color: rgba(var(--brand-green-rgb), 0.42);
+        text-underline-offset: 0.22rem;
+        transition: 0.2s ease;
+    }
+
+    .privacy-card a:not(.btn-primary):not(.btn-secondary):hover {
+        color: #ffffff;
+        text-decoration-color: rgba(255, 255, 255, 0.75);
+    }
+
+    .privacy-section-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.1rem;
+        height: 2.1rem;
+        padding: 0 0.6rem;
+        border-radius: 999px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.4);
+        background: rgba(var(--brand-green-rgb), 0.1);
+        color: var(--brand-green);
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.1);
+    }
+
+    .privacy-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-size: 0.63rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        line-height: 1.3;
+        text-transform: uppercase;
+    }
+
+    .privacy-placeholder {
+        display: inline;
+        color: var(--brand-yellow);
+        font-weight: 700;
+    }
+
+    .privacy-table-wrap {
+        overflow-x: auto;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 1rem;
+        background: rgba(0, 0, 0, 0.14);
+    }
+
+    .privacy-table {
+        width: 100%;
+        min-width: 44rem;
+        border-collapse: collapse;
+    }
+
+    .privacy-table th,
+    .privacy-table td {
+        padding: 0.9rem 1rem;
+        vertical-align: top;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+    }
+
+    .privacy-table tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .privacy-table th {
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.63rem;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+    }
+
+    .privacy-table td {
+        color: var(--muted);
+        font-size: 0.82rem;
+    }
+
+    .privacy-note {
+        border: 1px solid rgba(220, 226, 38, 0.28);
+        background: rgba(220, 226, 38, 0.065);
+    }
+
+    @media (max-width: 1024px) {
+        .privacy-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .privacy-sidebar {
+            position: static;
+        }
+
+        .privacy-toc {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.25rem;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .privacy-toc {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<section class="w-full">
+    <!-- Hero -->
+    <div class="glass-card relative overflow-hidden p-6 md:p-9 lg:p-11 mb-6 md:mb-8">
+        <div class="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-20 w-64 h-64 rounded-full bg-[var(--brand-yellow)]/5 blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10">
+            <div class="flex flex-wrap items-center gap-3 mb-5">
+                <span class="privacy-chip">
+                    <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+                    Privacy Protocol
+                </span>
+                <span class="privacy-chip">Stand: Juni 2026</span>
+            </div>
+
+            <p class="privacy-kicker text-[10px] md:text-[11px] uppercase tracking-[0.28em] text-[var(--brand-yellow)] mb-3">
+                Eifel LOG // Data Protection Node
+            </p>
+
+            <h1 class="font-orbitron text-3xl md:text-5xl font-extrabold tracking-wider uppercase text-[var(--text)] mb-5">
+                Datenschutz
+            </h1>
+
+            <p class="max-w-4xl text-sm md:text-base text-[var(--muted)] leading-relaxed">
+                In diesen Datenschutzhinweisen informieren wir darüber, welche personenbezogenen Daten beim Besuch
+                und bei der Nutzung der Website von Eifel LOG verarbeitet werden. Bitte ersetze vor der Veröffentlichung
+                sämtliche gelb markierten Platzhalter und entferne Abschnitte, die auf dein tatsächliches Angebot nicht zutreffen.
+            </p>
+        </div>
+    </div>
+
+    <!-- Hinweis für den Betreiber -->
+    <div class="privacy-note rounded-2xl px-5 py-4 md:px-6 md:py-5 mb-6 md:mb-8 backdrop-blur-xl">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 mt-0.5 shrink-0 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+                <p class="privacy-label text-[10px] uppercase tracking-[0.18em] text-[var(--brand-yellow)] font-bold mb-1">
+                    Vor Veröffentlichung prüfen
+                </p>
+                <p class="text-sm text-[var(--muted)] leading-relaxed">
+                    Diese Datei ist eine technisch passende Vorlage für das vorhandene Layout. Sie muss an Hosting,
+                    Kontaktdaten, Session-Konfiguration, Driver-Hub-Funktionen und weitere tatsächlich eingesetzte Dienste angepasst werden.
+                    Sie ersetzt keine individuelle rechtliche Prüfung.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="privacy-grid">
+        <!-- Inhaltsverzeichnis -->
+        <aside class="glass-card privacy-sidebar p-4 md:p-5">
+            <p class="privacy-label text-[10px] uppercase tracking-[0.2em] text-[var(--brand-yellow)] font-bold px-3 pt-2 pb-3">
+                Navigation
+            </p>
+
+            <nav class="privacy-toc" aria-label="Inhaltsverzeichnis Datenschutz">
+                <a class="privacy-toc-link" href="#verantwortlicher"><span class="privacy-toc-dot"></span>01 Verantwortlicher</a>
+                <a class="privacy-toc-link" href="#hosting"><span class="privacy-toc-dot"></span>02 Hosting & Logs</a>
+                <a class="privacy-toc-link" href="#cookies"><span class="privacy-toc-dot"></span>03 Cookies & Sessions</a>
+                <a class="privacy-toc-link" href="#konto"><span class="privacy-toc-dot"></span>04 Driver Hub</a>
+                <a class="privacy-toc-link" href="#kontakt"><span class="privacy-toc-dot"></span>05 Kontakt</a>
+                <a class="privacy-toc-link" href="#externe-dienste"><span class="privacy-toc-dot"></span>06 Externe Ressourcen</a>
+                <a class="privacy-toc-link" href="#empfaenger"><span class="privacy-toc-dot"></span>07 Empfänger</a>
+                <a class="privacy-toc-link" href="#speicherdauer"><span class="privacy-toc-dot"></span>08 Speicherdauer</a>
+                <a class="privacy-toc-link" href="#rechte"><span class="privacy-toc-dot"></span>09 Deine Rechte</a>
+                <a class="privacy-toc-link" href="#beschwerde"><span class="privacy-toc-dot"></span>10 Beschwerderecht</a>
+                <a class="privacy-toc-link" href="#sicherheit"><span class="privacy-toc-dot"></span>11 Sicherheit</a>
+                <a class="privacy-toc-link" href="#aenderungen"><span class="privacy-toc-dot"></span>12 Änderungen</a>
+            </nav>
+        </aside>
+
+        <!-- Inhalt -->
+        <div class="space-y-5 md:space-y-6">
+            <article id="verantwortlicher" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">01</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Verantwortlicher
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Verantwortlicher für die Verarbeitung personenbezogener Daten auf dieser Website ist:
+                </p>
+
+                <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-[var(--muted)] leading-relaxed">
+                    <p class="privacy-placeholder">[VOLLSTÄNDIGEN NAMEN ODER UNTERNEHMENSNAMEN EINTRAGEN]</p>
+                    <p class="privacy-placeholder">[ANSCHRIFT EINTRAGEN]</p>
+                    <p>
+                        E-Mail:
+                        <a href="mailto:[DATENSCHUTZ-EMAIL EINTRAGEN]">[DATENSCHUTZ-EMAIL EINTRAGEN]</a>
+                    </p>
+                    <p class="privacy-placeholder">[OPTIONAL: TELEFONNUMMER EINTRAGEN]</p>
+                </div>
+
+                <p class="text-xs text-[var(--muted)] mt-4">
+                    Falls ein Datenschutzbeauftragter bestellt wurde, ergänze hier dessen Kontaktdaten:
+                    <span class="privacy-placeholder">[OPTIONAL: KONTAKTDATEN DES DATENSCHUTZBEAUFTRAGTEN]</span>.
+                </p>
+            </article>
+
+            <article id="hosting" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">02</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Hosting und Server-Logfiles
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Beim Aufruf dieser Website können durch den Hosting-Anbieter technisch erforderliche Zugriffsdaten
+                    verarbeitet werden. Dazu können insbesondere IP-Adresse, Datum und Uhrzeit des Abrufs, aufgerufene
+                    Datei oder Seite, Referrer-URL, Browsertyp, Betriebssystem und HTTP-Statuscode gehören.
+                </p>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Die Verarbeitung erfolgt zur sicheren, stabilen und fehlerfreien Bereitstellung der Website sowie
+                    zur Abwehr missbräuchlicher Zugriffe. Als Rechtsgrundlage kommt Art. 6 Abs. 1 lit. f DSGVO in Betracht.
+                    Das berechtigte Interesse liegt in der zuverlässigen und sicheren Bereitstellung des Online-Angebots.
+                </p>
+
+                <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-[var(--muted)] leading-relaxed">
+                    <p>
+                        Hosting-Anbieter:
+                        <span class="privacy-placeholder">[HOSTING-ANBIETER UND ANSCHRIFT EINTRAGEN]</span>
+                    </p>
+                    <p>
+                        Speicherdauer der Logfiles:
+                        <span class="privacy-placeholder">[TATSÄCHLICHE SPEICHERDAUER EINTRAGEN]</span>
+                    </p>
+                    <p>
+                        Auftragsverarbeitung:
+                        <span class="privacy-placeholder">[PRÜFEN UND GEGEBENENFALLS AV-VERTRAG ANGEBEN]</span>
+                    </p>
+                </div>
+            </article>
+
+            <article id="cookies" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">03</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Cookies und Session-Verwaltung
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Diese Website kann technisch erforderliche Cookies oder vergleichbare Speichertechniken verwenden,
+                    damit angeforderte Funktionen bereitgestellt werden können. Dazu kann insbesondere eine Session-Kennung
+                    für die Anmeldung im Driver Hub gehören. Soweit eine Speicherung oder ein Zugriff auf Informationen
+                    in deinem Endgerät unbedingt erforderlich ist, erfolgt dies auf Grundlage von § 25 Abs. 2 Nr. 2 TDDDG.
+                    Die anschließende Verarbeitung personenbezogener Daten richtet sich je nach Funktion insbesondere nach
+                    Art. 6 Abs. 1 lit. b oder lit. f DSGVO.
+                </p>
+
+                <div class="privacy-table-wrap">
+                    <table class="privacy-table">
+                        <thead>
+                            <tr>
+                                <th>Cookie / Speichertechnik</th>
+                                <th>Zweck</th>
+                                <th>Kategorie</th>
+                                <th>Speicherdauer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="privacy-placeholder">[SESSION-COOKIE-NAME EINTRAGEN]</span></td>
+                                <td>Anmeldung, Sitzungsverwaltung und Schutz der Benutzeroberfläche.</td>
+                                <td>Technisch erforderlich</td>
+                                <td><span class="privacy-placeholder">[SESSION ODER KONKRETE DAUER EINTRAGEN]</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="privacy-placeholder">[OPTIONALE WEITERE COOKIES EINTRAGEN ODER ZEILE ENTFERNEN]</span></td>
+                                <td><span class="privacy-placeholder">[ZWECK EINTRAGEN]</span></td>
+                                <td><span class="privacy-placeholder">[KATEGORIE EINTRAGEN]</span></td>
+                                <td><span class="privacy-placeholder">[DAUER EINTRAGEN]</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="text-xs text-[var(--muted)] mt-4">
+                    Setzt du künftig nicht erforderliche Cookies, Analyse-Tools oder Marketing-Technologien ein, muss vor
+                    deren Einsatz eine passende Einwilligungslösung implementiert und dieser Abschnitt entsprechend ergänzt werden.
+                </p>
+            </article>
+
+            <article id="konto" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">04</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Driver Hub und Benutzerkonto
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Soweit du dich für den Driver Hub registrierst, anmeldest oder ein Benutzerkonto nutzt, verarbeiten
+                    wir die für die Bereitstellung des Kontos erforderlichen Angaben. Der konkrete Umfang richtet sich
+                    nach den tatsächlich abgefragten Formularfeldern und den genutzten Funktionen.
+                </p>
+
+                <div class="privacy-table-wrap">
+                    <table class="privacy-table">
+                        <thead>
+                            <tr>
+                                <th>Datenkategorie</th>
+                                <th>Zweck</th>
+                                <th>Rechtsgrundlage</th>
+                                <th>Speicherdauer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="privacy-placeholder">[Z. B. BENUTZERNAME, E-MAIL-ADRESSE]</span></td>
+                                <td>Registrierung, Anmeldung und Kontoverwaltung.</td>
+                                <td>Art. 6 Abs. 1 lit. b DSGVO</td>
+                                <td>Bis zur Löschung des Kontos, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="privacy-placeholder">[OPTIONAL: FAHRER-, PROFIL- ODER SPEDITIONSANGABEN]</span></td>
+                                <td><span class="privacy-placeholder">[KONKRETEN ZWECK EINTRAGEN]</span></td>
+                                <td><span class="privacy-placeholder">[RECHTSGRUNDLAGE PRÜFEN UND EINTRAGEN]</span></td>
+                                <td><span class="privacy-placeholder">[TATSÄCHLICHE SPEICHERDAUER EINTRAGEN]</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="text-xs text-[var(--muted)] mt-4">
+                    Entferne diesen Abschnitt vollständig, falls kein Benutzerkonto und kein Driver Hub mit personenbezogenen Daten angeboten werden.
+                </p>
+            </article>
+
+            <article id="kontakt" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">05</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Kontaktaufnahme
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Wenn du uns per E-Mail oder über einen angebotenen Kontaktweg kontaktierst, verarbeiten wir deine
+                    Angaben zur Bearbeitung deiner Anfrage und für mögliche Anschlussfragen. Je nach Inhalt der Anfrage
+                    erfolgt die Verarbeitung auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO zur Durchführung vorvertraglicher
+                    Maßnahmen oder auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO aufgrund unseres Interesses an einer
+                    sachgerechten Kommunikation.
+                </p>
+
+                <p class="text-sm text-[var(--muted)]">
+                    Die Daten werden gelöscht, sobald die Anfrage abschließend bearbeitet ist und keine gesetzlichen
+                    Aufbewahrungspflichten oder sonstigen Rechtsgründe für eine weitere Speicherung bestehen.
+                </p>
+
+                <p class="text-xs text-[var(--muted)] mt-4">
+                    Ergänze hier gegebenenfalls weitere Kontaktwege wie Discord-Tickets, Bewerbungsformulare oder Support-Systeme:
+                    <span class="privacy-placeholder">[OPTIONALE DIENSTE UND DATENFLÜSSE EINTRAGEN]</span>.
+                </p>
+            </article>
+
+            <article id="externe-dienste" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">06</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Externe Ressourcen
+                    </h2>
+                </div>
+
+                <h3 class="font-orbitron text-sm font-bold tracking-wider uppercase text-[var(--brand-green)] mb-3">
+                    Google Fonts
+                </h3>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Für die Darstellung der Schriftarten werden derzeit Ressourcen über die Google Fonts Web API geladen.
+                    Beim Abruf stellt dein Browser eine Verbindung zu Domains wie fonts.googleapis.com und fonts.gstatic.com her.
+                    Nach Angaben von Google wird die Google Fonts Web API ohne Authentifizierung bereitgestellt; die API setzt
+                    oder protokolliert keine Cookies. Unabhängig davon findet beim Abruf technisch eine Verbindung zu Servern
+                    des Anbieters statt.
+                </p>
+
+                <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-[var(--muted)] leading-relaxed mb-6">
+                    <p> Anbieter: Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA </p>
+                    <p>
+                        Weitere Informationen:
+                        <a href="https://developers.google.com/fonts/faq/privacy" target="_blank" rel="noopener noreferrer">
+                            Datenschutzinformationen zu Google Fonts
+                        </a>
+                    </p>
+                    <p>
+                        Rechtsgrundlage:
+                        <span class="privacy-placeholder">[RECHTSGRUNDLAGE UND GEGEBENENFALLS EINWILLIGUNGSLÖSUNG PRÜFEN]</span>
+                    </p>
+                </div>
+
+                <h3 class="font-orbitron text-sm font-bold tracking-wider uppercase text-[var(--brand-green)] mb-3">
+                    Tailwind CSS Play CDN
+                </h3>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Das Layout lädt derzeit ein JavaScript-Skript über cdn.tailwindcss.com. Dadurch wird beim Seitenaufruf
+                    eine Verbindung zu einem externen Server hergestellt. Die offizielle Tailwind-Dokumentation weist darauf hin,
+                    dass das Play CDN für Entwicklungszwecke vorgesehen und nicht für den Produktivbetrieb bestimmt ist.
+                </p>
+
+                <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-[var(--muted)] leading-relaxed">
+                    <p>
+                        Empfehlung: Erzeuge die benötigte Tailwind-CSS-Datei im Build-Prozess und hoste sie lokal. Entferne anschließend
+                        diesen Absatz oder passe ihn an die tatsächlich verwendete Infrastruktur an.
+                    </p>
+                    <p>
+                        Rechtsgrundlage bis zur Umstellung:
+                        <span class="privacy-placeholder">[EXTERNEN ANBIETER, DATENFLUSS UND RECHTSGRUNDLAGE PRÜFEN]</span>
+                    </p>
+                </div>
+
+                <p class="text-xs text-[var(--muted)] mt-4">
+                    Prüfe zusätzlich sämtliche eingebetteten Bilder, Videos, Karten, Discord-Widgets, Social-Media-Elemente,
+                    Statistik-Tools und sonstigen Drittanbieter-Ressourcen. Nicht eingesetzte Dienste gehören nicht in die Datenschutzhinweise.
+                </p>
+            </article>
+
+            <article id="empfaenger" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">07</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Empfänger und Drittlandübermittlungen
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Personenbezogene Daten werden nur an externe Stellen übermittelt, wenn dies für die Bereitstellung
+                    des Angebots erforderlich ist, eine gesetzliche Verpflichtung besteht, eine wirksame Einwilligung
+                    vorliegt oder eine andere Rechtsgrundlage die Übermittlung erlaubt.
+                </p>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Soweit Dienstleister personenbezogene Daten in unserem Auftrag verarbeiten, werden sie nach Maßgabe
+                    der gesetzlichen Anforderungen eingebunden. Bei Übermittlungen in Staaten außerhalb der Europäischen
+                    Union oder des Europäischen Wirtschaftsraums ist zu prüfen, ob die gesetzlichen Voraussetzungen für
+                    eine Drittlandübermittlung erfüllt sind.
+                </p>
+
+                <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-[var(--muted)] leading-relaxed">
+                    <p>
+                        Tatsächlich eingesetzte Empfänger:
+                        <span class="privacy-placeholder">[HOSTER, MAIL-ANBIETER, AUTHENTIFIZIERUNG, DISCORD-INTEGRATIONEN UND WEITERE EMPFÄNGER EINTRAGEN]</span>
+                    </p>
+                    <p>
+                        Drittlandübermittlungen:
+                        <span class="privacy-placeholder">[TATSÄCHLICH PRÜFEN UND KONKRET BESCHREIBEN]</span>
+                    </p>
+                </div>
+            </article>
+
+            <article id="speicherdauer" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">08</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Speicherdauer
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)]">
+                    Wir speichern personenbezogene Daten nur so lange, wie dies für den jeweiligen Zweck erforderlich ist
+                    oder gesetzliche Aufbewahrungspflichten bestehen. Entfällt der Verarbeitungszweck und besteht keine
+                    anderweitige Rechtsgrundlage für eine weitere Speicherung, werden die Daten gelöscht oder anonymisiert.
+                    Konkrete Fristen sind in den jeweiligen Abschnitten dieser Datenschutzhinweise angegeben oder vor der
+                    Veröffentlichung zu ergänzen.
+                </p>
+            </article>
+
+            <article id="rechte" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">09</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Deine Datenschutzrechte
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Nach Maßgabe der gesetzlichen Voraussetzungen stehen dir insbesondere folgende Rechte zu:
+                </p>
+
+                <ul class="space-y-2 text-sm text-[var(--muted)]">
+                    <li><span class="text-[var(--brand-green)] font-bold">Auskunft</span> über die Verarbeitung deiner personenbezogenen Daten gemäß Art. 15 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Berichtigung</span> unrichtiger oder unvollständiger Daten gemäß Art. 16 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Löschung</span> deiner Daten gemäß Art. 17 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Einschränkung der Verarbeitung</span> gemäß Art. 18 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Datenübertragbarkeit</span> gemäß Art. 20 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Widerspruch</span> gegen Verarbeitungen auf Grundlage von Art. 6 Abs. 1 lit. e oder lit. f DSGVO gemäß Art. 21 DSGVO.</li>
+                    <li><span class="text-[var(--brand-green)] font-bold">Widerruf</span> einer erteilten Einwilligung mit Wirkung für die Zukunft gemäß Art. 7 Abs. 3 DSGVO.</li>
+                </ul>
+
+                <p class="text-sm text-[var(--muted)] mt-4">
+                    Zur Ausübung deiner Rechte genügt eine Nachricht an:
+                    <a href="mailto:[DATENSCHUTZ-EMAIL EINTRAGEN]">[DATENSCHUTZ-EMAIL EINTRAGEN]</a>.
+                </p>
+            </article>
+
+            <article id="beschwerde" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">10</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Beschwerderecht
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)] mb-4">
+                    Wenn du der Ansicht bist, dass die Verarbeitung deiner personenbezogenen Daten gegen Datenschutzrecht
+                    verstößt, hast du gemäß Art. 77 DSGVO das Recht auf Beschwerde bei einer Datenschutzaufsichtsbehörde.
+                </p>
+
+                <p class="text-sm text-[var(--muted)]">
+                    Eine Übersicht der Datenschutzaufsichtsbehörden des Bundes und der Länder findest du bei der
+                    <a href="https://www.datenschutzkonferenz-online.de/datenschutzaufsichtsbehoerden.html" target="_blank" rel="noopener noreferrer">
+                        Datenschutzkonferenz
+                    </a>.
+                    Die für Eifel LOG zuständige Behörde sollte hier zusätzlich konkret ergänzt werden:
+                    <span class="privacy-placeholder">[ZUSTÄNDIGE AUFSICHTSBEHÖRDE EINTRAGEN]</span>.
+                </p>
+            </article>
+
+            <article id="sicherheit" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">11</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Datensicherheit
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)]">
+                    Wir treffen angemessene technische und organisatorische Maßnahmen, um personenbezogene Daten vor
+                    Verlust, Manipulation und unbefugtem Zugriff zu schützen. Sofern die Website über HTTPS bereitgestellt
+                    wird, ist die Übertragung zwischen deinem Browser und unserem Server transportverschlüsselt.
+                </p>
+            </article>
+
+            <article id="aenderungen" class="privacy-card glass-card p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="privacy-section-number">12</span>
+                    <h2 class="font-orbitron text-lg md:text-xl font-bold tracking-wider uppercase text-[var(--text)]">
+                        Änderungen dieser Hinweise
+                    </h2>
+                </div>
+
+                <p class="text-sm text-[var(--muted)]">
+                    Wir können diese Datenschutzhinweise anpassen, wenn sich Funktionen der Website, eingesetzte Dienste
+                    oder rechtliche Anforderungen ändern. Maßgeblich ist die jeweils auf dieser Seite veröffentlichte Fassung.
+                </p>
+            </article>
+
+            <div class="glass-card p-5 md:p-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div>
+                    <p class="privacy-label text-[10px] uppercase tracking-[0.18em] text-[var(--brand-yellow)] font-bold mb-1">
+                        Eifel LOG // Privacy Node
+                    </p>
+                    <p class="text-sm text-[var(--muted)]">Letzte Aktualisierung: Juni 2026</p>
+                </div>
+
+                <a href="/" class="btn-primary">
+                    Zurück zur Startseite
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -60,6 +60,20 @@ def fuhrpark(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.fuhrpark()."""
     return _legacy.fuhrpark(*args, **kwargs)
 
+@public_bp.route("/datenschutz")
+@public_bp.route("/datenschutz.html")
+def datenschutz(*args, **kwargs):
+    """Delegiert kompatibel an app.legacy.datenschutz()."""
+    return _legacy.datenschutz(*args, **kwargs)
+
+
+@public_bp.route("/nutzungsbedingungen")
+@public_bp.route("/nutzungsbedingungen.html")
+def nutzungsbedingungen(*args, **kwargs):
+    """Delegiert kompatibel an app.legacy.nutzungsbedingungen()."""
+    return _legacy.nutzungsbedingungen(*args, **kwargs)
+
+
 
 @public_bp.route("/impressum")
 def impressum(*args, **kwargs):
