@@ -193,17 +193,60 @@
         -webkit-line-clamp: 3;
     }
 
-    .events-card-details summary {
+    .events-card-details {
+        overflow: hidden;
+    }
+
+    .events-details-toggle {
+        width: 100%;
         cursor: pointer;
-        list-style: none;
+        text-align: left;
     }
 
-    .events-card-details summary::-webkit-details-marker {
-        display: none;
+    .events-details-toggle:focus-visible {
+        outline: 2px solid rgba(137, 190, 50, 0.76);
+        outline-offset: -2px;
     }
 
-    .events-card-details[open] .events-details-chevron {
+    .events-details-chevron {
+        transition: transform 260ms ease;
+    }
+
+    .events-card-details.is-open .events-details-chevron {
         transform: rotate(180deg);
+    }
+
+    .events-details-panel {
+        display: grid;
+        grid-template-rows: 0fr;
+        opacity: 0;
+        transform: translateY(-0.35rem);
+        visibility: hidden;
+        transition:
+            grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 220ms ease,
+            transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+            visibility 0s linear 320ms;
+    }
+
+    .events-card-details.is-open .events-details-panel {
+        grid-template-rows: 1fr;
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+        transition-delay: 0s;
+    }
+
+    .events-details-panel-inner {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .events-details-panel,
+        .events-details-chevron {
+            transition-duration: 1ms !important;
+        }
     }
 
     .events-markdown {
@@ -446,25 +489,17 @@
         </div>
 
         <!--
-            Die Übersicht lädt alle verfügbaren Events und Konvois. Standardmäßig werden
-            GET /api/events und optional GET /api/convoys mit include=all und expand=...
-            aufgerufen. Existiert /api/convoys in deinem Backend nicht, wird die Seite
-            weiterhin vollständig über /api/events befüllt.
-
-            Unterstützt werden Arrays, verschachtelte Plugin-Antworten und kombinierte
-            Antworten, zum Beispiel: [ ... ], {"events": [...]}, {"convoys": [...]},
+            Die Übersicht lädt alle verfügbaren Events und Konvois dynamisch. Unterstützt
+            werden Arrays, verschachtelte Plugin-Antworten und kombinierte Antworten, zum
+            Beispiel: [ ... ], {"events": [...]}, {"convoys": [...]},
             {"created_events": [...]}, {"data": {"events": [...], "convoys": [...]}},
             {"plugin": {"scheduled_events": [...], "created_convoys": [...]}}.
 
-            Detaildaten werden nur intern über die ID nachgeladen. Technische IDs werden
-            niemals in der Oberfläche ausgegeben. Falls dein Backend andere Routen nutzt,
-            passe data-endpoints, data-detail-endpoint und data-convoy-detail-endpoint an.
+            Technische IDs, interne Transportfelder und API-Metadaten werden niemals in
+            der Oberfläche ausgegeben. Detailbereiche öffnen und schließen animiert.
         -->
         <div
             id="events-page-list"
-            data-endpoints="/api/events,/api/convoys"
-            data-detail-endpoint="/api/events/{id}"
-            data-convoy-detail-endpoint="/api/convoys/{id}"
             class="grid gap-3 lg:grid-cols-2"
             aria-live="polite"
             aria-busy="true"
@@ -493,12 +528,10 @@
         const statNextDate = document.getElementById('stat-next-date');
         const statLastSync = document.getElementById('stat-last-sync');
 
-        const COLLECTION_ENDPOINTS = (eventsContainer?.dataset.endpoints || eventsContainer?.dataset.endpoint || '/api/events')
-            .split(',')
-            .map((endpoint) => endpoint.trim())
-            .filter(Boolean);
-        const DETAIL_ENDPOINT_TEMPLATE = eventsContainer?.dataset.detailEndpoint || '';
-        const CONVOY_DETAIL_ENDPOINT_TEMPLATE = eventsContainer?.dataset.convoyDetailEndpoint || '';
+        const EVENT_FEEDS = ['/api/events', '/api/convoys'];
+        const EVENT_DETAIL_ROUTE = '/api/events/{id}';
+        const CONVOY_DETAIL_ROUTE = '/api/convoys/{id}';
+        const EVENT_SOURCE = Symbol('eventSource');
         const EXPAND_FIELDS = 'details,participants,organizer,location,links,metadata,events,convoys';
         const DETAIL_FETCH_CONCURRENCY = 4;
 
@@ -670,12 +703,12 @@
                 event.kind,
                 event.category,
                 event.type,
-                event._collectionEndpoint
+                event[EVENT_SOURCE]
             )).toLocaleLowerCase('de-DE');
             const isConvoy = eventKind.includes('convoy') || eventKind.includes('konvoi');
             const fallbackTemplate = isConvoy
-                ? (CONVOY_DETAIL_ENDPOINT_TEMPLATE || DETAIL_ENDPOINT_TEMPLATE)
-                : DETAIL_ENDPOINT_TEMPLATE;
+                ? (CONVOY_DETAIL_ROUTE || EVENT_DETAIL_ROUTE)
+                : EVENT_DETAIL_ROUTE;
 
             if (!fallbackTemplate || !eventId) {
                 return null;
@@ -694,13 +727,21 @@
             'id', 'uuid', 'event_id', 'eventId', 'last_channel_id', 'lastChannelId',
             'role_id', 'roleId', 'guild_id', 'guildId', 'created_by_id', 'createdById',
             'channel_id', 'channelId', 'voice_channel_id', 'voiceChannelId', 'server_id',
-            'serverId', 'creator_id', 'creatorId', 'owner_id', 'ownerId', 'user_id', 'userId'
+            'serverId', 'creator_id', 'creatorId', 'owner_id', 'ownerId', 'user_id', 'userId',
+            'collection_endpoint', 'collectionEndpoint', '_collectionEndpoint', 'source_endpoint',
+            'sourceEndpoint', 'api_endpoint', 'apiEndpoint', 'detail_endpoint', 'detailEndpoint',
+            'details_endpoint', 'detailsEndpoint', 'event_api_url', 'eventApiUrl', 'api_detail_url',
+            'apiDetailUrl'
         ]);
 
-        const isInternalIdPath = (path) => {
+        const isHiddenTechnicalPath = (path) => {
             return String(path)
                 .split('.')
-                .some((fieldName) => HIDDEN_INTERNAL_FIELD_NAMES.has(fieldName) || INTERNAL_ID_FIELD_PATTERN.test(fieldName));
+                .some((fieldName) => {
+                    return fieldName.startsWith('_')
+                        || HIDDEN_INTERNAL_FIELD_NAMES.has(fieldName)
+                        || INTERNAL_ID_FIELD_PATTERN.test(fieldName);
+                });
         };
         const ALREADY_RENDERED_FIELDS = new Set([
             'title', 'name', 'description', 'summary', 'content', 'start_at', 'starts_at', 'start_time',
@@ -717,10 +758,16 @@
             'detailsUrl', 'discord_url', 'discordUrl', 'registration_url', 'registrationUrl', 'external_url', 'externalUrl',
             'image', 'image_url', 'imageUrl', 'banner', 'banner_url', 'bannerUrl', 'cover_url', 'coverUrl',
             'api_detail_url', 'apiDetailUrl', 'detail_endpoint', 'detailEndpoint', 'details_endpoint', 'detailsEndpoint',
-            'event_api_url', 'eventApiUrl', 'attributes', 'details', 'plugin_data', 'pluginData', 'metadata', '_links', 'links'
+            'event_api_url', 'eventApiUrl', 'collection_endpoint', 'collectionEndpoint', '_collectionEndpoint',
+            'source_endpoint', 'sourceEndpoint', 'api_endpoint', 'apiEndpoint', 'attributes', 'details', 'plugin_data',
+            'pluginData', 'metadata', '_links', 'links'
         ]);
 
         const FIELD_LABELS = {
+            id: 'Event-ID',
+            event_id: 'Event-ID',
+            eventId: 'Event-ID',
+            uuid: 'UUID',
             created_at: 'Erstellt am',
             createdAt: 'Erstellt am',
             updated_at: 'Aktualisiert am',
@@ -785,7 +832,7 @@
                     Object.entries(value)
                         .filter(([key]) => {
                             const path = prefix ? `${prefix}.${key}` : key;
-                            return !SENSITIVE_FIELD_PATTERN.test(path) && !isInternalIdPath(path);
+                            return !SENSITIVE_FIELD_PATTERN.test(path) && !isHiddenTechnicalPath(path);
                         })
                         .map(([key, childValue]) => {
                             const path = prefix ? `${prefix}.${key}` : key;
@@ -827,7 +874,7 @@
             Object.entries(object).forEach(([key, value]) => {
                 const path = prefix ? `${prefix}.${key}` : key;
 
-                if (SENSITIVE_FIELD_PATTERN.test(path) || isInternalIdPath(path) || ALREADY_RENDERED_FIELDS.has(key)) {
+                if (SENSITIVE_FIELD_PATTERN.test(path) || isHiddenTechnicalPath(path) || ALREADY_RENDERED_FIELDS.has(key)) {
                     return;
                 }
 
@@ -1296,13 +1343,20 @@
                 return null;
             }
 
-            const details = createElement('details', 'events-card-details mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/15');
-            const summary = createElement('summary', 'flex items-center justify-between gap-3 px-4 py-3 font-orbitron text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:bg-white/[0.035]');
+            const details = createElement('div', 'events-card-details mt-4 rounded-xl border border-white/10 bg-black/15');
+            const toggle = createElement('button', 'events-details-toggle flex items-center justify-between gap-3 px-4 py-3 font-orbitron text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:bg-white/[0.035]');
             const summaryLabel = createElement('span', '', 'Weitere Details');
-            const chevron = createIcon('M19 9l-7 7-7-7', 'events-details-chevron h-4 w-4 shrink-0 transition-transform');
-            summary.append(summaryLabel, chevron);
+            const chevron = createIcon('M19 9l-7 7-7-7', 'events-details-chevron h-4 w-4 shrink-0');
+            const panelId = `event-details-${Math.random().toString(36).slice(2, 10)}`;
+            toggle.type = 'button';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-controls', panelId);
+            toggle.append(summaryLabel, chevron);
 
-            const panel = createElement('div', 'border-t border-white/5 px-4 py-4');
+            const panel = createElement('div', 'events-details-panel');
+            panel.id = panelId;
+            panel.setAttribute('aria-hidden', 'true');
+            const panelInner = createElement('div', 'events-details-panel-inner border-t border-white/5 px-4 py-4');
 
             if (hasMarkdown) {
                 const markdownSection = createElement('section', 'rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3');
@@ -1310,24 +1364,43 @@
                 const markdown = createElement('div', 'events-markdown mt-2');
                 markdown.innerHTML = renderMarkdown(event.detailsMarkdown);
                 markdownSection.append(heading, markdown);
-                panel.appendChild(markdownSection);
+                panelInner.appendChild(markdownSection);
             }
 
             if (detailRows.length) {
                 const heading = createElement('h4', `${hasMarkdown ? 'mt-4 ' : ''}font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]`, 'Termindetails');
                 const list = createElement('dl', 'mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3');
                 detailRows.forEach(([label, value]) => appendDetailCell(list, label, value));
-                panel.append(heading, list);
+                panelInner.append(heading, list);
             }
 
             if (hasExtraData) {
                 const heading = createElement('h4', 'mt-4 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]', 'Zusätzliche Angaben');
                 const list = createElement('dl', 'mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3');
                 event.extraData.forEach(({ label, value }) => appendDetailCell(list, label, value));
-                panel.append(heading, list);
+                panelInner.append(heading, list);
             }
 
-            details.append(summary, panel);
+            panel.appendChild(panelInner);
+            toggle.addEventListener('click', () => {
+                const shouldOpen = !details.classList.contains('is-open');
+
+                document.querySelectorAll('.events-card-details.is-open').forEach((openDetails) => {
+                    if (openDetails !== details) {
+                        openDetails.classList.remove('is-open');
+                        const openToggle = openDetails.querySelector('.events-details-toggle');
+                        const openPanel = openDetails.querySelector('.events-details-panel');
+                        openToggle?.setAttribute('aria-expanded', 'false');
+                        openPanel?.setAttribute('aria-hidden', 'true');
+                    }
+                });
+
+                details.classList.toggle('is-open', shouldOpen);
+                toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+                panel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+            });
+
+            details.append(toggle, panel);
             return details;
         };
 
@@ -1584,33 +1657,19 @@
             return response.json();
         };
 
-        const EVENT_COLLECTION_KEY_PATTERN = /^(?:events?|convoys?|konvois?|created|scheduled|upcoming|items?|results?|entries?|records?|data|list)$/i;
-
-        const normalizeFieldKey = (value) => String(value)
-            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-            .replace(/[-\s]+/g, '_');
-
-        const isEventCollectionPath = (path) => {
-            const lastPathPart = String(path).split('.').pop() || '';
-            return EVENT_COLLECTION_KEY_PATTERN.test(normalizeFieldKey(lastPathPart));
-        };
+        const EVENT_COLLECTION_PATH_PATTERN = /(?:^|[._-])(?:events?|convoys?|konvois?|created|scheduled|upcoming|items?|results?|entries?|records?)(?:$|[._-])/i;
 
         const looksLikeEventObject = (value) => {
             if (!isPlainObject(value)) {
                 return false;
             }
 
-            const explicitTitle = pick(value, 'title', 'event_name', 'eventName');
-            const name = pick(value, 'name');
-            const eventData = firstDefined(
+            return firstDefined(
+                pick(value, 'title', 'name', 'event_name', 'eventName'),
                 pick(value, 'start_at', 'starts_at', 'start_time', 'startAt', 'startsAt', 'startTime', 'datetime', 'date'),
                 pick(value, 'route', 'start_location', 'startLocation', 'destination'),
-                pick(value, 'description', 'summary', 'details'),
-                pick(value, 'category', 'type', 'event_type', 'eventType'),
-                pick(value, 'location', 'venue')
-            );
-
-            return Boolean(explicitTitle || (name && eventData !== undefined));
+                pick(value, 'description', 'summary', 'details')
+            ) !== undefined;
         };
 
         const collectEventRecords = (value, path = '', depth = 0, target = []) => {
@@ -1619,7 +1678,7 @@
             }
 
             if (Array.isArray(value)) {
-                if (!path || isEventCollectionPath(path)) {
+                if (!path || EVENT_COLLECTION_PATH_PATTERN.test(path)) {
                     value.filter(looksLikeEventObject).forEach((event) => target.push(event));
                 }
 
@@ -1636,14 +1695,10 @@
                 return target;
             }
 
-            if (!path && looksLikeEventObject(value)) {
-                target.push(value);
-            }
-
             Object.entries(value).forEach(([key, childValue]) => {
                 const childPath = path ? `${path}.${key}` : key;
 
-                if (isPlainObject(childValue) && isEventCollectionPath(childPath)) {
+                if (isPlainObject(childValue) && EVENT_COLLECTION_PATH_PATTERN.test(childPath)) {
                     Object.values(childValue)
                         .filter(looksLikeEventObject)
                         .forEach((event) => target.push(event));
@@ -1773,7 +1828,7 @@
 
             try {
                 const collectionResults = await Promise.allSettled(
-                    COLLECTION_ENDPOINTS.map(async (endpoint) => {
+                    EVENT_FEEDS.map(async (endpoint) => {
                         const collectionUrl = appendQueryParams(endpoint, {
                             include: 'all',
                             expand: EXPAND_FIELDS
@@ -1793,7 +1848,7 @@
 
                 const rawEvents = deduplicateRawEvents(
                     successfulCollections.flatMap(({ endpoint, payload }) => {
-                        return extractEvents(payload).map((event) => mergeObjects(event, { _collectionEndpoint: endpoint }));
+                        return extractEvents(payload).map((event) => mergeObjects(event, { [EVENT_SOURCE]: endpoint }));
                     })
                 );
                 const enrichedEvents = await enrichUpcomingEvents(rawEvents);
