@@ -94,23 +94,18 @@
     </div>
 </section>
 
-<!-- Slideshow bei Browser-Zoom 100 % so kompakt wie zuvor bei 50 % -->
+<!-- Event-Slideshow: keine zusätzliche Desktop-Skalierung.
+     Die kompakte 100-%-Ansicht wird zentral über base.html gesteuert. -->
 <style>
     .event-slideshow-stage {
         height: 230px;
     }
 
-    /*
-        Desktop: sichtbare Skalierung auf 50 %.
-        Die doppelte Breite und Höhe gleichen transform: scale(0.5) aus,
-        damit die Slideshow weiterhin die komplette Stage sauber ausfüllt.
-    */
     .event-slideshow-fit {
-        width: 200%;
-        min-height: 460px;
-        margin-left: -50%;
-        transform: scale(0.5);
-        transform-origin: center center;
+        width: 100%;
+        min-height: 230px;
+        margin-left: 0;
+        transform: none;
     }
 
     @media (max-width: 640px) {
@@ -118,12 +113,11 @@
             height: 244px;
         }
 
-        /* Mobil bleibt die Slideshow lesbar und wird nur leicht verkleinert. */
         .event-slideshow-fit {
-            width: 104.166667%;
-            min-height: 254.166667px;
-            margin-left: -2.083333%;
-            transform: scale(0.96);
+            width: 100%;
+            min-height: 244px;
+            margin-left: 0;
+            transform: none;
         }
     }
 </style>
