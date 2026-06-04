@@ -9,7 +9,7 @@
         <div>
             <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase">Eifel LOG Community</span>
             <h1 id="events-page-title" class="text-3xl md:text-4xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
-                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
+                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-12 h-12 shrink-0 rounded-full object-contain bg-black/45 p-1 border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
                 Events &amp; Konvois
             </h1>
         </div>
@@ -29,33 +29,49 @@
         </div>
     </div>
 
-    <div class="relative overflow-hidden rounded-[2rem] border border-[var(--brand-green)]/25 bg-black/35 shadow-[0_22px_80px_rgba(0,0,0,0.45)] group">
-        <img
-            src="{{ url_for('static', filename='events.jpg') }}"
-            alt="EifelLog Events Banner"
-            class="block w-full h-[190px] sm:h-[250px] md:h-[310px] object-cover object-center transition duration-700 group-hover:scale-[1.015]"
-            loading="eager"
-        >
+    <div class="relative overflow-hidden rounded-[2rem] border border-[var(--brand-green)]/25 bg-black/45 shadow-[0_22px_80px_rgba(0,0,0,0.45)] group">
+        <!--
+            Das Banner wird nicht mehr mit object-cover beschnitten.
+            Dadurch bleiben das EifelLog-Logo und der komplette Schriftzug auf allen Bildschirmgrößen sichtbar.
+        -->
+        <div class="relative isolate overflow-hidden bg-black/50">
+            <img
+                src="{{ url_for('static', filename='events.jpg') }}"
+                alt=""
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-35 blur-xl"
+            >
 
-        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_25%,rgba(137,190,50,0.18),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.20),transparent_48%),linear-gradient(0deg,rgba(0,0,0,0.62),transparent_42%)]"></div>
-        <div class="pointer-events-none absolute inset-x-5 top-5 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-        <div class="pointer-events-none absolute inset-x-5 bottom-5 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/45 to-transparent"></div>
+            <img
+                src="{{ url_for('static', filename='events.jpg') }}"
+                alt="EifelLog Events Banner"
+                class="relative z-10 block h-auto w-full object-contain object-center"
+                loading="eager"
+            >
 
-        <div class="absolute left-5 right-5 bottom-5 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div class="max-w-3xl rounded-2xl border border-white/10 bg-black/45 px-5 py-4 backdrop-blur-md shadow-[0_15px_45px_rgba(0,0,0,0.35)]">
-                <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-2">Gemeinsam unterwegs</p>
-                <h2 class="text-2xl md:text-4xl font-orbitron font-extrabold text-white tracking-tight leading-tight">
-                    Die nächste Tour wartet.
-                    <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
-                </h2>
-                <p class="text-xs md:text-sm text-slate-200/85 mt-3 leading-relaxed font-inter">
-                    Alle Eifel LOG Events, Community-Abende und Konvois werden automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
-                </p>
-            </div>
+            <div class="pointer-events-none absolute inset-0 z-20 bg-[linear-gradient(180deg,rgba(0,0,0,0.05),transparent_58%,rgba(0,0,0,0.24))]"></div>
+            <div class="pointer-events-none absolute inset-x-5 top-5 z-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            <div class="pointer-events-none absolute inset-x-5 bottom-5 z-20 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/45 to-transparent"></div>
+        </div>
 
-            <div class="hidden lg:flex flex-col items-end gap-2 shrink-0">
-                <span class="rounded-full border border-[var(--brand-green)]/35 bg-[var(--brand-green)]/10 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] backdrop-blur-md shadow-[0_0_24px_rgba(137,190,50,0.25)]">Live Event Hub</span>
-                <span class="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-white/80 backdrop-blur-md">Konvois · Community · Touren</span>
+        <!-- Textbereich separat unter dem Banner, damit kein Logo verdeckt wird -->
+        <div class="relative z-30 border-t border-white/10 bg-black/60 px-5 py-5 backdrop-blur-xl md:px-7 md:py-6">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div class="max-w-4xl">
+                    <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-2">Gemeinsam unterwegs</p>
+                    <h2 class="text-2xl md:text-4xl font-orbitron font-extrabold text-white tracking-tight leading-tight">
+                        Die nächste Tour wartet.
+                        <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
+                    </h2>
+                    <p class="text-xs md:text-sm text-slate-200/85 mt-3 leading-relaxed font-inter">
+                        Alle Eifel LOG Events, Community-Abende und Konvois werden automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
+                    <span class="rounded-full border border-[var(--brand-green)]/35 bg-[var(--brand-green)]/10 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] shadow-[0_0_24px_rgba(137,190,50,0.25)]">Live Event Hub</span>
+                    <span class="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-white/80">Konvois · Community · Touren</span>
+                </div>
             </div>
         </div>
     </div>
