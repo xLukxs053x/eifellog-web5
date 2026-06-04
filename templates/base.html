@@ -56,13 +56,6 @@
             /* Allgemeiner Zoom / Layout-Balance */
             --site-max-width: 1280px;
             --nav-max-width: 1280px;
-
-            /*
-                Desktop-Ansicht wie Browser-Zoom 50 %, während der Browser selbst auf 100 % bleibt.
-                Auf Mobilgeräten wird das nicht angewendet, damit Menüs und Buttons bedienbar bleiben.
-            */
-            --desktop-page-zoom: 0.5;
-            --desktop-page-width-compensation: 200%;
         }
 
         /*
@@ -90,43 +83,6 @@
         @media (max-width: 768px) {
             html {
                 font-size: 14px;
-            }
-        }
-
-        /*
-            Desktop-Kompaktmodus:
-            Entspricht optisch ungefähr Browser-Zoom 50 %, aber direkt über base.html.
-            Breite und Mindesthöhe werden verdoppelt, damit nach zoom: 0.5 kein leerer
-            Rand entsteht und fixed Navigation/Footer sauber im sichtbaren Bereich sitzen.
-        */
-        @media (min-width: 1024px) {
-            body {
-                width: var(--desktop-page-width-compensation);
-                min-height: 200vh;
-                zoom: var(--desktop-page-zoom);
-            }
-
-            .hero-bg {
-                width: var(--desktop-page-width-compensation);
-                height: 200vh;
-            }
-
-            .hero-bg .bg-slide,
-            .hero-overlay {
-                width: 100%;
-                height: 100%;
-            }
-        }
-
-        /* Firefox-Fallback, falls zoom nicht unterstützt wird. */
-        @supports not (zoom: 1) {
-            @media (min-width: 1024px) {
-                body {
-                    width: var(--desktop-page-width-compensation);
-                    min-height: 200vh;
-                    transform: scale(var(--desktop-page-zoom));
-                    transform-origin: top left;
-                }
             }
         }
 
@@ -440,60 +396,54 @@
         }
 
 
-        /* === COOKIE CONSENT POPUP & MODAL === */
+        /* === COOKIE CONSENT BANNER & MODAL === */
         .cookie-banner {
             position: fixed;
-            top: 6.6rem;
-            right: max(1rem, calc((100vw - var(--nav-max-width)) / 2 + 1rem));
-            bottom: auto;
-            left: auto;
+            left: 0;
+            right: 0;
+            bottom: 0;
             z-index: 10000;
-            width: min(390px, calc(100vw - 2rem));
-            padding: 0;
+            padding: 1rem;
             pointer-events: none;
             opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
+            transform: translateY(0);
             visibility: visible;
-            transition:
-                opacity 0.34s ease,
-                transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
-                visibility 0s linear 0s;
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
         }
 
         .cookie-banner.is-hidden {
             opacity: 0;
-            transform: translate3d(0, -16px, 0) scale(0.98);
+            transform: translateY(18px);
             visibility: hidden;
-            transition:
-                opacity 0.3s ease,
-                transform 0.3s cubic-bezier(0.4, 0, 1, 1),
-                visibility 0s linear 0.3s;
         }
 
         .cookie-banner-panel {
-            width: 100%;
-            margin: 0;
-            padding: 0.95rem;
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            padding: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
             pointer-events: auto;
-            background: linear-gradient(135deg, rgba(13, 27, 17, 0.97), rgba(4, 10, 6, 0.985));
-            border: 1px solid rgba(137, 190, 50, 0.38);
-            border-radius: 16px;
-            box-shadow: 0 20px 58px rgba(0, 0, 0, 0.72), 0 0 26px rgba(var(--brand-green-rgb), 0.12);
+            background: linear-gradient(135deg, rgba(13, 27, 17, 0.97), rgba(4, 10, 6, 0.98));
+            border: 1px solid rgba(137, 190, 50, 0.35);
+            border-radius: 20px;
+            box-shadow: 0 22px 65px rgba(0, 0, 0, 0.68), 0 0 30px rgba(var(--brand-green-rgb), 0.1);
             backdrop-filter: blur(28px);
             -webkit-backdrop-filter: blur(28px);
         }
 
         .cookie-banner-copy {
-            display: grid;
-            grid-template-columns: 34px minmax(0, 1fr);
-            align-items: start;
-            gap: 0.72rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.9rem;
             min-width: 0;
         }
 
         .cookie-banner-icon {
-            width: 34px;
-            height: 34px;
+            width: 42px;
+            height: 42px;
             flex: 0 0 auto;
             display: flex;
             align-items: center;
@@ -502,7 +452,7 @@
             border: 1px solid rgba(var(--brand-green-rgb), 0.45);
             background: rgba(var(--brand-green-rgb), 0.12);
             color: var(--brand-green);
-            box-shadow: 0 0 16px rgba(var(--brand-green-rgb), 0.13);
+            box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.12);
         }
 
         .cookie-banner-title,
@@ -516,11 +466,6 @@
             text-transform: uppercase;
         }
 
-        .cookie-banner-title {
-            font-size: 10px;
-            letter-spacing: 0.14em;
-        }
-
         .cookie-banner-text,
         .cookie-modal-text {
             margin: 0.42rem 0 0;
@@ -530,49 +475,12 @@
             line-height: 1.65;
         }
 
-        .cookie-banner-text {
-            margin-top: 0.32rem;
-            font-size: 11px;
-            line-height: 1.52;
-        }
-
-        .cookie-banner-details {
-            display: inline-flex;
-            margin-top: 0.48rem;
-            border: 0;
-            padding: 0;
-            background: transparent;
-            color: var(--muted);
-            cursor: pointer;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8px;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            line-height: 1.4;
-            text-transform: uppercase;
-            transition: color 0.24s ease;
-        }
-
-        .cookie-banner-details:hover {
-            color: var(--brand-green);
-        }
-
         .cookie-banner-actions {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 0.5rem;
-            margin-top: 0.82rem;
-        }
-
-        .cookie-banner-actions .btn-primary,
-        .cookie-banner-actions .btn-secondary {
-            width: 100%;
-            min-height: 34px;
-            padding: 9px 10px;
-            border-radius: 10px;
-            font-size: 8px;
-            letter-spacing: 0.1em;
-            white-space: nowrap;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.65rem;
+            flex: 0 0 auto;
         }
 
         .cookie-modal {
@@ -703,38 +611,37 @@
             color: var(--brand-green);
         }
 
+        @media (max-width: 840px) {
+            .cookie-banner-panel {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .cookie-banner-actions {
+                justify-content: stretch;
+            }
+
+            .cookie-banner-actions .btn-primary,
+            .cookie-banner-actions .btn-secondary {
+                flex: 1 1 190px;
+            }
+        }
+
         @media (max-width: 640px) {
             .cookie-banner {
-                top: 5.8rem;
-                right: 0.75rem;
-                width: min(390px, calc(100vw - 1.5rem));
+                padding: 0.75rem;
             }
 
             .cookie-banner-panel,
             .cookie-modal-card {
-                border-radius: 15px;
+                border-radius: 18px;
             }
 
+            .cookie-banner-actions,
             .cookie-modal-actions {
                 flex-direction: column;
             }
         }
-
-        @media (max-width: 390px) {
-            .cookie-banner-actions {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .cookie-banner,
-            .cookie-banner.is-hidden {
-                transform: none;
-                transition-duration: 0.01ms;
-            }
-        }
-
-    
 
     </style>
 
@@ -864,15 +771,8 @@
 
             if (!banner) return;
 
+            banner.classList.remove('is-hidden');
             banner.setAttribute('aria-hidden', 'false');
-
-            // Zwei Frames sorgen dafür, dass das Popup auch beim ersten Laden
-            // garantiert sichtbar einblendet und nicht abrupt erscheint.
-            window.requestAnimationFrame(() => {
-                window.requestAnimationFrame(() => {
-                    banner.classList.remove('is-hidden');
-                });
-            });
         }
 
         function hideCookieBanner() {
@@ -1153,13 +1053,13 @@
 
 
     <!-- ========================================== -->
-    <!-- KOMPAKTES COOKIE POPUP OBEN RECHTS          -->
+    <!-- COOKIE CONSENT BANNER                      -->
     <!-- ========================================== -->
     <section id="cookie-banner" class="cookie-banner is-hidden" aria-label="Cookie-Einstellungen" aria-hidden="true">
         <div class="cookie-banner-panel">
             <div class="cookie-banner-copy">
                 <div class="cookie-banner-icon" aria-hidden="true">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 109 9c0-.34-.02-.67-.06-1A4.5 4.5 0 0116 6.06 4.5 4.5 0 0111.06 3c.31 0 .63 0 .94 0z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 12.5h.01M12 16h.01M15.5 12.5h.01"></path>
                     </svg>
@@ -1168,22 +1068,23 @@
                 <div>
                     <h2 class="cookie-banner-title">Cookie-Freigabe</h2>
                     <p class="cookie-banner-text">
-                        Wir speichern deine Cookie-Auswahl im Browser. Optionale Cookies werden nur nach deiner Zustimmung aktiviert.
+                        Wir verwenden Cookies, um deine Auswahl in diesem Browser zu speichern und die Webseite zuverlässig bereitzustellen.
+                        Du kannst die Details vor deiner Entscheidung öffnen. Deine Auswahl bleibt gespeichert, bis du die Cookies löschst oder einen anderen Browser verwendest.
                     </p>
-
-                    <button type="button" onclick="openCookieDetails()" class="cookie-banner-details">
-                        Details &amp; Einstellungen öffnen
-                    </button>
                 </div>
             </div>
 
             <div class="cookie-banner-actions">
+                <button type="button" onclick="openCookieDetails()" class="btn-secondary">
+                    Details lesen
+                </button>
+
                 <button type="button" onclick="acceptNecessaryCookies()" class="btn-secondary">
                     Nur notwendige
                 </button>
 
                 <button type="button" onclick="acceptAllCookies()" class="btn-primary">
-                    Alle akzeptieren
+                    Cookies akzeptieren
                 </button>
             </div>
         </div>
