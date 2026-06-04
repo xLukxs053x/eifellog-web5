@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "channel": "beta",
+  "releases": [
+    {
+      "version": "1.2.3-beta.1",
+      "name": "EifelLog Tracker 1.2.3 Beta 1",
+      "releaseNotes": "Erste Beta-Version nach Stable 1.2.2.",
+      "pageUrl": "https://www.eifellog.de/tracker/downloads",
+      "draft": false,
+      "prerelease": true,
+      "assets": [
+        {
+          "name": "EifelLog-Tracker-Setup-1.2.3-beta.1.exe"
+        }
+      ]
+    }
+  ]
+}
