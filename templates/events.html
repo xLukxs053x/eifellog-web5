@@ -113,6 +113,29 @@
         color: #f8fafc;
     }
 
+    .events-event-cover {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 6;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        object-fit: cover;
+        background: rgba(0, 0, 0, 0.22);
+    }
+
+    .events-plugin-details summary {
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .events-plugin-details summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .events-plugin-details[open] .events-plugin-chevron {
+        transform: rotate(180deg);
+    }
+
 </style>
 
 <div class="events-shell pb-4">
@@ -273,23 +296,18 @@
         </div>
 
         <!--
-            Unterstützte Antworten von GET /api/events:
-            [
-                {
-                    "title": "...",
-                    "description": "...",
-                    "start_at": "...",
-                    "location": "...",
-                    "category": "...",
-                    "participants": 12,
-                    "url": "..." // optional
-                }
-            ]
+            Die Übersicht ruft GET /api/events mit include=all und expand=... auf.
+            Unterstützt werden Arrays sowie verschachtelte Plugin-Antworten, zum Beispiel:
+            [ ... ], {"events": [...]}, {"upcoming_events": [...]},
+            {"data": {"events": [...]}}, {"plugin": {"scheduled_events": [...]}}.
 
-            Alternativ akzeptiert das Frontend weiterhin:
-            {"events": [...]} und {"upcoming_events": [...]}.
+            Für anstehende Events wird zusätzlich GET /api/events/{id} mit include=all
+            abgefragt, sofern eine Event-ID vorhanden ist. Falls dein Backend eine andere
+            Detailroute nutzt, passe data-detail-endpoint am Container an. Wenn es keine
+            Detailroute gibt, setze data-detail-endpoint="". Die Listen-Antwort bleibt
+            trotzdem vollständig nutzbar.
         -->
-        <div id="events-page-list" data-endpoint="/api/events" class="grid gap-5 lg:grid-cols-2" aria-live="polite" aria-busy="true">
+        <div id="events-page-list" data-endpoint="/api/events" data-detail-endpoint="/api/events/{id}" class="grid gap-5 lg:grid-cols-2" aria-live="polite" aria-busy="true">
             <article class="events-glass rounded-2xl p-6 lg:col-span-2">
                 <p class="font-inter text-sm text-[var(--muted)]">Events werden aus EifelLog geladen …</p>
             </article>
@@ -305,8 +323,6 @@
         const periodSelect = document.getElementById('event-period');
         const refreshButton = document.getElementById('refresh-events');
         const refreshIcon = document.getElementById('refresh-icon');
-        const heroRefreshButton = document.getElementById('hero-refresh-events');
-        const heroRefreshIcon = document.getElementById('hero-refresh-icon');
         const resultCount = document.getElementById('event-result-count');
         const statusBadge = document.getElementById('api-status-badge');
         const statusDot = document.getElementById('api-status-dot');
@@ -315,67 +331,352 @@
         const statTotal = document.getElementById('stat-total');
         const statNextDate = document.getElementById('stat-next-date');
         const statLastSync = document.getElementById('stat-last-sync');
-        const heroNextCountdown = document.getElementById('hero-next-countdown');
-        const heroNextDay = document.getElementById('hero-next-day');
-        const heroNextMonth = document.getElementById('hero-next-month');
-        const heroNextCategory = document.getElementById('hero-next-category');
-        const heroNextTitle = document.getElementById('hero-next-title');
-        const heroNextTime = document.getElementById('hero-next-time');
-        const heroNextLocation = document.getElementById('hero-next-location');
+
+        const COLLECTION_ENDPOINT = eventsContainer?.dataset.endpoint || '/api/events';
+        const DETAIL_ENDPOINT_TEMPLATE = eventsContainer?.dataset.detailEndpoint || '';
+        const EXPAND_FIELDS = 'details,participants,organizer,location,links,metadata';
+        const DETAIL_FETCH_CONCURRENCY = 4;
 
         let events = [];
+        let collectionStats = { total: null, upcoming: null };
         let isLoading = false;
 
-        const normalizeText = (value) => String(value || '').trim();
+        const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+        const normalizeText = (value) => String(value ?? '').trim();
+        const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null && value !== '');
+
+        const readPath = (object, path) => {
+            return String(path)
+                .split('.')
+                .reduce((current, key) => current && typeof current === 'object' ? current[key] : undefined, object);
+        };
+
+        const pick = (object, ...paths) => firstDefined(...paths.map((path) => readPath(object, path)));
+
+        const toNumberOrNull = (value) => {
+            if (typeof value === 'number' && Number.isFinite(value)) {
+                return value;
+            }
+
+            if (typeof value === 'string' && value.trim() !== '') {
+                const number = Number(value);
+                return Number.isFinite(number) ? number : null;
+            }
+
+            return null;
+        };
+
+        const mergeObjects = (...objects) => Object.assign({}, ...objects.filter(isPlainObject));
 
         const parseDate = (value) => {
             if (!value) {
                 return null;
             }
 
-            const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
-                ? `${value}T00:00:00`
-                : value;
+            const stringValue = String(value);
+            const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(stringValue)
+                ? `${stringValue}T00:00:00`
+                : stringValue;
             const date = new Date(normalizedValue);
 
             return Number.isNaN(date.getTime()) ? null : date;
         };
 
-        const getEventStartValue = (event) => {
-            return event.start_at
-                || event.starts_at
-                || event.start_time
-                || event.datetime
-                || event.date
-                || null;
-        };
+        const toAllowedUrl = (value, { sameOriginOnly = false } = {}) => {
+            const normalizedValue = normalizeText(value);
 
-        const getEventDate = (event) => parseDate(getEventStartValue(event));
-        const getEventTitle = (event) => normalizeText(event.title || event.name || 'EifelLog Event');
-        const getEventDescription = (event) => normalizeText(event.description || event.summary || 'Weitere Informationen werden noch bekannt gegeben.');
-        const getEventCategory = (event) => normalizeText(event.category || event.type || 'EifelLog Event');
-        const getEventLocation = (event) => normalizeText(event.location || event.channel_name || 'Eifel LOG Community');
-        const getEventParticipants = (event) => event.participants ?? event.participant_count ?? null;
-
-        const getEventUrl = (event) => {
-            const value = normalizeText(event.url || event.link || event.details_url || event.discord_url || event.registration_url);
-
-            if (!value) {
+            if (!normalizedValue) {
                 return null;
             }
 
             try {
-                const parsedUrl = new URL(value, window.location.origin);
+                const parsedUrl = new URL(normalizedValue, window.location.origin);
                 const isAllowedProtocol = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-                return isAllowedProtocol ? parsedUrl.href : null;
+                const isAllowedOrigin = !sameOriginOnly || parsedUrl.origin === window.location.origin;
+                return isAllowedProtocol && isAllowedOrigin ? parsedUrl.href : null;
             } catch (error) {
                 return null;
             }
         };
 
+        const appendQueryParams = (url, params) => {
+            const parsedUrl = new URL(url, window.location.origin);
+
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    parsedUrl.searchParams.set(key, String(value));
+                }
+            });
+
+            return parsedUrl.href;
+        };
+
+        const getEntityLabel = (value) => {
+            if (Array.isArray(value)) {
+                return value.map(getEntityLabel).filter(Boolean).join(', ');
+            }
+
+            if (isPlainObject(value)) {
+                return normalizeText(firstDefined(
+                    value.display_name,
+                    value.displayName,
+                    value.name,
+                    value.title,
+                    value.username,
+                    value.label,
+                    value.id
+                ));
+            }
+
+            return normalizeText(value);
+        };
+
+        const getParticipantCount = (value) => {
+            if (Array.isArray(value)) {
+                return value.length;
+            }
+
+            if (isPlainObject(value)) {
+                return toNumberOrNull(firstDefined(value.count, value.total, value.current, value.value));
+            }
+
+            return toNumberOrNull(value);
+        };
+
+        const getEventImageUrl = (event) => toAllowedUrl(firstDefined(
+            event.image_url,
+            event.imageUrl,
+            event.banner_url,
+            event.bannerUrl,
+            event.cover_url,
+            event.coverUrl,
+            isPlainObject(event.image) ? firstDefined(event.image.url, event.image.src) : event.image,
+            isPlainObject(event.banner) ? firstDefined(event.banner.url, event.banner.src) : event.banner
+        ));
+
+        const getEventDisplayUrl = (event) => toAllowedUrl(firstDefined(
+            event.url,
+            event.link,
+            event.details_url,
+            event.detailsUrl,
+            event.discord_url,
+            event.discordUrl,
+            event.registration_url,
+            event.registrationUrl,
+            event.external_url,
+            event.externalUrl
+        ));
+
+        const getApiDetailEndpoint = (event) => {
+            const explicitEndpoint = firstDefined(
+                event.api_detail_url,
+                event.apiDetailUrl,
+                event.detail_endpoint,
+                event.detailEndpoint,
+                event.details_endpoint,
+                event.detailsEndpoint,
+                event.event_api_url,
+                event.eventApiUrl,
+                event.links?.api,
+                event._links?.self?.href,
+                event._links?.details?.href
+            );
+
+            if (explicitEndpoint) {
+                return toAllowedUrl(explicitEndpoint, { sameOriginOnly: true });
+            }
+
+            const eventId = normalizeText(firstDefined(event.id, event.event_id, event.eventId, event.uuid));
+
+            if (!DETAIL_ENDPOINT_TEMPLATE || !eventId) {
+                return null;
+            }
+
+            return toAllowedUrl(
+                DETAIL_ENDPOINT_TEMPLATE.replace('{id}', encodeURIComponent(eventId)),
+                { sameOriginOnly: true }
+            );
+        };
+
+        const SENSITIVE_FIELD_PATTERN = /(token|secret|password|authorization|cookie|webhook|api[_-]?key|access[_-]?key|refresh[_-]?key|private[_-]?key)/i;
+        const PERSONAL_LIST_PATTERN = /(participants?|attendees?|members?|users?|registrations?)/i;
+        const ALREADY_RENDERED_FIELDS = new Set([
+            'title', 'name', 'description', 'summary', 'content', 'start_at', 'starts_at', 'start_time',
+            'startAt', 'startsAt', 'startTime', 'scheduled_start_time', 'scheduledStartTime', 'datetime', 'date',
+            'end_at', 'ends_at', 'end_time', 'endAt', 'endsAt', 'endTime', 'scheduled_end_time', 'scheduledEndTime',
+            'time', 'location', 'venue', 'address', 'channel_name', 'channelName', 'category', 'type', 'event_type',
+            'participants', 'participant_count', 'participantCount', 'participants_count', 'member_count', 'user_count',
+            'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'organizer', 'host', 'creator', 'owner',
+            'status', 'state', 'server', 'guild', 'channel', 'voice_channel', 'voiceChannel', 'platform', 'game',
+            'route', 'departure', 'destination', 'meeting_point', 'meetingPoint', 'url', 'link', 'details_url',
+            'detailsUrl', 'discord_url', 'discordUrl', 'registration_url', 'registrationUrl', 'external_url', 'externalUrl',
+            'image', 'image_url', 'imageUrl', 'banner', 'banner_url', 'bannerUrl', 'cover_url', 'coverUrl',
+            'api_detail_url', 'apiDetailUrl', 'detail_endpoint', 'detailEndpoint', 'details_endpoint', 'detailsEndpoint',
+            'event_api_url', 'eventApiUrl', 'attributes', 'details', 'plugin_data', 'pluginData', 'metadata', '_links', 'links'
+        ]);
+
+        const FIELD_LABELS = {
+            id: 'Event-ID',
+            event_id: 'Event-ID',
+            eventId: 'Event-ID',
+            uuid: 'UUID',
+            created_at: 'Erstellt am',
+            createdAt: 'Erstellt am',
+            updated_at: 'Aktualisiert am',
+            updatedAt: 'Aktualisiert am',
+            timezone: 'Zeitzone',
+            timezone_name: 'Zeitzone',
+            locale: 'Sprache',
+            truck: 'LKW',
+            trailer: 'Auflieger',
+            required_dlc: 'Benötigte DLCs',
+            requiredDlc: 'Benötigte DLCs',
+            dlc: 'DLCs',
+            convoy_code: 'Konvoi-Code',
+            convoyCode: 'Konvoi-Code',
+            server_code: 'Server-Code',
+            serverCode: 'Server-Code',
+            duration: 'Dauer',
+            duration_minutes: 'Dauer in Minuten',
+            notes: 'Hinweise',
+            requirements: 'Voraussetzungen',
+            rules: 'Regeln'
+        };
+
+        const prettifyFieldName = (path) => {
+            const fieldName = String(path).split('.').pop();
+
+            if (FIELD_LABELS[fieldName]) {
+                return FIELD_LABELS[fieldName];
+            }
+
+            return fieldName
+                .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                .replace(/[_-]+/g, ' ')
+                .replace(/^./, (character) => character.toUpperCase());
+        };
+
+        const safeStringify = (value) => {
+            try {
+                return JSON.stringify(value);
+            } catch (error) {
+                return '[nicht darstellbar]';
+            }
+        };
+
+        const formatPluginValue = (value) => {
+            if (typeof value === 'boolean') {
+                return value ? 'Ja' : 'Nein';
+            }
+
+            if (Array.isArray(value)) {
+                return value.map((item) => isPlainObject(item) ? safeStringify(item) : normalizeText(item)).join(', ');
+            }
+
+            if (isPlainObject(value)) {
+                return safeStringify(value);
+            }
+
+            return normalizeText(value);
+        };
+
+        const flattenPluginData = (object, prefix = '', depth = 0, target = []) => {
+            if (!isPlainObject(object) || depth > 3) {
+                return target;
+            }
+
+            Object.entries(object).forEach(([key, value]) => {
+                const path = prefix ? `${prefix}.${key}` : key;
+
+                if (SENSITIVE_FIELD_PATTERN.test(path) || ALREADY_RENDERED_FIELDS.has(key)) {
+                    return;
+                }
+
+                if (Array.isArray(value) && PERSONAL_LIST_PATTERN.test(path)) {
+                    return;
+                }
+
+                if (isPlainObject(value)) {
+                    flattenPluginData(value, path, depth + 1, target);
+                    return;
+                }
+
+                if (value === null || value === undefined || value === '') {
+                    return;
+                }
+
+                const formattedValue = formatPluginValue(value);
+
+                if (formattedValue) {
+                    target.push({ label: prettifyFieldName(path), value: formattedValue });
+                }
+            });
+
+            return target;
+        };
+
+        const normalizeEvent = (rawEvent) => {
+            const raw = isPlainObject(rawEvent) ? rawEvent : {};
+            const merged = mergeObjects(
+                raw,
+                raw.attributes,
+                raw.event,
+                raw.details,
+                raw.plugin_data,
+                raw.pluginData,
+                raw.metadata
+            );
+
+            const participantsSource = pick(
+                merged,
+                'participants',
+                'participant_count',
+                'participantCount',
+                'participants_count',
+                'member_count',
+                'user_count',
+                'attendance.count',
+                'registrations.total'
+            );
+
+            const route = getEntityLabel(firstDefined(
+                pick(merged, 'route', 'route_name', 'routeName'),
+                [pick(merged, 'departure', 'from'), pick(merged, 'destination', 'to')].filter(Boolean).join(' → ')
+            ));
+
+            return {
+                _raw: merged,
+                id: normalizeText(pick(merged, 'id', 'event_id', 'eventId', 'uuid')),
+                title: normalizeText(pick(merged, 'title', 'name', 'event_name', 'eventName')) || 'EifelLog Event',
+                description: normalizeText(pick(merged, 'description', 'summary', 'content', 'details.description')) || 'Weitere Informationen werden noch bekannt gegeben.',
+                category: normalizeText(pick(merged, 'category', 'type', 'event_type', 'eventType')) || 'EifelLog Event',
+                startAt: pick(merged, 'start_at', 'starts_at', 'start_time', 'startAt', 'startsAt', 'startTime', 'scheduled_start_time', 'scheduledStartTime', 'datetime', 'date'),
+                endAt: pick(merged, 'end_at', 'ends_at', 'end_time', 'endAt', 'endsAt', 'endTime', 'scheduled_end_time', 'scheduledEndTime'),
+                timeLabel: normalizeText(pick(merged, 'time', 'time_label', 'timeLabel')),
+                location: getEntityLabel(pick(merged, 'location', 'venue', 'address', 'channel_name', 'channelName', 'channel.name')) || 'Eifel LOG Community',
+                participants: getParticipantCount(participantsSource),
+                maxParticipants: toNumberOrNull(pick(merged, 'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'attendance.capacity')),
+                organizer: getEntityLabel(pick(merged, 'organizer', 'host', 'creator', 'owner', 'created_by', 'createdBy')),
+                status: getEntityLabel(pick(merged, 'status', 'state')),
+                server: getEntityLabel(pick(merged, 'server', 'guild', 'guild_name', 'guildName')),
+                channel: getEntityLabel(pick(merged, 'voice_channel', 'voiceChannel', 'channel')),
+                platform: getEntityLabel(pick(merged, 'platform')),
+                game: getEntityLabel(pick(merged, 'game')),
+                meetingPoint: getEntityLabel(pick(merged, 'meeting_point', 'meetingPoint', 'meeting_location', 'meetingLocation')),
+                route,
+                url: getEventDisplayUrl(merged),
+                imageUrl: getEventImageUrl(merged),
+                detailEndpoint: getApiDetailEndpoint(merged),
+                extraData: flattenPluginData(merged)
+            };
+        };
+
+        const getEventDate = (event) => parseDate(event.startAt);
+        const getEventEndDate = (event) => parseDate(event.endAt);
+
         const isPastEvent = (event) => {
-            const date = getEventDate(event);
-            return date ? date.getTime() < Date.now() : false;
+            const comparisonDate = getEventEndDate(event) || getEventDate(event);
+            return comparisonDate ? comparisonDate.getTime() < Date.now() : false;
         };
 
         const formatDate = (event, includeYear = true) => {
@@ -393,19 +694,39 @@
             }).format(date);
         };
 
+        const formatTimeFromDate = (date) => {
+            return new Intl.DateTimeFormat('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
+
         const formatTime = (event) => {
-            if (event.time) {
-                return normalizeText(event.time);
+            if (event.timeLabel) {
+                return event.timeLabel;
             }
 
-            const value = getEventStartValue(event);
             const date = getEventDate(event);
 
-            if (!date || !value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            if (!date || !event.startAt || /^\d{4}-\d{2}-\d{2}$/.test(String(event.startAt))) {
                 return 'Uhrzeit folgt';
             }
 
+            return `${formatTimeFromDate(date)} Uhr`;
+        };
+
+        const formatEnd = (event) => {
+            const date = getEventEndDate(event);
+
+            if (!date) {
+                return '';
+            }
+
             return new Intl.DateTimeFormat('de-DE', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
             }).format(date);
@@ -476,17 +797,57 @@
         const createMetaItem = (svgPath, label) => {
             const wrapper = createElement('div', 'flex min-w-0 items-center gap-2');
             const icon = createIcon(svgPath, 'h-4 w-4 shrink-0 text-[var(--brand-green)]');
-            const text = createElement('span', 'truncate', label);
+            const text = createElement('span', 'min-w-0 break-words', label);
             wrapper.append(icon, text);
             return wrapper;
         };
 
+        const appendOptionalMeta = (container, svgPath, label) => {
+            if (normalizeText(label)) {
+                container.appendChild(createMetaItem(svgPath, label));
+            }
+        };
+
+        const createPluginDetails = (event) => {
+            if (!event.extraData.length) {
+                return null;
+            }
+
+            const details = createElement('details', 'events-plugin-details mt-5 rounded-xl border border-white/10 bg-black/15 px-4 py-3');
+            const summary = createElement('summary', 'flex items-center justify-between gap-3 font-orbitron text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-yellow)]');
+            const summaryText = createElement('span', '', `Weitere Plugin-Informationen (${event.extraData.length})`);
+            const chevron = createIcon('M19 9l-7 7-7-7', 'events-plugin-chevron h-4 w-4 shrink-0 transition-transform');
+            summary.append(summaryText, chevron);
+
+            const list = createElement('dl', 'mt-4 grid gap-3 border-t border-white/5 pt-4 sm:grid-cols-2');
+            event.extraData.forEach(({ label, value }) => {
+                const item = createElement('div', 'min-w-0 rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2');
+                const term = createElement('dt', 'font-orbitron text-[8px] font-extrabold uppercase tracking-wider text-[var(--muted)]', label);
+                const description = createElement('dd', 'mt-1 break-words font-inter text-xs leading-relaxed text-[var(--text)]', value);
+                item.append(term, description);
+                list.appendChild(item);
+            });
+
+            details.append(summary, list);
+            return details;
+        };
+
         const createEventCard = (event) => {
             const card = createElement('article', 'events-event-card rounded-[1.35rem] p-5 md:p-6 flex flex-col');
+
+            if (event.imageUrl) {
+                const image = document.createElement('img');
+                image.src = event.imageUrl;
+                image.alt = `Eventbild: ${event.title}`;
+                image.loading = 'lazy';
+                image.className = 'events-event-cover mb-5';
+                card.appendChild(image);
+            }
+
             const topRow = createElement('div', 'flex items-start justify-between gap-4');
             const topContent = createElement('div', 'min-w-0');
-            const category = createElement('p', 'font-orbitron text-[8px] font-extrabold uppercase tracking-[0.18em] text-[var(--brand-green)]', getEventCategory(event));
-            const title = createElement('h3', 'mt-2 break-words font-orbitron text-lg font-extrabold leading-snug tracking-wide text-[var(--text)]', getEventTitle(event));
+            const category = createElement('p', 'font-orbitron text-[8px] font-extrabold uppercase tracking-[0.18em] text-[var(--brand-green)]', event.category);
+            const title = createElement('h3', 'mt-2 break-words font-orbitron text-lg font-extrabold leading-snug tracking-wide text-[var(--text)]', event.title);
             topContent.append(category, title);
 
             const dateBox = createElement('div', 'w-[4.75rem] shrink-0 rounded-2xl border border-[var(--brand-yellow)]/25 bg-[var(--brand-yellow)]/10 px-2 py-3 text-center');
@@ -497,20 +858,34 @@
             dateBox.append(day, month, year);
             topRow.append(topContent, dateBox);
 
-            const description = createElement('p', 'mt-5 flex-grow border-t border-white/5 pt-4 font-inter text-sm leading-relaxed text-[var(--muted)]', getEventDescription(event));
+            const description = createElement('p', 'mt-5 flex-grow border-t border-white/5 pt-4 font-inter text-sm leading-relaxed text-[var(--muted)]', event.description);
             const meta = createElement('div', 'mt-5 grid gap-x-4 gap-y-3 border-t border-white/5 pt-4 font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)] sm:grid-cols-2');
 
             meta.append(
                 createMetaItem('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', formatDate(event)),
                 createMetaItem('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', formatTime(event)),
-                createMetaItem('M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', getEventLocation(event))
+                createMetaItem('M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', event.location)
             );
 
-            const participants = getEventParticipants(event);
-            if (participants !== null && participants !== '') {
-                meta.append(createMetaItem('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', `${participants} Teilnehmer`));
+            appendOptionalMeta(meta, 'M5 12h14M12 5l7 7-7 7', formatEnd(event) ? `Ende: ${formatEnd(event)}` : '');
+
+            if (event.participants !== null) {
+                const participantText = event.maxParticipants !== null
+                    ? `${event.participants} / ${event.maxParticipants} Teilnehmer`
+                    : `${event.participants} Teilnehmer`;
+                appendOptionalMeta(meta, 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', participantText);
             }
 
+            appendOptionalMeta(meta, 'M5.121 17.804A13.936 13.936 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z', event.organizer ? `Organisation: ${event.organizer}` : '');
+            appendOptionalMeta(meta, 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', event.status ? `Status: ${event.status}` : '');
+            appendOptionalMeta(meta, 'M8 9l4-4 4 4m-8 6l4 4 4-4', event.route ? `Route: ${event.route}` : '');
+            appendOptionalMeta(meta, 'M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3-1.12 3-2.5S13.657 8 12 8zm0 13s7-4.35 7-10a7 7 0 10-14 0c0 5.65 7 10 7 10z', event.meetingPoint ? `Treffpunkt: ${event.meetingPoint}` : '');
+            appendOptionalMeta(meta, 'M5 12h14M12 5l7 7-7 7', event.server ? `Server: ${event.server}` : '');
+            appendOptionalMeta(meta, 'M8 12h8m-4-4v8', event.channel ? `Kanal: ${event.channel}` : '');
+            appendOptionalMeta(meta, 'M12 18h.01M8.2 15.8a5.4 5.4 0 017.6 0M5.4 13a9.3 9.3 0 0113.2 0M2.6 10.2a13.2 13.2 0 0118.8 0', event.platform ? `Plattform: ${event.platform}` : '');
+            appendOptionalMeta(meta, 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z', event.game ? `Spiel: ${event.game}` : '');
+
+            const pluginDetails = createPluginDetails(event);
             const footer = createElement('div', 'mt-5 flex flex-wrap items-center justify-between gap-3');
             const state = createElement(
                 'span',
@@ -521,17 +896,22 @@
             );
             footer.appendChild(state);
 
-            const eventUrl = getEventUrl(event);
-            if (eventUrl) {
+            if (event.url) {
                 const link = createElement('a', 'inline-flex items-center gap-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:text-white', 'Details ansehen');
-                link.href = eventUrl;
+                link.href = event.url;
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
                 link.appendChild(createIcon('M14 3h7m0 0v7m0-7L10 14m-3-7H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2', 'h-3.5 w-3.5'));
                 footer.appendChild(link);
             }
 
-            card.append(topRow, description, meta, footer);
+            card.append(topRow, description, meta);
+
+            if (pluginDetails) {
+                card.appendChild(pluginDetails);
+            }
+
+            card.appendChild(footer);
             return card;
         };
 
@@ -555,12 +935,21 @@
                 const matchesPeriod = period === 'all'
                     || (period === 'past' && isPast)
                     || (period === 'upcoming' && !isPast);
-                const matchesCategory = category === 'all' || getEventCategory(event) === category;
+                const matchesCategory = category === 'all' || event.category === category;
                 const haystack = [
-                    getEventTitle(event),
-                    getEventDescription(event),
-                    getEventCategory(event),
-                    getEventLocation(event)
+                    event.title,
+                    event.description,
+                    event.category,
+                    event.location,
+                    event.organizer,
+                    event.status,
+                    event.server,
+                    event.channel,
+                    event.platform,
+                    event.game,
+                    event.route,
+                    event.meetingPoint,
+                    ...event.extraData.flatMap(({ label, value }) => [label, value])
                 ].join(' ').toLocaleLowerCase('de-DE');
                 const matchesQuery = !query || haystack.includes(query);
 
@@ -574,7 +963,7 @@
             }
 
             const currentValue = categorySelect.value;
-            const categories = [...new Set(events.map(getEventCategory))]
+            const categories = [...new Set(events.map((event) => event.category))]
                 .filter(Boolean)
                 .sort((a, b) => a.localeCompare(b, 'de-DE'));
 
@@ -594,55 +983,21 @@
             categorySelect.value = categories.includes(currentValue) ? currentValue : 'all';
         };
 
-        const updateHeroNextEvent = (event) => {
-            const date = event ? getEventDate(event) : null;
-
-            if (heroNextCountdown) {
-                heroNextCountdown.textContent = event ? getCountdownLabel(event) : 'Kein Termin';
-            }
-
-            if (heroNextDay) {
-                heroNextDay.textContent = date ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(date) : '–';
-            }
-
-            if (heroNextMonth) {
-                heroNextMonth.textContent = date ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(date) : 'Termin';
-            }
-
-            if (heroNextCategory) {
-                heroNextCategory.textContent = event ? getEventCategory(event) : 'Event Hub';
-            }
-
-            if (heroNextTitle) {
-                heroNextTitle.textContent = event ? getEventTitle(event) : 'Aktuell ist kein Event geplant';
-            }
-
-            if (heroNextTime) {
-                heroNextTime.textContent = event ? formatTime(event) : 'Uhrzeit folgt';
-            }
-
-            if (heroNextLocation) {
-                heroNextLocation.textContent = event ? getEventLocation(event) : 'Eifel LOG Community';
-            }
-        };
-
         const updateStats = () => {
             const upcomingEvents = sortEvents(events.filter((event) => !isPastEvent(event)));
             const nextEvent = upcomingEvents[0] || null;
 
             if (statUpcoming) {
-                statUpcoming.textContent = String(upcomingEvents.length);
+                statUpcoming.textContent = String(collectionStats.upcoming ?? upcomingEvents.length);
             }
 
             if (statTotal) {
-                statTotal.textContent = String(events.length);
+                statTotal.textContent = String(collectionStats.total ?? events.length);
             }
 
             if (statNextDate) {
                 statNextDate.textContent = nextEvent ? formatDate(nextEvent, false) : 'Kein Termin';
             }
-
-            updateHeroNextEvent(nextEvent);
         };
 
         const renderEvents = () => {
@@ -678,17 +1033,13 @@
                 eventsContainer.setAttribute('aria-busy', loading ? 'true' : 'false');
             }
 
-            [refreshButton, heroRefreshButton].forEach((button) => {
-                if (!button) {
-                    return;
-                }
+            if (refreshButton) {
+                refreshButton.disabled = loading;
+                refreshButton.classList.toggle('opacity-60', loading);
+                refreshButton.classList.toggle('cursor-not-allowed', loading);
+            }
 
-                button.disabled = loading;
-                button.classList.toggle('opacity-60', loading);
-                button.classList.toggle('cursor-not-allowed', loading);
-            });
-
-            [refreshIcon, heroRefreshIcon].forEach((icon) => icon?.classList.toggle('animate-spin', loading));
+            refreshIcon?.classList.toggle('animate-spin', loading);
         };
 
         const setApiStatus = (type, label) => {
@@ -716,6 +1067,137 @@
             statusDot.classList.add('animate-pulse', 'bg-[var(--brand-green)]');
         };
 
+        const fetchJson = async (url) => {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Event API returned ${response.status} for ${url}`);
+            }
+
+            return response.json();
+        };
+
+        const extractEvents = (payload) => {
+            if (Array.isArray(payload)) {
+                return payload;
+            }
+
+            const possiblePaths = [
+                'events',
+                'upcoming_events',
+                'upcomingEvents',
+                'scheduled_events',
+                'scheduledEvents',
+                'items',
+                'results',
+                'data.events',
+                'data.upcoming_events',
+                'data.upcomingEvents',
+                'data.scheduled_events',
+                'data.scheduledEvents',
+                'data.items',
+                'plugin.events',
+                'plugin.upcoming_events',
+                'plugin.upcomingEvents',
+                'plugin.scheduled_events',
+                'plugin.scheduledEvents'
+            ];
+
+            for (const path of possiblePaths) {
+                const value = readPath(payload, path);
+
+                if (Array.isArray(value)) {
+                    return value;
+                }
+            }
+
+            return [];
+        };
+
+        const extractSingleEvent = (payload) => {
+            if (!isPlainObject(payload)) {
+                return null;
+            }
+
+            const possibleValues = [
+                payload.event,
+                payload.data?.event,
+                payload.data,
+                payload.details,
+                payload
+            ];
+
+            return possibleValues.find(isPlainObject) || null;
+        };
+
+        const extractCollectionStats = (payload) => {
+            if (!isPlainObject(payload)) {
+                return { total: null, upcoming: null };
+            }
+
+            return {
+                total: toNumberOrNull(pick(payload, 'total', 'total_count', 'totalCount', 'count', 'stats.total', 'meta.total')),
+                upcoming: toNumberOrNull(pick(payload, 'upcoming', 'upcoming_count', 'upcomingCount', 'stats.upcoming', 'meta.upcoming'))
+            };
+        };
+
+        const mergeDetailedEvent = (summary, detail) => {
+            if (!isPlainObject(detail)) {
+                return summary;
+            }
+
+            return mergeObjects(
+                summary,
+                detail,
+                isPlainObject(summary.details) ? summary.details : {},
+                isPlainObject(detail.details) ? detail.details : {},
+                { details: mergeObjects(summary.details, detail.details) }
+            );
+        };
+
+        const mapWithConcurrency = async (items, concurrency, callback) => {
+            const results = new Array(items.length);
+            let nextIndex = 0;
+
+            const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+                while (nextIndex < items.length) {
+                    const currentIndex = nextIndex;
+                    nextIndex += 1;
+                    results[currentIndex] = await callback(items[currentIndex], currentIndex);
+                }
+            });
+
+            await Promise.all(workers);
+            return results;
+        };
+
+        const enrichUpcomingEvents = async (rawEvents) => {
+            return mapWithConcurrency(rawEvents, DETAIL_FETCH_CONCURRENCY, async (rawEvent) => {
+                const normalizedEvent = normalizeEvent(rawEvent);
+
+                if (isPastEvent(normalizedEvent) || !normalizedEvent.detailEndpoint) {
+                    return rawEvent;
+                }
+
+                try {
+                    const detailUrl = appendQueryParams(normalizedEvent.detailEndpoint, {
+                        include: 'all',
+                        expand: EXPAND_FIELDS
+                    });
+                    const detailPayload = await fetchJson(detailUrl);
+                    return mergeDetailedEvent(rawEvent, extractSingleEvent(detailPayload));
+                } catch (error) {
+                    console.debug('Event-Detaildaten konnten nicht ergänzt werden:', error);
+                    return rawEvent;
+                }
+            });
+        };
+
         const loadEvents = async () => {
             if (!eventsContainer || isLoading) {
                 return;
@@ -725,26 +1207,17 @@
             setApiStatus('loading', 'Event-Sync läuft');
 
             try {
-                const response = await fetch(eventsContainer.dataset.endpoint, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    credentials: 'same-origin'
+                const collectionUrl = appendQueryParams(COLLECTION_ENDPOINT, {
+                    include: 'all',
+                    expand: EXPAND_FIELDS
                 });
+                const payload = await fetchJson(collectionUrl);
+                const rawEvents = extractEvents(payload)
+                    .filter((event) => event && typeof event === 'object');
+                const enrichedEvents = await enrichUpcomingEvents(rawEvents);
 
-                if (!response.ok) {
-                    throw new Error(`Event API returned ${response.status}`);
-                }
-
-                const payload = await response.json();
-                const rawEvents = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload.events)
-                        ? payload.events
-                        : Array.isArray(payload.upcoming_events)
-                            ? payload.upcoming_events
-                            : [];
-
-                events = sortEvents(rawEvents.filter((event) => event && typeof event === 'object'));
+                events = sortEvents(enrichedEvents.map(normalizeEvent));
+                collectionStats = extractCollectionStats(payload);
                 populateCategories();
                 updateStats();
                 renderEvents();
@@ -762,6 +1235,7 @@
             } catch (error) {
                 console.error('Events konnten nicht geladen werden:', error);
                 events = [];
+                collectionStats = { total: null, upcoming: null };
                 populateCategories();
                 updateStats();
                 eventsContainer.replaceChildren(createStateCard(
@@ -787,7 +1261,6 @@
         categorySelect?.addEventListener('change', renderEvents);
         periodSelect?.addEventListener('change', renderEvents);
         refreshButton?.addEventListener('click', loadEvents);
-        heroRefreshButton?.addEventListener('click', loadEvents);
 
         loadEvents();
         window.setInterval(loadEvents, 300000);
