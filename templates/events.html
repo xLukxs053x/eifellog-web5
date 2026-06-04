@@ -1,191 +1,301 @@
 {% extends "base.html" %}
 
-{% block title %}EifelLog - Events{% endblock %}
+{% block title %}EifelLog - Events & Konvois{% endblock %}
 
 {% block content %}
-<!-- Events Hero -->
-<section class="mb-10 mt-10" aria-labelledby="events-page-title">
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 pb-4 mb-4">
-        <div>
-            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase">Eifel LOG Community</span>
-            <h1 id="events-page-title" class="text-3xl md:text-4xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
-                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-12 h-12 shrink-0 rounded-full object-contain bg-black/45 p-1 border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
-                Events &amp; Konvois
-            </h1>
-        </div>
+<style>
+    .events-shell {
+        --events-green: var(--brand-green, #89be32);
+        --events-yellow: var(--brand-yellow, #d4e51a);
+        position: relative;
+        isolation: isolate;
+    }
 
-        <div class="flex flex-wrap items-center gap-3">
-            <span id="api-status-badge" class="px-4 py-2 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2 shadow-[0_0_15px_rgba(137,190,50,0.2)]">
-                <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] animate-pulse"></span>
-                <span id="api-status-label">Event-Sync startet</span>
-            </span>
+    .events-shell::before,
+    .events-shell::after {
+        content: "";
+        position: fixed;
+        z-index: -1;
+        pointer-events: none;
+        border-radius: 999px;
+        filter: blur(90px);
+        opacity: 0.14;
+    }
 
-            <a href="/" class="btn-secondary inline-flex items-center justify-center">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 mr-2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
-                </svg>
-                Zur Startseite
-            </a>
-        </div>
-    </div>
+    .events-shell::before {
+        width: 22rem;
+        height: 22rem;
+        top: 8rem;
+        right: -7rem;
+        background: var(--events-green);
+    }
 
-    <div class="relative overflow-hidden rounded-[2rem] border border-[var(--brand-green)]/25 bg-black/45 shadow-[0_22px_80px_rgba(0,0,0,0.45)] group">
-        <!--
-            Das Banner wird nicht mehr mit object-cover beschnitten.
-            Dadurch bleiben das EifelLog-Logo und der komplette Schriftzug auf allen Bildschirmgrößen sichtbar.
-        -->
-        <div class="relative isolate overflow-hidden bg-black/50">
-            <img
-                src="{{ url_for('static', filename='events.jpg') }}"
-                alt=""
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-35 blur-xl"
-            >
+    .events-shell::after {
+        width: 18rem;
+        height: 18rem;
+        bottom: 3rem;
+        left: -8rem;
+        background: var(--events-yellow);
+        opacity: 0.08;
+    }
 
-            <img
-                src="{{ url_for('static', filename='events.jpg') }}"
-                alt="EifelLog Events Banner"
-                class="relative z-10 block h-auto w-full object-contain object-center"
-                loading="eager"
-            >
+    .events-glass {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(145deg, rgba(14, 20, 15, 0.9), rgba(4, 7, 5, 0.76));
+        box-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(18px);
+    }
 
-            <div class="pointer-events-none absolute inset-0 z-20 bg-[linear-gradient(180deg,rgba(0,0,0,0.05),transparent_58%,rgba(0,0,0,0.24))]"></div>
-            <div class="pointer-events-none absolute inset-x-5 top-5 z-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-            <div class="pointer-events-none absolute inset-x-5 bottom-5 z-20 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/45 to-transparent"></div>
-        </div>
+    .events-hero {
+        aspect-ratio: 1869 / 322;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        background: transparent;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+    }
 
-        <!-- Textbereich separat unter dem Banner, damit kein Logo verdeckt wird -->
-        <div class="relative z-30 border-t border-white/10 bg-black/60 px-5 py-5 backdrop-blur-xl md:px-7 md:py-6">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div class="max-w-4xl">
-                    <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-2">Gemeinsam unterwegs</p>
-                    <h2 class="text-2xl md:text-4xl font-orbitron font-extrabold text-white tracking-tight leading-tight">
-                        Die nächste Tour wartet.
-                        <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
-                    </h2>
-                    <p class="text-xs md:text-sm text-slate-200/85 mt-3 leading-relaxed font-inter">
-                        Alle Eifel LOG Events, Community-Abende und Konvois werden automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
-                    </p>
-                </div>
+    .events-hero-image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        opacity: 1;
+        filter: none;
+    }
 
-                <div class="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
-                    <span class="rounded-full border border-[var(--brand-green)]/35 bg-[var(--brand-green)]/10 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] shadow-[0_0_24px_rgba(137,190,50,0.25)]">Live Event Hub</span>
-                    <span class="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-white/80">Konvois · Community · Touren</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+    .events-stat-card,
+    .events-event-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(145deg, rgba(20, 27, 21, 0.86), rgba(5, 9, 6, 0.78));
+        box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(16px);
+    }
 
-<!-- Event Kennzahlen -->
-<section class="mb-8" aria-label="Event-Übersicht">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <article class="info-card p-5">
-            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Anstehende Events</p>
-            <p id="stat-upcoming" class="text-3xl font-orbitron font-bold text-[var(--brand-green)] mt-3">–</p>
-        </article>
+    .events-stat-card::before,
+    .events-event-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 2px;
+        background: linear-gradient(180deg, transparent, var(--events-green), transparent);
+        opacity: 0.9;
+    }
 
-        <article class="info-card p-5">
-            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Events insgesamt</p>
-            <p id="stat-total" class="text-3xl font-orbitron font-bold text-[var(--text)] mt-3">–</p>
-        </article>
+    .events-event-card {
+        transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
 
-        <article class="info-card p-5">
-            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Nächster Termin</p>
-            <p id="stat-next-date" class="text-lg font-orbitron font-bold text-[var(--brand-yellow)] mt-3">Wird geladen</p>
-        </article>
+    .events-event-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(137, 190, 50, 0.4);
+        box-shadow: 0 22px 52px rgba(0, 0, 0, 0.34), 0 0 30px rgba(137, 190, 50, 0.08);
+    }
 
-        <article class="info-card p-5">
-            <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.16em] uppercase">Letzte Synchronisierung</p>
-            <p id="stat-last-sync" class="text-sm font-orbitron font-bold text-[var(--text)] mt-3">Noch nicht geladen</p>
-        </article>
-    </div>
-</section>
+    .events-input {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.11);
+        border-radius: 0.9rem;
+        background: rgba(0, 0, 0, 0.26);
+        color: var(--text);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
 
-<!-- Filter -->
-<section class="mb-8" aria-labelledby="event-filter-title">
-    <article class="info-card p-5 md:p-6">
-        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+    .events-input:focus {
+        border-color: rgba(137, 190, 50, 0.62);
+        background: rgba(0, 0, 0, 0.34);
+        box-shadow: 0 0 0 3px rgba(137, 190, 50, 0.12);
+    }
+
+    .events-input option {
+        background: #0b110d;
+        color: #f8fafc;
+    }
+
+</style>
+
+<div class="events-shell pb-4">
+    <!-- Seitenkopf -->
+    <section class="mb-5 mt-8 md:mt-10" aria-labelledby="events-page-title">
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="font-orbitron text-[8px] font-bold text-[var(--brand-green)] tracking-[0.16em] uppercase mb-1">Event-Navigation</p>
-                <h2 id="event-filter-title" class="text-xl font-orbitron font-bold text-[var(--text)] tracking-wide">Events durchsuchen</h2>
+                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.24em] text-[var(--brand-yellow)]">Eifel LOG Community</p>
+                <h1 id="events-page-title" class="mt-2 flex items-center gap-3 font-orbitron text-3xl font-extrabold tracking-tight text-[var(--text)] md:text-4xl">
+                    <img
+                        src="{{ url_for('static', filename='eifellog.jpg') }}"
+                        alt="Eifel LOG Logo"
+                        class="h-12 w-12 shrink-0 rounded-full border border-[var(--brand-green)]/50 bg-black/55 object-contain p-1 shadow-[0_0_24px_rgba(137,190,50,0.3)]"
+                    >
+                    Events &amp; Konvois
+                </h1>
             </div>
 
-            <button id="refresh-events" type="button" class="btn-secondary inline-flex items-center justify-center shrink-0">
-                <svg id="refresh-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 mr-2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                Neu laden
-            </button>
+            <div class="flex flex-wrap items-center gap-3">
+                <span id="api-status-badge" class="flex items-center gap-2 rounded-full border border-[var(--brand-yellow)]/30 bg-[var(--brand-yellow)]/10 px-4 py-2 font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--brand-yellow)] backdrop-blur-md">
+                    <span id="api-status-dot" class="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-yellow)]"></span>
+                    <span id="api-status-label">Event-Sync startet</span>
+                </span>
+
+                <a href="/" class="btn-secondary inline-flex items-center justify-center">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="mr-2 h-4 w-4" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Zur Startseite
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Event-Banner ohne Overlays: events.jpg bleibt vollständig sichtbar -->
+    <section class="events-hero relative mb-7 overflow-hidden rounded-[2rem]" aria-label="EifelLog Events">
+        <img
+            src="{{ url_for('static', filename='events.jpg') }}"
+            alt="EifelLog Events"
+            class="events-hero-image"
+            loading="eager"
+        >
+    </section>
+
+    <!-- Kennzahlen -->
+    <section class="mb-8" aria-label="Event-Übersicht">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <article class="events-stat-card rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">Anstehende Events</p>
+                    <span class="rounded-full border border-[var(--brand-green)]/25 bg-[var(--brand-green)]/10 p-2 text-[var(--brand-green)]">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </span>
+                </div>
+                <p id="stat-upcoming" class="mt-4 font-orbitron text-3xl font-extrabold text-[var(--brand-green)]">–</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Bereit für die nächste gemeinsame Strecke.</p>
+            </article>
+
+            <article class="events-stat-card rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">Events insgesamt</p>
+                    <span class="rounded-full border border-white/10 bg-white/5 p-2 text-white/75">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0a2 2 0 104 0m-4 0a2 2 0 114 0m-4 8l2 2 4-4"></path>
+                        </svg>
+                    </span>
+                </div>
+                <p id="stat-total" class="mt-4 font-orbitron text-3xl font-extrabold text-[var(--text)]">–</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Alle gespeicherten Community-Termine.</p>
+            </article>
+
+            <article class="events-stat-card rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">Nächster Termin</p>
+                    <span class="rounded-full border border-[var(--brand-yellow)]/25 bg-[var(--brand-yellow)]/10 p-2 text-[var(--brand-yellow)]">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </span>
+                </div>
+                <p id="stat-next-date" class="mt-4 font-orbitron text-lg font-extrabold text-[var(--brand-yellow)]">Wird geladen</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Der nächste geplante Treffpunkt.</p>
+            </article>
+
+            <article class="events-stat-card rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">Letzte Synchronisierung</p>
+                    <span class="rounded-full border border-white/10 bg-white/5 p-2 text-white/75">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </span>
+                </div>
+                <p id="stat-last-sync" class="mt-4 font-orbitron text-sm font-extrabold text-[var(--text)]">Noch nicht geladen</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Automatischer Abgleich alle fünf Minuten.</p>
+            </article>
+        </div>
+    </section>
+
+    <!-- Filter -->
+    <section class="mb-8" aria-labelledby="event-filter-title">
+        <article class="events-glass rounded-[1.5rem] p-5 md:p-6">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)]">Event-Navigation</p>
+                    <h2 id="event-filter-title" class="mt-2 font-orbitron text-xl font-extrabold tracking-wide text-[var(--text)]">Finde deinen nächsten Termin</h2>
+                    <p class="mt-2 font-inter text-sm text-[var(--muted)]">Suche nach Titel, Ort oder Kategorie und grenze die Übersicht gezielt ein.</p>
+                </div>
+
+                <button id="refresh-events" type="button" class="btn-secondary inline-flex shrink-0 items-center justify-center">
+                    <svg id="refresh-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="mr-2 h-4 w-4" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Neu laden
+                </button>
+            </div>
+
+            <div class="mt-6 grid gap-4 md:grid-cols-3">
+                <label class="block">
+                    <span class="mb-2 block font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">Suche</span>
+                    <span class="relative block">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--brand-green)]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.35-5.15a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"></path>
+                        </svg>
+                        <input id="event-search" type="search" autocomplete="off" placeholder="Titel, Beschreibung oder Ort" class="events-input py-3 pl-11 pr-4 font-inter text-sm placeholder:text-[var(--muted)]/65">
+                    </span>
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">Kategorie</span>
+                    <select id="event-category" class="events-input px-4 py-3 font-inter text-sm">
+                        <option value="all">Alle Kategorien</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">Zeitraum</span>
+                    <select id="event-period" class="events-input px-4 py-3 font-inter text-sm">
+                        <option value="upcoming">Nur anstehende Events</option>
+                        <option value="all">Alle Events</option>
+                        <option value="past">Vergangene Events</option>
+                    </select>
+                </label>
+            </div>
+        </article>
+    </section>
+
+    <!-- Eventliste -->
+    <section class="mb-16 scroll-mt-5" aria-labelledby="event-list-title">
+        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--brand-yellow)]">EifelLog API</p>
+                <h2 id="event-list-title" class="mt-2 font-orbitron text-2xl font-extrabold tracking-wide text-[var(--text)] md:text-3xl">Eventübersicht</h2>
+            </div>
+            <p id="event-result-count" class="font-orbitron text-[10px] uppercase tracking-wider text-[var(--muted)]">Events werden geladen</p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-4 mt-5">
-            <label class="block">
-                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Suche</span>
-                <input id="event-search"
-                       type="search"
-                       autocomplete="off"
-                       placeholder="Titel, Beschreibung oder Ort"
-                       class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/70 outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
-            </label>
+        <!--
+            Unterstützte Antworten von GET /api/events:
+            [
+                {
+                    "title": "...",
+                    "description": "...",
+                    "start_at": "...",
+                    "location": "...",
+                    "category": "...",
+                    "participants": 12,
+                    "url": "..." // optional
+                }
+            ]
 
-            <label class="block">
-                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Kategorie</span>
-                <select id="event-category"
-                        class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
-                    <option value="all">Alle Kategorien</option>
-                </select>
-            </label>
-
-            <label class="block">
-                <span class="block text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Zeitraum</span>
-                <select id="event-period"
-                        class="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[var(--brand-green)]/50 focus:ring-1 focus:ring-[var(--brand-green)]/30">
-                    <option value="upcoming">Nur anstehende Events</option>
-                    <option value="all">Alle Events</option>
-                    <option value="past">Vergangene Events</option>
-                </select>
-            </label>
+            Alternativ akzeptiert das Frontend weiterhin:
+            {"events": [...]} und {"upcoming_events": [...]}.
+        -->
+        <div id="events-page-list" data-endpoint="/api/events" class="grid gap-5 lg:grid-cols-2" aria-live="polite" aria-busy="true">
+            <article class="events-glass rounded-2xl p-6 lg:col-span-2">
+                <p class="font-inter text-sm text-[var(--muted)]">Events werden aus EifelLog geladen …</p>
+            </article>
         </div>
-    </article>
-</section>
-
-<!-- Vollständige Event-Liste -->
-<section class="mb-16" aria-labelledby="event-list-title">
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
-        <div>
-            <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.2em] uppercase mb-2">EifelLog API</p>
-            <h2 id="event-list-title" class="text-2xl md:text-3xl font-orbitron font-bold text-[var(--text)] tracking-wide">Eventübersicht</h2>
-        </div>
-        <p id="event-result-count" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Events werden geladen</p>
-    </div>
-
-    <!--
-        Unterstützte Antworten von GET /api/events:
-        [
-            {
-                "title": "...",
-                "description": "...",
-                "start_at": "...",
-                "location": "...",
-                "category": "...",
-                "participants": 12
-            }
-        ]
-
-        Alternativ akzeptiert das Frontend weiterhin:
-        {"events": [...]} und {"upcoming_events": [...]}.
-    -->
-    <div id="events-page-list"
-         data-endpoint="/api/events"
-         class="grid lg:grid-cols-2 gap-5"
-         aria-live="polite"
-         aria-busy="true">
-        <div class="info-card p-6 lg:col-span-2">
-            <p class="text-sm text-[var(--muted)] font-inter">Events werden aus EifelLog geladen …</p>
-        </div>
-    </div>
-</section>
+    </section>
+</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -195,6 +305,8 @@
         const periodSelect = document.getElementById('event-period');
         const refreshButton = document.getElementById('refresh-events');
         const refreshIcon = document.getElementById('refresh-icon');
+        const heroRefreshButton = document.getElementById('hero-refresh-events');
+        const heroRefreshIcon = document.getElementById('hero-refresh-icon');
         const resultCount = document.getElementById('event-result-count');
         const statusBadge = document.getElementById('api-status-badge');
         const statusDot = document.getElementById('api-status-dot');
@@ -203,6 +315,13 @@
         const statTotal = document.getElementById('stat-total');
         const statNextDate = document.getElementById('stat-next-date');
         const statLastSync = document.getElementById('stat-last-sync');
+        const heroNextCountdown = document.getElementById('hero-next-countdown');
+        const heroNextDay = document.getElementById('hero-next-day');
+        const heroNextMonth = document.getElementById('hero-next-month');
+        const heroNextCategory = document.getElementById('hero-next-category');
+        const heroNextTitle = document.getElementById('hero-next-title');
+        const heroNextTime = document.getElementById('hero-next-time');
+        const heroNextLocation = document.getElementById('hero-next-location');
 
         let events = [];
         let isLoading = false;
@@ -236,15 +355,27 @@
         const getEventDescription = (event) => normalizeText(event.description || event.summary || 'Weitere Informationen werden noch bekannt gegeben.');
         const getEventCategory = (event) => normalizeText(event.category || event.type || 'EifelLog Event');
         const getEventLocation = (event) => normalizeText(event.location || event.channel_name || 'Eifel LOG Community');
+        const getEventParticipants = (event) => event.participants ?? event.participant_count ?? null;
+
+        const getEventUrl = (event) => {
+            const value = normalizeText(event.url || event.link || event.details_url || event.discord_url || event.registration_url);
+
+            if (!value) {
+                return null;
+            }
+
+            try {
+                const parsedUrl = new URL(value, window.location.origin);
+                const isAllowedProtocol = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+                return isAllowedProtocol ? parsedUrl.href : null;
+            } catch (error) {
+                return null;
+            }
+        };
 
         const isPastEvent = (event) => {
             const date = getEventDate(event);
-
-            if (!date) {
-                return false;
-            }
-
-            return date.getTime() < Date.now();
+            return date ? date.getTime() < Date.now() : false;
         };
 
         const formatDate = (event, includeYear = true) => {
@@ -280,6 +411,27 @@
             }).format(date);
         };
 
+        const getCountdownLabel = (event) => {
+            const date = getEventDate(event);
+
+            if (!date) {
+                return 'Termin folgt';
+            }
+
+            const difference = date.getTime() - Date.now();
+            const days = Math.ceil(difference / 86400000);
+
+            if (days <= 0) {
+                return 'Heute';
+            }
+
+            if (days === 1) {
+                return 'Morgen';
+            }
+
+            return `In ${days} Tagen`;
+        };
+
         const createElement = (tag, className, textContent) => {
             const element = document.createElement(tag);
 
@@ -295,55 +447,58 @@
         };
 
         const createStateCard = (title, message) => {
-            const card = createElement('article', 'info-card p-6 lg:col-span-2');
-            const heading = createElement('h3', 'text-base font-orbitron font-bold text-[var(--text)] tracking-wide', title);
-            const description = createElement('p', 'text-sm text-[var(--muted)] font-inter leading-relaxed mt-2', message);
-
+            const card = createElement('article', 'events-glass rounded-2xl p-6 lg:col-span-2');
+            const heading = createElement('h3', 'font-orbitron text-base font-extrabold tracking-wide text-[var(--text)]', title);
+            const description = createElement('p', 'mt-2 font-inter text-sm leading-relaxed text-[var(--muted)]', message);
             card.append(heading, description);
             return card;
         };
 
-        const createMetaItem = (svgPath, label) => {
-            const wrapper = createElement('div', 'flex items-center gap-2 min-w-0');
+        const createIcon = (svgPath, className = 'h-4 w-4 shrink-0') => {
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', '0 0 24 24');
-            svg.setAttribute('width', '15');
-            svg.setAttribute('height', '15');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
             svg.setAttribute('fill', 'none');
             svg.setAttribute('stroke', 'currentColor');
             svg.setAttribute('stroke-width', '2');
             svg.setAttribute('aria-hidden', 'true');
-            svg.classList.add('shrink-0');
+            svg.setAttribute('class', className);
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('stroke-linejoin', 'round');
             path.setAttribute('d', svgPath);
             svg.appendChild(path);
+            return svg;
+        };
 
+        const createMetaItem = (svgPath, label) => {
+            const wrapper = createElement('div', 'flex min-w-0 items-center gap-2');
+            const icon = createIcon(svgPath, 'h-4 w-4 shrink-0 text-[var(--brand-green)]');
             const text = createElement('span', 'truncate', label);
-            wrapper.append(svg, text);
+            wrapper.append(icon, text);
             return wrapper;
         };
 
         const createEventCard = (event) => {
-            const card = createElement('article', 'info-card p-6 flex flex-col');
-            const topRow = createElement('div', 'flex items-start justify-between gap-4 border-b border-white/5 pb-4');
+            const card = createElement('article', 'events-event-card rounded-[1.35rem] p-5 md:p-6 flex flex-col');
+            const topRow = createElement('div', 'flex items-start justify-between gap-4');
             const topContent = createElement('div', 'min-w-0');
-            const category = createElement('p', 'text-[9px] font-orbitron font-bold uppercase tracking-[0.16em] text-[var(--brand-green)]', getEventCategory(event));
-            const title = createElement('h3', 'text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mt-2 break-words', getEventTitle(event));
+            const category = createElement('p', 'font-orbitron text-[8px] font-extrabold uppercase tracking-[0.18em] text-[var(--brand-green)]', getEventCategory(event));
+            const title = createElement('h3', 'mt-2 break-words font-orbitron text-lg font-extrabold leading-snug tracking-wide text-[var(--text)]', getEventTitle(event));
             topContent.append(category, title);
 
-            const dateBox = createElement('div', 'w-24 shrink-0 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 px-3 py-3 text-center');
+            const dateBox = createElement('div', 'w-[4.75rem] shrink-0 rounded-2xl border border-[var(--brand-yellow)]/25 bg-[var(--brand-yellow)]/10 px-2 py-3 text-center');
             const eventDate = getEventDate(event);
-            const day = createElement('p', 'text-xl font-orbitron font-bold text-[var(--text)]', eventDate ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(eventDate) : '–');
-            const month = createElement('p', 'text-[10px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)] mt-1', eventDate ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(eventDate) : 'Termin');
-            const year = createElement('p', 'text-[9px] font-orbitron font-bold text-[var(--muted)] mt-1', eventDate ? new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(eventDate) : 'folgt');
+            const day = createElement('p', 'font-orbitron text-2xl font-extrabold leading-none text-[var(--text)]', eventDate ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(eventDate) : '–');
+            const month = createElement('p', 'mt-2 font-orbitron text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-yellow)]', eventDate ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(eventDate) : 'Termin');
+            const year = createElement('p', 'mt-1 font-orbitron text-[8px] font-bold text-[var(--muted)]', eventDate ? new Intl.DateTimeFormat('de-DE', { year: 'numeric' }).format(eventDate) : 'folgt');
             dateBox.append(day, month, year);
             topRow.append(topContent, dateBox);
 
-            const description = createElement('p', 'text-sm text-[var(--muted)] font-inter leading-relaxed mt-5 flex-grow', getEventDescription(event));
-            const meta = createElement('div', 'grid sm:grid-cols-2 gap-x-4 gap-y-3 mt-5 pt-4 border-t border-white/5 text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]');
+            const description = createElement('p', 'mt-5 flex-grow border-t border-white/5 pt-4 font-inter text-sm leading-relaxed text-[var(--muted)]', getEventDescription(event));
+            const meta = createElement('div', 'mt-5 grid gap-x-4 gap-y-3 border-t border-white/5 pt-4 font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)] sm:grid-cols-2');
 
             meta.append(
                 createMetaItem('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', formatDate(event)),
@@ -351,19 +506,30 @@
                 createMetaItem('M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', getEventLocation(event))
             );
 
-            if (event.participants !== undefined && event.participants !== null && event.participants !== '') {
-                meta.append(createMetaItem('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', `${event.participants} Teilnehmer`));
+            const participants = getEventParticipants(event);
+            if (participants !== null && participants !== '') {
+                meta.append(createMetaItem('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', `${participants} Teilnehmer`));
             }
 
-            const footer = createElement('div', 'mt-5 flex items-center justify-between gap-4');
+            const footer = createElement('div', 'mt-5 flex flex-wrap items-center justify-between gap-3');
             const state = createElement(
                 'span',
                 isPastEvent(event)
-                    ? 'px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--muted)]'
-                    : 'px-3 py-1.5 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-green)]',
-                isPastEvent(event) ? 'Vergangen' : 'Anstehend'
+                    ? 'rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-wider text-[var(--muted)]'
+                    : 'rounded-full border border-[var(--brand-green)]/25 bg-[var(--brand-green)]/10 px-3 py-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-wider text-[var(--brand-green)]',
+                isPastEvent(event) ? 'Vergangen' : getCountdownLabel(event)
             );
             footer.appendChild(state);
+
+            const eventUrl = getEventUrl(event);
+            if (eventUrl) {
+                const link = createElement('a', 'inline-flex items-center gap-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:text-white', 'Details ansehen');
+                link.href = eventUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.appendChild(createIcon('M14 3h7m0 0v7m0-7L10 14m-3-7H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2', 'h-3.5 w-3.5'));
+                footer.appendChild(link);
+            }
 
             card.append(topRow, description, meta, footer);
             return card;
@@ -375,7 +541,6 @@
                 const bDate = getEventDate(b);
                 const aTime = aDate ? aDate.getTime() : Number.MAX_SAFE_INTEGER;
                 const bTime = bDate ? bDate.getTime() : Number.MAX_SAFE_INTEGER;
-
                 return aTime - bTime;
             });
         };
@@ -385,7 +550,7 @@
             const category = categorySelect?.value || 'all';
             const period = periodSelect?.value || 'upcoming';
 
-            return events.filter(event => {
+            return events.filter((event) => {
                 const isPast = isPastEvent(event);
                 const matchesPeriod = period === 'all'
                     || (period === 'past' && isPast)
@@ -419,7 +584,7 @@
             allOption.textContent = 'Alle Kategorien';
             categorySelect.appendChild(allOption);
 
-            categories.forEach(category => {
+            categories.forEach((category) => {
                 const option = document.createElement('option');
                 option.value = category;
                 option.textContent = category;
@@ -429,9 +594,41 @@
             categorySelect.value = categories.includes(currentValue) ? currentValue : 'all';
         };
 
+        const updateHeroNextEvent = (event) => {
+            const date = event ? getEventDate(event) : null;
+
+            if (heroNextCountdown) {
+                heroNextCountdown.textContent = event ? getCountdownLabel(event) : 'Kein Termin';
+            }
+
+            if (heroNextDay) {
+                heroNextDay.textContent = date ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(date) : '–';
+            }
+
+            if (heroNextMonth) {
+                heroNextMonth.textContent = date ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(date) : 'Termin';
+            }
+
+            if (heroNextCategory) {
+                heroNextCategory.textContent = event ? getEventCategory(event) : 'Event Hub';
+            }
+
+            if (heroNextTitle) {
+                heroNextTitle.textContent = event ? getEventTitle(event) : 'Aktuell ist kein Event geplant';
+            }
+
+            if (heroNextTime) {
+                heroNextTime.textContent = event ? formatTime(event) : 'Uhrzeit folgt';
+            }
+
+            if (heroNextLocation) {
+                heroNextLocation.textContent = event ? getEventLocation(event) : 'Eifel LOG Community';
+            }
+        };
+
         const updateStats = () => {
-            const upcomingEvents = sortEvents(events.filter(event => !isPastEvent(event)));
-            const nextEvent = upcomingEvents[0];
+            const upcomingEvents = sortEvents(events.filter((event) => !isPastEvent(event)));
+            const nextEvent = upcomingEvents[0] || null;
 
             if (statUpcoming) {
                 statUpcoming.textContent = String(upcomingEvents.length);
@@ -444,6 +641,8 @@
             if (statNextDate) {
                 statNextDate.textContent = nextEvent ? formatDate(nextEvent, false) : 'Kein Termin';
             }
+
+            updateHeroNextEvent(nextEvent);
         };
 
         const renderEvents = () => {
@@ -462,7 +661,7 @@
                         : 'Zurzeit sind keine Events im EifelLog-System eingetragen.'
                 ));
             } else {
-                filteredEvents.forEach(event => eventsContainer.appendChild(createEventCard(event)));
+                filteredEvents.forEach((event) => eventsContainer.appendChild(createEventCard(event)));
             }
 
             if (resultCount) {
@@ -479,15 +678,17 @@
                 eventsContainer.setAttribute('aria-busy', loading ? 'true' : 'false');
             }
 
-            if (refreshButton) {
-                refreshButton.disabled = loading;
-                refreshButton.classList.toggle('opacity-60', loading);
-                refreshButton.classList.toggle('cursor-not-allowed', loading);
-            }
+            [refreshButton, heroRefreshButton].forEach((button) => {
+                if (!button) {
+                    return;
+                }
 
-            if (refreshIcon) {
-                refreshIcon.classList.toggle('animate-spin', loading);
-            }
+                button.disabled = loading;
+                button.classList.toggle('opacity-60', loading);
+                button.classList.toggle('cursor-not-allowed', loading);
+            });
+
+            [refreshIcon, heroRefreshIcon].forEach((icon) => icon?.classList.toggle('animate-spin', loading));
         };
 
         const setApiStatus = (type, label) => {
@@ -496,23 +697,23 @@
             }
 
             statusLabel.textContent = label;
-            statusBadge.className = 'px-4 py-2 rounded-full text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2';
-            statusDot.className = 'w-1.5 h-1.5 rounded-full';
+            statusBadge.className = 'flex items-center gap-2 rounded-full border px-4 py-2 font-orbitron text-[9px] font-bold uppercase tracking-wider backdrop-blur-md';
+            statusDot.className = 'h-1.5 w-1.5 rounded-full';
 
             if (type === 'error') {
-                statusBadge.classList.add('bg-red-500/10', 'border', 'border-red-500/30', 'text-red-300');
+                statusBadge.classList.add('border-red-500/30', 'bg-red-500/10', 'text-red-300');
                 statusDot.classList.add('bg-red-400');
                 return;
             }
 
             if (type === 'loading') {
-                statusBadge.classList.add('bg-[var(--brand-yellow)]/10', 'border', 'border-[var(--brand-yellow)]/30', 'text-[var(--brand-yellow)]');
-                statusDot.classList.add('bg-[var(--brand-yellow)]', 'animate-pulse');
+                statusBadge.classList.add('border-[var(--brand-yellow)]/30', 'bg-[var(--brand-yellow)]/10', 'text-[var(--brand-yellow)]');
+                statusDot.classList.add('animate-pulse', 'bg-[var(--brand-yellow)]');
                 return;
             }
 
-            statusBadge.classList.add('bg-[var(--brand-green)]/10', 'border', 'border-[var(--brand-green)]/30', 'text-[var(--brand-green)]');
-            statusDot.classList.add('bg-[var(--brand-green)]', 'animate-pulse');
+            statusBadge.classList.add('border-[var(--brand-green)]/30', 'bg-[var(--brand-green)]/10', 'text-[var(--brand-green)]');
+            statusDot.classList.add('animate-pulse', 'bg-[var(--brand-green)]');
         };
 
         const loadEvents = async () => {
@@ -526,9 +727,7 @@
             try {
                 const response = await fetch(eventsContainer.dataset.endpoint, {
                     method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Accept': 'application/json' },
                     credentials: 'same-origin'
                 });
 
@@ -545,7 +744,7 @@
                             ? payload.upcoming_events
                             : [];
 
-                events = sortEvents(rawEvents.filter(event => event && typeof event === 'object'));
+                events = sortEvents(rawEvents.filter((event) => event && typeof event === 'object'));
                 populateCategories();
                 updateStats();
                 renderEvents();
@@ -588,6 +787,7 @@
         categorySelect?.addEventListener('change', renderEvents);
         periodSelect?.addEventListener('change', renderEvents);
         refreshButton?.addEventListener('click', loadEvents);
+        heroRefreshButton?.addEventListener('click', loadEvents);
 
         loadEvents();
         window.setInterval(loadEvents, 300000);
