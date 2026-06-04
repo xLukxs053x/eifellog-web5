@@ -27794,4 +27794,14 @@ def register_tracker_blueprint_for_legacy_app():
     )
 
 
+@app.route("/datenschutz")
+def datenschutz():
+    return render_template("datenschutz.html")
+
+
+@app.route("/nutzungsbedingungen")
+def nutzungsbedingungen():
+    return render_template("nutzungsbedingungen.html")
+
+
 register_tracker_blueprint_for_legacy_app()
