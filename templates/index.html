@@ -94,36 +94,44 @@
     </div>
 </section>
 
-<!-- Kompakte Skalierung der Event-Slideshow wie in der Referenzansicht -->
+<!-- Kompakte Event-Vorschau mit weichem Slide-Wechsel -->
 <style>
     .event-slideshow-stage {
-        height: 230px;
+        height: 238px;
     }
 
-    /*
-        Desktop: Die Slideshow wird auf 92 % verkleinert.
-        Breite und Mindesthöhe werden mathematisch kompensiert, damit der
-        sichtbare Bereich sauber und vollständig in der Stage sitzt.
-    */
     .event-slideshow-fit {
-        width: 108.695652%;
-        min-height: 250px;
-        margin-left: -4.347826%;
-        transform: scale(0.92);
-        transform-origin: center center;
+        width: 100%;
+        min-height: 238px;
+    }
+
+    .event-preview-slide {
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .event-preview-slide.is-entering {
+        opacity: 0;
+        transform: translateY(7px);
+    }
+
+    .event-preview-slide.is-leaving {
+        opacity: 0;
+        transform: translateY(-7px);
     }
 
     @media (max-width: 640px) {
-        .event-slideshow-stage {
-            height: 244px;
-        }
-
-        /* Mobil nur leicht verkleinern, damit der Text gut lesbar bleibt. */
+        .event-slideshow-stage,
         .event-slideshow-fit {
-            width: 104.166667%;
-            min-height: 254.166667px;
-            margin-left: -2.083333%;
-            transform: scale(0.96);
+            height: 272px;
+            min-height: 272px;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .event-preview-slide {
+            transition: none;
         }
     }
 </style>
@@ -141,8 +149,8 @@
         <article class="info-card p-7 md:p-8 flex flex-col">
             <div class="flex items-center justify-between gap-4 mb-5 border-b border-white/5 pb-4">
                 <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">EifelLog API</p>
-                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Events</h3>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Community Kalender</p>
+                    <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Events &amp; Konvois</h3>
                 </div>
                 <div class="w-11 h-11 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="var(--brand-yellow)" stroke-width="2" aria-hidden="true">
@@ -151,23 +159,8 @@
                 </div>
             </div>
 
-            <!--
-                Unterstützte Antworten von GET /api/events:
-                [
-                        {
-                            "title": "...",
-                            "description": "...",
-                            "start_at": "...",
-                            "location": "...",
-                            "category": "..."
-                        }
-                ]
-
-                Alternativ akzeptiert das Frontend weiterhin die Legacy-Formate
-                {"events": [...]} und {"upcoming_events": [...]}.
-            -->
+            <!-- Kompakte Vorschau. Vollständige Angaben stehen ausschließlich auf /events. -->
             <div id="eifellog-events"
-                 data-endpoint="/api/events"
                  class="flex-grow"
                  aria-busy="true">
                 <div class="event-slideshow-stage relative overflow-hidden rounded-2xl border border-white/5 bg-black/15">
@@ -209,7 +202,7 @@
             <div class="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <p id="event-status" class="text-[10px] text-[var(--muted)] font-orbitron uppercase tracking-wider">Event-Daten werden geladen</p>
                 <a href="/events" class="btn-secondary inline-flex items-center justify-center shrink-0">
-                    Alle Events anzeigen
+                    Zur Event-Seite
                     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                     </svg>
@@ -221,7 +214,7 @@
         <article class="info-card p-7 md:p-8 flex flex-col">
             <div class="flex items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
                 <div>
-                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">EifelLog API</p>
+                    <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Community Geburtstage</p>
                     <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Anstehende Geburtstage</h3>
                 </div>
                 <div class="w-11 h-11 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center">
@@ -231,24 +224,7 @@
                 </div>
             </div>
 
-            <!--
-                Unterstützte Antworten von GET /api/birthdays:
-                [
-                    {
-                        "user_id": "499690831070887936",
-                        "user_name": "lukxsde",
-                        "day_month": "11.10.",
-                        "full_date": "11.10.2005",
-                        "year": 2005,
-                        "updated_at": "2026-05-04T15:55:08.732+00:00"
-                    }
-                ]
-
-                Zusätzlich bleiben ältere Feldnamen und die Legacy-Wrapper
-                {"birthdays": [...]} sowie {"upcoming_birthdays": [...]} kompatibel.
-            -->
             <div id="eifellog-birthdays"
-                 data-endpoint="/api/birthdays"
                  class="space-y-3 flex-grow"
                  aria-live="polite"
                  aria-busy="true">
@@ -363,9 +339,23 @@
             return Number.isNaN(date.getTime()) ? null : date;
         };
 
+        const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+        const normalizeText = (value) => String(value ?? '').trim();
+
+        const readPath = (object, path) => String(path)
+            .split('.')
+            .reduce((current, key) => current && typeof current === 'object' ? current[key] : undefined, object);
+
+        const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null && value !== '');
+
         /* --------------------------------------------------------------
-           Events aus der öffentlichen EifelLog-API
+           Kompakte Event- und Konvoi-Vorschau
+           Vollständige Details werden ausschließlich auf /events angezeigt.
         -------------------------------------------------------------- */
+        const EVENTS_API_URL = '/api/events';
+        const EVENTS_PAGE_URL = '/events';
+        const BIRTHDAYS_API_URL = '/api/birthdays';
+
         const eventsContainer = document.getElementById('eifellog-events');
         const eventViewport = document.getElementById('event-slideshow-viewport');
         const eventStatus = document.getElementById('event-status');
@@ -377,17 +367,181 @@
         let events = [];
         let activeEventIndex = 0;
         let eventRotationTimer = null;
+        let eventTransitionTimer = null;
 
-        const getEventStartValue = (event) => {
-            return event.start_at || event.starts_at || event.start_time || event.datetime || event.date || null;
+        const getEventStartValue = (event) => firstDefined(
+            event.start_at,
+            event.starts_at,
+            event.start_time,
+            event.startAt,
+            event.startsAt,
+            event.startTime,
+            event.scheduled_start_time,
+            event.scheduledStartTime,
+            event.datetime,
+            event.date,
+            event.start?.datetime,
+            event.start?.date
+        );
+
+        const getEventEndValue = (event) => firstDefined(
+            event.end_at,
+            event.ends_at,
+            event.end_time,
+            event.endAt,
+            event.endsAt,
+            event.endTime,
+            event.scheduled_end_time,
+            event.scheduledEndTime,
+            event.end?.datetime,
+            event.end?.date
+        );
+
+        const getEventTitle = (event) => normalizeText(firstDefined(
+            event.title,
+            event.name,
+            event.event_name,
+            event.eventName
+        )) || 'EifelLog Event';
+
+        const getEventDescription = (event) => normalizeText(firstDefined(
+            event.summary,
+            event.excerpt,
+            event.short_description,
+            event.shortDescription,
+            event.description
+        )) || 'Weitere Informationen findest du auf der vollständigen Event-Seite.';
+
+        const getEntityLabel = (value) => {
+            if (isPlainObject(value)) {
+                return normalizeText(firstDefined(value.display_name, value.displayName, value.name, value.title, value.label));
+            }
+
+            return normalizeText(value);
         };
 
-        const getEventTitle = (event) => {
-            return event.title || event.name || 'EifelLog Event';
+        const getEventLocation = (event) => getEntityLabel(firstDefined(
+            event.start_location,
+            event.startLocation,
+            event.start_point,
+            event.startPoint,
+            event.location,
+            event.venue,
+            event.meeting_point,
+            event.meetingPoint,
+            event.channel_name,
+            event.channelName
+        )) || 'Eifel LOG Community';
+
+        const getEventCategory = (event) => normalizeText(firstDefined(
+            event.category,
+            event.type,
+            event.event_type,
+            event.eventType
+        )) || 'EifelLog Event';
+
+        const getEventParticipantCount = (event) => {
+            const value = firstDefined(
+                event.participant_count,
+                event.participantCount,
+                event.participants_count,
+                event.member_count,
+                event.user_count,
+                isPlainObject(event.participants) ? firstDefined(event.participants.count, event.participants.total) : event.participants
+            );
+
+            if (Array.isArray(value)) {
+                return value.length;
+            }
+
+            const number = Number(value);
+            return Number.isFinite(number) ? number : null;
         };
 
-        const getEventDescription = (event) => {
-            return event.description || event.summary || 'Weitere Informationen findest du in der vollständigen Eventübersicht.';
+        const getEventIdentity = (event) => normalizeText(firstDefined(
+            event.id,
+            event.event_id,
+            event.eventId,
+            event.uuid,
+            `${getEventTitle(event)}|${getEventStartValue(event) || ''}|${getEventLocation(event)}`
+        ));
+
+        const isPastEvent = (event) => {
+            const sourceValue = getEventEndValue(event) || getEventStartValue(event);
+            const date = parseDate(sourceValue);
+
+            if (!date) {
+                return false;
+            }
+
+            if (!getEventEndValue(event) && /^\d{4}-\d{2}-\d{2}$/.test(String(sourceValue))) {
+                date.setHours(23, 59, 59, 999);
+            }
+
+            return date.getTime() < Date.now();
+        };
+
+        const EVENT_COLLECTION_KEYS = new Set([
+            'events',
+            'upcomingevents',
+            'scheduledevents',
+            'createdevents',
+            'convoys',
+            'upcomingconvoys',
+            'scheduledconvoys',
+            'createdconvoys',
+            'konvois',
+            'items',
+            'results'
+        ]);
+
+        const normalizeCollectionKey = (key) => String(key).replace(/[_-]/g, '').toLowerCase();
+
+        const extractEventCollections = (payload, depth = 0, target = []) => {
+            if (depth > 5) {
+                return target;
+            }
+
+            if (Array.isArray(payload)) {
+                target.push(payload);
+                return target;
+            }
+
+            if (!isPlainObject(payload)) {
+                return target;
+            }
+
+            Object.entries(payload).forEach(([key, value]) => {
+                if (Array.isArray(value) && EVENT_COLLECTION_KEYS.has(normalizeCollectionKey(key))) {
+                    target.push(value);
+                    return;
+                }
+
+                if (isPlainObject(value)) {
+                    extractEventCollections(value, depth + 1, target);
+                }
+            });
+
+            return target;
+        };
+
+        const extractEvents = (payload) => {
+            const collections = extractEventCollections(payload);
+            const seen = new Set();
+
+            return collections
+                .flat()
+                .filter((event) => event && typeof event === 'object')
+                .filter((event) => {
+                    const identity = getEventIdentity(event);
+
+                    if (!identity || seen.has(identity)) {
+                        return false;
+                    }
+
+                    seen.add(identity);
+                    return true;
+                });
         };
 
         const formatEventWeekday = (event) => {
@@ -417,13 +571,13 @@
 
         const formatEventTime = (event) => {
             if (event.time) {
-                return event.time;
+                return normalizeText(event.time);
             }
 
             const value = getEventStartValue(event);
             const date = parseDate(value);
 
-            if (!date || !value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            if (!date || !value || /^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
                 return 'Uhrzeit folgt';
             }
 
@@ -435,7 +589,7 @@
 
         const createEventSlide = (event) => {
             const card = document.createElement('article');
-            card.className = 'w-full rounded-2xl border border-white/5 bg-black/30 p-4 sm:p-5 shadow-inner';
+            card.className = 'event-preview-slide w-full rounded-2xl border border-white/5 bg-black/30 p-4 sm:p-5 shadow-inner';
 
             const topRow = document.createElement('div');
             topRow.className = 'flex items-start gap-4';
@@ -462,35 +616,63 @@
 
             const category = document.createElement('p');
             category.className = 'text-[9px] font-orbitron font-bold uppercase tracking-[0.16em] text-[var(--brand-green)]';
-            category.textContent = event.category || event.type || 'EifelLog Event';
+            category.textContent = getEventCategory(event);
 
             const title = document.createElement('h4');
             title.className = 'text-base sm:text-lg font-orbitron font-bold text-[var(--text)] tracking-wide mt-2 break-words';
             title.textContent = getEventTitle(event);
 
             const description = document.createElement('p');
-            description.className = 'text-xs sm:text-sm text-[var(--muted)] font-inter leading-relaxed mt-2 line-clamp-3';
+            description.className = 'text-xs sm:text-sm text-[var(--muted)] font-inter leading-relaxed mt-2 line-clamp-2';
             description.textContent = getEventDescription(event);
 
             content.append(category, title, description);
             topRow.append(dateBox, content);
 
+            const footer = document.createElement('div');
+            footer.className = 'mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-3';
+
             const metaRow = document.createElement('div');
-            metaRow.className = 'mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-4 gap-y-2';
+            metaRow.className = 'flex flex-wrap items-center gap-x-4 gap-y-2';
 
             const location = document.createElement('p');
             location.className = 'text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]';
-            location.textContent = event.location || event.channel_name || 'Eifel LOG Community';
+            location.textContent = getEventLocation(event);
             metaRow.appendChild(location);
 
-            if (event.participants !== undefined && event.participants !== null) {
+            const participantCount = getEventParticipantCount(event);
+
+            if (participantCount !== null) {
                 const participants = document.createElement('p');
                 participants.className = 'text-[10px] font-orbitron uppercase tracking-wider text-[var(--muted)]';
-                participants.textContent = `${event.participants} Teilnehmer`;
+                participants.textContent = `${participantCount} Teilnehmer`;
                 metaRow.appendChild(participants);
             }
 
-            card.append(topRow, metaRow);
+            const detailsLink = document.createElement('a');
+            detailsLink.href = EVENTS_PAGE_URL;
+            detailsLink.className = 'inline-flex items-center gap-1.5 text-[9px] font-orbitron font-bold uppercase tracking-wider text-[var(--brand-yellow)] hover:text-white transition';
+            detailsLink.textContent = 'Mehr Details auf der Event-Seite';
+            detailsLink.setAttribute('aria-label', `Mehr Details zu ${getEventTitle(event)} auf der Event-Seite anzeigen`);
+
+            const detailsIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            detailsIcon.setAttribute('viewBox', '0 0 24 24');
+            detailsIcon.setAttribute('width', '14');
+            detailsIcon.setAttribute('height', '14');
+            detailsIcon.setAttribute('fill', 'none');
+            detailsIcon.setAttribute('stroke', 'currentColor');
+            detailsIcon.setAttribute('stroke-width', '2');
+            detailsIcon.setAttribute('aria-hidden', 'true');
+
+            const detailsPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            detailsPath.setAttribute('stroke-linecap', 'round');
+            detailsPath.setAttribute('stroke-linejoin', 'round');
+            detailsPath.setAttribute('d', 'M14 5l7 7m0 0l-7 7m7-7H3');
+            detailsIcon.appendChild(detailsPath);
+            detailsLink.appendChild(detailsIcon);
+
+            footer.append(metaRow, detailsLink);
+            card.append(topRow, footer);
             return card;
         };
 
@@ -507,7 +689,7 @@
 
             if (eventCounter) {
                 eventCounter.textContent = events.length
-                    ? `Event ${activeEventIndex + 1} von ${events.length}`
+                    ? `Termin ${activeEventIndex + 1} von ${events.length}`
                     : 'Keine Event-Vorschau verfügbar';
             }
 
@@ -523,7 +705,7 @@
                 dot.className = index === activeEventIndex
                     ? 'w-5 h-1.5 rounded-full bg-[var(--brand-yellow)] transition-all'
                     : 'w-1.5 h-1.5 rounded-full bg-white/20 hover:bg-white/40 transition-all';
-                dot.setAttribute('aria-label', `Event ${index + 1} anzeigen`);
+                dot.setAttribute('aria-label', `Termin ${index + 1} anzeigen`);
                 dot.setAttribute('aria-current', index === activeEventIndex ? 'true' : 'false');
                 dot.addEventListener('click', () => {
                     activeEventIndex = index;
@@ -534,15 +716,46 @@
             });
         };
 
+        const replaceEventSlide = (nextContent) => {
+            if (!eventViewport) {
+                return;
+            }
+
+            if (eventTransitionTimer) {
+                window.clearTimeout(eventTransitionTimer);
+                eventTransitionTimer = null;
+            }
+
+            const currentContent = eventViewport.firstElementChild;
+
+            const mountNextContent = () => {
+                nextContent.classList?.add('is-entering');
+                eventViewport.replaceChildren(nextContent);
+
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(() => nextContent.classList?.remove('is-entering'));
+                });
+            };
+
+            if (!currentContent || !currentContent.classList.contains('event-preview-slide')) {
+                mountNextContent();
+                return;
+            }
+
+            currentContent.classList.add('is-leaving');
+            eventTransitionTimer = window.setTimeout(() => {
+                mountNextContent();
+                eventTransitionTimer = null;
+            }, 180);
+        };
+
         const renderActiveEvent = () => {
             if (!eventViewport) {
                 return;
             }
 
-            eventViewport.replaceChildren();
-
             if (!events.length) {
-                eventViewport.appendChild(createStateCard('Zurzeit sind keine anstehenden Events eingetragen.'));
+                eventViewport.replaceChildren(createStateCard('Zurzeit sind keine anstehenden Events oder Konvois eingetragen.'));
                 updateEventControls();
                 return;
             }
@@ -551,7 +764,7 @@
                 activeEventIndex = 0;
             }
 
-            eventViewport.appendChild(createEventSlide(events[activeEventIndex]));
+            replaceEventSlide(createEventSlide(events[activeEventIndex]));
             updateEventControls();
         };
 
@@ -584,19 +797,15 @@
             }
         };
 
-        if (eventPrev) {
-            eventPrev.addEventListener('click', () => {
-                showPreviousEvent();
-                restartEventRotation();
-            });
-        }
+        eventPrev?.addEventListener('click', () => {
+            showPreviousEvent();
+            restartEventRotation();
+        });
 
-        if (eventNext) {
-            eventNext.addEventListener('click', () => {
-                showNextEvent();
-                restartEventRotation();
-            });
-        }
+        eventNext?.addEventListener('click', () => {
+            showNextEvent();
+            restartEventRotation();
+        });
 
         const loadEvents = async () => {
             if (!eventsContainer || !eventViewport || !eventStatus) {
@@ -604,15 +813,14 @@
             }
 
             eventsContainer.setAttribute('aria-busy', 'true');
-            eventStatus.textContent = 'EifelLog Event-Sync läuft';
+            eventStatus.textContent = 'Event-Sync läuft';
 
             try {
-                const response = await fetch(eventsContainer.dataset.endpoint, {
+                const response = await fetch(EVENTS_API_URL, {
                     method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    },
-                    credentials: 'same-origin'
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
                 });
 
                 if (!response.ok) {
@@ -620,22 +828,14 @@
                 }
 
                 const payload = await response.json();
-                const rawEvents = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload.events)
-                        ? payload.events
-                        : Array.isArray(payload.upcoming_events)
-                            ? payload.upcoming_events
-                            : [];
 
-                events = rawEvents
-                    .filter(event => event && typeof event === 'object')
+                events = extractEvents(payload)
+                    .filter((event) => !isPastEvent(event))
                     .sort((a, b) => {
                         const aDate = parseDate(getEventStartValue(a));
                         const bDate = parseDate(getEventStartValue(b));
                         const aTime = aDate ? aDate.getTime() : Number.MAX_SAFE_INTEGER;
                         const bTime = bDate ? bDate.getTime() : Number.MAX_SAFE_INTEGER;
-
                         return aTime - bTime;
                     })
                     .slice(0, 8);
@@ -643,7 +843,7 @@
                 activeEventIndex = 0;
                 renderActiveEvent();
                 restartEventRotation();
-                eventStatus.textContent = '';
+                eventStatus.textContent = events.length ? 'Vorschau · Details auf der Event-Seite' : 'Keine anstehenden Termine';
             } catch (error) {
                 console.error('Events konnten nicht geladen werden:', error);
                 events = [];
@@ -856,12 +1056,11 @@
             birthdayStatus.textContent = 'EifelLog Sync läuft';
 
             try {
-                const response = await fetch(birthdaysContainer.dataset.endpoint, {
+                const response = await fetch(BIRTHDAYS_API_URL, {
                     method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    },
-                    credentials: 'same-origin'
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
                 });
 
                 if (!response.ok) {
