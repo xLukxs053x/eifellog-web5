@@ -18,6 +18,7 @@ import hmac
 import math
 import zlib
 import secrets
+import threading
 from html import escape as html_escape
 import requests
 from io import BytesIO
@@ -89,6 +90,416 @@ register_template_helpers(app)
 ensure_indexes()
 
 register_http_handlers(app)
+
+# ==========================================
+# TRACKER-UPDATE-CDN / DESKTOP-UPDATER
+# ==========================================
+# Der Windows-Tracker lädt seine Channel-Manifeste und Update-Pakete ausschließlich
+# über die eigene Domain:
+#
+#   https://www.eifellog.de/tracker/updates/stable/manifest.json
+#   https://www.eifellog.de/tracker/updates/beta/manifest.json
+#   https://www.eifellog.de/tracker/updates/developer/manifest.json
+#   https://www.eifellog.de/tracker/updates/files/<Dateiname>
+#
+# Die Dateien liegen standardmäßig unter:
+#
+#   <BASE_DIR>/tracker_updates/
+#       stable/manifest.json
+#       beta/manifest.json
+#       developer/manifest.json
+#       files/EifelLog-Tracker-Setup-1.0.1.exe
+#       files/EifelLog-Tracker-Delta-1.0.0-to-1.0.1.zip
+#
+# Der Ablageort kann in der .env überschrieben werden:
+#
+#   TRACKER_UPDATE_CDN_ROOT=/absoluter/pfad/zu/tracker_updates
+#
+# Das Backend liefert ausschließlich Dateien innerhalb dieses Ordners aus. Relative
+# Pfade, Traversal-Sequenzen, Symlink-Ausbrüche und fremde Asset-URLs werden nicht
+# akzeptiert. SHA256 und Dateigröße werden serverseitig aus der tatsächlich
+# ausgelieferten Datei berechnet. Ein optional im Manifest eingetragener SHA256-Wert
+# wird zusätzlich geprüft und muss exakt übereinstimmen.
+TRACKER_UPDATE_CDN_PUBLIC_PATH = "/tracker/updates"
+TRACKER_UPDATE_CDN_ROOT = os.path.realpath(
+    os.getenv("TRACKER_UPDATE_CDN_ROOT")
+    or os.path.join(BASE_DIR, "tracker_updates")
+)
+TRACKER_UPDATE_CDN_FILES_ROOT = os.path.realpath(
+    os.path.join(TRACKER_UPDATE_CDN_ROOT, "files")
+)
+TRACKER_UPDATE_CDN_CHANNELS = {"stable", "beta", "developer"}
+TRACKER_UPDATE_CDN_SCHEMA_VERSION = 1
+TRACKER_UPDATE_CDN_DOWNLOAD_CACHE_SECONDS = max(
+    0,
+    int(float(os.getenv("TRACKER_UPDATE_CDN_DOWNLOAD_CACHE_SECONDS", "31536000")))
+)
+TRACKER_UPDATE_CDN_FALLBACK_CACHE_SECONDS = max(
+    0,
+    int(float(os.getenv("TRACKER_UPDATE_CDN_FALLBACK_CACHE_SECONDS", "300")))
+)
+TRACKER_UPDATE_CDN_PACKAGE_EXTENSIONS = {".exe", ".msi", ".zip"}
+TRACKER_UPDATE_CDN_DOWNLOAD_EXTENSIONS = {
+    ".exe",
+    ".msi",
+    ".zip",
+    ".sha256",
+    ".txt",
+    ".json",
+}
+TRACKER_UPDATE_CDN_SPECIAL_DOWNLOAD_NAMES = {
+    "SHA256SUMS",
+    "SHA256SUMS.txt",
+    "checksums.txt",
+    "sha256sums.txt",
+}
+TRACKER_UPDATE_CDN_ALLOWED_PUBLIC_HOSTS = {"www.eifellog.de", "eifellog.de"}
+TRACKER_UPDATE_CDN_ASSET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$")
+TRACKER_UPDATE_CDN_VERSION_PATTERN = re.compile(
+    r"^v?[0-9]+(?:\.[0-9]+){1,3}(?:[-+][0-9A-Za-z.-]+)?$"
+)
+TRACKER_UPDATE_CDN_SHA256_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$")
+TRACKER_UPDATE_CDN_SHA256_CACHE = {}
+TRACKER_UPDATE_CDN_SHA256_CACHE_LOCK = threading.RLock()
+
+
+def tracker_update_cdn_is_public_path(path):
+    """Erkennt alle öffentlichen Desktop-Updater-Routen robust."""
+    path = str(path or "")
+    return (
+        path == TRACKER_UPDATE_CDN_PUBLIC_PATH
+        or path.startswith(TRACKER_UPDATE_CDN_PUBLIC_PATH + "/")
+    )
+
+
+def tracker_update_cdn_json_error(message, status_code=400):
+    """Einheitliche JSON-Fehlerantwort ohne Offenlegung interner Serverpfade."""
+    response = jsonify({
+        "success": False,
+        "updateCdn": True,
+        "message": str(message or "Update-CDN-Fehler."),
+    })
+    response.status_code = int(status_code)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def tracker_update_cdn_channel_or_none(channel):
+    channel = str(channel or "").strip().lower()
+    return channel if channel in TRACKER_UPDATE_CDN_CHANNELS else None
+
+
+def tracker_update_cdn_safe_path(root, relative_path):
+    """Löst einen relativen CDN-Pfad auf und verhindert Traversal sowie Symlink-Ausbrüche."""
+    root = os.path.realpath(str(root or ""))
+    relative_path = str(relative_path or "").strip().replace("\\", "/")
+
+    if not root or not relative_path or relative_path.startswith("/") or "\x00" in relative_path:
+        raise ValueError("Ungültiger CDN-Dateipfad.")
+
+    segments = relative_path.split("/")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ValueError("Ungültiger CDN-Dateipfad.")
+
+    target_path = os.path.realpath(os.path.join(root, *segments))
+    try:
+        if os.path.commonpath([root, target_path]) != root:
+            raise ValueError("Ungültiger CDN-Dateipfad.")
+    except ValueError as error:
+        raise ValueError("Ungültiger CDN-Dateipfad.") from error
+
+    return target_path
+
+
+def tracker_update_cdn_asset_name(value, package_only=False):
+    """Validiert einen einzelnen, URL-sicheren Update-Dateinamen."""
+    filename = str(value or "").strip()
+    if (
+        not filename
+        or os.path.basename(filename) != filename
+        or not TRACKER_UPDATE_CDN_ASSET_NAME_PATTERN.fullmatch(filename)
+    ):
+        raise ValueError("Manifest enthält einen ungültigen Asset-Dateinamen.")
+
+    extension = os.path.splitext(filename)[1].lower()
+    if package_only and extension not in TRACKER_UPDATE_CDN_PACKAGE_EXTENSIONS:
+        raise ValueError(f"Nicht unterstütztes Update-Paket: {filename}")
+
+    if not package_only and (
+        extension not in TRACKER_UPDATE_CDN_DOWNLOAD_EXTENSIONS
+        and filename not in TRACKER_UPDATE_CDN_SPECIAL_DOWNLOAD_NAMES
+    ):
+        raise ValueError(f"Nicht erlaubte CDN-Datei: {filename}")
+
+    return filename
+
+
+def tracker_update_cdn_sha256(file_path):
+    """Berechnet SHA256 effizient und cached das Ergebnis bis zur nächsten Dateiänderung."""
+    stat = os.stat(file_path)
+    cache_key = (file_path, int(stat.st_size), int(stat.st_mtime_ns))
+
+    with TRACKER_UPDATE_CDN_SHA256_CACHE_LOCK:
+        cached = TRACKER_UPDATE_CDN_SHA256_CACHE.get(cache_key)
+        if cached:
+            return cached
+
+    digest = hashlib.sha256()
+    with open(file_path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    value = digest.hexdigest().lower()
+
+    with TRACKER_UPDATE_CDN_SHA256_CACHE_LOCK:
+        stale_keys = [key for key in TRACKER_UPDATE_CDN_SHA256_CACHE if key[0] == file_path]
+        for key in stale_keys:
+            TRACKER_UPDATE_CDN_SHA256_CACHE.pop(key, None)
+        TRACKER_UPDATE_CDN_SHA256_CACHE[cache_key] = value
+
+    return value
+
+
+def tracker_update_cdn_iso_from_timestamp(timestamp):
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def tracker_update_cdn_public_asset_url(filename):
+    """Gibt absichtlich eine relative URL zurück; der Desktop-Client bindet sie an eifellog.de."""
+    filename = tracker_update_cdn_asset_name(filename, package_only=True)
+    return f"files/{quote(filename, safe='-._~')}"
+
+
+def tracker_update_cdn_validate_optional_page_url(value):
+    """Erlaubt als öffentliche Release-Seite ausschließlich die eigene HTTPS-Domain."""
+    value = str(value or "").strip()
+    if not value:
+        return "https://www.eifellog.de/"
+
+    match = re.fullmatch(
+        r"https://(?P<host>www\.eifellog\.de|eifellog\.de)(?P<path>/[^#]*)?",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return "https://www.eifellog.de/"
+
+    return value
+
+
+def tracker_update_cdn_manifest_path(channel):
+    channel = tracker_update_cdn_channel_or_none(channel)
+    if not channel:
+        raise ValueError("Unbekannter Update-Kanal.")
+    return tracker_update_cdn_safe_path(TRACKER_UPDATE_CDN_ROOT, f"{channel}/manifest.json")
+
+
+def tracker_update_cdn_normalize_manifest(channel):
+    """Lädt, validiert und ergänzt das Manifest anhand der real ausgelieferten Dateien."""
+    channel = tracker_update_cdn_channel_or_none(channel)
+    if not channel:
+        raise ValueError("Unbekannter Update-Kanal.")
+
+    manifest_path = tracker_update_cdn_manifest_path(channel)
+    if not os.path.isfile(manifest_path):
+        raise FileNotFoundError("Für diesen Update-Kanal wurde noch kein manifest.json veröffentlicht.")
+
+    with open(manifest_path, "r", encoding="utf-8-sig") as file:
+        manifest = json.load(file)
+
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest.json muss ein JSON-Objekt enthalten.")
+
+    schema_version = manifest.get("schemaVersion", TRACKER_UPDATE_CDN_SCHEMA_VERSION)
+    try:
+        schema_version = int(schema_version)
+    except (TypeError, ValueError) as error:
+        raise ValueError("manifest.json enthält eine ungültige schemaVersion.") from error
+
+    if schema_version != TRACKER_UPDATE_CDN_SCHEMA_VERSION:
+        raise ValueError(f"Nicht unterstützte Manifest-Version: {schema_version}")
+
+    manifest_channel = str(manifest.get("channel") or channel).strip().lower()
+    if manifest_channel != channel:
+        raise ValueError(
+            f"Manifest-Kanal stimmt nicht mit der URL überein: {manifest_channel} statt {channel}."
+        )
+
+    releases = manifest.get("releases")
+    if not isinstance(releases, list) or not releases:
+        raise ValueError("manifest.json muss mindestens ein Release enthalten.")
+
+    normalized_releases = []
+    for release in releases:
+        if not isinstance(release, dict):
+            raise ValueError("Manifest enthält einen ungültigen Release-Eintrag.")
+
+        version = str(release.get("version") or "").strip()
+        if not TRACKER_UPDATE_CDN_VERSION_PATTERN.fullmatch(version):
+            raise ValueError(f"Ungültige Release-Version: {version or '<leer>'}")
+
+        assets = release.get("assets") or []
+        if not isinstance(assets, list):
+            raise ValueError(f"Assets für Version {version} müssen als Liste angegeben werden.")
+
+        normalized_assets = []
+        release_latest_mtime = os.path.getmtime(manifest_path)
+        for asset in assets:
+            if not isinstance(asset, dict):
+                raise ValueError(f"Version {version} enthält einen ungültigen Asset-Eintrag.")
+
+            filename = tracker_update_cdn_asset_name(asset.get("name"), package_only=True)
+            file_path = tracker_update_cdn_safe_path(TRACKER_UPDATE_CDN_FILES_ROOT, filename)
+            if not os.path.isfile(file_path):
+                raise FileNotFoundError(f"Veröffentlichtes Update-Paket fehlt: {filename}")
+
+            file_stat = os.stat(file_path)
+            if file_stat.st_size <= 0:
+                raise ValueError(f"Veröffentlichtes Update-Paket ist leer: {filename}")
+
+            actual_sha256 = tracker_update_cdn_sha256(file_path)
+            declared_sha256 = str(asset.get("sha256") or "").strip().lower()
+            if declared_sha256:
+                if not TRACKER_UPDATE_CDN_SHA256_PATTERN.fullmatch(declared_sha256):
+                    raise ValueError(f"Ungültiger SHA256-Wert für {filename}.")
+                if not hmac.compare_digest(declared_sha256, actual_sha256):
+                    raise ValueError(f"SHA256-Wert stimmt nicht mit der Datei überein: {filename}")
+
+            release_latest_mtime = max(release_latest_mtime, file_stat.st_mtime)
+            normalized_assets.append({
+                "name": filename,
+                "url": tracker_update_cdn_public_asset_url(filename),
+                "size": int(file_stat.st_size),
+                "sha256": actual_sha256,
+            })
+
+        normalized_releases.append({
+            "version": version,
+            "name": str(release.get("name") or f"EifelLog Tracker {version}").strip(),
+            "releaseNotes": str(release.get("releaseNotes") or "Keine Release Notes vorhanden.").strip(),
+            "pageUrl": tracker_update_cdn_validate_optional_page_url(release.get("pageUrl")),
+            "draft": bool(release.get("draft", False)),
+            "prerelease": bool(release.get("prerelease", channel != "stable")),
+            "createdAt": str(release.get("createdAt") or tracker_update_cdn_iso_from_timestamp(release_latest_mtime)),
+            "publishedAt": str(release.get("publishedAt") or tracker_update_cdn_iso_from_timestamp(release_latest_mtime)),
+            "assets": normalized_assets,
+        })
+
+    return {
+        "schemaVersion": TRACKER_UPDATE_CDN_SCHEMA_VERSION,
+        "channel": channel,
+        "releases": normalized_releases,
+    }
+
+
+def tracker_update_cdn_apply_manifest_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def tracker_update_cdn_apply_file_headers(response, filename):
+    filename = str(filename or "")
+    is_versioned = bool(re.search(r"\d+\.\d+(?:\.\d+)?", filename))
+    max_age = (
+        TRACKER_UPDATE_CDN_DOWNLOAD_CACHE_SECONDS
+        if is_versioned
+        else TRACKER_UPDATE_CDN_FALLBACK_CACHE_SECONDS
+    )
+    cache_control = f"public, max-age={max_age}"
+    if is_versioned and max_age > 0:
+        cache_control += ", immutable"
+    response.headers["Cache-Control"] = cache_control
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route(
+    f"{TRACKER_UPDATE_CDN_PUBLIC_PATH}/<channel>/manifest.json",
+    methods=["GET", "HEAD", "OPTIONS"],
+)
+def tracker_update_cdn_manifest(channel):
+    """Öffentliches, normalisiertes Channel-Manifest für den Desktop-Updater."""
+    if request.method == "OPTIONS":
+        return tracker_update_cdn_apply_manifest_headers(Response(status=204))
+
+    try:
+        manifest = tracker_update_cdn_normalize_manifest(channel)
+    except FileNotFoundError as error:
+        return tracker_update_cdn_json_error(error, 404)
+    except json.JSONDecodeError:
+        return tracker_update_cdn_json_error("manifest.json enthält kein gültiges JSON.", 500)
+    except (OSError, ValueError) as error:
+        return tracker_update_cdn_json_error(error, 500)
+
+    response = jsonify(manifest)
+    return tracker_update_cdn_apply_manifest_headers(response)
+
+
+@app.route(
+    f"{TRACKER_UPDATE_CDN_PUBLIC_PATH}/files/<path:filename>",
+    methods=["GET", "HEAD", "OPTIONS"],
+)
+def tracker_update_cdn_file(filename):
+    """Liefert versionierte Setup-, MSI-, Delta- und Checksum-Dateien sicher aus."""
+    if request.method == "OPTIONS":
+        response = Response(status=204)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    try:
+        filename = tracker_update_cdn_asset_name(filename, package_only=False)
+        file_path = tracker_update_cdn_safe_path(TRACKER_UPDATE_CDN_FILES_ROOT, filename)
+    except ValueError as error:
+        return tracker_update_cdn_json_error(error, 404)
+
+    if not os.path.isfile(file_path):
+        return tracker_update_cdn_json_error("Update-Datei wurde nicht gefunden.", 404)
+
+    response = send_file(
+        file_path,
+        as_attachment=True,
+        download_name=filename,
+        conditional=True,
+        max_age=TRACKER_UPDATE_CDN_DOWNLOAD_CACHE_SECONDS,
+    )
+    return tracker_update_cdn_apply_file_headers(response, filename)
+
+
+@app.route(
+    f"{TRACKER_UPDATE_CDN_PUBLIC_PATH}/health.json",
+    methods=["GET", "HEAD", "OPTIONS"],
+)
+def tracker_update_cdn_health():
+    """Kleine öffentliche Diagnose-Route für Deployment-Checks."""
+    if request.method == "OPTIONS":
+        return tracker_update_cdn_apply_manifest_headers(Response(status=204))
+
+    channels = {}
+    for channel in sorted(TRACKER_UPDATE_CDN_CHANNELS):
+        try:
+            manifest = tracker_update_cdn_normalize_manifest(channel)
+            channels[channel] = {
+                "available": True,
+                "releases": len(manifest.get("releases") or []),
+            }
+        except Exception as error:
+            channels[channel] = {
+                "available": False,
+                "error": str(error),
+            }
+
+    response = jsonify({
+        "success": True,
+        "updateCdn": True,
+        "channels": channels,
+    })
+    return tracker_update_cdn_apply_manifest_headers(response)
+
 
 # ==========================================
 # SERVICECENTER / WEB-ONLY FAHRERKARTE
@@ -1490,6 +1901,12 @@ def enforce_global_wartungsmodus():
     if request.method == "OPTIONS":
         return None
     if endpoint == "static" or path.startswith("/static/") or path in {"/favicon.ico", "/robots.txt"}:
+        return None
+
+    # Der Desktop-Updater muss auch während Wartungsarbeiten Updates laden können.
+    # Dadurch kann insbesondere ein verpflichtendes Update nicht durch den globalen
+    # Wartungsschalter blockiert werden.
+    if tracker_update_cdn_is_public_path(path):
         return None
 
     config = load_wartung_config()
