@@ -136,6 +136,150 @@
         transform: rotate(180deg);
     }
 
+
+    /* Saubere, responsive Eventdarstellung */
+    .events-hero {
+        aspect-ratio: auto;
+        background: rgba(0, 0, 0, 0.42);
+    }
+
+    .events-hero-image {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+        object-position: center;
+    }
+
+    .events-event-card {
+        padding: 1rem;
+    }
+
+    .events-event-card::before {
+        opacity: 0.65;
+    }
+
+    .events-event-cover {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        object-fit: cover;
+        object-position: center;
+        background: rgba(0, 0, 0, 0.22);
+    }
+
+    .events-fact-pill {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.45rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.035);
+        padding: 0.5rem 0.7rem;
+    }
+
+    .events-line-clamp-3 {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+    }
+
+    .events-card-details summary {
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .events-card-details summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .events-card-details[open] .events-details-chevron {
+        transform: rotate(180deg);
+    }
+
+    .events-markdown {
+        color: var(--muted);
+        font-family: var(--font-inter, Inter, sans-serif);
+        font-size: 0.875rem;
+        line-height: 1.72;
+    }
+
+    .events-markdown > :first-child {
+        margin-top: 0;
+    }
+
+    .events-markdown > :last-child {
+        margin-bottom: 0;
+    }
+
+    .events-markdown p,
+    .events-markdown ul,
+    .events-markdown ol,
+    .events-markdown blockquote {
+        margin: 0.7rem 0;
+    }
+
+    .events-markdown h1,
+    .events-markdown h2,
+    .events-markdown h3,
+    .events-markdown h4 {
+        margin: 1rem 0 0.45rem;
+        color: var(--text);
+        font-family: Orbitron, sans-serif;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        line-height: 1.5;
+        text-transform: uppercase;
+    }
+
+    .events-markdown ul,
+    .events-markdown ol {
+        padding-left: 1.3rem;
+    }
+
+    .events-markdown ul {
+        list-style: disc;
+    }
+
+    .events-markdown ol {
+        list-style: decimal;
+    }
+
+    .events-markdown li + li {
+        margin-top: 0.25rem;
+    }
+
+    .events-markdown blockquote {
+        border-left: 2px solid var(--events-green);
+        border-radius: 0 0.65rem 0.65rem 0;
+        background: rgba(137, 190, 50, 0.07);
+        padding: 0.65rem 0.8rem;
+    }
+
+    .events-markdown code {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0.35rem;
+        background: rgba(0, 0, 0, 0.28);
+        padding: 0.1rem 0.35rem;
+        color: var(--brand-yellow);
+        font-size: 0.78rem;
+    }
+
+    .events-markdown a {
+        color: var(--brand-yellow);
+        text-decoration: underline;
+        text-underline-offset: 0.2rem;
+    }
+
+    .events-markdown strong {
+        color: var(--text);
+        font-weight: 700;
+    }
+
 </style>
 
 <div class="events-shell pb-4">
@@ -143,7 +287,7 @@
     <section class="mb-5 mt-8 md:mt-10" aria-labelledby="events-page-title">
         <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.24em] text-[var(--brand-yellow)]">Eifel LOG Community</p>
+                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.24em] text-[var(--brand-yellow)]">EifelLog Event Hub</p>
                 <h1 id="events-page-title" class="mt-2 flex items-center gap-3 font-orbitron text-3xl font-extrabold tracking-tight text-[var(--text)] md:text-4xl">
                     <img
                         src="{{ url_for('static', filename='eifellog.jpg') }}"
@@ -170,7 +314,7 @@
         </div>
     </section>
 
-    <!-- Event-Banner ohne Overlays: events.jpg bleibt vollständig sichtbar -->
+    <!-- Responsiver Event-Banner: Das vollständige events.jpg bleibt sichtbar und wird nicht beschnitten. -->
     <section class="events-hero relative mb-7 overflow-hidden rounded-[2rem]" aria-label="EifelLog Events">
         <img
             src="{{ url_for('static', filename='events.jpg') }}"
@@ -206,7 +350,7 @@
                     </span>
                 </div>
                 <p id="stat-total" class="mt-4 font-orbitron text-3xl font-extrabold text-[var(--text)]">–</p>
-                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Alle gespeicherten Community-Termine.</p>
+                <p class="mt-2 font-inter text-xs text-[var(--muted)]">Alle gespeicherten Event-Termine.</p>
             </article>
 
             <article class="events-stat-card rounded-2xl p-5">
@@ -244,7 +388,7 @@
                 <div>
                     <p class="font-orbitron text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)]">Event-Navigation</p>
                     <h2 id="event-filter-title" class="mt-2 font-orbitron text-xl font-extrabold tracking-wide text-[var(--text)]">Finde deinen nächsten Termin</h2>
-                    <p class="mt-2 font-inter text-sm text-[var(--muted)]">Suche nach Titel, Ort oder Kategorie und grenze die Übersicht gezielt ein.</p>
+                    <p class="mt-2 font-inter text-sm text-[var(--muted)]">Suche nach Titel, Startpunkt oder Kategorie und grenze die Übersicht gezielt ein.</p>
                 </div>
 
                 <button id="refresh-events" type="button" class="btn-secondary inline-flex shrink-0 items-center justify-center">
@@ -262,7 +406,7 @@
                         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--brand-green)]" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.35-5.15a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"></path>
                         </svg>
-                        <input id="event-search" type="search" autocomplete="off" placeholder="Titel, Beschreibung oder Ort" class="events-input py-3 pl-11 pr-4 font-inter text-sm placeholder:text-[var(--muted)]/65">
+                        <input id="event-search" type="search" autocomplete="off" placeholder="Titel, Startpunkt oder Route" class="events-input py-3 pl-11 pr-4 font-inter text-sm placeholder:text-[var(--muted)]/65">
                     </span>
                 </label>
 
@@ -289,8 +433,8 @@
     <section class="mb-16 scroll-mt-5" aria-labelledby="event-list-title">
         <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--brand-yellow)]">EifelLog API</p>
-                <h2 id="event-list-title" class="mt-2 font-orbitron text-2xl font-extrabold tracking-wide text-[var(--text)] md:text-3xl">Eventübersicht</h2>
+                <p class="font-orbitron text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--brand-yellow)]">Aktuelle Termine</p>
+                <h2 id="event-list-title" class="mt-2 font-orbitron text-2xl font-extrabold tracking-wide text-[var(--text)] md:text-3xl">Events &amp; Konvois</h2>
             </div>
             <p id="event-result-count" class="font-orbitron text-[10px] uppercase tracking-wider text-[var(--muted)]">Events werden geladen</p>
         </div>
@@ -307,7 +451,7 @@
             Detailroute gibt, setze data-detail-endpoint="". Die Listen-Antwort bleibt
             trotzdem vollständig nutzbar.
         -->
-        <div id="events-page-list" data-endpoint="/api/events" data-detail-endpoint="/api/events/{id}" class="grid gap-5 lg:grid-cols-2" aria-live="polite" aria-busy="true">
+        <div id="events-page-list" data-endpoint="/api/events" data-detail-endpoint="/api/events/{id}" class="grid gap-4" aria-live="polite" aria-busy="true">
             <article class="events-glass rounded-2xl p-6 lg:col-span-2">
                 <p class="font-inter text-sm text-[var(--muted)]">Events werden aus EifelLog geladen …</p>
             </article>
@@ -505,6 +649,9 @@
             'startAt', 'startsAt', 'startTime', 'scheduled_start_time', 'scheduledStartTime', 'datetime', 'date',
             'end_at', 'ends_at', 'end_time', 'endAt', 'endsAt', 'endTime', 'scheduled_end_time', 'scheduledEndTime',
             'time', 'location', 'venue', 'address', 'channel_name', 'channelName', 'category', 'type', 'event_type',
+            'start', 'start_location', 'startLocation', 'start_point', 'startPoint', 'origin', 'from',
+            'end_location', 'endLocation', 'destination', 'to', 'details_markdown', 'detailsMarkdown', 'markdown',
+            'long_description', 'longDescription', 'short_description', 'shortDescription', 'excerpt',
             'participants', 'participant_count', 'participantCount', 'participants_count', 'member_count', 'user_count',
             'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'organizer', 'host', 'creator', 'owner',
             'status', 'state', 'server', 'guild', 'channel', 'voice_channel', 'voiceChannel', 'platform', 'game',
@@ -615,6 +762,47 @@
             return target;
         };
 
+        const looksLikeDateValue = (value) => {
+            const normalizedValue = normalizeText(value);
+
+            if (!normalizedValue) {
+                return false;
+            }
+
+            return /^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(normalizedValue)
+                || /^\d{2}\.\d{2}\.\d{4}(?:[T\s].*)?$/.test(normalizedValue);
+        };
+
+        const getPlaceLabel = (...values) => {
+            for (const value of values) {
+                const label = getEntityLabel(value);
+
+                if (label && !looksLikeDateValue(label)) {
+                    return label;
+                }
+            }
+
+            return '';
+        };
+
+        const normalizeMarkdown = (value) => {
+            if (Array.isArray(value)) {
+                return value.map(normalizeMarkdown).filter(Boolean).join('\n');
+            }
+
+            if (isPlainObject(value)) {
+                return normalizeText(firstDefined(
+                    value.markdown,
+                    value.content,
+                    value.text,
+                    value.description,
+                    value.value
+                ));
+            }
+
+            return normalizeText(value);
+        };
+
         const normalizeEvent = (rawEvent) => {
             const raw = isPlainObject(rawEvent) ? rawEvent : {};
             const merged = mergeObjects(
@@ -639,21 +827,72 @@
                 'registrations.total'
             );
 
+            const location = getPlaceLabel(
+                pick(merged, 'location', 'venue', 'address', 'channel_name', 'channelName', 'channel.name')
+            );
+            const meetingPoint = getPlaceLabel(
+                pick(merged, 'meeting_point', 'meetingPoint', 'meeting_location', 'meetingLocation')
+            );
+            const startLocation = getPlaceLabel(
+                pick(
+                    merged,
+                    'start_location',
+                    'startLocation',
+                    'start_point',
+                    'startPoint',
+                    'departure',
+                    'origin',
+                    'from',
+                    'start.name',
+                    'start.location',
+                    'start'
+                ),
+                meetingPoint,
+                location
+            ) || 'Startpunkt folgt';
+            const destination = getPlaceLabel(
+                pick(
+                    merged,
+                    'destination',
+                    'to',
+                    'end_location',
+                    'endLocation',
+                    'finish',
+                    'arrival',
+                    'destination.name'
+                )
+            );
             const route = getEntityLabel(firstDefined(
                 pick(merged, 'route', 'route_name', 'routeName'),
-                [pick(merged, 'departure', 'from'), pick(merged, 'destination', 'to')].filter(Boolean).join(' → ')
+                [startLocation !== 'Startpunkt folgt' ? startLocation : '', destination].filter(Boolean).join(' → ')
+            ));
+            const detailsMarkdown = normalizeMarkdown(pick(
+                merged,
+                'details_markdown',
+                'detailsMarkdown',
+                'markdown',
+                'long_description',
+                'longDescription',
+                'details.markdown',
+                'details.content',
+                'details.text',
+                'content',
+                'description'
             ));
 
             return {
                 _raw: merged,
                 id: normalizeText(pick(merged, 'id', 'event_id', 'eventId', 'uuid')),
                 title: normalizeText(pick(merged, 'title', 'name', 'event_name', 'eventName')) || 'EifelLog Event',
-                description: normalizeText(pick(merged, 'description', 'summary', 'content', 'details.description')) || 'Weitere Informationen werden noch bekannt gegeben.',
-                category: normalizeText(pick(merged, 'category', 'type', 'event_type', 'eventType')) || 'EifelLog Event',
+                description: normalizeText(pick(merged, 'summary', 'excerpt', 'short_description', 'shortDescription', 'description', 'details.description')) || 'Weitere Informationen folgen.',
+                detailsMarkdown,
+                category: normalizeText(pick(merged, 'category', 'type', 'event_type', 'eventType')) || 'Event',
                 startAt: pick(merged, 'start_at', 'starts_at', 'start_time', 'startAt', 'startsAt', 'startTime', 'scheduled_start_time', 'scheduledStartTime', 'datetime', 'date'),
                 endAt: pick(merged, 'end_at', 'ends_at', 'end_time', 'endAt', 'endsAt', 'endTime', 'scheduled_end_time', 'scheduledEndTime'),
                 timeLabel: normalizeText(pick(merged, 'time', 'time_label', 'timeLabel')),
-                location: getEntityLabel(pick(merged, 'location', 'venue', 'address', 'channel_name', 'channelName', 'channel.name')) || 'Eifel LOG Community',
+                location,
+                startLocation,
+                destination,
                 participants: getParticipantCount(participantsSource),
                 maxParticipants: toNumberOrNull(pick(merged, 'max_participants', 'maxParticipants', 'participant_limit', 'capacity', 'attendance.capacity')),
                 organizer: getEntityLabel(pick(merged, 'organizer', 'host', 'creator', 'owner', 'created_by', 'createdBy')),
@@ -662,7 +901,7 @@
                 channel: getEntityLabel(pick(merged, 'voice_channel', 'voiceChannel', 'channel')),
                 platform: getEntityLabel(pick(merged, 'platform')),
                 game: getEntityLabel(pick(merged, 'game')),
-                meetingPoint: getEntityLabel(pick(merged, 'meeting_point', 'meetingPoint', 'meeting_location', 'meetingLocation')),
+                meetingPoint,
                 route,
                 url: getEventDisplayUrl(merged),
                 imageUrl: getEventImageUrl(merged),
@@ -794,63 +1033,230 @@
             return svg;
         };
 
-        const createMetaItem = (svgPath, label) => {
-            const wrapper = createElement('div', 'flex min-w-0 items-center gap-2');
-            const icon = createIcon(svgPath, 'h-4 w-4 shrink-0 text-[var(--brand-green)]');
-            const text = createElement('span', 'min-w-0 break-words', label);
+        const escapeHtml = (value) => normalizeText(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const renderInlineMarkdown = (value) => escapeHtml(value)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        const renderMarkdown = (value) => {
+            const markdown = normalizeText(value);
+
+            if (!markdown) {
+                return '';
+            }
+
+            const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+            const html = [];
+            let paragraphLines = [];
+            let listType = '';
+
+            const closeList = () => {
+                if (listType) {
+                    html.push(`</${listType}>`);
+                    listType = '';
+                }
+            };
+
+            const flushParagraph = () => {
+                if (paragraphLines.length) {
+                    html.push(`<p>${paragraphLines.map(renderInlineMarkdown).join('<br>')}</p>`);
+                    paragraphLines = [];
+                }
+            };
+
+            lines.forEach((rawLine) => {
+                const line = rawLine.trim();
+
+                if (!line) {
+                    flushParagraph();
+                    closeList();
+                    return;
+                }
+
+                const heading = line.match(/^(#{1,4})\s+(.+)$/);
+                const unorderedItem = line.match(/^[-*]\s+(.+)$/);
+                const orderedItem = line.match(/^\d+[.)]\s+(.+)$/);
+                const quote = line.match(/^>\s?(.+)$/);
+
+                if (heading) {
+                    flushParagraph();
+                    closeList();
+                    const level = Math.min(heading[1].length + 1, 4);
+                    html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+                    return;
+                }
+
+                if (unorderedItem || orderedItem) {
+                    flushParagraph();
+                    const nextListType = unorderedItem ? 'ul' : 'ol';
+
+                    if (listType !== nextListType) {
+                        closeList();
+                        listType = nextListType;
+                        html.push(`<${listType}>`);
+                    }
+
+                    html.push(`<li>${renderInlineMarkdown((unorderedItem || orderedItem)[1])}</li>`);
+                    return;
+                }
+
+                if (quote) {
+                    flushParagraph();
+                    closeList();
+                    html.push(`<blockquote>${renderInlineMarkdown(quote[1])}</blockquote>`);
+                    return;
+                }
+
+                paragraphLines.push(line);
+            });
+
+            flushParagraph();
+            closeList();
+            return html.join('');
+        };
+
+        const stripMarkdown = (value) => normalizeText(value)
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+            .replace(/^#{1,6}\s+/gm, '')
+            .replace(/^[-*>]\s+/gm, '')
+            .replace(/[*_~]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const createFactPill = (svgPath, label, accent = false) => {
+            const wrapper = createElement(
+                'div',
+                accent
+                    ? 'events-fact-pill border-[var(--brand-green)]/20 bg-[var(--brand-green)]/[0.07] text-[var(--text)]'
+                    : 'events-fact-pill text-[var(--muted)]'
+            );
+            const icon = createIcon(svgPath, accent ? 'h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]' : 'h-3.5 w-3.5 shrink-0 text-[var(--brand-yellow)]');
+            const text = createElement('span', 'min-w-0 break-words font-orbitron text-[8px] font-bold uppercase tracking-wider', label);
             wrapper.append(icon, text);
             return wrapper;
         };
 
-        const appendOptionalMeta = (container, svgPath, label) => {
+        const appendFactPill = (container, svgPath, label, accent = false) => {
             if (normalizeText(label)) {
-                container.appendChild(createMetaItem(svgPath, label));
+                container.appendChild(createFactPill(svgPath, label, accent));
             }
         };
 
-        const createPluginDetails = (event) => {
-            if (!event.extraData.length) {
+        const createDetailCell = (label, value) => {
+            if (!normalizeText(value)) {
                 return null;
             }
 
-            const details = createElement('details', 'events-plugin-details mt-5 rounded-xl border border-white/10 bg-black/15 px-4 py-3');
-            const summary = createElement('summary', 'flex items-center justify-between gap-3 font-orbitron text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-yellow)]');
-            const summaryText = createElement('span', '', `Weitere Plugin-Informationen (${event.extraData.length})`);
-            const chevron = createIcon('M19 9l-7 7-7-7', 'events-plugin-chevron h-4 w-4 shrink-0 transition-transform');
-            summary.append(summaryText, chevron);
+            const item = createElement('div', 'min-w-0 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-3');
+            const term = createElement('dt', 'font-orbitron text-[8px] font-extrabold uppercase tracking-wider text-[var(--muted)]', label);
+            const description = createElement('dd', 'mt-1 break-words font-inter text-sm leading-relaxed text-[var(--text)]', value);
+            item.append(term, description);
+            return item;
+        };
 
-            const list = createElement('dl', 'mt-4 grid gap-3 border-t border-white/5 pt-4 sm:grid-cols-2');
-            event.extraData.forEach(({ label, value }) => {
-                const item = createElement('div', 'min-w-0 rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2');
-                const term = createElement('dt', 'font-orbitron text-[8px] font-extrabold uppercase tracking-wider text-[var(--muted)]', label);
-                const description = createElement('dd', 'mt-1 break-words font-inter text-xs leading-relaxed text-[var(--text)]', value);
-                item.append(term, description);
-                list.appendChild(item);
-            });
+        const appendDetailCell = (container, label, value) => {
+            const cell = createDetailCell(label, value);
 
-            details.append(summary, list);
+            if (cell) {
+                container.appendChild(cell);
+            }
+        };
+
+        const createAdditionalDetails = (event) => {
+            const participantText = event.participants !== null
+                ? event.maxParticipants !== null
+                    ? `${event.participants} / ${event.maxParticipants}`
+                    : String(event.participants)
+                : '';
+            const detailRows = [
+                ['Startpunkt', event.startLocation],
+                ['Ziel', event.destination],
+                ['Treffpunkt', event.meetingPoint],
+                ['Ort', event.location && event.location !== event.startLocation ? event.location : ''],
+                ['Beginn', `${formatDate(event)} · ${formatTime(event)}`],
+                ['Ende', formatEnd(event)],
+                ['Route', event.route],
+                ['Teilnehmer', participantText],
+                ['Organisation', event.organizer],
+                ['Status', event.status],
+                ['Server', event.server],
+                ['Kanal', event.channel],
+                ['Plattform', event.platform],
+                ['Spiel', event.game]
+            ].filter(([, value]) => normalizeText(value));
+
+            const hasMarkdown = Boolean(normalizeText(event.detailsMarkdown));
+            const hasExtraData = event.extraData.length > 0;
+
+            if (!hasMarkdown && !detailRows.length && !hasExtraData) {
+                return null;
+            }
+
+            const details = createElement('details', 'events-card-details mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/15');
+            const summary = createElement('summary', 'flex items-center justify-between gap-3 px-4 py-3 font-orbitron text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:bg-white/[0.035]');
+            const summaryLabel = createElement('span', '', 'Weitere Details');
+            const chevron = createIcon('M19 9l-7 7-7-7', 'events-details-chevron h-4 w-4 shrink-0 transition-transform');
+            summary.append(summaryLabel, chevron);
+
+            const panel = createElement('div', 'border-t border-white/5 px-4 py-4');
+
+            if (hasMarkdown) {
+                const markdownSection = createElement('section', 'rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3');
+                const heading = createElement('h4', 'font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]', 'Eventbeschreibung');
+                const markdown = createElement('div', 'events-markdown mt-2');
+                markdown.innerHTML = renderMarkdown(event.detailsMarkdown);
+                markdownSection.append(heading, markdown);
+                panel.appendChild(markdownSection);
+            }
+
+            if (detailRows.length) {
+                const heading = createElement('h4', `${hasMarkdown ? 'mt-4 ' : ''}font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]`, 'Termindetails');
+                const list = createElement('dl', 'mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3');
+                detailRows.forEach(([label, value]) => appendDetailCell(list, label, value));
+                panel.append(heading, list);
+            }
+
+            if (hasExtraData) {
+                const heading = createElement('h4', 'mt-4 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]', 'Zusätzliche Angaben');
+                const list = createElement('dl', 'mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3');
+                event.extraData.forEach(({ label, value }) => appendDetailCell(list, label, value));
+                panel.append(heading, list);
+            }
+
+            details.append(summary, panel);
             return details;
         };
 
         const createEventCard = (event) => {
-            const card = createElement('article', 'events-event-card rounded-[1.35rem] p-5 md:p-6 flex flex-col');
-
-            if (event.imageUrl) {
-                const image = document.createElement('img');
-                image.src = event.imageUrl;
-                image.alt = `Eventbild: ${event.title}`;
-                image.loading = 'lazy';
-                image.className = 'events-event-cover mb-5';
-                card.appendChild(image);
-            }
-
+            const card = createElement('article', 'events-event-card rounded-[1.35rem] md:p-5');
+            const layout = createElement('div', event.imageUrl ? 'grid gap-5 md:grid-cols-[minmax(0,1fr)_15rem] md:items-start' : '');
+            const content = createElement('div', 'min-w-0');
             const topRow = createElement('div', 'flex items-start justify-between gap-4');
             const topContent = createElement('div', 'min-w-0');
-            const category = createElement('p', 'font-orbitron text-[8px] font-extrabold uppercase tracking-[0.18em] text-[var(--brand-green)]', event.category);
-            const title = createElement('h3', 'mt-2 break-words font-orbitron text-lg font-extrabold leading-snug tracking-wide text-[var(--text)]', event.title);
-            topContent.append(category, title);
+            const badgeRow = createElement('div', 'flex flex-wrap items-center gap-2');
+            const category = createElement('span', 'rounded-full border border-[var(--brand-green)]/20 bg-[var(--brand-green)]/10 px-2.5 py-1 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand-green)]', event.category);
+            badgeRow.appendChild(category);
 
-            const dateBox = createElement('div', 'w-[4.75rem] shrink-0 rounded-2xl border border-[var(--brand-yellow)]/25 bg-[var(--brand-yellow)]/10 px-2 py-3 text-center');
+            if (event.status) {
+                badgeRow.appendChild(createElement('span', 'rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-orbitron text-[8px] font-bold uppercase tracking-wider text-[var(--muted)]', event.status));
+            }
+
+            const title = createElement('h3', 'mt-3 break-words font-orbitron text-xl font-extrabold leading-snug tracking-wide text-[var(--text)]', event.title);
+            topContent.append(badgeRow, title);
+
+            const dateBox = createElement('div', 'w-[4.5rem] shrink-0 rounded-2xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.08] px-2 py-3 text-center');
             const eventDate = getEventDate(event);
             const day = createElement('p', 'font-orbitron text-2xl font-extrabold leading-none text-[var(--text)]', eventDate ? new Intl.DateTimeFormat('de-DE', { day: '2-digit' }).format(eventDate) : '–');
             const month = createElement('p', 'mt-2 font-orbitron text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-yellow)]', eventDate ? new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(eventDate) : 'Termin');
@@ -858,35 +1264,22 @@
             dateBox.append(day, month, year);
             topRow.append(topContent, dateBox);
 
-            const description = createElement('p', 'mt-5 flex-grow border-t border-white/5 pt-4 font-inter text-sm leading-relaxed text-[var(--muted)]', event.description);
-            const meta = createElement('div', 'mt-5 grid gap-x-4 gap-y-3 border-t border-white/5 pt-4 font-orbitron text-[9px] font-bold uppercase tracking-wider text-[var(--muted)] sm:grid-cols-2');
-
-            meta.append(
-                createMetaItem('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', formatDate(event)),
-                createMetaItem('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', formatTime(event)),
-                createMetaItem('M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', event.location)
-            );
-
-            appendOptionalMeta(meta, 'M5 12h14M12 5l7 7-7 7', formatEnd(event) ? `Ende: ${formatEnd(event)}` : '');
+            const teaserText = stripMarkdown(event.description || event.detailsMarkdown) || 'Weitere Informationen folgen.';
+            const teaser = createElement('p', 'events-line-clamp-3 mt-4 font-inter text-sm leading-relaxed text-[var(--muted)]', teaserText);
+            const facts = createElement('div', 'mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-4');
+            appendFactPill(facts, 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', formatDate(event));
+            appendFactPill(facts, 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', formatTime(event));
+            appendFactPill(facts, 'M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', `Start: ${event.startLocation}`, true);
+            appendFactPill(facts, 'M8 9l4-4 4 4m-8 6l4 4 4-4', event.destination ? `Ziel: ${event.destination}` : event.route ? `Route: ${event.route}` : '');
 
             if (event.participants !== null) {
                 const participantText = event.maxParticipants !== null
                     ? `${event.participants} / ${event.maxParticipants} Teilnehmer`
                     : `${event.participants} Teilnehmer`;
-                appendOptionalMeta(meta, 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', participantText);
+                appendFactPill(facts, 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', participantText);
             }
 
-            appendOptionalMeta(meta, 'M5.121 17.804A13.936 13.936 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z', event.organizer ? `Organisation: ${event.organizer}` : '');
-            appendOptionalMeta(meta, 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', event.status ? `Status: ${event.status}` : '');
-            appendOptionalMeta(meta, 'M8 9l4-4 4 4m-8 6l4 4 4-4', event.route ? `Route: ${event.route}` : '');
-            appendOptionalMeta(meta, 'M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3-1.12 3-2.5S13.657 8 12 8zm0 13s7-4.35 7-10a7 7 0 10-14 0c0 5.65 7 10 7 10z', event.meetingPoint ? `Treffpunkt: ${event.meetingPoint}` : '');
-            appendOptionalMeta(meta, 'M5 12h14M12 5l7 7-7 7', event.server ? `Server: ${event.server}` : '');
-            appendOptionalMeta(meta, 'M8 12h8m-4-4v8', event.channel ? `Kanal: ${event.channel}` : '');
-            appendOptionalMeta(meta, 'M12 18h.01M8.2 15.8a5.4 5.4 0 017.6 0M5.4 13a9.3 9.3 0 0113.2 0M2.6 10.2a13.2 13.2 0 0118.8 0', event.platform ? `Plattform: ${event.platform}` : '');
-            appendOptionalMeta(meta, 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z', event.game ? `Spiel: ${event.game}` : '');
-
-            const pluginDetails = createPluginDetails(event);
-            const footer = createElement('div', 'mt-5 flex flex-wrap items-center justify-between gap-3');
+            const footer = createElement('div', 'mt-4 flex flex-wrap items-center justify-between gap-3');
             const state = createElement(
                 'span',
                 isPastEvent(event)
@@ -897,7 +1290,7 @@
             footer.appendChild(state);
 
             if (event.url) {
-                const link = createElement('a', 'inline-flex items-center gap-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:text-white', 'Details ansehen');
+                const link = createElement('a', 'inline-flex items-center gap-1.5 font-orbitron text-[8px] font-extrabold uppercase tracking-[0.14em] text-[var(--brand-yellow)] transition hover:text-white', 'Event-Link öffnen');
                 link.href = event.url;
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
@@ -905,13 +1298,27 @@
                 footer.appendChild(link);
             }
 
-            card.append(topRow, description, meta);
+            content.append(topRow, teaser, facts, footer);
+            layout.appendChild(content);
 
-            if (pluginDetails) {
-                card.appendChild(pluginDetails);
+            if (event.imageUrl) {
+                const imageWrapper = createElement('div', 'overflow-hidden rounded-2xl border border-white/5 bg-black/20');
+                const image = document.createElement('img');
+                image.src = event.imageUrl;
+                image.alt = `Eventbild: ${event.title}`;
+                image.loading = 'lazy';
+                image.className = 'events-event-cover';
+                imageWrapper.appendChild(image);
+                layout.appendChild(imageWrapper);
             }
 
-            card.appendChild(footer);
+            card.appendChild(layout);
+            const details = createAdditionalDetails(event);
+
+            if (details) {
+                card.appendChild(details);
+            }
+
             return card;
         };
 
@@ -941,6 +1348,9 @@
                     event.description,
                     event.category,
                     event.location,
+                    event.startLocation,
+                    event.destination,
+                    event.detailsMarkdown,
                     event.organizer,
                     event.status,
                     event.server,
@@ -1013,7 +1423,7 @@
                     'Keine passenden Events gefunden',
                     events.length
                         ? 'Passe die Suche oder die Filter an, um weitere Termine anzuzeigen.'
-                        : 'Zurzeit sind keine Events im EifelLog-System eingetragen.'
+                        : 'Zurzeit sind keine Events oder Konvois eingetragen.'
                 ));
             } else {
                 filteredEvents.forEach((event) => eventsContainer.appendChild(createEventCard(event)));
