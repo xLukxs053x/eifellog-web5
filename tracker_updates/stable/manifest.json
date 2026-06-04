@@ -5,13 +5,13 @@
     {
       "version": "1.2.2",
       "name": "EifelLog Tracker 1.2.2",
-      "releaseNotes": "CDN-Testversion",
+      "releaseNotes": "CDN-Testversion.",
       "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
       "prerelease": false,
       "assets": [
         {
-          "name": "EifelLog-Tracker-Setup-1.2.2.exe"
+          "name": "EifelLog-Tracker-Portable-1.2.2.zip"
         }
       ]
     }
