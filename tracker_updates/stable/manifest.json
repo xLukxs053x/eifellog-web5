@@ -3,25 +3,19 @@
   "channel": "stable",
   "releases": [
     {
-      "tagName": "1.2.2",
+      "version": "1.2.2",
       "name": "EifelLog Tracker 1.2.2",
-      "body": "Update auf Version 1.2.2.",
+      "releaseNotes": "Update auf Version 1.2.2.",
+      "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
       "prerelease": false,
       "publishedAt": "2026-06-04T12:00:00Z",
-      "htmlUrl": "https://www.eifellog.de/tracker/downloads",
       "assets": [
         {
-          "name": "EifelLog-Tracker-Setup-1.2.2.exe",
-          "browserDownloadUrl": "https://www.eifellog.de/tracker/updates/files/EifelLog-Tracker-Setup-1.2.2.exe",
-          "size": 0,
-          "sha256": ""
+          "name": "EifelLog-Tracker-Setup-1.2.2.exe"
         },
         {
-          "name": "EifelLog-Tracker-Delta-1.2.1-to-1.2.2.zip",
-          "browserDownloadUrl": "https://www.eifellog.de/tracker/updates/files/EifelLog-Tracker-Delta-1.2.1-to-1.2.2.zip",
-          "size": 0,
-          "sha256": ""
+          "name": "EifelLog-Tracker-Delta-1.2.1-to-1.2.2.zip"
         }
       ]
     }

@@ -29,15 +29,35 @@
         </div>
     </div>
 
-    <div class="glass-card p-8 md:p-10 relative overflow-hidden">
-        <p class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-3">Gemeinsam unterwegs</p>
-        <h2 class="text-3xl md:text-5xl font-orbitron font-extrabold text-[var(--text)] tracking-tight leading-tight">
-            Die nächste Tour wartet.<br>
-            <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
-        </h2>
-        <p class="text-sm md:text-base text-[var(--muted)] mt-5 max-w-3xl leading-relaxed font-inter">
-            Hier findest du alle geplanten Eifel LOG Events, Community-Abende und Konvois. Die Übersicht wird automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
-        </p>
+    <div class="relative overflow-hidden rounded-[2rem] border border-[var(--brand-green)]/25 bg-black/35 shadow-[0_22px_80px_rgba(0,0,0,0.45)] group">
+        <img
+            src="{{ url_for('static', filename='events.jpg') }}"
+            alt="EifelLog Events Banner"
+            class="block w-full h-[190px] sm:h-[250px] md:h-[310px] object-cover object-center transition duration-700 group-hover:scale-[1.015]"
+            loading="eager"
+        >
+
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_25%,rgba(137,190,50,0.18),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.20),transparent_48%),linear-gradient(0deg,rgba(0,0,0,0.62),transparent_42%)]"></div>
+        <div class="pointer-events-none absolute inset-x-5 top-5 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+        <div class="pointer-events-none absolute inset-x-5 bottom-5 h-px bg-gradient-to-r from-transparent via-[var(--brand-green)]/45 to-transparent"></div>
+
+        <div class="absolute left-5 right-5 bottom-5 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div class="max-w-3xl rounded-2xl border border-white/10 bg-black/45 px-5 py-4 backdrop-blur-md shadow-[0_15px_45px_rgba(0,0,0,0.35)]">
+                <p class="font-orbitron text-[9px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase mb-2">Gemeinsam unterwegs</p>
+                <h2 class="text-2xl md:text-4xl font-orbitron font-extrabold text-white tracking-tight leading-tight">
+                    Die nächste Tour wartet.
+                    <span class="text-[var(--brand-green)]">Steig ein und fahr mit.</span>
+                </h2>
+                <p class="text-xs md:text-sm text-slate-200/85 mt-3 leading-relaxed font-inter">
+                    Alle Eifel LOG Events, Community-Abende und Konvois werden automatisch mit den aktuellen Daten aus dem EifelLog-System synchronisiert.
+                </p>
+            </div>
+
+            <div class="hidden lg:flex flex-col items-end gap-2 shrink-0">
+                <span class="rounded-full border border-[var(--brand-green)]/35 bg-[var(--brand-green)]/10 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] backdrop-blur-md shadow-[0_0_24px_rgba(137,190,50,0.25)]">Live Event Hub</span>
+                <span class="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[9px] font-orbitron font-bold uppercase tracking-[0.18em] text-white/80 backdrop-blur-md">Konvois · Community · Touren</span>
+            </div>
+        </div>
     </div>
 </section>
 
