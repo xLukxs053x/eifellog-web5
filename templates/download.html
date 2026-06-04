@@ -5,7 +5,8 @@
 {% block content %}
 
 
-{% set github_repo = "xLukxs053x/EifelLog-Tracking" %}
+{% set tracker_updates_base_url = "/tracker/updates" %}
+{% set tracker_default_channel = "stable" %}
 {% set telemetry_dll_file = "EifelLogTelemetry.dll" %}
 {% set telemetry_dll_url = url_for('static', filename=telemetry_dll_file) if url_for is defined else '/static/EifelLogTelemetry.dll' %}
 
@@ -18,7 +19,7 @@
             Downloads
         </h1>
         <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
-            Lade dir hier das aktuelle EifelLog Setup, das Telemetry-Plugin und wichtige Fahrer-Dokumente direkt im Hub herunter.
+            Lade dir hier aktuelle EifelLog-Versionen direkt aus dem eigenen CDN, das Telemetry-Plugin und wichtige Fahrer-Dokumente herunter.
         </p>
     </div>
 
@@ -31,6 +32,43 @@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
 
     <div class="xl:col-span-2 flex flex-col gap-6">
+
+        <div class="glass-card p-6 border-t border-white/10">
+            <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+                <div class="flex-1">
+                    <label for="release-channel-select" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">
+                        Update-Kanal
+                    </label>
+                    <select id="release-channel-select"
+                            class="w-full bg-black/35 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white font-inter focus:outline-none focus:border-[var(--brand-green)]/60">
+                        <option value="stable">Stable</option>
+                        <option value="beta">Beta</option>
+                        <option value="developer">Developer</option>
+                    </select>
+                </div>
+
+                <div class="flex-1">
+                    <label for="release-version-select" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">
+                        Version
+                    </label>
+                    <select id="release-version-select"
+                            class="w-full bg-black/35 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white font-inter focus:outline-none focus:border-[var(--brand-green)]/60 disabled:opacity-50"
+                            disabled>
+                        <option value="">Wird geladen...</option>
+                    </select>
+                </div>
+
+                <div class="lg:min-w-[220px] bg-black/30 border border-white/5 rounded-2xl px-4 py-3">
+                    <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Veröffentlicht</p>
+                    <p id="release-published-at" class="text-sm font-orbitron font-bold text-white">Prüfe...</p>
+                </div>
+            </div>
+
+            <div class="mt-4 bg-black/30 border border-white/5 rounded-2xl p-4">
+                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Release Notes</p>
+                <p id="release-notes" class="text-sm text-gray-300 font-inter leading-relaxed whitespace-pre-line">Release wird geladen...</p>
+            </div>
+        </div>
 
         <div class="glass-card p-6 relative overflow-hidden border-t border-[var(--brand-green)]/30">
             <div class="absolute -right-10 -top-10 opacity-5 text-white">
@@ -55,7 +93,7 @@
                             EifelLog Fahrer-App
                         </h2>
                         <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
-                            Installiere immer die neueste Version. Der Download-Button lädt das aktuelle Setup direkt herunter.
+                            Wähle Kanal und Version aus. Der Download-Button lädt das passende Setup direkt aus dem EifelLog-CDN herunter.
                         </p>
 
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
@@ -89,6 +127,29 @@
                         </svg>
                         Setup wird gesucht...
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Tracker-Dateien
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        Verfügbare Dateien für die ausgewählte Version. Delta-Dateien sind primär für den integrierten Auto-Updater vorgesehen.
+                    </p>
+                </div>
+
+                <span id="release-channel-badge" class="inline-flex w-fit px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
+                    Stable
+                </span>
+            </div>
+
+            <div id="release-assets-list" class="space-y-3">
+                <div class="rounded-2xl bg-black/30 border border-white/5 p-4 text-sm text-[var(--muted)] font-inter">
+                    Tracker-Dateien werden geladen...
                 </div>
             </div>
         </div>
@@ -416,7 +477,7 @@
             <div class="space-y-3">
                 <div class="flex justify-between items-center text-sm">
                     <span class="text-gray-400 font-inter">Setup Quelle:</span>
-                    <span class="text-white font-orbitron font-bold text-xs uppercase">GitHub</span>
+                    <span class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">EifelLog CDN</span>
                 </div>
 
                 <div class="flex justify-between items-center text-sm">
@@ -529,11 +590,19 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const repo = {{ github_repo|tojson }};
-        const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+        const updatesBaseUrl = {{ tracker_updates_base_url|tojson }};
+        const defaultChannel = {{ tracker_default_channel|tojson }};
+        const allowedChannels = ['stable', 'beta', 'developer'];
 
         const telemetryDllFileName = {{ telemetry_dll_file|tojson }};
         const telemetryDllUrl = {{ telemetry_dll_url|tojson }};
+
+        const channelSelect = document.getElementById('release-channel-select');
+        const versionSelect = document.getElementById('release-version-select');
+        const releasePublishedAt = document.getElementById('release-published-at');
+        const releaseNotes = document.getElementById('release-notes');
+        const releaseChannelBadge = document.getElementById('release-channel-badge');
+        const releaseAssetsList = document.getElementById('release-assets-list');
 
         const setupVersion = document.getElementById('setup-version');
         const setupSize = document.getElementById('setup-size');
@@ -568,7 +637,8 @@
             'nutzungsbedingungen.doc': null
         };
 
-        let latestVersion = 'Latest';
+        let releases = [];
+        let latestVersion = '-';
 
         function formatBytes(bytes) {
             const value = Number(bytes);
@@ -583,6 +653,21 @@
             return `${value} B`;
         }
 
+        function formatPublishedAt(value) {
+            if (!value) return '-';
+
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value);
+
+            return new Intl.DateTimeFormat('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        }
+
         function normalizeName(value) {
             return String(value || '')
                 .toLowerCase()
@@ -592,9 +677,87 @@
                 .trim();
         }
 
+        function normalizeAsset(rawAsset) {
+            const asset = rawAsset && typeof rawAsset === 'object' ? rawAsset : {};
+            const name = String(asset.name || '').trim();
+            const rawUrl = String(
+                asset.url
+                || asset.browserDownloadUrl
+                || asset.browser_download_url
+                || ''
+            ).trim();
+
+            return {
+                name,
+                url: normalizeCdnAssetUrl(rawUrl),
+                size: Number(asset.size || asset.sizeBytes || asset.size_bytes || 0),
+                sha256: String(asset.sha256 || asset.sha256sum || '').trim().toLowerCase(),
+                kind: String(asset.kind || '').trim()
+            };
+        }
+
+        function normalizeRelease(rawRelease) {
+            const release = rawRelease && typeof rawRelease === 'object' ? rawRelease : {};
+            const assets = Array.isArray(release.assets)
+                ? release.assets.map(normalizeAsset).filter(asset => asset.name)
+                : [];
+
+            return {
+                version: String(
+                    release.version
+                    || release.tagName
+                    || release.tag_name
+                    || ''
+                ).trim(),
+                name: String(release.name || '').trim(),
+                notes: String(
+                    release.releaseNotes
+                    || release.body
+                    || release.notes
+                    || ''
+                ).trim(),
+                pageUrl: String(
+                    release.pageUrl
+                    || release.htmlUrl
+                    || release.html_url
+                    || ''
+                ).trim(),
+                publishedAt: release.publishedAt || release.published_at || release.createdAt || release.created_at || '',
+                draft: Boolean(release.draft),
+                prerelease: Boolean(release.prerelease),
+                assets
+            };
+        }
+
+        function normalizeCdnAssetUrl(rawUrl) {
+            if (!rawUrl) return '';
+
+            try {
+                const url = new URL(rawUrl, window.location.origin);
+                const isSameOrigin = url.origin === window.location.origin;
+                const isProductionCdn =
+                    url.protocol === 'https:'
+                    && ['www.eifellog.de', 'eifellog.de'].includes(url.hostname.toLowerCase());
+
+                if (!isSameOrigin && !isProductionCdn) return '';
+                if (!url.pathname.startsWith('/tracker/updates/files/')) return '';
+
+                return url.href;
+            } catch (error) {
+                return '';
+            }
+        }
+
         function setStatusColor(element, colorClass) {
             if (!element) return;
-            element.classList.remove('text-[var(--brand-green)]', 'text-[var(--brand-yellow)]', 'text-red-400', 'text-[#9AA2FF]');
+
+            element.classList.remove(
+                'text-[var(--brand-green)]',
+                'text-[var(--brand-yellow)]',
+                'text-red-400',
+                'text-[#9AA2FF]'
+            );
+
             element.classList.add(colorClass);
         }
 
@@ -622,29 +785,63 @@
                 const normalized = normalizeName(assetName);
                 const lowerName = assetName.toLowerCase();
 
-                const matchesName = names.length === 0 || names.some(name => normalized === name || normalized.startsWith(name));
-                const matchesIncludes = includes.length === 0 || includes.some(keyword => normalized.includes(keyword));
-                const matchesExtension = extensions.length === 0 || extensions.some(extension => lowerName.endsWith(extension));
+                const matchesName =
+                    names.length === 0
+                    || names.some(name => normalized === name || normalized.startsWith(name));
+
+                const matchesIncludes =
+                    includes.length === 0
+                    || includes.some(keyword => normalized.includes(keyword));
+
+                const matchesExtension =
+                    extensions.length === 0
+                    || extensions.some(extension => lowerName.endsWith(extension));
 
                 return matchesName && matchesIncludes && matchesExtension;
             }) || null;
         }
 
         function findSetupAsset(assets) {
-            return findAsset(assets, {
-                includes: ['setup', 'installer', 'install', 'eifellog', 'eifel-log', 'tracking', 'fahrer'],
-                extensions: ['.exe', '.msi', '.zip']
-            }) || findAsset(assets, {
-                extensions: ['.exe', '.msi']
-            }) || findAsset(assets, {
-                extensions: ['.zip']
-            });
+            if (!Array.isArray(assets)) return null;
+
+            return assets.find(asset => {
+                const name = normalizeName(asset.name);
+                const lower = String(asset.name || '').toLowerCase();
+
+                return asset.url
+                    && (lower.endsWith('.exe') || lower.endsWith('.msi'))
+                    && (name.includes('setup') || name.includes('installer'));
+            }) || assets.find(asset => {
+                const lower = String(asset.name || '').toLowerCase();
+                return asset.url && (lower.endsWith('.exe') || lower.endsWith('.msi'));
+            }) || null;
+        }
+
+        function getAssetType(asset) {
+            const name = String(asset.name || '').toLowerCase();
+
+            if (name.includes('delta') && name.endsWith('.zip')) return 'Delta Update';
+            if (name.includes('portable') && name.endsWith('.zip')) return 'Portable';
+            if (name.endsWith('.exe') || name.endsWith('.msi')) return 'Installer';
+            if (name.endsWith('.dll')) return 'Plugin';
+            if (name.endsWith('.pdf')) return 'PDF';
+            if (name.endsWith('.doc') || name.endsWith('.docx')) return 'Dokument';
+
+            return 'Datei';
+        }
+
+        function createElement(tag, className = '', text = '') {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text) element.textContent = text;
+            return element;
         }
 
         function setSetupButtonLoading() {
             setupDownloadBtn.href = '#';
             setupDownloadBtn.removeAttribute('download');
             setDisabledLink(setupDownloadBtn, true);
+
             setupDownloadBtn.innerHTML = `
                 <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -655,7 +852,7 @@
         }
 
         function setSetupButtonReady(asset) {
-            setupDownloadBtn.href = asset.browser_download_url;
+            setupDownloadBtn.href = asset.url;
             setupDownloadBtn.setAttribute('download', asset.name || 'EifelLog-Setup');
             setDisabledLink(setupDownloadBtn, false);
 
@@ -755,9 +952,7 @@
                 }
 
                 const contentLength = response.headers.get('content-length');
-                const sizeText = contentLength ? formatBytes(contentLength) : '-';
-
-                setTelemetryDllReady(sizeText);
+                setTelemetryDllReady(contentLength ? formatBytes(contentLength) : '-');
             } catch (headError) {
                 try {
                     const response = await fetch(telemetryDllUrl, {
@@ -770,9 +965,7 @@
                     }
 
                     const contentLength = response.headers.get('content-length');
-                    const sizeText = contentLength ? formatBytes(contentLength) : '-';
-
-                    setTelemetryDllReady(sizeText);
+                    setTelemetryDllReady(contentLength ? formatBytes(contentLength) : '-');
                 } catch (getError) {
                     console.warn('Telemetry DLL konnte nicht geladen werden:', headError, getError);
                     setTelemetryDllUnavailable('Datei fehlt');
@@ -781,15 +974,24 @@
         }
 
         function setUnavailableState(message = 'Kein Release') {
+            releases = [];
+            latestVersion = '-';
+
+            versionSelect.innerHTML = '<option value="">Keine Version verfügbar</option>';
+            versionSelect.disabled = true;
+
             setupVersion.textContent = '-';
             setupSize.textContent = '-';
             setupStatus.textContent = message;
             setStatusColor(setupStatus, 'text-[var(--brand-yellow)]');
 
+            releasePublishedAt.textContent = '-';
+            releaseNotes.textContent = message;
             releaseStatusVersion.textContent = '-';
             releaseStatusFiles.textContent = '0 Dateien';
 
             setSetupButtonUnavailable();
+            renderAssets([]);
 
             docFrachtterminalVersion.textContent = 'Version: -';
             docFrachtterminalSize.textContent = 'Größe: -';
@@ -802,7 +1004,7 @@
             const versionElement = isFracht ? docFrachtterminalVersion : docNutzungVersion;
             const sizeElement = isFracht ? docFrachtterminalSize : docNutzungSize;
 
-            if (asset) {
+            if (asset && asset.url) {
                 knownAssets[assetKey] = asset;
                 versionElement.textContent = `Version: ${version}`;
                 sizeElement.textContent = `Größe: ${formatBytes(asset.size)}`;
@@ -813,57 +1015,218 @@
             }
         }
 
-        async function loadLatestRelease() {
+        function renderAssets(assets) {
+            releaseAssetsList.innerHTML = '';
+
+            if (!Array.isArray(assets) || assets.length === 0) {
+                releaseAssetsList.appendChild(
+                    createElement(
+                        'div',
+                        'rounded-2xl bg-black/30 border border-white/5 p-4 text-sm text-[var(--muted)] font-inter',
+                        'Für diese Version wurden keine Dateien veröffentlicht.'
+                    )
+                );
+                return;
+            }
+
+            assets.forEach(asset => {
+                const row = createElement(
+                    'div',
+                    'flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl bg-black/30 border border-white/5 p-4'
+                );
+
+                const main = createElement('div', 'min-w-0');
+                const title = createElement('p', 'text-sm text-white font-orbitron font-bold break-all', asset.name);
+                const meta = createElement(
+                    'p',
+                    'text-xs text-[var(--muted)] font-inter mt-1',
+                    `${getAssetType(asset)} · ${formatBytes(asset.size)}`
+                );
+
+                main.appendChild(title);
+                main.appendChild(meta);
+
+                if (asset.sha256) {
+                    const checksum = createElement('p', 'text-[10px] text-gray-500 font-mono mt-2 break-all');
+                    checksum.textContent = `SHA256: ${asset.sha256}`;
+                    main.appendChild(checksum);
+                }
+
+                const actions = createElement('div', 'flex flex-wrap items-center gap-2 shrink-0');
+
+                if (asset.sha256 && navigator.clipboard) {
+                    const copyButton = createElement(
+                        'button',
+                        'px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[10px] font-orbitron uppercase tracking-wider text-gray-300',
+                        'SHA256 kopieren'
+                    );
+
+                    copyButton.type = 'button';
+                    copyButton.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(asset.sha256);
+                            copyButton.textContent = 'Kopiert';
+                            window.setTimeout(() => {
+                                copyButton.textContent = 'SHA256 kopieren';
+                            }, 1500);
+                        } catch (error) {
+                            console.warn('SHA256 konnte nicht kopiert werden:', error);
+                        }
+                    });
+
+                    actions.appendChild(copyButton);
+                }
+
+                const download = createElement(
+                    'a',
+                    'inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-[10px] font-orbitron uppercase tracking-wider',
+                    asset.url ? 'Herunterladen' : 'Nicht verfügbar'
+                );
+
+                download.href = asset.url || '#';
+
+                if (asset.url) {
+                    download.setAttribute('download', asset.name);
+                } else {
+                    download.setAttribute('aria-disabled', 'true');
+                    download.classList.add('opacity-60', 'cursor-not-allowed');
+                    download.addEventListener('click', event => event.preventDefault());
+                }
+
+                actions.appendChild(download);
+                row.appendChild(main);
+                row.appendChild(actions);
+                releaseAssetsList.appendChild(row);
+            });
+        }
+
+        function renderRelease(release) {
+            latestVersion = release.version || '-';
+
+            releasePublishedAt.textContent = formatPublishedAt(release.publishedAt);
+            releaseNotes.textContent = release.notes || 'Keine Release Notes vorhanden.';
+            releaseStatusVersion.textContent = latestVersion;
+            releaseStatusFiles.textContent = `${release.assets.length} ${release.assets.length === 1 ? 'Datei' : 'Dateien'}`;
+
+            renderAssets(release.assets);
+
+            const setupAsset = findSetupAsset(release.assets);
+
+            if (setupAsset) {
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = formatBytes(setupAsset.size);
+                setupStatus.textContent = 'Bereit';
+                setStatusColor(setupStatus, 'text-[var(--brand-green)]');
+                setSetupButtonReady(setupAsset);
+            } else {
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = '-';
+                setupStatus.textContent = 'Setup fehlt';
+                setStatusColor(setupStatus, 'text-[var(--brand-yellow)]');
+                setSetupButtonUnavailable('Setup fehlt');
+            }
+
+            updateDocAssetUi('Frachtterminal.doc', findAsset(release.assets, {
+                includes: ['frachtterminal'],
+                extensions: ['.doc', '.docx', '.pdf']
+            }), latestVersion);
+
+            updateDocAssetUi('nutzungsbedingungen.doc', findAsset(release.assets, {
+                includes: ['nutzungsbedingungen', 'nutzung', 'bedingungen'],
+                extensions: ['.doc', '.docx', '.pdf']
+            }), latestVersion);
+        }
+
+        function populateVersionSelect(items) {
+            versionSelect.innerHTML = '';
+
+            if (!items.length) {
+                versionSelect.innerHTML = '<option value="">Keine Version verfügbar</option>';
+                versionSelect.disabled = true;
+                return;
+            }
+
+            items.forEach((release, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = index === 0
+                    ? `${release.version} (neueste)`
+                    : release.version;
+
+                versionSelect.appendChild(option);
+            });
+
+            versionSelect.disabled = false;
+            versionSelect.value = '0';
+        }
+
+        async function loadChannel(channel) {
+            const selectedChannel = allowedChannels.includes(channel)
+                ? channel
+                : defaultChannel;
+
+            channelSelect.value = selectedChannel;
+            releaseChannelBadge.textContent = selectedChannel;
             setSetupButtonLoading();
 
+            versionSelect.innerHTML = '<option value="">Wird geladen...</option>';
+            versionSelect.disabled = true;
+            releasePublishedAt.textContent = 'Prüfe...';
+            releaseNotes.textContent = 'Release wird geladen...';
+            releaseAssetsList.innerHTML = `
+                <div class="rounded-2xl bg-black/30 border border-white/5 p-4 text-sm text-[var(--muted)] font-inter">
+                    Tracker-Dateien werden geladen...
+                </div>
+            `;
+
             try {
-                const response = await fetch(releaseApiUrl, {
-                    cache: 'no-store',
-                    headers: {
-                        'Accept': 'application/vnd.github+json',
-                        'X-GitHub-Api-Version': '2022-11-28'
+                const response = await fetch(
+                    `${updatesBaseUrl}/${encodeURIComponent(selectedChannel)}/manifest.json`,
+                    {
+                        cache: 'no-store',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
                     }
-                });
+                );
 
                 if (!response.ok) {
-                    throw new Error(`GitHub Release konnte nicht geladen werden: HTTP ${response.status}`);
+                    throw new Error(`CDN-Manifest konnte nicht geladen werden: HTTP ${response.status}`);
                 }
 
-                const release = await response.json();
-                const assets = Array.isArray(release.assets) ? release.assets : [];
+                const manifest = await response.json();
 
-                latestVersion = release.tag_name || release.name || 'Latest';
-                releaseStatusVersion.textContent = latestVersion;
-                releaseStatusFiles.textContent = `${assets.length} ${assets.length === 1 ? 'Datei' : 'Dateien'}`;
-
-                const setupAsset = findSetupAsset(assets);
-
-                if (setupAsset && setupAsset.browser_download_url) {
-                    setupVersion.textContent = latestVersion;
-                    setupSize.textContent = formatBytes(setupAsset.size);
-                    setupStatus.textContent = 'Bereit';
-                    setStatusColor(setupStatus, 'text-[var(--brand-green)]');
-                    setSetupButtonReady(setupAsset);
-                } else {
-                    setupVersion.textContent = latestVersion;
-                    setupSize.textContent = '-';
-                    setupStatus.textContent = 'Setup fehlt';
-                    setStatusColor(setupStatus, 'text-[var(--brand-yellow)]');
-                    setSetupButtonUnavailable('Setup fehlt');
+                if (
+                    manifest.channel
+                    && String(manifest.channel).toLowerCase() !== selectedChannel
+                ) {
+                    throw new Error(
+                        `CDN-Manifest gehört zu ${manifest.channel}, erwartet wurde ${selectedChannel}.`
+                    );
                 }
 
-                updateDocAssetUi('Frachtterminal.doc', findAsset(assets, {
-                    includes: ['frachtterminal'],
-                    extensions: ['.doc', '.docx', '.pdf']
-                }), latestVersion);
+                releases = Array.isArray(manifest.releases)
+                    ? manifest.releases
+                        .map(normalizeRelease)
+                        .filter(release => release.version && !release.draft)
+                    : [];
 
-                updateDocAssetUi('nutzungsbedingungen.doc', findAsset(assets, {
-                    includes: ['nutzungsbedingungen', 'nutzung', 'bedingungen'],
-                    extensions: ['.doc', '.docx', '.pdf']
-                }), latestVersion);
+                releases.sort((left, right) => {
+                    const rightTime = new Date(right.publishedAt || 0).getTime() || 0;
+                    const leftTime = new Date(left.publishedAt || 0).getTime() || 0;
+                    return rightTime - leftTime;
+                });
+
+                if (!releases.length) {
+                    throw new Error('CDN-Manifest enthält keine veröffentlichten Releases.');
+                }
+
+                populateVersionSelect(releases);
+                renderRelease(releases[0]);
             } catch (error) {
-                console.warn('GitHub Release konnte nicht geladen werden:', error);
-                setUnavailableState('GitHub Fehler');
+                console.warn('CDN-Manifest konnte nicht geladen werden:', error);
+                setUnavailableState('CDN Fehler');
+                releaseNotes.textContent = error.message || 'CDN-Manifest konnte nicht geladen werden.';
             }
         }
 
@@ -890,11 +1253,12 @@
             docModalSize.textContent = asset ? formatBytes(asset.size) : '-';
             docModalContent.innerHTML = content;
 
-            if (asset && asset.browser_download_url) {
-                docModalDownload.href = asset.browser_download_url;
+            if (asset && asset.url) {
+                docModalDownload.href = asset.url;
                 docModalDownload.setAttribute('download', asset.name || file);
                 docModalDownload.removeAttribute('aria-disabled');
                 docModalDownload.classList.remove('opacity-50', 'opacity-60', 'cursor-not-allowed');
+
                 docModalDownload.innerHTML = `
                     <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
@@ -906,6 +1270,7 @@
                 docModalDownload.removeAttribute('download');
                 docModalDownload.setAttribute('aria-disabled', 'true');
                 docModalDownload.classList.add('opacity-50', 'cursor-not-allowed');
+
                 docModalDownload.innerHTML = `
                     <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
@@ -937,6 +1302,7 @@
 
         function preventDisabledDownload(event) {
             const link = event.currentTarget;
+
             if (link && link.getAttribute('aria-disabled') === 'true') {
                 event.preventDefault();
             }
@@ -944,6 +1310,18 @@
 
         document.querySelectorAll('.doc-modal-trigger').forEach(button => {
             button.addEventListener('click', () => openDocModal(button));
+        });
+
+        channelSelect.addEventListener('change', () => {
+            loadChannel(channelSelect.value);
+        });
+
+        versionSelect.addEventListener('change', () => {
+            const index = Number(versionSelect.value);
+
+            if (Number.isInteger(index) && releases[index]) {
+                renderRelease(releases[index]);
+            }
         });
 
         setupDownloadBtn.addEventListener('click', preventDisabledDownload);
@@ -965,7 +1343,7 @@
         });
 
         checkTelemetryDll();
-        loadLatestRelease();
+        loadChannel(defaultChannel);
     });
 </script>
 
