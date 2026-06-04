@@ -56,6 +56,13 @@
             /* Allgemeiner Zoom / Layout-Balance */
             --site-max-width: 1280px;
             --nav-max-width: 1280px;
+
+            /*
+                Desktop-Ansicht wie Browser-Zoom 50 %, während der Browser selbst auf 100 % bleibt.
+                Auf Mobilgeräten wird das nicht angewendet, damit Menüs und Buttons bedienbar bleiben.
+            */
+            --desktop-page-zoom: 0.5;
+            --desktop-page-width-compensation: 200%;
         }
 
         /*
@@ -83,6 +90,43 @@
         @media (max-width: 768px) {
             html {
                 font-size: 14px;
+            }
+        }
+
+        /*
+            Desktop-Kompaktmodus:
+            Entspricht optisch ungefähr Browser-Zoom 50 %, aber direkt über base.html.
+            Breite und Mindesthöhe werden verdoppelt, damit nach zoom: 0.5 kein leerer
+            Rand entsteht und fixed Navigation/Footer sauber im sichtbaren Bereich sitzen.
+        */
+        @media (min-width: 1024px) {
+            body {
+                width: var(--desktop-page-width-compensation);
+                min-height: 200vh;
+                zoom: var(--desktop-page-zoom);
+            }
+
+            .hero-bg {
+                width: var(--desktop-page-width-compensation);
+                height: 200vh;
+            }
+
+            .hero-bg .bg-slide,
+            .hero-overlay {
+                width: 100%;
+                height: 100%;
+            }
+        }
+
+        /* Firefox-Fallback, falls zoom nicht unterstützt wird. */
+        @supports not (zoom: 1) {
+            @media (min-width: 1024px) {
+                body {
+                    width: var(--desktop-page-width-compensation);
+                    min-height: 200vh;
+                    transform: scale(var(--desktop-page-zoom));
+                    transform-origin: top left;
+                }
             }
         }
 
