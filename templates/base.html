@@ -394,6 +394,255 @@
                 transform: translateY(-12px);
             }
         }
+
+
+        /* === COOKIE CONSENT BANNER & MODAL === */
+        .cookie-banner {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+            padding: 1rem;
+            pointer-events: none;
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+        }
+
+        .cookie-banner.is-hidden {
+            opacity: 0;
+            transform: translateY(18px);
+            visibility: hidden;
+        }
+
+        .cookie-banner-panel {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            padding: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
+            pointer-events: auto;
+            background: linear-gradient(135deg, rgba(13, 27, 17, 0.97), rgba(4, 10, 6, 0.98));
+            border: 1px solid rgba(137, 190, 50, 0.35);
+            border-radius: 20px;
+            box-shadow: 0 22px 65px rgba(0, 0, 0, 0.68), 0 0 30px rgba(var(--brand-green-rgb), 0.1);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+        }
+
+        .cookie-banner-copy {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+
+        .cookie-banner-icon {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.45);
+            background: rgba(var(--brand-green-rgb), 0.12);
+            color: var(--brand-green);
+            box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.12);
+        }
+
+        .cookie-banner-title,
+        .cookie-modal-title {
+            margin: 0;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .cookie-banner-text,
+        .cookie-modal-text {
+            margin: 0.42rem 0 0;
+            color: var(--muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            line-height: 1.65;
+        }
+
+        .cookie-banner-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.65rem;
+            flex: 0 0 auto;
+        }
+
+        .cookie-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .cookie-modal.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .cookie-modal-card {
+            width: min(680px, 100%);
+            max-height: min(760px, calc(100vh - 2rem));
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(15, 30, 19, 0.98), rgba(4, 10, 6, 0.99));
+            border: 1px solid rgba(137, 190, 50, 0.35);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .cookie-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .cookie-modal-close {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .cookie-modal-close:hover {
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .cookie-category {
+            margin-top: 0.9rem;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .cookie-category-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .cookie-category-name {
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .cookie-category-status {
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .cookie-category p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .cookie-modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.7rem;
+            margin-top: 1.25rem;
+        }
+
+        .cookie-settings-link {
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            transition: color 0.25s ease;
+        }
+
+        .cookie-settings-link:hover {
+            color: var(--brand-green);
+        }
+
+        @media (max-width: 840px) {
+            .cookie-banner-panel {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .cookie-banner-actions {
+                justify-content: stretch;
+            }
+
+            .cookie-banner-actions .btn-primary,
+            .cookie-banner-actions .btn-secondary {
+                flex: 1 1 190px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .cookie-banner {
+                padding: 0.75rem;
+            }
+
+            .cookie-banner-panel,
+            .cookie-modal-card {
+                border-radius: 18px;
+            }
+
+            .cookie-banner-actions,
+            .cookie-modal-actions {
+                flex-direction: column;
+            }
+        }
+
     </style>
 
     <script>
@@ -420,6 +669,9 @@
                 });
             });
 
+            // === COOKIE CONSENT INIT ===
+            initCookieConsent();
+
             // === SICHERHEITSSYSTEM INIT ===
             initSecuritySystem();
         });
@@ -433,6 +685,132 @@
             menu.classList.toggle('hidden');
             menu.classList.toggle('flex');
         }
+
+
+
+        // === COOKIE CONSENT SYSTEM ===
+        const COOKIE_CONSENT_NAME = 'eifellog_cookie_consent';
+        const COOKIE_CONSENT_VERSION = 'v1';
+        const COOKIE_LIFETIME_SECONDS = 315360000; // 10 Jahre, bei jedem Besuch erneut verlängert
+
+        function getCookie(name) {
+            const prefix = `${name}=`;
+            const cookies = document.cookie ? document.cookie.split('; ') : [];
+
+            for (const cookie of cookies) {
+                if (cookie.startsWith(prefix)) {
+                    return decodeURIComponent(cookie.substring(prefix.length));
+                }
+            }
+
+            return null;
+        }
+
+        function setCookie(name, value) {
+            let cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${COOKIE_LIFETIME_SECONDS}; expires=Fri, 31 Dec 9999 23:59:59 GMT; SameSite=Lax`;
+
+            // Secure nur auf HTTPS setzen, damit lokale Entwicklung über HTTP weiterhin funktioniert.
+            if (window.location.protocol === 'https:') {
+                cookie += '; Secure';
+            }
+
+            document.cookie = cookie;
+        }
+
+        function deleteCookie(name) {
+            document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+        }
+
+        function initCookieConsent() {
+            const savedConsent = getCookie(COOKIE_CONSENT_NAME);
+            const acceptedValues = [
+                `${COOKIE_CONSENT_VERSION}:necessary`,
+                `${COOKIE_CONSENT_VERSION}:all`
+            ];
+
+            if (acceptedValues.includes(savedConsent)) {
+                // Gültigkeit bei jedem Besuch erneut verlängern.
+                setCookie(COOKIE_CONSENT_NAME, savedConsent);
+                applyCookieConsent(savedConsent.split(':')[1]);
+                hideCookieBanner();
+                return;
+            }
+
+            showCookieBanner();
+        }
+
+        function applyCookieConsent(level) {
+            document.documentElement.dataset.cookieConsent = level;
+
+            // Hier können später optionale Analyse- oder Marketing-Skripte
+            // ausschließlich nach Zustimmung geladen werden.
+            window.dispatchEvent(new CustomEvent('eifellog:cookie-consent', {
+                detail: { level }
+            }));
+        }
+
+        function saveCookieConsent(level) {
+            const value = `${COOKIE_CONSENT_VERSION}:${level}`;
+
+            setCookie(COOKIE_CONSENT_NAME, value);
+            applyCookieConsent(level);
+            closeCookieDetails();
+            hideCookieBanner();
+        }
+
+        function acceptAllCookies() {
+            saveCookieConsent('all');
+        }
+
+        function acceptNecessaryCookies() {
+            saveCookieConsent('necessary');
+        }
+
+        function showCookieBanner() {
+            const banner = document.getElementById('cookie-banner');
+
+            if (!banner) return;
+
+            banner.classList.remove('is-hidden');
+            banner.setAttribute('aria-hidden', 'false');
+        }
+
+        function hideCookieBanner() {
+            const banner = document.getElementById('cookie-banner');
+
+            if (!banner) return;
+
+            banner.classList.add('is-hidden');
+            banner.setAttribute('aria-hidden', 'true');
+        }
+
+        function openCookieDetails() {
+            const modal = document.getElementById('cookie-details-modal');
+
+            if (!modal) return;
+
+            modal.classList.remove('is-hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeCookieDetails() {
+            const modal = document.getElementById('cookie-details-modal');
+
+            if (!modal) return;
+
+            modal.classList.add('is-hidden');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        function resetCookieConsent() {
+            deleteCookie(COOKIE_CONSENT_NAME);
+            document.documentElement.removeAttribute('data-cookie-consent');
+            closeCookieDetails();
+            showCookieBanner();
+        }
+
 
         // === SICHERHEITSSYSTEM FUNKTIONEN ===
         function initSecuritySystem() {
@@ -659,12 +1037,121 @@
                     &copy; 2026 Eifel LOG. Fahre mit Leidenschaft..
                 </p>
 
-                <a href="/impressum" class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest hover:text-[var(--brand-green)] transition-colors">
-                    Impressum
-                </a>
+                <div class="flex items-center gap-3">
+                    <a href="/impressum" class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest hover:text-[var(--brand-green)] transition-colors">
+                        Impressum
+                    </a>
+
+                    <button type="button" onclick="openCookieDetails()" class="cookie-settings-link">
+                        Cookie-Einstellungen
+                    </button>
+                </div>
             </div>
         </div>
     </footer>
+
+
+
+    <!-- ========================================== -->
+    <!-- COOKIE CONSENT BANNER                      -->
+    <!-- ========================================== -->
+    <section id="cookie-banner" class="cookie-banner is-hidden" aria-label="Cookie-Einstellungen" aria-hidden="true">
+        <div class="cookie-banner-panel">
+            <div class="cookie-banner-copy">
+                <div class="cookie-banner-icon" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 109 9c0-.34-.02-.67-.06-1A4.5 4.5 0 0116 6.06 4.5 4.5 0 0111.06 3c.31 0 .63 0 .94 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 12.5h.01M12 16h.01M15.5 12.5h.01"></path>
+                    </svg>
+                </div>
+
+                <div>
+                    <h2 class="cookie-banner-title">Cookie-Freigabe</h2>
+                    <p class="cookie-banner-text">
+                        Wir verwenden Cookies, um deine Auswahl in diesem Browser zu speichern und die Webseite zuverlässig bereitzustellen.
+                        Du kannst die Details vor deiner Entscheidung öffnen. Deine Auswahl bleibt gespeichert, bis du die Cookies löschst oder einen anderen Browser verwendest.
+                    </p>
+                </div>
+            </div>
+
+            <div class="cookie-banner-actions">
+                <button type="button" onclick="openCookieDetails()" class="btn-secondary">
+                    Details lesen
+                </button>
+
+                <button type="button" onclick="acceptNecessaryCookies()" class="btn-secondary">
+                    Nur notwendige
+                </button>
+
+                <button type="button" onclick="acceptAllCookies()" class="btn-primary">
+                    Cookies akzeptieren
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- COOKIE DETAILS MODAL                       -->
+    <!-- ========================================== -->
+    <div id="cookie-details-modal" class="cookie-modal is-hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cookie-details-title">
+        <div class="cookie-modal-card">
+            <div class="cookie-modal-header">
+                <div>
+                    <h2 id="cookie-details-title" class="cookie-modal-title">Cookie-Einstellungen</h2>
+                    <p class="cookie-modal-text">
+                        Hier findest du eine Übersicht der eingesetzten Cookie-Kategorien. Deine Entscheidung wird ausschließlich in deinem aktuellen Browser gespeichert.
+                    </p>
+                </div>
+
+                <button type="button" onclick="closeCookieDetails()" class="cookie-modal-close" aria-label="Cookie-Details schließen">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="cookie-category">
+                <div class="cookie-category-head">
+                    <span class="cookie-category-name">Notwendige Cookies</span>
+                    <span class="cookie-category-status">Immer aktiv</span>
+                </div>
+
+                <p>
+                    Der Cookie <strong>eifellog_cookie_consent</strong> speichert deine Cookie-Auswahl. Dadurch erscheint dieses Banner nach deiner Entscheidung nicht erneut. Ohne diesen Cookie müsste die Abfrage bei jedem Seitenaufruf erneut angezeigt werden.
+                </p>
+            </div>
+
+            <div class="cookie-category">
+                <div class="cookie-category-head">
+                    <span class="cookie-category-name">Optionale Cookies</span>
+                    <span class="cookie-category-status">Nur nach Zustimmung</span>
+                </div>
+
+                <p>
+                    Diese Vorlage setzt aktuell keine Analyse- oder Marketing-Cookies. Falls später optionale Dienste ergänzt werden, dürfen diese erst nach deiner ausdrücklichen Zustimmung geladen werden.
+                </p>
+            </div>
+
+            <p class="cookie-modal-text">
+                Du kannst deine Auswahl jederzeit zurücksetzen. Danach wird das Cookie gelöscht und das Banner erneut angezeigt.
+            </p>
+
+            <div class="cookie-modal-actions">
+                <button type="button" onclick="resetCookieConsent()" class="btn-secondary">
+                    Auswahl zurücksetzen
+                </button>
+
+                <button type="button" onclick="acceptNecessaryCookies()" class="btn-secondary">
+                    Nur notwendige
+                </button>
+
+                <button type="button" onclick="acceptAllCookies()" class="btn-primary">
+                    Alle akzeptieren
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- ========================================== -->
     <!-- SECURITY MODAL (F12 / Rechtsklick Warnung) -->
