@@ -42,8 +42,14 @@ def tutorial(*args, **kwargs):
 
 
 @public_bp.route("/downloads")
+@public_bp.route("/tracker/downloads")
 def downloads(*args, **kwargs):
-    """Delegiert kompatibel an app.legacy.downloads()."""
+    """
+    Delegiert kompatibel an app.legacy.downloads().
+
+    Die zusätzliche Route /tracker/downloads wird vom Tracker-Update-CDN
+    als optionale Download-Seite erwartet.
+    """
     return _legacy.downloads(*args, **kwargs)
 
 
@@ -60,6 +66,7 @@ def fuhrpark(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.fuhrpark()."""
     return _legacy.fuhrpark(*args, **kwargs)
 
+
 @public_bp.route("/datenschutz")
 @public_bp.route("/datenschutz.html")
 def datenschutz(*args, **kwargs):
@@ -74,7 +81,6 @@ def nutzungsbedingungen(*args, **kwargs):
     return _legacy.nutzungsbedingungen(*args, **kwargs)
 
 
-
 @public_bp.route("/impressum")
 def impressum(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.impressum()."""
@@ -86,6 +92,7 @@ def impressum(*args, **kwargs):
 def team(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.team()."""
     return _legacy.team(*args, **kwargs)
+
 
 # ==========================================
 # ÖFFENTLICHE DISCORD-PLUGIN-API
@@ -101,3 +108,4 @@ def api_discord_events(*args, **kwargs):
 def api_discord_birthdays(*args, **kwargs):
     """Liefert die öffentliche Geburtstagsvorschau aus EifelLog.Birthdays."""
     return _legacy.api_discord_birthdays(*args, **kwargs)
+
