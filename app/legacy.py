@@ -267,9 +267,9 @@ def tracker_update_cdn_iso_from_timestamp(timestamp):
 
 
 def tracker_update_cdn_public_asset_url(filename):
-    """Gibt absichtlich eine relative URL zurück; der Desktop-Client bindet sie an eifellog.de."""
+    """Gibt den öffentlichen CDN-Pfad für ein Update-Paket zurück."""
     filename = tracker_update_cdn_asset_name(filename, package_only=True)
-    return f"files/{quote(filename, safe='-._~')}"
+    return f"{TRACKER_UPDATE_CDN_PUBLIC_PATH}/files/{quote(filename, safe='-._~')}"
 
 
 def tracker_update_cdn_validate_optional_page_url(value):
