@@ -4,14 +4,19 @@
   "releases": [
     {
       "version": "1.2.3-dev.1",
+      "tagName": "1.2.3-dev.1",
       "name": "EifelLog Tracker 1.2.3 Developer Preview 1",
       "releaseNotes": "Erste Developer-Version nach Stable 1.2.2.",
+      "body": "Erste Developer-Version nach Stable 1.2.2.",
+      "htmlUrl": "https://www.eifellog.de/tracker/downloads",
       "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
       "prerelease": true,
       "assets": [
         {
-          "name": "EifelLog-Tracker-Setup-1.2.3-dev.1.exe"
+          "name": "EifelLog-Tracker-Setup-1.2.3-dev.1.exe",
+          "browserDownloadUrl": "https://www.eifellog.de/tracker/updates/files/EifelLog-Tracker-Setup-1.2.3-dev.1.exe",
+          "size": 0
         }
       ]
     }
