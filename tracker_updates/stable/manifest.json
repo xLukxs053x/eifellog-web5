@@ -1,24 +1,17 @@
 {
   "schemaVersion": 1,
-  "channel": "developer",
+  "channel": "stable",
   "releases": [
     {
-      "version": "1.2.3-dev.1",
-      "name": "EifelLog Tracker 1.2.3 Developer Preview 1",
-      "releaseNotes": "Erste Developer-Version nach Stable 1.2.2.",
+      "version": "1.2.2",
+      "name": "EifelLog Tracker 1.2.2",
+      "releaseNotes": "Stable Release 1.2.2.",
       "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
-      "prerelease": true,
+      "prerelease": false,
       "assets": [
         {
-          "name": "EifelLog-Tracker-Setup-1.2.3-dev.1.exe",
-          "url": "https://www.eifellog.de/tracker/updates/files/EifelLog-Tracker-Setup-1.2.3-dev.1.exe",
-          "size": 0
-        },
-        {
-          "name": "EifelLog-Tracker-Setup-1.2.3-dev.1.exe.sha256",
-          "url": "https://www.eifellog.de/tracker/updates/files/EifelLog-Tracker-Setup-1.2.3-dev.1.exe.sha256",
-          "size": 0
+          "name": "EifelLog-Tracker-Setup-1.2.2.exe"
         }
       ]
     }
