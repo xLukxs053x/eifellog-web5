@@ -5,7 +5,7 @@
     {
       "version": "1.2.3",
       "name": "EifelLog Tracker 1.2.3",
-      "releaseNotes": "## 🚀 Neu in Version 1.2.3 | **🎨 Design Overhaul:** Die Benutzeroberfläche wurde umfassend modernisiert und visuell überarbeitet. | **🛠️ Neues Personalisierungscenter:** Passe Farben, Hintergründe, Schriftarten, Layouts, Effekte und Benachrichtigungen individuell an. | **👀 Live-Vorschau:** Änderungen am Login- und Dashboard-Design werden direkt in einer Vorschau dargestellt. | **📊 Telemetry Fixes:** Fehlerbehebungen und Stabilitätsverbesserungen bei der Verarbeitung von Telemetriedaten. | **⚡ Allgemeine Verbesserungen:** Weitere kleinere Optimierungen für eine zuverlässigere und angenehmere Nutzung des Trackers. | **💚 Entwickelt von LukxsDE mit 💚**",
+      "releaseNotes": "## 🚀 Neu in Version 1.2.3<br><br>### 🎨 Design Overhaul<br>Die Benutzeroberfläche wurde umfassend modernisiert und visuell überarbeitet.<br><br>### 🛠️ Neues Personalisierungscenter<br>Passe Farben, Hintergründe, Schriftarten, Layouts, Effekte und Benachrichtigungen individuell an.<br><br>### 👀 Live-Vorschau<br>Änderungen am Login- und Dashboard-Design werden direkt in einer Vorschau dargestellt.<br><br>### 📊 Telemetry Fixes<br>Fehlerbehebungen und Stabilitätsverbesserungen bei der Verarbeitung von Telemetriedaten.<br><br>### ⚡ Allgemeine Verbesserungen<br>Weitere kleinere Optimierungen für eine zuverlässigere und angenehmere Nutzung des Trackers.<br><br>---<br><br>💚 Entwickelt von LukxsDE mit 💚",
       "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
       "prerelease": false,
