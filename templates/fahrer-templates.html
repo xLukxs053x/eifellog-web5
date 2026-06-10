@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+
+{#
+    EifelLog Fahrer-Templates
+    -------------------------------------------------------------
+    Diese Seite enthält bewusst keine manuell eingetragenen Banner.
+    Alle Wallpaper-Karten werden ausschließlich aus dem Backend geladen.
+
+    Erwarteter Template-Kontext aus main.py:
+    - fahrer_templates: Liste der für den eingeloggten Nutzer freigegebenen Wallpaper
+    - Unterstützte optionale Felder je Datensatz:
+      id, title, description, preview_url, download_url, download_filename,
+      format, resolution, category, is_personalized, updated_at
+
+    Wichtig:
+    - Die Personalisierung erfolgt serverseitig pro eingeloggtem User.
+    - download_url sollte bereits die für den Nutzer bestimmte Datei liefern.
+    - Keine Wallpaper-Datensätze direkt in dieser HTML-Datei ergänzen.
+#}
+
+{% set safe_templates = fahrer_templates|default(wallpaper_templates|default([], true), true) %}
+{% set driver_name = current_user.username|default('Fahrer', true) %}
+
+{% block title %}EifelLog - Fahrer-Templates{% endblock %}
+
+{% block content %}
+<style>
+    .templates-page,
+    .templates-page * {
+        box-sizing: border-box;
+    }
+
+    .templates-page {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        min-width: 0;
+    }
+
+    .templates-hero {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        border: 1px solid rgba(137, 190, 50, 0.2);
+        border-radius: 1.45rem;
+        background:
+            radial-gradient(circle at 8% 0%, rgba(137, 190, 50, 0.19), transparent 35%),
+            radial-gradient(circle at 94% 10%, rgba(220, 226, 38, 0.12), transparent 38%),
+            linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
+            rgba(4, 6, 5, 0.8);
+        box-shadow: 0 20px 52px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+        padding: clamp(1rem, 2.2vw, 1.75rem);
+    }
+
+    .templates-hero::after {
+        content: "";
+        position: absolute;
+        right: -4.5rem;
+        top: -5rem;
+        width: 15rem;
+        height: 15rem;
+        border-radius: 9999px;
+        background: radial-gradient(circle, rgba(220, 226, 38, 0.12), transparent 70%);
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    .templates-hero-topline {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.63rem;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .templates-hero-dot,
+    .templates-status-dot {
+        display: inline-block;
+        width: 0.52rem;
+        height: 0.52rem;
+        border-radius: 9999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 15px rgba(137, 190, 50, 0.6);
+        flex: 0 0 auto;
+    }
+
+    .templates-hero-title {
+        margin-top: 0.75rem;
+        color: #fff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.42rem, 2.2vw, 2.15rem);
+        font-weight: 900;
+        line-height: 1.14;
+        letter-spacing: -0.035em;
+    }
+
+    .templates-hero-copy {
+        max-width: 53rem;
+        margin-top: 0.8rem;
+        color: rgba(255, 255, 255, 0.62);
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(0.84rem, 1vw, 0.94rem);
+        line-height: 1.65;
+    }
+
+    .templates-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.2rem;
+    }
+
+    .templates-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.48rem;
+        min-height: 2.25rem;
+        padding: 0.62rem 0.82rem;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 9999px;
+        background: rgba(0, 0, 0, 0.22);
+        color: rgba(255, 255, 255, 0.7);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.61rem;
+        font-weight: 900;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+    }
+
+    .templates-pill strong {
+        color: #fff;
+        font-weight: 900;
+    }
+
+    .templates-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin: clamp(1.2rem, 2vw, 1.65rem) 0 0.85rem;
+    }
+
+    .templates-section-title {
+        color: rgba(255, 255, 255, 0.95);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .templates-section-subtitle {
+        margin-top: 0.28rem;
+        color: rgba(255, 255, 255, 0.43);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.78rem;
+        line-height: 1.45;
+    }
+
+    .templates-back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.4rem;
+        padding: 0.68rem 0.88rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.045);
+        color: rgba(255, 255, 255, 0.72);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.61rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .templates-back-link:hover,
+    .templates-back-link:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba(137, 190, 50, 0.42);
+        background: rgba(137, 190, 50, 0.11);
+        color: #fff;
+        outline: none;
+    }
+
+    .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.85rem, 1.3vw, 1.15rem);
+    }
+
+    .template-card {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.085);
+        border-radius: 1.25rem;
+        background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022)),
+            rgba(4, 6, 5, 0.76);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+        transition: transform 210ms ease, border-color 210ms ease, box-shadow 210ms ease;
+    }
+
+    .template-card:hover,
+    .template-card:focus-within {
+        transform: translateY(-3px);
+        border-color: rgba(137, 190, 50, 0.33);
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.34), 0 0 28px rgba(137, 190, 50, 0.06);
+    }
+
+    .template-preview {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at 18% 15%, rgba(137, 190, 50, 0.16), transparent 34%),
+            radial-gradient(circle at 84% 20%, rgba(220, 226, 38, 0.1), transparent 36%),
+            rgba(0, 0, 0, 0.34);
+    }
+
+    .template-preview img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 260ms ease, filter 260ms ease;
+    }
+
+    .template-card:hover .template-preview img,
+    .template-card:focus-within .template-preview img {
+        transform: scale(1.035);
+        filter: saturate(1.05) contrast(1.02);
+    }
+
+    .template-preview-fallback {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.24);
+    }
+
+    .template-preview-badges {
+        position: absolute;
+        top: 0.75rem;
+        left: 0.75rem;
+        right: 0.75rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.55rem;
+        pointer-events: none;
+    }
+
+    .template-preview-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: 1.75rem;
+        padding: 0.43rem 0.58rem;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 9999px;
+        background: rgba(0, 0, 0, 0.58);
+        color: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(10px);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.54rem;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .template-preview-badge--personal {
+        border-color: rgba(137, 190, 50, 0.32);
+        color: var(--brand-green);
+        background: rgba(5, 12, 4, 0.72);
+    }
+
+    .template-content {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .template-title {
+        color: rgba(255, 255, 255, 0.96);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 900;
+        line-height: 1.32;
+        letter-spacing: 0.035em;
+        overflow-wrap: anywhere;
+    }
+
+    .template-description {
+        display: -webkit-box;
+        overflow: hidden;
+        margin-top: 0.55rem;
+        color: rgba(255, 255, 255, 0.48);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.76rem;
+        line-height: 1.55;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+    }
+
+    .template-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.9rem;
+    }
+
+    .template-meta-item {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.7rem;
+        padding: 0.38rem 0.52rem;
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.035);
+        color: rgba(255, 255, 255, 0.56);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.54rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .template-download {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        min-height: 2.72rem;
+        margin-top: auto;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid rgba(137, 190, 50, 0.32);
+        border-radius: 9999px;
+        background: rgba(137, 190, 50, 0.1);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.61rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .template-download-wrap {
+        margin-top: 1rem;
+        padding-top: 0.88rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .template-download:hover,
+    .template-download:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba(220, 226, 38, 0.52);
+        background: rgba(220, 226, 38, 0.14);
+        color: var(--brand-yellow);
+        outline: none;
+    }
+
+    .template-download--disabled {
+        cursor: not-allowed;
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.035);
+        color: rgba(255, 255, 255, 0.34);
+        pointer-events: none;
+    }
+
+    .templates-empty {
+        display: flex;
+        min-height: 19rem;
+        align-items: center;
+        justify-content: center;
+        border: 1px dashed rgba(137, 190, 50, 0.22);
+        border-radius: 1.3rem;
+        background:
+            radial-gradient(circle at 50% 5%, rgba(137, 190, 50, 0.09), transparent 38%),
+            rgba(4, 6, 5, 0.62);
+        padding: 1.25rem;
+        text-align: center;
+    }
+
+    .templates-empty-icon {
+        display: inline-flex;
+        width: 4.3rem;
+        height: 4.3rem;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        border-radius: 1.3rem;
+        background: rgba(137, 190, 50, 0.08);
+        color: var(--brand-green);
+        box-shadow: 0 0 28px rgba(137, 190, 50, 0.09);
+    }
+
+    .templates-empty-title {
+        margin-top: 1rem;
+        color: rgba(255, 255, 255, 0.94);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.92rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .templates-empty-copy {
+        max-width: 31rem;
+        margin: 0.6rem auto 0;
+        color: rgba(255, 255, 255, 0.48);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.8rem;
+        line-height: 1.62;
+    }
+
+    @media (max-width: 1100px) {
+        .templates-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 680px) {
+        .templates-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .templates-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .templates-back-link {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .templates-hero {
+            border-radius: 1.15rem;
+            padding: 1rem;
+        }
+
+        .template-card {
+            border-radius: 1.1rem;
+        }
+    }
+</style>
+
+<div class="templates-page">
+    <section class="templates-hero" aria-labelledby="templates-page-title">
+        <span class="templates-hero-topline">
+            <span class="templates-hero-dot"></span>
+            Fahrer-Templates
+        </span>
+
+        <h1 id="templates-page-title" class="templates-hero-title">Deine personalisierten EifelLog-Wallpaper</h1>
+
+        <p class="templates-hero-copy">
+            Hier findest du die für <strong class="text-white">{{ driver_name }}</strong> freigegebenen EifelLog-Wallpaper.
+            Jede verfügbare Datei wird automatisch für deinen Benutzer bereitgestellt und kann direkt heruntergeladen werden.
+        </p>
+
+        <div class="templates-hero-actions">
+            <span class="templates-pill">
+                <span class="templates-status-dot"></span>
+                Nutzer: <strong>{{ driver_name }}</strong>
+            </span>
+
+            <span class="templates-pill">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Verfügbar: <strong>{{ safe_templates|length }}</strong>
+            </span>
+        </div>
+    </section>
+
+    <div class="templates-toolbar">
+        <div>
+            <h2 class="templates-section-title">Wallpaper-Auswahl</h2>
+            <p class="templates-section-subtitle">Die Inhalte werden automatisch für deinen Benutzer geladen.</p>
+        </div>
+
+        <a href="/dashboard" class="templates-back-link" aria-label="Zurück zum Dashboard">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Dashboard
+        </a>
+    </div>
+
+    {% if safe_templates %}
+        <div class="templates-grid">
+            {% for template in safe_templates %}
+                {% if template is mapping %}
+                    {% set template_title = template.get('title', template.get('name', 'EifelLog Wallpaper')) %}
+                    {% set template_description = template.get('description', template.get('subtitle', '')) %}
+                    {% set template_preview_url = template.get('preview_url', template.get('banner_url', template.get('image_url', ''))) %}
+                    {% set template_download_url = template.get('download_url', template.get('personalized_download_url', '')) %}
+                    {% set template_filename = template.get('download_filename', template.get('filename', '')) %}
+                    {% set template_format = template.get('format', '') %}
+                    {% set template_resolution = template.get('resolution', '') %}
+                    {% set template_category = template.get('category', '') %}
+                    {% set template_updated_at = template.get('updated_at', '') %}
+                    {% set template_is_personalized = template.get('is_personalized', true) %}
+                {% else %}
+                    {% set template_title = template.title|default(template.name|default('EifelLog Wallpaper', true), true) %}
+                    {% set template_description = template.description|default(template.subtitle|default('', true), true) %}
+                    {% set template_preview_url = template.preview_url|default(template.banner_url|default(template.image_url|default('', true), true), true) %}
+                    {% set template_download_url = template.download_url|default(template.personalized_download_url|default('', true), true) %}
+                    {% set template_filename = template.download_filename|default(template.filename|default('', true), true) %}
+                    {% set template_format = template.format|default('', true) %}
+                    {% set template_resolution = template.resolution|default('', true) %}
+                    {% set template_category = template.category|default('', true) %}
+                    {% set template_updated_at = template.updated_at|default('', true) %}
+                    {% set template_is_personalized = template.is_personalized|default(true, true) %}
+                {% endif %}
+
+                <article class="template-card">
+                    <div class="template-preview">
+                        {% if template_preview_url %}
+                            <img src="{{ template_preview_url }}"
+                                 alt="Vorschau: {{ template_title }}"
+                                 loading="lazy"
+                                 decoding="async">
+                        {% else %}
+                            <div class="template-preview-fallback" aria-hidden="true">
+                                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                        {% endif %}
+
+                        <div class="template-preview-badges">
+                            {% if template_is_personalized %}
+                                <span class="template-preview-badge template-preview-badge--personal">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    Personalisiert
+                                </span>
+                            {% endif %}
+
+                            {% if template_category %}
+                                <span class="template-preview-badge">{{ template_category }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="template-content">
+                        <h3 class="template-title">{{ template_title }}</h3>
+
+                        {% if template_description %}
+                            <p class="template-description">{{ template_description }}</p>
+                        {% endif %}
+
+                        {% if template_format or template_resolution or template_updated_at %}
+                            <div class="template-meta">
+                                {% if template_format %}
+                                    <span class="template-meta-item">{{ template_format }}</span>
+                                {% endif %}
+
+                                {% if template_resolution %}
+                                    <span class="template-meta-item">{{ template_resolution }}</span>
+                                {% endif %}
+
+                                {% if template_updated_at %}
+                                    <span class="template-meta-item">Aktualisiert: {{ template_updated_at }}</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <div class="template-download-wrap">
+                            {% if template_download_url %}
+                                <a href="{{ template_download_url }}"
+                                   class="template-download"
+                                   {% if template_filename %}download="{{ template_filename }}"{% else %}download{% endif %}
+                                   aria-label="{{ template_title }} herunterladen">
+                                    <span>Wallpaper herunterladen</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                </a>
+                            {% else %}
+                                <span class="template-download template-download--disabled" aria-disabled="true">
+                                    <span>Download noch nicht verfügbar</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 8v4m0 4h.01M10.29 3.86l-7.82 13.55A2 2 0 004.2 20h15.6a2 2 0 001.73-2.99L13.71 3.86a2 2 0 00-3.42 0z"></path>
+                                    </svg>
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <section class="templates-empty" aria-label="Keine Wallpaper verfügbar">
+            <div>
+                <span class="templates-empty-icon">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </span>
+                <h3 class="templates-empty-title">Noch keine Wallpaper verfügbar</h3>
+                <p class="templates-empty-copy">
+                    Sobald personalisierte EifelLog-Wallpaper für deinen Benutzer bereitgestellt wurden,
+                    erscheinen sie automatisch an dieser Stelle. Es müssen keine Einträge in der HTML-Datei gepflegt werden.
+                </p>
+            </div>
+        </section>
+    {% endif %}
+</div>
+{% endblock %}
