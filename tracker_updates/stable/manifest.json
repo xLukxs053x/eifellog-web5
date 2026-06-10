@@ -3,15 +3,15 @@
   "channel": "stable",
   "releases": [
     {
-      "version": "1.2.3",
-      "name": "EifelLog Tracker 1.2.3",
-      "releaseNotes": "## 🚀 Neu in Version 1.2.3\n\n### 🎨 Design Overhaul\nDie Benutzeroberfläche wurde umfassend modernisiert und visuell überarbeitet.\n\n### 🛠️ Neues Personalisierungscenter\nPasse Farben, Hintergründe, Schriftarten, Layouts, Effekte und Benachrichtigungen individuell an.\n\n### 👀 Live-Vorschau\nÄnderungen am Login- und Dashboard-Design werden direkt in einer Vorschau dargestellt.\n\n### 📊 Telemetry Fixes\nFehlerbehebungen und Stabilitätsverbesserungen bei der Verarbeitung von Telemetriedaten.\n\n### ⚡ Allgemeine Verbesserungen\nWeitere kleinere Optimierungen für eine zuverlässigere und angenehmere Nutzung des Trackers.\n\n---\n\n💚 Entwickelt von **LukxsDE** mit 💚",
+      "version": "1.2.4",
+      "name": "EifelLog Tracker 1.2.4",
+      "releaseNotes": "## 🚀 Neu in Version 1.2.4\n\n### 🎨 Verbesserter Personalisierungsbereich\nDer Personalisierungsbereich wurde erweitert und verbessert. Einstellungen lassen sich jetzt noch übersichtlicher und komfortabler anpassen.\n\n### 🏠 Neue Auswahl für die Startansicht\nUnter **Start** kannst du jetzt festlegen, welche Ansicht beim Öffnen des Trackers angezeigt werden soll:\n\n- **Login**\n- **Dashboard**\n\n### 🔄 Neustart direkt oder später durchführen\nNach bestimmten Änderungen kannst du den Tracker direkt neu starten oder den Neustart auf später verschieben.\n\nWenn du **Später** auswählst, erscheint in der Titelleiste ein Symbol. Darüber kannst du den Neustart jederzeit nachholen.\n\n### 📥 Neues Tray-System\nDas Tray-System wurde neu hinzugefügt und verbessert die Bedienung des Trackers im Hintergrund.\n\n**Tray-Version:** `1.1.0`\n\n### ⚡ Allgemeine Verbesserungen\nWeitere kleinere Optimierungen sorgen für eine zuverlässigere und angenehmere Nutzung des Trackers.\n\n---\n\n💚 Entwickelt von **LukxsDE** mit 💚",
       "pageUrl": "https://www.eifellog.de/tracker/downloads",
       "draft": false,
       "prerelease": false,
       "assets": [
         {
-          "name": "EifelLog-Tracker-Setup-1.2.3.exe"
+          "name": "EifelLog-Tracker-Setup-1.2.4.exe"
         }
       ]
     }
