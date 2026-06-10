@@ -9,7 +9,8 @@
     - NEU: Blaues Tutorial-Alert, welches nur 1x pro User erscheint.
     - NEU: Tutorial-Status (Abgeschlossen / Ausstehend) landet sortiert nach Datum/Uhrzeit im Postfach.
     - NEU: Disposition-Schnellzugriff für Rolle 1473726639643820344 auf dispo.html.
-    - NEU: Servicecenter-Schnellzugriff über /servicecenter statt Mein-Profil-Kachel.
+    - Servicecenter-Schnellzugriff über /servicecenter ohne NEU-Badge.
+    - NEU: Fahrer-Templates-Schnellzugriff über /fahrer-templates mit NEU-Badge.
     - NEU: System-Postfach-Hinweis für alle User: Fahrerkarten jetzt verfügbar / beantragbar.
     - NEU: System-Postfach mit Aktiv-/Archiv-Ansicht, manueller Archivierung und automatischer Archivierung alter Dokumente.
     - NEU: Temporäre Pflichtunterweisung "Update & Wipe Info" vom 01.06.2026, 12:45 Uhr.
@@ -1533,6 +1534,191 @@
         }
     }
 
+
+    /* ---------------------------------------------------------
+       Schnellzugriff / Icon-System
+       - Einheitliche Icon-Flächen und Hover-Zustände für die kompakten Kacheln.
+       - Servicecenter ohne NEU-Badge.
+       - Fahrer-Templates als hervorgehobene neue Funktion.
+    --------------------------------------------------------- */
+    .quick-access-tile {
+        --quick-access-accent: rgba(255, 255, 255, 0.82);
+        --quick-access-accent-rgb: 255, 255, 255;
+        position: relative;
+        isolation: isolate;
+        min-height: 7.15rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.58rem;
+        overflow: hidden;
+        padding: 1rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(var(--quick-access-accent-rgb), 0.16);
+        background: rgba(255, 255, 255, 0.038);
+        text-align: center;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .quick-access-tile::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: radial-gradient(circle at 50% 0%, rgba(var(--quick-access-accent-rgb), 0.15), transparent 62%);
+        opacity: 0;
+        transition: opacity 180ms ease;
+        pointer-events: none;
+    }
+
+    .quick-access-tile:hover,
+    .quick-access-tile:focus-visible {
+        transform: translateY(-2px);
+        border-color: rgba(var(--quick-access-accent-rgb), 0.55);
+        background: rgba(var(--quick-access-accent-rgb), 0.10);
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24), 0 0 18px rgba(var(--quick-access-accent-rgb), 0.08);
+        outline: none;
+    }
+
+    .quick-access-tile:hover::before,
+    .quick-access-tile:focus-visible::before {
+        opacity: 1;
+    }
+
+    .quick-access-icon {
+        width: 2.7rem;
+        height: 2.7rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem;
+        color: var(--quick-access-accent);
+        border: 1px solid rgba(var(--quick-access-accent-rgb), 0.23);
+        background: rgba(var(--quick-access-accent-rgb), 0.095);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 0 18px rgba(var(--quick-access-accent-rgb), 0.07);
+    }
+
+    .quick-access-icon svg {
+        width: 1.35rem;
+        height: 1.35rem;
+        transition: transform 180ms ease;
+    }
+
+    .quick-access-tile:hover .quick-access-icon svg,
+    .quick-access-tile:focus-visible .quick-access-icon svg {
+        transform: scale(1.1);
+    }
+
+    .quick-access-label {
+        position: relative;
+        z-index: 2;
+        color: var(--text);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        line-height: 1.35;
+        text-transform: uppercase;
+    }
+
+    .quick-access-tile--green {
+        --quick-access-accent: var(--brand-green);
+        --quick-access-accent-rgb: 137, 190, 50;
+    }
+
+    .quick-access-tile--yellow {
+        --quick-access-accent: var(--brand-yellow);
+        --quick-access-accent-rgb: 220, 226, 38;
+    }
+
+    .quick-access-tile--blue {
+        --quick-access-accent: #7ba7ff;
+        --quick-access-accent-rgb: 123, 167, 255;
+    }
+
+    .quick-access-tile--discord {
+        --quick-access-accent: #8a94ff;
+        --quick-access-accent-rgb: 88, 101, 242;
+    }
+
+    .quick-access-tile--featured {
+        grid-column: 1 / -1;
+        min-height: 5.35rem;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.85rem;
+        padding: 0.95rem 1rem;
+        text-align: left;
+        border-color: rgba(220, 226, 38, 0.30);
+        background: linear-gradient(135deg, rgba(220, 226, 38, 0.11), rgba(137, 190, 50, 0.055));
+    }
+
+    .quick-access-tile--featured .quick-access-icon {
+        flex: 0 0 auto;
+    }
+
+    .quick-access-feature-copy {
+        min-width: 0;
+        padding-right: 3rem;
+    }
+
+    .quick-access-feature-copy .quick-access-label {
+        display: block;
+        color: #ffffff;
+    }
+
+    .quick-access-feature-copy small {
+        display: block;
+        margin-top: 0.28rem;
+        color: var(--muted);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+
+    .quick-access-badge {
+        position: absolute;
+        top: 0.72rem;
+        right: 0.72rem;
+        z-index: 3;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.28rem 0.48rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(0, 0, 0, 0.32);
+        background: var(--brand-yellow);
+        color: #090b08;
+        box-shadow: 0 0 12px rgba(220, 226, 38, 0.48);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.48rem;
+        font-weight: 950;
+        letter-spacing: 0.13em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    @media (max-width: 520px) {
+        .quick-access-tile {
+            min-height: 6.65rem;
+            padding: 0.82rem;
+        }
+
+        .quick-access-tile--featured {
+            min-height: 5.15rem;
+            padding: 0.82rem;
+        }
+
+        .quick-access-feature-copy {
+            padding-right: 2.75rem;
+        }
+
+        .quick-access-feature-copy small {
+            font-size: 0.68rem;
+        }
+    }
+
 </style>
 
 <div id="dashboard-responsive-shell" class="dashboard-responsive-shell">
@@ -2265,48 +2451,71 @@
                 </a>
                 {% endif %}
 
-                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Tour Eintragen</span>
+                <button type="button" class="quick-access-tile quick-access-tile--green group" aria-label="Tour eintragen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5h6m-6 4h6m-6 4h3m-5 8h10a2 2 0 002-2V7.5L14.5 3H7a2 2 0 00-2 2v14a2 2 0 002 2zm8-18v5h5M12 16v4m2-2h-4"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Tour eintragen</span>
                 </button>
 
-                <a href="/fuhrpark" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-yellow)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Fuhrpark</span>
+                <a href="/fuhrpark" class="quick-access-tile quick-access-tile--yellow group" aria-label="Fuhrpark öffnen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M3 7h11v9H3V7zm11 3h3.2L21 13.5V16h-7v-6zM6.5 19a2 2 0 100-4 2 2 0 000 4zm11 0a2 2 0 100-4 2 2 0 000 4zM3 16h1.5m4 0h7m4 0H21"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Fuhrpark</span>
                 </a>
 
-                <a href="/leaderboard" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-yellow)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8m-4-4v4m-5-17h10v5a5 5 0 01-10 0V4zM5 5H3v2a4 4 0 004 4m12-6h2v2a4 4 0 01-4 4"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Leaderboard</span>
+                <a href="/leaderboard" class="quick-access-tile quick-access-tile--yellow group" aria-label="Leaderboard öffnen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 21h8m-4-4v4m-4-4h8M7 4h10v4a5 5 0 01-10 0V4zm0 2H4v1a4 4 0 004 4m9-5h3v1a4 4 0 01-4 4"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Leaderboard</span>
                 </a>
 
-                <button class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#5865F2] hover:bg-[#5865F2]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[#5865F2] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Support</span>
+                <button type="button" class="quick-access-tile quick-access-tile--discord group" aria-label="Support öffnen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 14v-2a8 8 0 0116 0v2m-16 0a2 2 0 002 2h1v-5H6a2 2 0 00-2 2v1zm16 0a2 2 0 01-2 2h-1v-5h1a2 2 0 012 2v1zm-3 2c0 2-1.5 3-4 3h-1"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Support</span>
                 </button>
 
-                <a href="/servicecenter" class="p-4 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-center group relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <span class="absolute top-2 right-2 z-20 rounded-full bg-[var(--brand-yellow)] text-black border border-black/30 px-2 py-0.5 text-[8px] font-orbitron font-black uppercase tracking-widest shadow-[0_0_12px_rgba(220,226,38,0.55)]">Neu</span>
-                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 0L14.121 9.879m4.243-4.243L14.121 9.879m0 0a3 3 0 00-4.242 4.242m4.242-4.242L9.879 14.121m0 0l-4.243 4.243m4.243-4.243l-4.243 4.243"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider relative z-10">Servicecenter</span>
+                <a href="/servicecenter" class="quick-access-tile quick-access-tile--green group" aria-label="Servicecenter öffnen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M14.7 6.3a4 4 0 01-5 5L4 17v3h3l5.7-5.7a4 4 0 005-5l-2.4 2.4-3-3 2.4-2.4z"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Servicecenter</span>
                 </a>
 
-                <a href="/downloads" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
-                    <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                    </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Downloads</span>
+                <a href="/downloads" class="quick-access-tile quick-access-tile--green group" aria-label="Downloads öffnen">
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v11m0 0l4-4m-4 4l-4-4M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-label">Downloads</span>
+                </a>
+
+                <a href="/fahrer-templates" class="quick-access-tile quick-access-tile--yellow quick-access-tile--featured group" aria-label="Fahrer-Templates öffnen">
+                    <span class="quick-access-badge">Neu</span>
+                    <span class="quick-access-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 3h7l4 4v12a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M9 12h6m-6 4h6M4 7v12a2 2 0 002 2"></path>
+                        </svg>
+                    </span>
+                    <span class="quick-access-feature-copy">
+                        <span class="quick-access-label">Fahrer-Templates</span>
+                        <small>Vorlagen und Dokumente für Fahrer direkt öffnen.</small>
+                    </span>
                 </a>
             </div>
         </div>
@@ -2708,7 +2917,7 @@
                 <div class="hidden doc-data-content">
                     <p><strong>Fahrerkarten jetzt verfügbar / beantragbar</strong></p>
                     <p class="mt-4">Fahrerkarten können ab sofort über das Servicecenter beantragt werden.</p>
-                    <p class="mt-4">Nutze dafür den neuen Schnellzugriff <strong>Servicecenter</strong> im Dashboard oder öffne direkt die Route <strong>/servicecenter</strong>.</p>
+                    <p class="mt-4">Nutze dafür den Schnellzugriff <strong>Servicecenter</strong> im Dashboard oder öffne direkt die Route <strong>/servicecenter</strong>.</p>
                     <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
                         <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Servicecenter</p>
                         <a href="/servicecenter" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/25 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
