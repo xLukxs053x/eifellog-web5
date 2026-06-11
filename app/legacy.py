@@ -18636,6 +18636,148 @@ def require_dashboard_detail_access(error_message="Zugriff verweigert! Du benöt
     return None
 
 
+
+# ==========================================
+# FAHRER-TEMPLATES / PERSONALISIERTE WALLPAPER
+# ==========================================
+#
+# Die Route wird im Dashboard-Blueprint als GET /dashboard/fahrer-templates
+# registriert. Die Freigabe erfolgt serverseitig pro eingeloggtem Fahrer:
+# Es werden ausschließlich die im jeweiligen MongoDB-Benutzerdokument
+# hinterlegten Einträge ausgeliefert. In der HTML-Datei müssen daher keine
+# Wallpaper-Datensätze manuell gepflegt werden.
+#
+# Unterstützte Felder pro Datensatz:
+#   id, title, description, preview_url, download_url, download_filename,
+#   format, resolution, category, is_personalized, updated_at
+#
+# Als Übergang werden einige frühere Alias-Namen ebenfalls akzeptiert.
+
+
+def normalize_fahrer_template(template_doc, fallback_index=0):
+    """Normalisiert einen benutzerspezifischen Wallpaper-Datensatz fürs Template."""
+    if not isinstance(template_doc, dict):
+        return None
+
+    if template_doc.get("active") is False or template_doc.get("enabled") is False:
+        return None
+
+    template_id = safe_str(
+        template_doc.get("id")
+        or template_doc.get("template_id")
+        or template_doc.get("wallpaper_id")
+        or f"fahrer-template-{fallback_index}"
+    )
+    title = safe_str(
+        template_doc.get("title")
+        or template_doc.get("name")
+        or "EifelLog Wallpaper"
+    )
+    description = safe_str(
+        template_doc.get("description")
+        or template_doc.get("subtitle")
+    )
+    preview_url = safe_str(
+        template_doc.get("preview_url")
+        or template_doc.get("banner_url")
+        or template_doc.get("image_url")
+    )
+    download_url = safe_str(
+        template_doc.get("download_url")
+        or template_doc.get("personalized_download_url")
+    )
+    download_filename = safe_str(
+        template_doc.get("download_filename")
+        or template_doc.get("filename")
+    )
+
+    updated_at = template_doc.get("updated_at")
+    if isinstance(updated_at, datetime):
+        updated_at = updated_at.strftime("%d.%m.%Y")
+    else:
+        updated_at = safe_str(updated_at)
+
+    return {
+        "id": template_id,
+        "title": title,
+        "description": description,
+        "preview_url": preview_url,
+        "download_url": download_url,
+        "download_filename": download_filename,
+        "format": safe_str(template_doc.get("format")),
+        "resolution": safe_str(template_doc.get("resolution")),
+        "category": safe_str(template_doc.get("category")),
+        "is_personalized": template_doc.get("is_personalized", True) is not False,
+        "updated_at": updated_at,
+    }
+
+
+def get_fahrer_templates_for_user(user_doc):
+    """Liest nur die für diesen Fahrer hinterlegten Wallpaper aus MongoDB."""
+    user_doc = user_doc or {}
+    raw_templates = (
+        user_doc.get("fahrer_templates")
+        or user_doc.get("wallpaper_templates")
+        or user_doc.get("driver_templates")
+        or []
+    )
+
+    if not isinstance(raw_templates, list):
+        return []
+
+    templates = []
+    seen_keys = set()
+    for index, template_doc in enumerate(raw_templates, start=1):
+        template = normalize_fahrer_template(template_doc, fallback_index=index)
+        if not template:
+            continue
+
+        dedupe_key = (
+            safe_str(template.get("id"))
+            or safe_str(template.get("download_url"))
+            or safe_str(template.get("title"))
+        )
+        if dedupe_key and dedupe_key in seen_keys:
+            continue
+        if dedupe_key:
+            seen_keys.add(dedupe_key)
+
+        templates.append(template)
+
+    return templates
+
+
+def fahrer_templates():
+    """Zeigt die personalisierten Wallpaper des eingeloggten Fahrers."""
+    denied_response = require_dashboard_detail_access(
+        "Zugriff verweigert! Du benötigst eine anerkannte Rolle, um deine Fahrer-Templates zu öffnen."
+    )
+    if denied_response:
+        return denied_response
+
+    session_user = session.get("user") or {}
+    user_roles = session_user.get("roles", [])
+    discord_id = safe_str(session_user.get("id") or session_user.get("discord_id"))
+
+    db_user = users_collection.find_one({"discord_id": discord_id}) if discord_id else None
+    if not db_user:
+        db_user = dict(session_user)
+        if discord_id:
+            db_user["discord_id"] = discord_id
+
+    templates = get_fahrer_templates_for_user(db_user)
+
+    return render_template(
+        "fahrer_templates.html",
+        current_user=session_user,
+        user=session_user,
+        db_user=db_user,
+        primary_role_name=get_primary_role_name(user_roles),
+        fahrer_templates=templates,
+        wallpaper_templates=templates,
+    )
+
+
 def dashboard_detail():
     denied_response = require_dashboard_detail_access(
         "Zugriff verweigert! Du benötigst eine anerkannte Rolle, um die Fahrtenbuch-Details zu öffnen."
