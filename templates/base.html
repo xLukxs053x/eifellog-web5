@@ -643,6 +643,207 @@
             }
         }
 
+
+        /* === EIFEL LOG CAPTCHA === */
+        .eifel-captcha-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10002;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.86);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .eifel-captcha-modal.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .eifel-captcha-card {
+            position: relative;
+            width: min(560px, 100%);
+            overflow: hidden;
+            padding: 1.5rem;
+            border: 1px solid rgba(var(--brand-green-rgb), 0.42);
+            border-top-color: rgba(220, 226, 38, 0.46);
+            border-radius: 24px;
+            background: linear-gradient(145deg, rgba(16, 34, 21, 0.98), rgba(4, 10, 6, 0.99));
+            box-shadow: 0 30px 95px rgba(0, 0, 0, 0.76), 0 0 34px rgba(var(--brand-green-rgb), 0.12);
+        }
+
+        .eifel-captcha-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, transparent 0 49.5%, rgba(var(--brand-green-rgb), 0.06) 50%, transparent 50.5%),
+                linear-gradient(transparent 0 49.5%, rgba(var(--brand-green-rgb), 0.045) 50%, transparent 50.5%);
+            background-size: 36px 36px;
+            opacity: 0.6;
+        }
+
+        .eifel-captcha-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .eifel-captcha-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .eifel-captcha-kicker {
+            margin: 0;
+            color: var(--brand-green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+        }
+
+        .eifel-captcha-title {
+            margin: 0.45rem 0 0;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .eifel-captcha-close {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .eifel-captcha-close:hover {
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .eifel-captcha-intro {
+            margin: 0.8rem 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .eifel-captcha-manifest {
+            margin-top: 1.1rem;
+            padding: 1rem;
+            border: 1px dashed rgba(220, 226, 38, 0.42);
+            border-radius: 16px;
+            background: rgba(0, 0, 0, 0.32);
+        }
+
+        .eifel-captcha-manifest-label {
+            color: var(--brand-yellow);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .eifel-captcha-question {
+            margin: 0.65rem 0 0;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.55;
+        }
+
+        .eifel-captcha-field {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 13px;
+            outline: none;
+            background: rgba(0, 0, 0, 0.42);
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            letter-spacing: 0.1em;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .eifel-captcha-field:focus {
+            border-color: rgba(var(--brand-green-rgb), 0.78);
+            box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.12);
+        }
+
+        .eifel-captcha-field::placeholder {
+            color: rgba(147, 164, 200, 0.68);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            letter-spacing: 0;
+        }
+
+        .eifel-captcha-status {
+            min-height: 1.4rem;
+            margin: 0.7rem 0 0;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .eifel-captcha-status.is-error {
+            color: var(--danger);
+        }
+
+        .eifel-captcha-status.is-success {
+            color: var(--brand-green);
+        }
+
+        .eifel-captcha-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.65rem;
+            margin-top: 0.9rem;
+        }
+
+        .eifel-captcha-actions button:disabled {
+            cursor: wait;
+            opacity: 0.55;
+            transform: none !important;
+        }
+
+        @media (max-width: 640px) {
+            .eifel-captcha-card {
+                border-radius: 18px;
+            }
+
+            .eifel-captcha-actions {
+                flex-direction: column;
+            }
+        }
+
     </style>
 
     <script>
@@ -674,6 +875,9 @@
 
             // === SICHERHEITSSYSTEM INIT ===
             initSecuritySystem();
+
+            // === EIFEL LOG CAPTCHA INIT ===
+            initEifelCaptcha();
         });
 
         // Mobile Menü Toggle
@@ -809,6 +1013,223 @@
             document.documentElement.removeAttribute('data-cookie-consent');
             closeCookieDetails();
             showCookieBanner();
+        }
+
+
+        // === EIFEL LOG CAPTCHA ===
+        // Das Frontend zeigt ausschließlich die Challenge an. Erzeugung, Prüfung,
+        // Ablaufzeit und Einmal-Token müssen serverseitig in Flask umgesetzt werden.
+        const EIFEL_CAPTCHA_CHALLENGE_URL = '/api/captcha/challenge';
+        const EIFEL_CAPTCHA_VERIFY_URL = '/api/captcha/verify';
+
+        let eifelCaptchaPendingForm = null;
+        let eifelCaptchaChallengeId = null;
+        let eifelCaptchaBusy = false;
+
+        function initEifelCaptcha() {
+            const protectedForms = document.querySelectorAll('form[data-eifel-captcha="true"]');
+            const answerInput = document.getElementById('eifel-captcha-answer');
+            const modal = document.getElementById('eifel-captcha-modal');
+
+            protectedForms.forEach(form => {
+                form.addEventListener('submit', event => {
+                    // Beim zweiten Submit nach erfolgreicher Prüfung darf das Formular
+                    // normal an Flask gesendet werden.
+                    if (form.dataset.eifelCaptchaVerified === 'true') {
+                        delete form.dataset.eifelCaptchaVerified;
+                        return;
+                    }
+
+                    event.preventDefault();
+                    eifelCaptchaPendingForm = form;
+                    openEifelCaptcha();
+                });
+            });
+
+            if (answerInput) {
+                answerInput.addEventListener('keydown', event => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        verifyEifelCaptcha();
+                    }
+                });
+            }
+
+            if (modal) {
+                modal.addEventListener('click', event => {
+                    if (event.target === modal) {
+                        closeEifelCaptcha();
+                    }
+                });
+            }
+        }
+
+        async function openEifelCaptcha() {
+            const modal = document.getElementById('eifel-captcha-modal');
+            const answerInput = document.getElementById('eifel-captcha-answer');
+
+            if (!modal || !answerInput || eifelCaptchaBusy) return;
+
+            modal.classList.remove('is-hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+            answerInput.value = '';
+            setEifelCaptchaStatus('Sicherheitsfracht wird geladen ...');
+
+            await loadEifelCaptchaChallenge();
+        }
+
+        function closeEifelCaptcha() {
+            const modal = document.getElementById('eifel-captcha-modal');
+            const answerInput = document.getElementById('eifel-captcha-answer');
+
+            if (!modal || eifelCaptchaBusy) return;
+
+            modal.classList.add('is-hidden');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('overflow-hidden');
+            eifelCaptchaChallengeId = null;
+
+            if (answerInput) answerInput.value = '';
+        }
+
+        async function refreshEifelCaptcha() {
+            if (eifelCaptchaBusy) return;
+
+            const answerInput = document.getElementById('eifel-captcha-answer');
+            if (answerInput) answerInput.value = '';
+
+            setEifelCaptchaStatus('Neue Sicherheitsfracht wird geladen ...');
+            await loadEifelCaptchaChallenge();
+        }
+
+        async function loadEifelCaptchaChallenge() {
+            const question = document.getElementById('eifel-captcha-question');
+            const answerInput = document.getElementById('eifel-captcha-answer');
+
+            setEifelCaptchaBusy(true);
+
+            try {
+                const response = await fetch(EIFEL_CAPTCHA_CHALLENGE_URL, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok || !payload.challenge_id || !payload.prompt) {
+                    throw new Error(payload.error || 'Captcha konnte nicht geladen werden.');
+                }
+
+                eifelCaptchaChallengeId = payload.challenge_id;
+
+                if (question) question.textContent = payload.prompt;
+                setEifelCaptchaStatus(`Frachtbrief aktiv · gültig für ${payload.expires_in || 180} Sekunden`);
+
+                if (answerInput) {
+                    answerInput.disabled = false;
+                    answerInput.focus();
+                }
+            } catch (error) {
+                eifelCaptchaChallengeId = null;
+                if (question) question.textContent = 'Die Sicherheitsfracht konnte nicht geladen werden.';
+                if (answerInput) answerInput.disabled = true;
+                setEifelCaptchaStatus(error.message || 'Captcha konnte nicht geladen werden.', 'error');
+            } finally {
+                setEifelCaptchaBusy(false);
+            }
+        }
+
+        async function verifyEifelCaptcha() {
+            const answerInput = document.getElementById('eifel-captcha-answer');
+
+            if (!answerInput || !eifelCaptchaPendingForm || eifelCaptchaBusy) return;
+
+            const answer = answerInput.value.trim();
+
+            if (!eifelCaptchaChallengeId) {
+                setEifelCaptchaStatus('Bitte lade zuerst eine neue Sicherheitsfracht.', 'error');
+                return;
+            }
+
+            if (!answer) {
+                setEifelCaptchaStatus('Bitte trage die Lösung aus dem Frachtbrief ein.', 'error');
+                answerInput.focus();
+                return;
+            }
+
+            setEifelCaptchaBusy(true);
+            setEifelCaptchaStatus('Frachtbrief wird geprüft ...');
+
+            try {
+                const response = await fetch(EIFEL_CAPTCHA_VERIFY_URL, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        challenge_id: eifelCaptchaChallengeId,
+                        answer
+                    })
+                });
+
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok || !payload.success || !payload.token) {
+                    throw new Error(payload.error || 'Sicherheitsprüfung fehlgeschlagen.');
+                }
+
+                let tokenInput = eifelCaptchaPendingForm.querySelector('input[name="eifel_captcha_token"]');
+
+                if (!tokenInput) {
+                    tokenInput = document.createElement('input');
+                    tokenInput.type = 'hidden';
+                    tokenInput.name = 'eifel_captcha_token';
+                    eifelCaptchaPendingForm.appendChild(tokenInput);
+                }
+
+                tokenInput.value = payload.token;
+                eifelCaptchaPendingForm.dataset.eifelCaptchaVerified = 'true';
+                setEifelCaptchaStatus('Sicherheitsprüfung erfolgreich. Übermittlung läuft ...', 'success');
+
+                const verifiedForm = eifelCaptchaPendingForm;
+
+                setTimeout(() => {
+                    eifelCaptchaBusy = false;
+                    closeEifelCaptcha();
+                    verifiedForm.requestSubmit();
+                }, 450);
+            } catch (error) {
+                setEifelCaptchaStatus(error.message || 'Sicherheitsprüfung fehlgeschlagen.', 'error');
+                answerInput.select();
+                setEifelCaptchaBusy(false);
+            }
+        }
+
+        function setEifelCaptchaStatus(message, type = '') {
+            const status = document.getElementById('eifel-captcha-status');
+
+            if (!status) return;
+
+            status.textContent = message;
+            status.classList.toggle('is-error', type === 'error');
+            status.classList.toggle('is-success', type === 'success');
+        }
+
+        function setEifelCaptchaBusy(isBusy) {
+            eifelCaptchaBusy = isBusy;
+
+            const verifyButton = document.getElementById('eifel-captcha-verify');
+            const refreshButton = document.getElementById('eifel-captcha-refresh');
+
+            if (verifyButton) verifyButton.disabled = isBusy;
+            if (refreshButton) refreshButton.disabled = isBusy;
         }
 
 
@@ -1148,6 +1569,63 @@
                 <button type="button" onclick="acceptAllCookies()" class="btn-primary">
                     Alle akzeptieren
                 </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- EIFEL LOG CAPTCHA MODAL                    -->
+    <!-- Aktivierung: data-eifel-captcha="true"     -->
+    <!-- an das zu schützende <form> schreiben.     -->
+    <!-- ========================================== -->
+    <div id="eifel-captcha-modal" class="eifel-captcha-modal is-hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="eifel-captcha-title">
+        <div class="eifel-captcha-card">
+            <div class="eifel-captcha-content">
+                <div class="eifel-captcha-header">
+                    <div>
+                        <p class="eifel-captcha-kicker">Eifel LOG · Security Checkpoint</p>
+                        <h2 id="eifel-captcha-title" class="eifel-captcha-title">Sicherheitsfracht prüfen</h2>
+                    </div>
+
+                    <button type="button" onclick="closeEifelCaptcha()" class="eifel-captcha-close" aria-label="Captcha schließen">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <p class="eifel-captcha-intro">
+                    Bestätige kurz den digitalen Frachtbrief. Die Aufgabe wird serverseitig erzeugt und ist nur für eine begrenzte Zeit gültig.
+                </p>
+
+                <div class="eifel-captcha-manifest">
+                    <span class="eifel-captcha-manifest-label">Digitaler Frachtbrief · Kontrollfrage</span>
+                    <p id="eifel-captcha-question" class="eifel-captcha-question">Sicherheitsfracht wird geladen ...</p>
+                </div>
+
+                <label for="eifel-captcha-answer" class="sr-only">Lösung der Captcha-Aufgabe</label>
+                <input
+                    id="eifel-captcha-answer"
+                    class="eifel-captcha-field"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    maxlength="12"
+                    placeholder="Lösung aus dem Frachtbrief eingeben"
+                >
+
+                <p id="eifel-captcha-status" class="eifel-captcha-status" aria-live="polite"></p>
+
+                <div class="eifel-captcha-actions">
+                    <button id="eifel-captcha-refresh" type="button" onclick="refreshEifelCaptcha()" class="btn-secondary">
+                        Neue Fracht
+                    </button>
+
+                    <button id="eifel-captcha-verify" type="button" onclick="verifyEifelCaptcha()" class="btn-primary">
+                        Fracht freigeben
+                    </button>
+                </div>
             </div>
         </div>
     </div>
