@@ -10,7 +10,7 @@
     - NEU: Tutorial-Status (Abgeschlossen / Ausstehend) landet sortiert nach Datum/Uhrzeit im Postfach.
     - NEU: Disposition-Schnellzugriff für Rolle 1473726639643820344 auf dispo.html.
     - Servicecenter-Schnellzugriff über /servicecenter ohne NEU-Badge.
-    - NEU: Fahrer-Templates-Schnellzugriff über /fahrer-templates mit NEU-Badge.
+    - NEU: Fahrer-Templates-Schnellzugriff über /dashboard/fahrer-templates mit NEU-Badge.
     - NEU: System-Postfach-Hinweis für alle User: Fahrerkarten jetzt verfügbar / beantragbar.
     - NEU: System-Postfach mit Aktiv-/Archiv-Ansicht, manueller Archivierung und automatischer Archivierung alter Dokumente.
     - NEU: Temporäre Pflichtunterweisung "Update & Wipe Info" vom 01.06.2026, 12:45 Uhr.
@@ -2505,7 +2505,7 @@
                     <span class="quick-access-label">Downloads</span>
                 </a>
 
-                <a href="/fahrer-templates" class="quick-access-tile quick-access-tile--yellow quick-access-tile--featured group" aria-label="Fahrer-Templates öffnen">
+                <a href="{{ url_for('public.fahrer_templates') }}" class="quick-access-tile quick-access-tile--yellow quick-access-tile--featured group" aria-label="Fahrer-Templates öffnen">
                     <span class="quick-access-badge">Neu</span>
                     <span class="quick-access-icon" aria-hidden="true">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
