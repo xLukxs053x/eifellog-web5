@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from flask import Blueprint, Response, current_app, jsonify, request, session
+from flask_login import login_required
 
 from app import legacy as _legacy
 
@@ -244,6 +245,17 @@ def impressum(*args, **kwargs):
 def team(*args, **kwargs):
     """Delegiert kompatibel an app.legacy.team()."""
     return _legacy.team(*args, **kwargs)
+
+
+# ==========================================
+# GESCHÜTZTE DASHBOARD-SEITEN
+# ==========================================
+
+@public_bp.route("/dashboard/fahrer-templates", methods=["GET"])
+@login_required
+def fahrer_templates(*args, **kwargs):
+    """Zeigt die personalisierten Wallpaper des eingeloggten Fahrers."""
+    return _legacy.fahrer_templates(*args, **kwargs)
 
 
 # ==========================================
