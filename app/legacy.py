@@ -92,6 +92,180 @@ ensure_indexes()
 register_http_handlers(app)
 
 # ==========================================
+# EIFEL LOG CAPTCHA / SECURITY CHECKPOINT
+# ==========================================
+#
+# Die öffentlichen Challenge- und Verify-Endpunkte liegen im Public-Blueprint:
+#
+#   GET  /api/captcha/challenge
+#   POST /api/captcha/verify
+#
+# Nach erfolgreicher Prüfung speichert der Blueprint ausschließlich einen
+# kurzlebigen HMAC-Prüfwert in der Flask-Session und gibt dem Browser einen
+# Einmal-Token zurück. Dieses Legacy-Modul verbraucht den Token unmittelbar vor
+# einer geschützten Aktion. Die Klartext-Lösung wird weder hier noch in der
+# Browser-Session gespeichert.
+#
+# Login-Schutz ist standardmäßig aktiv. Zusätzliche HTML-Formulare werden erst
+# dann verpflichtend geprüft, wenn du sie im Template mit
+# data-eifel-captcha="true" markierst und die ENV-Option aktivierst.
+EIFEL_CAPTCHA_PASS_SESSION_KEY = "eifel_captcha_pass"
+EIFEL_CAPTCHA_LOGIN_REQUIRED = env_bool("EIFEL_CAPTCHA_LOGIN_REQUIRED", default=True)
+EIFEL_CAPTCHA_SENSITIVE_HTML_FORMS_REQUIRED = env_bool(
+    "EIFEL_CAPTCHA_SENSITIVE_HTML_FORMS_REQUIRED",
+    default=False,
+)
+
+
+def _eifel_captcha_secret_key_bytes():
+    """Liefert den zentralen Flask-SECRET_KEY als Bytes für HMAC-Prüfwerte."""
+    secret_key = app.config.get("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError(
+            "Flask SECRET_KEY fehlt. Setze FLASK_SECRET_KEY, bevor das "
+            "Eifel-LOG-Captcha verwendet wird."
+        )
+    if isinstance(secret_key, bytes):
+        return secret_key
+    return str(secret_key).encode("utf-8")
+
+
+def _eifel_captcha_hmac_digest(namespace, value):
+    """Erzeugt denselben HMAC-Prüfwert wie das Public-Blueprint."""
+    message = f"{namespace}:{value}".encode("utf-8")
+    return hmac.new(_eifel_captcha_secret_key_bytes(), message, hashlib.sha256).hexdigest()
+
+
+def eifel_captcha_request_token(data=None):
+    """Liest einen Captcha-Einmal-Token aus Formular, JSON, Query oder Header."""
+    data = data if isinstance(data, dict) else {}
+    token = (
+        request.form.get("eifel_captcha_token")
+        or data.get("eifel_captcha_token")
+        or data.get("eifelCaptchaToken")
+        or request.args.get("eifel_captcha_token")
+        or request.headers.get("X-EifelLog-Captcha-Token")
+        or ""
+    )
+    return str(token).strip()
+
+
+def consume_eifel_captcha(token=None, data=None):
+    """Verbraucht eine kurzlebige Captcha-Freigabe genau einmal.
+
+    Der Public-Blueprint legt nach erfolgreicher Antwort nur den Digest des
+    Tokens in der Session ab. Dieses Modul akzeptiert den zugehörigen Klartext-
+    Token aus der aktuellen Anfrage und entfernt die Freigabe unabhängig vom
+    Ergebnis. Ein Replay ist dadurch ausgeschlossen.
+    """
+    submitted_token = str(token or eifel_captcha_request_token(data=data)).strip()
+    grant = session.pop(EIFEL_CAPTCHA_PASS_SESSION_KEY, None)
+
+    if not submitted_token or not isinstance(grant, dict):
+        return False
+
+    try:
+        expires_at = int(grant.get("expires_at", 0))
+    except (TypeError, ValueError):
+        return False
+
+    if expires_at < int(time.time()):
+        return False
+
+    expected_digest = str(grant.get("token_digest", ""))
+    submitted_digest = _eifel_captcha_hmac_digest("captcha-pass", submitted_token)
+
+    return bool(expected_digest) and hmac.compare_digest(
+        expected_digest,
+        submitted_digest,
+    )
+
+
+def require_eifel_captcha_for_html(redirect_endpoint, **redirect_values):
+    """Prüft optionale sensible Browser-Formulare und liefert ggf. Redirect."""
+    if not EIFEL_CAPTCHA_SENSITIVE_HTML_FORMS_REQUIRED:
+        return None
+
+    if consume_eifel_captcha():
+        return None
+
+    flash(
+        "Sicherheitsprüfung fehlgeschlagen oder abgelaufen. Bitte versuche es erneut.",
+        "error",
+    )
+    return redirect(url_for(redirect_endpoint, **redirect_values))
+
+
+def require_eifel_captcha_for_json(data=None):
+    """Prüft optionale JSON-Aktionen und liefert ggf. eine JSON-Fehlerantwort."""
+    if not EIFEL_CAPTCHA_SENSITIVE_HTML_FORMS_REQUIRED:
+        return None
+
+    if consume_eifel_captcha(data=data):
+        return None
+
+    return jsonify({
+        "success": False,
+        "message": "Sicherheitsprüfung fehlgeschlagen oder abgelaufen. Bitte versuche es erneut.",
+    }), 403
+
+
+EIFEL_CAPTCHA_LOGIN_CHECKPOINT_TEMPLATE = r'''{% extends "base.html" %}
+
+{% block title %}Security Checkpoint · Eifel LOG{% endblock %}
+
+{% block content %}
+<section class="w-full max-w-2xl mx-auto flex-1 flex items-center justify-center py-8">
+    <div class="glass-card w-full p-7 md:p-10 relative overflow-hidden">
+        <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
+
+        <div class="relative">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-12 h-12 rounded-full border border-[var(--brand-green)]/45 bg-[var(--brand-green)]/10 flex items-center justify-center text-[var(--brand-green)] shadow-[0_0_20px_rgba(137,190,50,0.15)]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path>
+                    </svg>
+                </div>
+
+                <div>
+                    <p class="font-orbitron text-[9px] uppercase tracking-[0.22em] text-[var(--brand-green)]">Eifel LOG · Network Security</p>
+                    <h1 class="font-orbitron text-xl md:text-2xl uppercase tracking-widest text-[var(--text)] font-bold mt-1">Driver Hub Checkpoint</h1>
+                </div>
+            </div>
+
+            <p class="text-sm leading-relaxed text-[var(--muted)] mb-7">
+                Vor der Weiterleitung zum Discord-Login wird einmalig ein digitaler Frachtbrief geprüft.
+                Die Sicherheitsfreigabe ist kurzlebig und kann nur für diesen Anmeldevorgang verwendet werden.
+            </p>
+
+            <form method="get" action="{{ url_for('login') }}" data-eifel-captcha="true" class="space-y-4">
+                <input type="hidden" name="checkpoint" value="discord-login">
+
+                <button type="submit" class="btn-primary w-full justify-center">
+                    Sicherheitsprüfung starten
+                </button>
+            </form>
+
+            <a href="{{ url_for('hub') }}" class="btn-secondary w-full justify-center mt-3 no-fade">
+                Zurück zum Driver Hub
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+'''
+
+
+def render_eifel_captcha_login_checkpoint():
+    """Rendert den vorgeschalteten Captcha-Checkpoint für den Discord-Login."""
+    response = app.make_response(render_template_string(EIFEL_CAPTCHA_LOGIN_CHECKPOINT_TEMPLATE))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+# ==========================================
 # TRACKER-UPDATE-CDN / DESKTOP-UPDATER
 # ==========================================
 # Der Windows-Tracker lädt seine Channel-Manifeste und Update-Pakete ausschließlich
@@ -1827,6 +2001,8 @@ def wartung_api_token_matches(config=None):
 WARTUNG_PUBLIC_ENDPOINTS = {
     "api_discord_events",
     "api_discord_birthdays",
+    "eifel_captcha_challenge",
+    "eifel_captcha_verify",
     "home",
     "about",
     "team",
@@ -1837,6 +2013,8 @@ WARTUNG_PUBLIC_ENDPOINTS = {
 WARTUNG_PUBLIC_PATHS = {
     "/api/discord/events",
     "/api/discord/birthdays",
+    "/api/captcha/challenge",
+    "/api/captcha/verify",
     "/",
     "/index.html",
     "/about",
@@ -15309,6 +15487,24 @@ def login():
     # Auch im Wartungsmodus muss /login erreichbar bleiben, damit Discord nach dem
     # OAuth-Callback die Rollen prüfen kann. Nicht freigegebene Rollen werden in
     # callback() sauber blockiert.
+    #
+    # Der Eifel-LOG-Checkpoint ist vorgeschaltet: Ohne Token wird zunächst eine
+    # kleine GET-Formularseite gerendert. Das Captcha-Modal aus base.html ergänzt
+    # nach erfolgreicher Challenge einen kurzlebigen Einmal-Token als Query-Wert.
+    # Dadurch funktioniert der Schutz auch dann, wenn die Blueprint-Route /login
+    # ausschließlich GET akzeptiert.
+    if EIFEL_CAPTCHA_LOGIN_REQUIRED:
+        captcha_token = eifel_captcha_request_token()
+        if not captcha_token:
+            return render_eifel_captcha_login_checkpoint()
+
+        if not consume_eifel_captcha(token=captcha_token):
+            flash(
+                "Sicherheitsprüfung fehlgeschlagen oder abgelaufen. Bitte starte den Login erneut.",
+                "error",
+            )
+            return redirect(url_for("hub"))
+
     auth_url = (
         f"{OAUTH_URL}?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds%20guilds.members.read"
     )
@@ -16611,6 +16807,13 @@ def profile(username):
 
     if request.method == "POST":
         if not is_own_profile: abort(403)
+
+        captcha_error = require_eifel_captcha_for_html(
+            "profile",
+            username=profile_user.get("username") or username,
+        )
+        if captcha_error:
+            return captcha_error
 
         old_username = profile_user.get("username")
         new_username = normalize_username(request.form.get("username", old_username), fallback=old_username)
@@ -18939,6 +19142,10 @@ def bildungen_anmelden():
         flash("Zugriff verweigert.", "error")
         return redirect(url_for("home"))
 
+    captcha_error = require_eifel_captcha_for_html("bildungen")
+    if captcha_error:
+        return captcha_error
+
     submitted_csrf = safe_str(request.form.get("csrf_token"))
     stored_csrf = safe_str(session.get("_csrf_token"))
     if not submitted_csrf or not stored_csrf or not secrets.compare_digest(submitted_csrf, stored_csrf):
@@ -19302,6 +19509,10 @@ def servicecenter_fahrerkarte_beantragen():
     if not has_dashboard_permission(user_roles):
         flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um eine Fahrerkarte zu beantragen.", "error")
         return redirect(url_for("home"))
+
+    captcha_error = require_eifel_captcha_for_html("servicecenter")
+    if captcha_error:
+        return captcha_error
 
     discord_id = safe_str(user.get("id"))
     if not discord_id:
